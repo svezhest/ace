@@ -37,7 +37,7 @@ def curate(model, memory, r):
         memory.add(r["rule"], kind=kind)
 
 
-def bound(model, memory):
+def bound(model, memory, *_):
     for kind in ("tactical", "strategic"):
         same = [x for x in memory.records if x.kind == kind]
         for x in same[:-CAP]:

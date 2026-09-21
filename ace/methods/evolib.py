@@ -48,7 +48,7 @@ def curate(model, memory, insights):
         memory.add(text)
 
 
-def bound(model, memory):
+def bound(model, memory, *_):
     fit = lambda r: r.helpful / (r.helpful + r.harmful or 1)
     for r in list(memory.records):
         if r.helpful + r.harmful >= MIN_USES and fit(r) < MIN_RATE:

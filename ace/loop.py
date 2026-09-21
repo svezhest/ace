@@ -2,6 +2,7 @@
 
     вопрос -> inject(memory) -> решатель -> signal -> reflect -> curate -> bound -> memory
 """
+import copy
 import json
 import time
 from dataclasses import dataclass, field
@@ -31,7 +32,7 @@ class Method:
     inject: callable = lambda memory: memory.text()          # память -> текст в системный промпт
     reflect: callable = lambda model, trace, memory: None    # опыт -> дельта (любой объект или None)
     curate: callable = lambda model, memory, delta: None     # дельта -> правка памяти
-    bound: callable = lambda model, memory: None             # ограничение роста
+    bound: callable = lambda model, memory, task, method: None   # ограничение роста
     signal: str = "golden"                                   # golden | yes_no | none
     env: Env = field(default_factory=Env)                    # Env | Sandbox | Skills
     group: int = 0                                           # сколько сэмплов добавить к жадному ответу
@@ -68,16 +69,17 @@ def run(task, method, model, n=40, out=None, split=""):
         trace.group = [solve(model, task, memory, method, item, temperature=0.7) for _ in range(method.group)]
         delta = method.reflect(model, trace, memory)
         if delta:
+            memory.before = copy.deepcopy(memory.records)
             method.curate(model, memory, delta)
-            method.bound(model, memory)
+            method.bound(model, memory, task, method)
         traces.append(trace)
         if method.every and len(traces) % method.every == 0:
             method.batch(model, memory, traces[-method.every:])
         log.append(dict(i=i, target=trace.target, answer=trace.answer, correct=trace.correct,
                         finish="length" if trace.truncated else "stop", output=trace.output,
-                        used=trace.used, memory_chars=len(memory.text()), sec=round(time.time() - t0, 1)))
+                        used=trace.used, gated=memory.gated[-1:], memory_chars=len(method.inject(memory)), sec=round(time.time() - t0, 1)))
         print(f"{task.name} {method.name} {i:3} {'+' if trace.correct else '-'} "
-              f"{sum(r['correct'] for r in log)}/{i + 1} mem={len(memory.text())}", flush=True)
+              f"{sum(r['correct'] for r in log)}/{i + 1} mem={len(method.inject(memory))}", flush=True)
     summary = dict(task=task.name, method=method.name, model=model.name, n=len(log),
                    correct=sum(r["correct"] for r in log), truncated=sum(r["finish"] == "length" for r in log),
                    **model.usage())

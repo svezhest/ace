@@ -56,7 +56,7 @@ def curate(model, memory, lessons):
             memory.get(op["id"]).text = op["text"]
 
 
-def bound(model, memory):
+def bound(model, memory, *_):
     for r in list(memory.records):
         if r.harmful >= 3 and r.harmful > r.helpful:
             memory.drop(r.id)

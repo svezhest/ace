@@ -18,6 +18,8 @@ class Memory:
     records: list = field(default_factory=list)
     counter: int = 0
     used: list = field(default_factory=list)   # что решатель вызвал в текущей задаче
+    before: list = field(default_factory=list) # снимок до последней правки (для gate)
+    gated: list = field(default_factory=list)  # решения gate: принято / откачено
 
     def add(self, text, **fields):
         self.counter += 1

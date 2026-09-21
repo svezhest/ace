@@ -8,6 +8,7 @@
 """
 import json
 
+from .. import bound
 from ..env import Skills
 from ..loop import Method
 from .ace import parse_json
@@ -100,4 +101,5 @@ def apply(memory, op):
             memory.drop(r.id)
 
 
-proto = Method("proto", inject=inject, reflect=reflect, curate=curate, env=Skills())
+proto = Method("proto", inject=inject, reflect=reflect, curate=curate, env=Skills(),
+               bound=bound.chain(bound.budget(0.25), bound.gate()))
