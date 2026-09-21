@@ -31,8 +31,12 @@ Add only genuinely new and transferable bullets; update a bullet if a lesson ref
 
 
 def parse_json(text):
+    """Модель иногда ломает JSON; тогда считаем, что она ничего не сказала."""
     m = re.search(r"\{.*\}", text, re.S)
-    return json.loads(m.group(0)) if m else {}
+    try:
+        return json.loads(m.group(0)) if m else {}
+    except json.JSONDecodeError:
+        return {}
 
 
 def reflect(model, trace, memory):
