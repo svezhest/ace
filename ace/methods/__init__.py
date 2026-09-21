@@ -5,5 +5,6 @@ from .tfgrpo import tfgrpo
 from .scope import scope
 from .evolib import evolib
 from .mce import mce
+from .proto import proto
 
-METHODS = {m.name: m for m in [baseline, dc, ace, tfgrpo, scope, evolib, mce]}
+METHODS = {m.name: m for m in [baseline, dc, ace, tfgrpo, scope, evolib, mce, proto]}
