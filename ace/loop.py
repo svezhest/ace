@@ -4,7 +4,10 @@
 """
 import copy
 import json
+import os
+import random
 import time
+from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -36,6 +39,7 @@ class Method:
     signal: str = "golden"                                   # golden | yes_no | none
     env: Env = field(default_factory=Env)                    # Env | Sandbox | Skills
     group: int = 0                                           # сколько сэмплов добавить к жадному ответу
+    vote: bool = False                                       # ответ большинством по группе (self-consistency)
     every: int = 0                                           # батчевый сигнал: раз в every задач
     batch: callable = lambda model, memory, traces: None     # что делать с батчем трасс
 
@@ -61,12 +65,16 @@ def solve(model, task, memory, method, item, temperature=0):
 
 def run(task, method, model, n=40, out=None, split=""):
     items = task.load(split)[:n]
+    random.seed(int(os.getenv("SEED", 0)))
     memory = Memory()
     log, traces = [], []
     for i, item in enumerate(items):
         t0 = time.time()
         trace = solve(model, task, memory, method, item)
         trace.group = [solve(model, task, memory, method, item, temperature=0.7) for _ in range(method.group)]
+        if method.vote:
+            trace.answer = Counter(t.answer for t in [trace] + trace.group).most_common(1)[0][0]
+            trace.correct = task.check(trace.answer, trace.target)
         delta = method.reflect(model, trace, memory)
         if delta:
             memory.before = copy.deepcopy(memory.records)

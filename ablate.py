@@ -11,8 +11,11 @@ from ace.model import Model
 from ace.tasks import TASKS
 
 nobound = lambda *_: None
+PLACEBO = "\n".join(f"[r{i}] Read the question carefully and check units before answering." for i in range(1, 9))
 CHAIN = {
     "baseline": baseline,
+    "placebo": replace(baseline, inject=lambda memory: PLACEBO, reflect=lambda *_: True, curate=lambda model, memory, _: memory.records or memory.add("placebo")),
+    "sc3": replace(baseline, group=2, vote=True),
     "ace": ace,
     "catalog": replace(ace, inject=proto.inject, env=Skills()),                   # Inject: каталог вместо полной памяти
     "typed": replace(proto, bound=nobound, curate=ace.curate),                     # Store: типы, рефлексия по вызванным

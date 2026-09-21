@@ -18,11 +18,10 @@ Return JSON: {{"insights": ["..."]}}
 {attempts}"""
 
 SAMPLE, MIN_USES, MIN_RATE, CAP = 5, 4, 0.3, 30
-rng = random.Random(0)
 
 
 def inject(memory):
-    picked = rng.sample(memory.records, min(SAMPLE, len(memory.records)))
+    picked = random.sample(memory.records, min(SAMPLE, len(memory.records)))
     memory.used = [r.id for r in picked]
     return "\n".join(f"[{r.id}] {r.text}" for r in picked)
 

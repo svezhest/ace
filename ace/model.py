@@ -13,9 +13,9 @@ class Reply:
 
 
 class Model:
-    def __init__(self, name=None, max_tokens=4096, base_url=None):
+    def __init__(self, name=None, max_tokens=None, base_url=None):
         self.name = name or os.getenv("MODEL", "ornith15-9b")
-        self.max_tokens = max_tokens
+        self.max_tokens = max_tokens or int(os.getenv('MAX_TOKENS', 4096))
         self.client = OpenAI(base_url=base_url or os.getenv("LOCAL_BASE_URL", "http://localhost:8080/v1"),
                              api_key="local", timeout=3600, max_retries=8)
         self.calls = self.prompt_tokens = self.completion_tokens = 0
