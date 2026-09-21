@@ -17,6 +17,7 @@ class Record:
 class Memory:
     records: list = field(default_factory=list)
     counter: int = 0
+    used: list = field(default_factory=list)   # что решатель вызвал в текущей задаче
 
     def add(self, text, **fields):
         self.counter += 1
@@ -36,6 +37,10 @@ class Memory:
 
     def text(self):
         return "\n".join(f"[{r.id}] {r.text}" for r in self.records)
+
+    def catalog(self):
+        """Только имя и условие применения; тело по вызову."""
+        return "\n".join(f"[{r.id}] {r.when or r.text[:80]}" for r in self.records)
 
     def save(self, path):
         json.dump([asdict(r) for r in self.records], open(path, "w"), ensure_ascii=False, indent=1)

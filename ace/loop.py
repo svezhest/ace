@@ -7,6 +7,7 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from .env import Env
 from .memory import Memory
 from .tasks import final_answer
 
@@ -31,14 +32,26 @@ class Method:
     curate: callable = lambda model, memory, delta: None     # дельта -> правка памяти
     bound: callable = lambda model, memory: None             # ограничение роста
     signal: str = "golden"                                   # golden | yes_no | none
+    env: Env = field(default_factory=Env)                    # Env | Sandbox | Skills
 
 
 def solve(model, task, memory, method, item):
-    system = task.system + ("\n\nWhat you learned so far:\n" + method.inject(memory) if memory.records else "")
-    reply = model.one(system, f"{task.instr}\n\n{item['context']}")
+    """Диалог с решателем: пока среда отвечает на действия, продолжаем, не дольше env.rounds."""
+    system = task.system + method.env.hint
+    if memory.records:
+        system += "\n\nWhat you learned so far:\n" + method.inject(memory)
+    messages = [{"role": "user", "content": f"{task.instr}\n\n{item['context']}"}]
+    memory.used = []
+    for _ in range(method.env.rounds + 1):
+        reply = model.one(system, messages)
+        observation = method.env.act(reply.text, memory)
+        if observation is None:
+            break
+        messages += [{"role": "assistant", "content": reply.text}, {"role": "user", "content": observation}]
+    output = "\n\n".join(m["content"] for m in messages[1:]) + "\n\n" + reply.text if len(messages) > 1 else reply.text
     answer = final_answer(reply.text)
-    return Trace(item["context"], item["target"], reply.text, answer,
-                 task.check(answer, item["target"]), reply.truncated)
+    return Trace(item["context"], item["target"], output, answer,
+                 task.check(answer, item["target"]), reply.truncated, list(memory.used))
 
 
 def run(task, method, model, n=40, out=None, split=""):

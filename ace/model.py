@@ -21,10 +21,11 @@ class Model:
         self.calls = self.prompt_tokens = self.completion_tokens = 0
 
     def chat(self, system, user, temperature=0, n=1, json=False):
-        """-> list[Reply] длины n."""
+        """-> list[Reply] длины n. user: строка или готовый список сообщений."""
+        messages = user if isinstance(user, list) else [{"role": "user", "content": user}]
         r = self.client.chat.completions.create(
             model=self.name, temperature=temperature, n=n, max_tokens=self.max_tokens,
-            messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
+            messages=[{"role": "system", "content": system}] + messages,
             **({"response_format": {"type": "json_object"}} if json else {}))
         self.calls += 1
         self.prompt_tokens += r.usage.prompt_tokens
