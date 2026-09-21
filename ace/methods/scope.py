@@ -1,10 +1,12 @@
 """SCOPE: два потока правил. Тактические пишутся по каждой ошибке, стратегические — обобщения,
 которые синтезатор выделяет с высокой уверенностью. Оба потока ограничены по размеру."""
+from typing import Literal
+
+from pydantic import BaseModel
+
 from ..loop import Method
-from .ace import parse_json
 
 SYNTH = """The agent failed a task. Write one rule that would prevent this class of mistake next time.
-Return JSON: {{"rule": "...", "scope": "tactical" or "strategic", "confidence": 0.0-1.0}}
 "tactical" = specific to this kind of input; "strategic" = general principle for the whole task family.
 
 ## Task
@@ -22,19 +24,24 @@ Return JSON: {{"rule": "...", "scope": "tactical" or "strategic", "confidence": 
 CAP = 10
 
 
+class Rule(BaseModel):
+    rule: str
+    scope: Literal["tactical", "strategic"]
+    confidence: float
+
+
 def reflect(model, trace, memory):
     if trace.correct:
         return None
     error = f"wrong answer, expected {trace.target}" if not trace.truncated else "output truncated"
-    r = parse_json(model.one("You are a rule synthesizer.", SYNTH.format(
-        question=trace.question, output=trace.output, error=error, memory=memory.text() or "(empty)")).text)
-    return r if r.get("rule") else None
+    return model.run("You are a rule synthesizer.", SYNTH.format(
+        question=trace.question, output=trace.output, error=error, memory=memory.text() or "(empty)"), output=Rule).output
 
 
 def curate(model, memory, r):
-    kind = "strategic" if r.get("scope") == "strategic" and r.get("confidence", 0) >= 0.7 else "tactical"
-    if r["rule"] not in {x.text for x in memory.records}:
-        memory.add(r["rule"], kind=kind)
+    kind = "strategic" if r.scope == "strategic" and r.confidence >= 0.7 else "tactical"
+    if r.rule not in {x.text for x in memory.records}:
+        memory.add(r.rule, kind=kind)
 
 
 def bound(model, memory, *_):

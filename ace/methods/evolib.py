@@ -2,11 +2,11 @@
 записи накапливают успехи и провалы, слабые отбраковываются, инсайты рождаются на неудачах."""
 import random
 
+from pydantic import BaseModel
+
 from ..loop import Method
-from .ace import parse_json
 
 INSIGHT = """The attempts below failed. Write 1-2 short insights that would have led to the correct answer.
-Return JSON: {{"insights": ["..."]}}
 
 ## Task
 {question}
@@ -16,6 +16,10 @@ Return JSON: {{"insights": ["..."]}}
 
 ## Attempts
 {attempts}"""
+
+class Insights(BaseModel):
+    insights: list[str]
+
 
 SAMPLE, MIN_USES, MIN_RATE, CAP = 5, 4, 0.3, 30
 
@@ -36,10 +40,10 @@ def reflect(model, trace, memory):
                 rec.harmful += not t.correct
     if any(t.correct for t in attempts):
         return None
-    r = parse_json(model.one("You are a reflector.", INSIGHT.format(
-        question=trace.question, target=trace.target,
-        attempts="\n\n".join(t.output for t in attempts))).text)
-    return r.get("insights") or None
+    r = model.run("You are a reflector.", INSIGHT.format(
+        question=trace.question, target=trace.target, attempts="\n\n".join(t.output for t in attempts)),
+        output=Insights).output
+    return r.insights if r and r.insights else None
 
 
 def curate(model, memory, insights):
