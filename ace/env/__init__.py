@@ -8,7 +8,7 @@ import re
 from . import sandbox
 
 CODE = re.compile(r"```python\n(.*?)```\s*$", re.S)
-SKILL = re.compile(r"^USE SKILL:\s*(\S+)", re.M)
+SKILL = re.compile(r"^USE SKILL:\s*\[?(\w+)", re.M)
 
 
 class Env:
