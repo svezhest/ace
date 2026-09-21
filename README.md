@@ -3,7 +3,7 @@
 Стенд для сравнения методов агентного контекст-инжиниринга (ACE, Dynamic Cheatsheet, SCOPE, TF-GRPO, EvoLib, MCE) на одном цикле. Метод — набор функций `inject / reflect / curate / bound` плюс среда; абляция — замена одной из них.
 
 ```
-uv venv .venv && uv pip install -p .venv/bin/python openai
+uv venv .venv && uv pip install -p .venv/bin/python "pydantic-ai-slim[openai]"
 python ace/env/sandbox.py --build        # образ docker для исполнения кода
 python run.py formula ace 40             # результаты в results/formula40/ace/
 python ablate.py formula 40              # вся цепочка абляций, или список ступеней после N

@@ -1,40 +1,59 @@
-"""Клиент к OpenAI-совместимому gateway. Считает вызовы и токены."""
+"""Модель через pydantic-ai: один агент на вызов, tools и схема ответа передаются явно."""
 import os
+os.environ.setdefault("PYDANTIC_AI_NO_BANNER", "1")
 from dataclasses import dataclass
 
-from openai import OpenAI
+from pydantic_ai import Agent, UsageLimits
+from pydantic_ai.exceptions import UnexpectedModelBehavior, UsageLimitExceeded
+from pydantic_ai.messages import ModelResponse, TextPart, ToolCallPart, ToolReturnPart
+from pydantic_ai.models.openai import OpenAIChatModel
+from pydantic_ai.providers.openai import OpenAIProvider
 
 
 @dataclass
 class Reply:
-    text: str
-    tokens: int
+    output: object          # str или объект схемы; None, если модель не справилась
+    text: str               # вся траектория текстом: ответы, вызовы tools, их результаты
     truncated: bool
 
 
 class Model:
     def __init__(self, name=None, max_tokens=None, base_url=None):
         self.name = name or os.getenv("MODEL", "ornith15-9b")
-        self.max_tokens = max_tokens or int(os.getenv('MAX_TOKENS', 4096))
-        self.client = OpenAI(base_url=base_url or os.getenv("LOCAL_BASE_URL", "http://localhost:8080/v1"),
-                             api_key="local", timeout=3600, max_retries=8)
+        self.max_tokens = max_tokens or int(os.getenv("MAX_TOKENS", 4096))
+        self.llm = OpenAIChatModel(self.name, provider=OpenAIProvider(
+            base_url=base_url or os.getenv("LOCAL_BASE_URL", "http://localhost:8080/v1"), api_key="local"))
         self.calls = self.prompt_tokens = self.completion_tokens = 0
 
-    def chat(self, system, user, temperature=0, n=1, json=False):
-        """-> list[Reply] длины n. user: строка или готовый список сообщений."""
-        messages = user if isinstance(user, list) else [{"role": "user", "content": user}]
-        r = self.client.chat.completions.create(
-            model=self.name, temperature=temperature, n=n, max_tokens=self.max_tokens,
-            messages=[{"role": "system", "content": system}] + messages,
-            **({"response_format": {"type": "json_object"}} if json else {}))
-        self.calls += 1
-        self.prompt_tokens += r.usage.prompt_tokens
-        self.completion_tokens += r.usage.completion_tokens
-        per = r.usage.completion_tokens // max(n, 1)
-        return [Reply(c.message.content or "", per, c.finish_reason == "length") for c in r.choices]
+    def run(self, system, user, output=str, tools=(), deps=None, rounds=0, temperature=0):
+        agent = Agent(self.llm, system_prompt=system, output_type=output, tools=tools, retries=1)
+        try:
+            messages = agent.run_sync(user, deps=deps, usage_limits=UsageLimits(request_limit=rounds + 2),
+                                      model_settings={"temperature": temperature, "max_tokens": self.max_tokens})
+            result, messages = messages.output, messages.new_messages()
+        except (UsageLimitExceeded, UnexpectedModelBehavior) as e:
+            result, messages = None, getattr(e, "messages", []) or []
+        responses = [m for m in messages if isinstance(m, ModelResponse)]
+        self.calls += len(responses)
+        self.prompt_tokens += sum(m.usage.input_tokens for m in responses)
+        self.completion_tokens += sum(m.usage.output_tokens for m in responses)
+        return Reply(result, transcript(messages), any(m.finish_reason == "length" for m in responses))
 
-    def one(self, system, user, **kw):
-        return self.chat(system, user, **kw)[0]
+    def one(self, system, user, temperature=0):
+        return self.run(system, user, temperature=temperature)
 
     def usage(self):
         return dict(calls=self.calls, prompt_tokens=self.prompt_tokens, completion_tokens=self.completion_tokens)
+
+
+def transcript(messages):
+    lines = []
+    for m in messages:
+        for p in m.parts:
+            if isinstance(p, TextPart) and p.content:
+                lines.append(p.content)
+            elif isinstance(p, ToolCallPart):
+                lines.append(f"[call {p.tool_name}] {p.args_as_json_str()}")
+            elif isinstance(p, ToolReturnPart):
+                lines.append(f"[{p.tool_name}] {p.content}")
+    return "\n\n".join(lines)

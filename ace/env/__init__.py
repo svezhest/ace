@@ -1,46 +1,38 @@
-"""Среда решателя: что он может сделать между вопросом и ответом.
-
-Протокол текстовый, чтобы не зависеть от tool-calling конкретной модели:
-блок ```python ... ``` в конце ответа исполняется, `USE SKILL: name` возвращает тело записи.
-"""
-import re
+"""Среда решателя: tools, доступные между вопросом и ответом. deps каждого tool — Memory."""
+from pydantic_ai import RunContext
 
 from . import sandbox
-
-CODE = re.compile(r"```python\n(.*?)```\s*$", re.S)
-SKILL = re.compile(r"^USE SKILL:\s*\[?(\w+)", re.M)
+from ..memory import Memory
 
 
 class Env:
     """Пустая среда: ответ сразу."""
     rounds = 0
     hint = ""
+    tools = ()
 
-    def act(self, text, memory):
-        return None                          # None = действий нет, ответ окончательный
+
+def run_python(code: str) -> str:
+    """Run Python code in a sandbox and return its stdout and stderr."""
+    r = sandbox.run(code)
+    return f"[stdout]\n{r['stdout']}\n[stderr]\n{r['stderr']}".strip()
+
+
+def use_skill(ctx: RunContext[Memory], id: str) -> str:
+    """Read a memory entry in full by its id from the catalog."""
+    ctx.deps.used.append(id)
+    rec = ctx.deps.get(id)
+    return rec.text if rec else "no such entry"
 
 
 class Sandbox(Env):
     rounds = 3
-    hint = ("\nYou may run Python: end your message with a ```python block and wait for its output "
-            "before giving the final answer.")
-
-    def act(self, text, memory):
-        m = CODE.search(text)
-        if not m:
-            return None
-        r = sandbox.run(m.group(1))
-        return f"[stdout]\n{r['stdout']}\n[stderr]\n{r['stderr']}".strip()
+    hint = "\nYou may run Python with run_python before giving the final answer."
+    tools = (run_python,)
 
 
 class Skills(Env):
-    """Каталог в промпте, тело по вызову. Вызовы пишутся в memory.used."""
+    """Каталог в промпте, тело по вызову use_skill. Вызовы пишутся в memory.used."""
     rounds = 3
-    hint = "\nTo read a memory entry in full write a line `USE SKILL: <id>` and wait."
-
-    def act(self, text, memory):
-        ids = SKILL.findall(text)
-        if not ids:
-            return None
-        memory.used += ids
-        return "\n\n".join(f"[{i}] {memory.get(i).text if memory.get(i) else 'no such entry'}" for i in ids)
+    hint = "\nYou may read any catalog entry in full with use_skill(id)."
+    tools = (use_skill,)
