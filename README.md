@@ -6,7 +6,10 @@
 uv venv .venv && uv pip install -p .venv/bin/python openai
 python ace/env/sandbox.py --build        # образ docker для исполнения кода
 python run.py formula ace 40             # результаты в results/formula40/ace/
+python ablate.py formula 40              # вся цепочка абляций, или список ступеней после N
+python report.py                         # таблица по results/
 python ace/tasks.py meb results/meb40/ace/log.json   # переоценить лог
 ```
 
-Модель: любой OpenAI-совместимый endpoint (`LOCAL_BASE_URL`, `MODEL`).
+Методы: baseline, dc, ace, scope, tfgrpo, evolib, mce, proto (`ace/methods/`). Ступени абляции в `ablate.py`.
+Окружение: `LOCAL_BASE_URL`, `MODEL`, `MAX_TOKENS` (MEB: 8192), `SEED`.
