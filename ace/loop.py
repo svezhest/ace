@@ -22,6 +22,7 @@ class Trace:
     correct: bool
     truncated: bool
     used: list = field(default_factory=list)   # id записей, которые решатель вызвал
+    group: list = field(default_factory=list)  # сэмплированные попытки того же вопроса (групповой сигнал)
 
 
 @dataclass
@@ -33,9 +34,10 @@ class Method:
     bound: callable = lambda model, memory: None             # ограничение роста
     signal: str = "golden"                                   # golden | yes_no | none
     env: Env = field(default_factory=Env)                    # Env | Sandbox | Skills
+    group: int = 0                                           # сколько сэмплов добавить к жадному ответу
 
 
-def solve(model, task, memory, method, item):
+def solve(model, task, memory, method, item, temperature=0):
     """Диалог с решателем: пока среда отвечает на действия, продолжаем, не дольше env.rounds."""
     system = task.system + method.env.hint
     if memory.records:
@@ -43,7 +45,7 @@ def solve(model, task, memory, method, item):
     messages = [{"role": "user", "content": f"{task.instr}\n\n{item['context']}"}]
     memory.used = []
     for _ in range(method.env.rounds + 1):
-        reply = model.one(system, messages)
+        reply = model.one(system, messages, temperature=temperature)
         observation = method.env.act(reply.text, memory)
         if observation is None:
             break
@@ -61,6 +63,7 @@ def run(task, method, model, n=40, out=None, split=""):
     for i, item in enumerate(items):
         t0 = time.time()
         trace = solve(model, task, memory, method, item)
+        trace.group = [solve(model, task, memory, method, item, temperature=0.7) for _ in range(method.group)]
         delta = method.reflect(model, trace, memory)
         if delta:
             method.curate(model, memory, delta)
