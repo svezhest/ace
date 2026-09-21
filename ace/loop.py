@@ -35,6 +35,8 @@ class Method:
     signal: str = "golden"                                   # golden | yes_no | none
     env: Env = field(default_factory=Env)                    # Env | Sandbox | Skills
     group: int = 0                                           # сколько сэмплов добавить к жадному ответу
+    every: int = 0                                           # батчевый сигнал: раз в every задач
+    batch: callable = lambda model, memory, traces: None     # что делать с батчем трасс
 
 
 def solve(model, task, memory, method, item, temperature=0):
@@ -59,7 +61,7 @@ def solve(model, task, memory, method, item, temperature=0):
 def run(task, method, model, n=40, out=None, split=""):
     items = task.load(split)[:n]
     memory = Memory()
-    log = []
+    log, traces = [], []
     for i, item in enumerate(items):
         t0 = time.time()
         trace = solve(model, task, memory, method, item)
@@ -68,6 +70,9 @@ def run(task, method, model, n=40, out=None, split=""):
         if delta:
             method.curate(model, memory, delta)
             method.bound(model, memory)
+        traces.append(trace)
+        if method.every and len(traces) % method.every == 0:
+            method.batch(model, memory, traces[-method.every:])
         log.append(dict(i=i, target=trace.target, answer=trace.answer, correct=trace.correct,
                         finish="length" if trace.truncated else "stop", output=trace.output,
                         used=trace.used, memory_chars=len(memory.text()), sec=round(time.time() - t0, 1)))
