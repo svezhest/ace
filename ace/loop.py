@@ -11,9 +11,18 @@ from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from pydantic import BaseModel
+
 from .env import Env
 from .memory import Memory
 from .tasks import final_answer
+
+
+class Answer(BaseModel):
+    """Ответ с самоотчётом: какие записи памяти пригодились (ACE bullet_ids)."""
+    reasoning: str
+    bullet_ids: list[str] = []
+    final_answer: str
 
 
 @dataclass
@@ -39,6 +48,7 @@ class Method:
     curate: callable = lambda model, memory, delta: None     # дельта -> правка памяти
     bound: callable = lambda model, memory, task, method: None   # ограничение роста
     signal: str = "golden"                                   # golden | yes_no | none
+    used_from: str = "none"                                  # откуда известно, что решатель прочёл: env (tool read) | self (самоотчёт в ответе) | none
     env: Env = field(default_factory=Env)                    # Env | Sandbox | Skills
     group: int = 0                                           # сколько сэмплов добавить к жадному ответу
     vote: bool = False                                       # ответ большинством по группе (self-consistency)
@@ -52,9 +62,16 @@ def solve(model, task, memory, method, item, temperature=0, hint=""):
     if memory.records:
         system += "\n\nWhat you learned so far:\n" + method.inject(memory)
     memory.used = []
-    r = model.run(system, f"{task.instr}\n\n{item['context']}", tools=method.env.tools, deps=memory,
-                  rounds=method.env.rounds, temperature=temperature)
-    answer = final_answer(r.output or "")
+    if method.used_from == "self" and memory.records:
+        system += "\n\nIn bullet_ids list the ids of the memory bullets you actually relied on."
+    r = model.run(system, f"{task.instr}\n\n{item['context']}", tools=method.env.tools, deps=method.env.deps(memory),
+                  rounds=method.env.rounds, temperature=temperature,
+                  output=Answer if method.used_from == "self" else str)
+    if isinstance(r.output, Answer):
+        memory.used = [i for i in r.output.bullet_ids if memory.get(i)]
+        answer = r.output.final_answer
+    else:
+        answer = final_answer(r.output or "")
     return Trace(item["context"], item["target"], r.text, answer,
                  task.check(answer, item["target"]), r.truncated, list(memory.used), r.steps)
 

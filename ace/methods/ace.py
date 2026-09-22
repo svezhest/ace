@@ -4,6 +4,7 @@ from typing import Literal
 from pydantic import BaseModel
 from pydantic_ai import RunContext
 
+from .. import fs
 from ..loop import Method
 from ..memory import Memory
 
@@ -23,8 +24,8 @@ that would help solve similar tasks. Also name the memory bullets that helped an
 ## Memory bullets available during the attempt
 {memory}"""
 
-CURATE = """Merge the lessons into memory using the tools: add a bullet only if it is genuinely new and transferable,
-update a bullet if a lesson refines it. Do nothing for duplicates. When done, reply "done".
+CURATE = """Merge the lessons into memory using the tools: create a bullet in memory/ only if it is genuinely new and transferable,
+edit a bullet (read it first) if a lesson refines it. Do nothing for duplicates. When done, reply "done".
 
 ## Lessons
 {lessons}
@@ -87,7 +88,9 @@ def curate(mode="tools"):
         shown = lessons if isinstance(lessons, str) else "\n".join(f"- {l}" for l in lessons)
         prompt = CURATE.format(lessons=shown, memory=memory.text() or "(empty)")
         if mode == "tools":
-            model.run("You are a curator.", prompt, tools=(add, update), deps=memory, rounds=4)
+            files = "\n".join(f"memory/{r.id}: {r.text}" for r in memory.records) or "(empty)"
+            model.run("You are a curator.", CURATE.format(lessons=shown, memory=files),
+                      tools=fs.TOOLS, deps=fs.FS({"memory": fs.Mount(memory)}), rounds=6)
         elif mode == "json":
             r = model.run("You are a curator.", prompt.replace("using the tools", "as a list of ADD/UPDATE operations"),
                           output=Ops).output
@@ -113,3 +116,19 @@ def bound(model, memory, *_):
 
 
 ace = Method("ace", reflect=reflect(), curate=curate(), bound=bound)
+
+
+def propose_add(model, memory, lessons):
+    """Куратор апстрима: только ADD, применяет код (счётчики уже поставил reflect по меткам)."""
+    shown = lessons if isinstance(lessons, str) else "\n".join(f"- {l}" for l in lessons)
+    r = model.run("You are a curator.", CURATE.format(lessons=shown, memory=memory.text() or "(empty)")
+                  .replace("using the tools", "as a list of ADD operations"), output=Ops).output
+    for op in (r.ops if r else []):
+        if op.op == "ADD" and op.text.strip():
+            memory.add(op.text.strip())
+
+
+# ACE как в апстриме: самоотчёт bullet_ids, куратор только добавляет, grow-and-refine по эмбеддингам
+from .. import bound as bounds
+ace_exact = Method("ace_exact", reflect=reflect(), curate=propose_add, used_from="self",
+                   bound=bounds.chain(bounds.dedup(), bound))
