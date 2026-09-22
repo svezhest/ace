@@ -11,5 +11,5 @@ python report.py                         # таблица по results/
 python ace/tasks.py meb results/meb40/ace/log.json   # переоценить лог
 ```
 
-Методы: baseline, dc, ace, scope, tfgrpo, evolib, mce, proto (`ace/methods/`). Ступени абляции в `ablate.py`.
+Методы: baseline, dc, dc_rs, ace, scope, scope_k2, tfgrpo, evolib, mce, proto (`ace/methods/`). Retrieval-варианты считают эмбеддинги BGE-M3 (`ace/embed.py`). Ступени абляции в `ablate.py`.
 Окружение: `LOCAL_BASE_URL`, `MODEL`, `MAX_TOKENS` (MEB: 8192), `SEED`.
