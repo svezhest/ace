@@ -1,11 +1,25 @@
 """Элемент 2. Инжект: как память доходит до решателя.
 
 Вариант: inject(model, memory, item) -> View. View это текст в системный промпт и, если память
-читается по вызову, инструменты чтения. Память инжект не меняет. Вариант с инструментами
-помечен reads = True: только он может дать сигнал «что решатель прочёл»."""
-from dataclasses import dataclass, field
+читается по вызову, инструменты чтения. Память инжект не меняет.
+
+Инжект собирается из блоков:
+    show(kinds, pick, line | layout, before, after, empty, head)   какие записи и как они выглядят
+        pick     какие из записей видов: все, topk по эмбеддингу, sample по весу, where по условию
+        line     строка записи; layout — весь текст из записей (группы с заголовками, пары)
+    choose((p, inject), ...)     одно случайное число выбирает ветку (EvoLib: skills, insights или ничего)
+    concat(inject, ...)          несколько блоков подряд (SCOPE: strategic, затем tactical)
+    synth(inject, prompt, ...)   модель переписывает показанное под вопрос (DC-RS)
+    fixed(text), catalog(...)    плацебо; каталог с чтением тел по read(path)
+
+При перспективах (SCOPE K=2) у попытки item["perspective"], и show берёт виды с этим суффиксом.
+Вариант с инструментами помечен reads = True: только он может дать сигнал «что решатель прочёл»."""
+import random
+from dataclasses import dataclass, field, replace
 
 from . import embed, fs
+
+HEAD = "What you learned so far:\n"
 
 
 @dataclass
@@ -15,27 +29,80 @@ class View:
     tools: tuple = ()                           # чтение памяти по вызову
     fs: object = None                           # FS, к которой привязаны инструменты
     rounds: int = 0                             # сколько лишних шагов агенту на чтение
-    head: str = "What you learned so far:\n"     # заголовок перед text; у методов со своей формулировкой пуст
+    head: str = HEAD                            # заголовок перед text; у методов со своей формулировкой пуст
+
+# строка записи
 
 
-def numbered(records):
-    return "\n".join(f"[{r.id}] {r.text}" for r in records)
+def plain(r):
+    return r.text
 
 
-def dashed(records):
-    return "\n".join(f"- {r.text}" for r in records)
+def dashed(r):
+    return f"- {r.text}"
 
 
-def plain(records):
-    return "\n\n".join(r.text for r in records)
+def numbered(r):
+    return f"[{r.id}] {r.text}"
 
 
-def full(render=numbered, kinds=()):
-    """Все записи указанных видов целиком."""
+def counted(r):
+    return f"[{r.id}] helpful={r.helpful} harmful={r.harmful} :: {r.text}"
+
+# какие записи
+
+
+def topk(k, key=lambda r: r.text):
+    """k ближайших к вопросу по эмбеддингу, от самой близкой; близость в копии записи, meta["score"]."""
+    def pick(records, item):
+        sims = embed.embed([key(r) for r in records]) @ embed.embed([item["context"]])[0]
+        return [replace(records[i], meta={**records[i].meta, "score": float(sims[i])}) for i in sims.argsort()[::-1][:k]]
+    return pick
+
+
+def sample(k, weight):
+    """k записей с возвращением, с вероятностью по весу."""
+    def pick(records, item):
+        return random.choices(records, [weight(r) for r in records], k=min(len(records), k))
+    return pick
+
+
+def where(test):
+    return lambda records, item: [r for r in records if test(r, item)]
+
+
+def by_group(line, order=(), header="## {}", sep="\n\n", title=str):
+    """Записи под заголовками по полю group. order — пары (группа, заголовок), показываются все,
+    даже пустые; без order группы идут по первому появлению."""
+    def layout(records):
+        groups = list(order) or [(g, title(g)) for g in dict.fromkeys(r.group for r in records)]
+        return sep.join("\n".join([header.format(t)] + [line(r) for r in records if r.group == g]) for g, t in groups)
+    return layout
+
+# сборка
+
+
+def kinds_of(kinds, item):
+    p = (item or {}).get("perspective", "")
+    return tuple(f"{k}:{p}" for k in kinds) if p and kinds else kinds
+
+
+def show(kinds=(), pick=None, line=numbered, sep="\n", layout=None, before="", after="", empty=None, head=HEAD):
+    """Записи видов kinds (все, если не заданы). empty: текст при пустой выборке, иначе в промпт ничего."""
     def inject(model, memory, item):
-        recs = memory.of(*kinds)
-        return View(render(recs), [r.id for r in recs])
+        recs = memory.of(*kinds_of(kinds, item))
+        if pick and recs:
+            recs = pick(recs, item)
+        if not recs:
+            return View(empty, head=head) if empty is not None else View()
+        body = layout(recs) if layout else sep.join(line(r) for r in recs)
+        return View(before + body + after, [r.id for r in recs], head=head)
     return inject
+
+
+def full(line=numbered, kinds=(), sep="\n"):
+    """Все записи видов kinds целиком."""
+    return show(kinds, line=line, sep=sep)
 
 
 def fixed(text):
@@ -43,12 +110,36 @@ def fixed(text):
     return lambda model, memory, item: View(text)
 
 
-def topk(k, render=numbered, kinds=()):
-    """Только k записей, ближайших по эмбеддингу к вопросу."""
+def choose(*branches):
+    """branches: (накопленная вероятность, inject). Первая ветка, чей порог выше случайного числа и чей
+    показ не пуст; иначе ничего (EvoLib: пустая библиотека skills отдаёт ход insights)."""
     def inject(model, memory, item):
-        recs = memory.of(*kinds)
-        picked = [recs[i] for i in embed.top(item["context"], [r.text for r in recs], k)]
-        return View(render(picked), [r.id for r in picked])
+        p = random.random()
+        for bound, branch in branches:
+            if p < bound:
+                view = branch(model, memory, item)
+                if view.shown:
+                    return view
+        return View()
+    return inject
+
+
+def concat(*injects, sep=""):
+    def inject(model, memory, item):
+        views = [v for v in (i(model, memory, item) for i in injects) if v.text]
+        if not views:
+            return View()
+        return View(sep.join(v.text for v in views), [i for v in views for i in v.shown], head=views[0].head)
+    return inject
+
+
+def synth(base, prompt, fields, parse, max_tokens=2):
+    """Модель переписывает показанное base под вопрос: fields(view, memory, item) -> поля промпта,
+    parse(ответ) -> текст или None (тогда решатель видит сам base). max_tokens — доля от бюджета модели."""
+    def inject(model, memory, item):
+        view = base(model, memory, item)
+        out = parse(model.one("", prompt.fill(fields(view, memory, item)), max_tokens=max_tokens * model.max_tokens).text)
+        return replace(view, text=out if out is not None else view.text)
     return inject
 
 
@@ -62,7 +153,7 @@ def catalog(always=(), listed=()):
             return View()
         text = ""
         if always:
-            text += "Rules:\n" + (dashed(rules) or "(none)") + "\n\n"
+            text += "Rules:\n" + ("\n".join(dashed(r) for r in rules) or "(none)") + "\n\n"
         skills = fs.FS({"skills": fs.Mount(memory, listed, "ro", track=True)})
         text += "Entries you can read with read(path):\n" + fs.listing(skills, "skills")
         return View(text, [r.id for r in rules], fs.READ_TOOLS, skills, rounds=3)

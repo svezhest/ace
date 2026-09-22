@@ -7,10 +7,23 @@
 | память | виды записей и разрешённые операции | `ace/memory.py` |
 | инжект | что из памяти видит решатель | `ace/inject.py` |
 | сигнал | что после попытки возвращается в систему | `ace/feedback.py` |
-| обновление | reflect, curate, bound, раз в every задач | `ace/update.py` |
-| решатель | среда задачи, число попыток, голосование, перспективы | `ace/loop.py` |
+| обновление | reflect, curate, bound, раз в every задач | `ace/update.py`, `reflect.py`, `curate.py`, `bound.py` |
+| решатель | среда задачи, число попыток, температура, голосование, перспективы, формат ответа | `ace/loop.py` |
+
+Метод — сборка из блоков плюс промпты апстрима файлами (`ace/methods/prompts/`, `ace/prompts.py`):
+
+| Где | Блоки |
+|---|---|
+| память | схема вид -> операции; `Kind(ops, per="task")` — записи на одну задачу; поле `group` (раздел, домен) |
+| инжект | `show(kinds, pick, line/layout, before, empty, head)`; pick: `topk`, `sample`, `where`; `by_group`; `choose`, `concat`, `synth`, `fixed`, `catalog` |
+| сигнал | `Feedback(verdict: golden / yes_no / judge / majority / none, usage: env / self / none)` |
+| общие | `ask` (вызов модели по промпту), `seq`, `when`, `maybe`, `retry` |
+| reflect | `keep`, `rounds`, `per_step`, `perspectives`, `best_of`, `each_attempt`, `log_gain`, `future_gain` |
+| curate | `each`, `per_lesson`, `count`, `add`, `apply_ops`, `remember`, `rewrite`, `tools`, `admit`, `limit`, `consolidate`, `duplicate_words` |
+| bound | `prune`, `budget`, `gate`, `merge_similar`, `best_by_val`, `chain`; `optimize` SCOPE |
 
 Абляция это замена одной части: `swap(ace, inject=inject.catalog())` или `swap(ace, curate=...)`.
+Новый метод — новая сборка; если блока не хватает, существующий делится на два.
 
 ```
 uv venv .venv && uv pip install -p .venv/bin/python "pydantic-ai-slim[openai]"

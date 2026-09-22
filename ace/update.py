@@ -1,12 +1,16 @@
 """Элемент 4. Обновление: как сигнал становится правкой памяти. Память меняет только оно.
 
-    reflect(ctx, episode, memory) -> дельта или None     память не трогает
-    curate(ctx, memory, deltas)                           применяет накопленные дельты раз в every задач прохода
-    bound(ctx, memory, before)                            ограничение после правки; before = память до неё
+    reflect(ctx, episode, memory) -> дельта или None     память не трогает              reflect.py
+    curate(ctx, memory, deltas)                           применяет дельты раз в every     curate.py
+    bound(ctx, memory, before)                            ограничение после правки         bound.py
+
+Стадии собираются из блоков этих модулей; общие блоки здесь: ask — один вызов модели по промпту метода,
+seq — цепочка блоков, when — блок по условию (иначе цепочка обрывается), maybe — блок по условию
+(иначе цепочка идёт дальше), retry — повтор до разбора.
 
 ctx: model, task, evaluate(memory) -> [(верно, обрыв)] на val, render(memory) -> что увидит решатель,
 retry(memory, note) -> новая попытка того же вопроса с заметкой (раунды рефлексии ACE),
-step и total: номер задачи и их число, state: своё состояние обновления на прогон, gated: решения gate."""
+step и total: номер задачи в проходе и их число, state: своё состояние обновления на прогон, gated: решения gate."""
 import copy
 from dataclasses import dataclass, field
 
@@ -37,14 +41,63 @@ class Ctx:
 
 
 class Delta(BaseModel):
-    """Общая форма дельты ACE и прототипа: уроки плюс метки записей для счётчиков."""
+    """Общая форма дельты: уроки, метки записей для счётчиков, предложенные операции, прочее."""
     lessons: list = []          # строки или типизированные уроки
     helpful: list[str] = []
     harmful: list[str] = []
     episode: dict = {}          # запись об эпизоде для provenance: text, when
+    ops: list = []              # операции над памятью, предложенные рефлексией (TF-GRPO)
+    info: dict = {}             # что ещё нужно куратору: вопрос, баллы, лучшее решение
 
     def shown(self):
         return "\n".join(f"- {l}" for l in self.lessons)
+
+
+def ask(prompt, fields, output=str, then=None, system="", temperature=0, tokens=1):
+    """Блок одного вызова модели. prompt — Prompt или функция от аргументов стадии, fields(ctx, *args, **extra)
+    -> поля промпта, then(ответ или None, ctx, *args, **extra) -> результат блока. system — строка или
+    функция от ctx (TF-GRPO: цели агента зависят от задачи). Температуру может задать обёртка (best_of).
+    tokens — множитель бюджета генерации (DC пишет cheatsheet вдвое длиннее)."""
+    def block(ctx, *args, **extra):
+        p = prompt(*args, **extra) if callable(prompt) else prompt
+        out = ctx.model.run(system(ctx) if callable(system) else system, p.fill(fields(ctx, *args, **extra)), output=output,
+                            temperature=extra.get("temperature", temperature),
+                            max_tokens=tokens * ctx.model.max_tokens if tokens != 1 else None).output
+        return then(out, ctx, *args, **extra) if then else out
+    return block
+
+
+def retry(inner, n):
+    """inner до n раз, пока результат None (TF-GRPO: разбор JSON плана батча)."""
+    def block(ctx, *args, **extra):
+        for _ in range(n):
+            out = inner(ctx, *args, **extra)
+            if out is not None:
+                return out
+        return None
+    return block
+
+
+def seq(*blocks):
+    """Блоки по очереди, результат предыдущего в extra["prev"]; None обрывает цепочку."""
+    def block(ctx, *args, **extra):
+        out = None
+        for b in blocks:
+            out = b(ctx, *args, **{**extra, "prev": out})
+            if out is None:
+                return None
+        return out
+    return block
+
+
+def when(test, inner):
+    """inner, только если test(ctx, *args, **extra)."""
+    return lambda ctx, *args, **extra: inner(ctx, *args, **extra) if test(ctx, *args, **extra) else None
+
+
+def maybe(test, inner):
+    """В цепочке: inner, если test(ctx, *args, **extra), иначе результат предыдущего блока дальше без изменений."""
+    return lambda ctx, *args, **extra: inner(ctx, *args, **extra) if test(ctx, *args, **extra) else extra.get("prev")
 
 
 def count(memory, helpful, harmful):
@@ -54,40 +107,6 @@ def count(memory, helpful, harmful):
     for id in harmful:
         if memory.get(id):
             memory.get(id).harmful += 1
-
-
-# ограничители, общие для методов
-
-def budget(share, max_tokens=4096):
-    """Память в промпте занимает не больше share бюджета генерации. Первыми уходят слабые insight, потом procedure."""
-    limit = share * max_tokens * 4                        # символов, грубо 4 на токен
-
-    def bound(ctx, memory, before):
-        weak = sorted(memory.of("insight", "procedure"), key=lambda r: (r.kind == "procedure", r.helpful - r.harmful))
-        while len(ctx.render(memory)) > limit and weak:
-            memory.drop(weak.pop(0).id)
-    return bound
-
-
-def gate():
-    """Правка принимается, только если на val не хуже прежней памяти: не меньше верных и не больше обрывов.
-    Если решатель увидит то же самое, проверять нечего."""
-    def bound(ctx, memory, before):
-        if ctx.render(memory) == ctx.render(before):
-            return
-        after, prev = ctx.evaluate(memory), ctx.evaluate(before)
-        ok = sum(c for c, _ in after) >= sum(c for c, _ in prev) and sum(t for _, t in after) <= sum(t for _, t in prev)
-        if not ok:
-            memory.records = before.records
-        ctx.gated.append(ok)
-    return bound
-
-
-def chain(*bounds):
-    def bound(ctx, memory, before):
-        for b in bounds:
-            b(ctx, memory, before)
-    return bound
 
 
 def snapshot(memory):

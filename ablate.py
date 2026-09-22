@@ -3,10 +3,10 @@ python ablate.py TASK [N] [STEP ...]"""
 import os
 import sys
 
-from ace import inject, update
+from ace import bound, inject
 from ace.loop import Solver, run, swap
 from ace.methods import ace, baseline, proto
-from ace.methods.ace import curate as ace_curate, reflect as ace_reflect
+from ace.methods.ace import stand_curate as ace_curate, stand_reflect as ace_reflect
 from ace.methods.proto import curate as proto_curate
 from ace.model import Model
 from ace.tasks import TASKS
@@ -26,8 +26,8 @@ CHAIN = {
     "ops5": swap(proto, bound=nobound),                                         # обновление: операции прототипа через tools
     "ops5_json": swap(proto, bound=nobound, curate=proto_curate("json")),       # операции одной схемой
     "ops5_rewrite": swap(proto, bound=nobound, curate=proto_curate("rewrite")), # все записи заново
-    "gate": swap(proto, bound=update.gate()),                                   # ограничение: gate на val
-    "budget": swap(proto, bound=update.budget(0.25)),                           # ограничение: доля бюджета
+    "gate": swap(proto, bound=bound.gate()),                                   # ограничение: gate на val
+    "budget": swap(proto, bound=bound.budget(0.25)),                           # ограничение: доля бюджета
     "proto": proto,
 }
 

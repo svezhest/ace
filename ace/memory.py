@@ -1,7 +1,9 @@
 """Элемент 1. Память: какие записи бывают и что с ними разрешено делать.
 
-Схема метода: вид записи -> разрешённые операции. Показывает память инжект, меняет только
-обновление, и то в пределах схемы: запрещённая операция поднимает Forbidden.
+Схема метода: вид записи -> разрешённые операции, или Kind(операции, per), если записи вида
+живут одну задачу (per="task": тактические правила SCOPE; цикл стирает их перед новой задачей).
+Показывает память инжект, меняет только обновление, и то в пределах схемы: запрещённая операция
+поднимает Forbidden.
 
     add     новая запись
     edit    новый текст (и условие применения)
@@ -18,12 +20,19 @@ class Forbidden(Exception):
     pass
 
 
+@dataclass(frozen=True)
+class Kind:
+    ops: tuple = ALL
+    per: str = "run"           # run | task
+
+
 @dataclass
 class Record:
     id: str
     text: str
     kind: str
     when: str = ""             # когда применять
+    group: str = ""            # раздел или домен внутри вида (ACE, SCOPE)
     helpful: int = 0
     harmful: int = 0
     meta: dict = field(default_factory=dict)   # что ещё метод хранит о записи (веса, история)
@@ -35,9 +44,17 @@ class Memory:
     records: list = field(default_factory=list)
     counter: int = 0
 
+    def ops(self, kind):
+        spec = self.schema.get(kind, ())
+        return spec.ops if isinstance(spec, Kind) else spec
+
     def allow(self, kind, op):
-        if op not in self.schema.get(kind, ()):
+        if op not in self.ops(kind):
             raise Forbidden(f"{op} is not allowed for {kind} entries")
+
+    def new_task(self):
+        """Записи видов, живущих одну задачу, уходят без операции delete: это срок жизни, а не правка."""
+        self.records = [r for r in self.records if getattr(self.schema.get(r.kind), "per", "run") != "task"]
 
     def add(self, text, kind=None, **fields):
         kind = kind or next(iter(self.schema))
@@ -53,7 +70,7 @@ class Memory:
             self.allow(rec.kind, "edit")
             rec.text = text
         if when is not None:
-            if "edit" not in self.schema.get(rec.kind, ()):
+            if "edit" not in self.ops(rec.kind):
                 self.allow(rec.kind, "narrow")
             rec.when = when
         return rec

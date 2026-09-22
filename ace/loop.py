@@ -161,6 +161,7 @@ def run(task, method, model, n=40, out=None, split="", epochs=None, offline=Fals
         for i, item in enumerate(items):
             t0 = time.time()
             ctx.step, ctx.total = i + 1, len(items)
+            memory.new_task()
             a, group = attempt(model, task, method, memory, item)
             episode = method.feedback.observe(model, a, group)
             delta = method.update.reflect(ctx, episode, memory)
@@ -183,6 +184,7 @@ def run(task, method, model, n=40, out=None, split="", epochs=None, offline=Fals
         memory = best
         for i, item in enumerate(task.load(split)[:n]):
             t0 = time.time()
+            memory.new_task()
             record("test", 0, i, attempt(model, task, method, memory, item)[0], t0)
     final = [r for r in log if r["phase"] == "test" or r["phase"] == "online" and r["epoch"] == epochs - 1]
     summary = dict(task=task.name, method=method.name, model=model.name, n=len(final), epochs=epochs, offline=offline,
