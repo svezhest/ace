@@ -5,26 +5,22 @@ configs/practice/math_reasoning.yaml.
     1 память      библиотека опытов «Experience name: Brief description.»
     2 инжект      вся библиотека: «When solving problems, you MUST first carefully read ...», «[id]. опыт»
     3 сигнал      верный ответ и награда 0/1 каждой из G = 5 попыток при T = 0.7
-    4 обновление  только группы с частично верными попытками: сводка каждой траектории (с верным ответом),
-                  по сводкам групповое семантическое преимущество, не больше 1 опыта на вопрос;
-                  опыт сверяется с библиотекой (ADD / UPDATE / DELETE / NONE); раз в батч операции
-                  всего батча сводятся в одну правку библиотеки
+    4 обновление  reflect: when(группа верна частично, seq(each_attempt(сводка траектории), групповое
+                  преимущество -> не больше 1 опыта, сверка с библиотекой -> операции ADD / UPDATE / DELETE / NONE));
+                  до конца батча библиотека не меняется, поэтому сверка идёт в reflect;
+                  curate раз в батч: retry(план батча по всем операциям) -> apply_ops
     решатель      в зачёт жадная попытка при T = 0 (как оценка в апстриме), группа из 5 отдельно
 
-Батч в апстриме 50 из 100 задач, 2 шага за эпоху; у нас 20 из 40, те же 2 шага.
+Батч в апстриме 50 из 100 задач, 2 шага за эпоху; у нас 20 из 40, те же 2 шага. Неполный батч отбрасывается.
 """
 import json
-from pathlib import Path
 
-import jinja2
-import yaml
-
+from .. import curate as stages, inject, prompts, reflect as steps
 from ..feedback import Feedback
-from ..inject import View
 from ..loop import Method, Solver
-from ..update import Update
+from ..update import Delta, Update, ask, retry, seq
 
-PROMPTS = yaml.safe_load((Path(__file__).parent / "prompts" / "tfgrpo.yaml").read_text())
+Y = prompts.load_yaml("tfgrpo.yaml")
 
 # 1. память
 
@@ -32,13 +28,8 @@ MEMORY = {"experience": ("add", "edit", "delete")}
 
 # 2. инжект
 
-
-def experiences(model, memory, item):
-    if not memory.records:
-        return View()
-    text = ("When solving problems, you MUST first carefully read and understand the helpful instructions and experiences:\n"
-            + "\n".join(f"[{r.id}]. {r.text}" for r in memory.records))
-    return View(text, [r.id for r in memory.records], head="")
+experiences = inject.show(line=lambda r: f"[{r.id}]. {r.text}", head="",
+                          before="When solving problems, you MUST first carefully read and understand the helpful instructions and experiences:\n")
 
 # 4. обновление
 
@@ -52,14 +43,14 @@ LEARNING = "Help the agent to improve the solving capability on these questions 
 NUM, BATCH = 1, 20
 
 
-def ask(ctx, name, **values):
-    """Системная и пользовательская части промпта апстрима: name_SP и name_UP."""
-    render = lambda part, **v: jinja2.Template(PROMPTS[f"{name}_{part}"]).render(**v)
-    sp = render("SP", agent_objective=OBJECTIVE[ctx.task.name], learning_objective=LEARNING, num_experiences=NUM)
-    return ctx.model.one(sp, render("UP", **values)).output
+def template(name, fields, then=None):
+    """Пара промптов апстрима: name_SP с целями агента и обучения — системный, name_UP — пользовательский."""
+    system = lambda ctx: Y[f"{name}_SP"].fill(dict(agent_objective=OBJECTIVE[ctx.task.name], learning_objective=LEARNING,
+                                                   num_experiences=NUM))
+    return ask(Y[f"{name}_UP"], fields, system=system, then=then)
 
 
-def json_block(text):
+def json_block(text, *_, **__):
     try:
         return json.loads(text.split("```json")[-1].split("```")[0])
     except (json.JSONDecodeError, AttributeError):
@@ -74,19 +65,21 @@ def partial(rollouts, labeled):
     return 0 < mean < 1
 
 
-def advantage(ctx, ep):
-    """Сводки траекторий группы и групповое преимущество; возвращает текст новых опытов или None."""
-    labeled, answer = bool(ep.target), ep.target or "[REDACTED]"
-    if not partial(ep.group, labeled):
-        return None
-    summarized = [(g, ask(ctx, "SINGLE_ROLLOUT_SUMMARY_TEMPLATE", question=ep.question, trajectory=g.output,
-                          answer=answer, critique="[No critique provided]")) for g in ep.group]
-    summarized = [(g, s) for g, s in summarized if s]
-    if not partial([g for g, _ in summarized], labeled):
-        return None
-    trajectories = "\n\n".join(f"Attempt {i + 1} (Reward {float(bool(g.ok)) if labeled else '[REDACTED]'}):\n{s}"
-                               for i, (g, s) in enumerate(summarized))
-    critique = ask(ctx, "SINGLE_QUERY_GROUP_ADVANTAGE", question=ep.question, answer=answer, trajectories=trajectories)
+def answer(ep):
+    return ep.target or "[REDACTED]"
+
+
+summarize = template("SINGLE_ROLLOUT_SUMMARY_TEMPLATE", lambda ctx, g, memory, **_: dict(
+    question=g.question, trajectory=g.output, answer=answer(g), critique="[No critique provided]"))
+
+
+def summarized(ctx, ep, memory, prev, **extra):
+    kept = [(g, s) for g, s in prev if s]
+    return kept if partial([g for g, _ in kept], bool(ep.target)) else None
+
+
+def experiences_of(critique, *_, **__):
+    """Текст внутри <Experiences>, регистр не важен; без блока пусто."""
     if critique is None:
         return None
     low = critique.lower()
@@ -96,33 +89,18 @@ def advantage(ctx, ep):
     return ""
 
 
-def reflect(ctx, ep, memory):
-    """Опыты вопроса сверяются с библиотекой; до конца батча библиотека не меняется."""
-    new = advantage(ctx, ep)
-    if new is None:
-        return None
-    existing = "\n".join(f"[{r.id}]. {r.text}" for r in memory.records) or "None"
-    ops = json_block(ask(ctx, "GROUP_EXPERIENCE_UPDATE_TEMPLATE", existing_experiences=existing, new_experiences=new))
-    return ops if isinstance(ops, list) else None
+advantage = template("SINGLE_QUERY_GROUP_ADVANTAGE", lambda ctx, ep, memory, prev, **_: dict(
+    question=ep.question, answer=answer(ep), trajectories="\n\n".join(
+        f"Attempt {i + 1} (Reward {float(bool(g.ok)) if ep.target else '[REDACTED]'}):\n{s}" for i, (g, s) in enumerate(prev))),
+    then=experiences_of)
 
+against_library = template("GROUP_EXPERIENCE_UPDATE_TEMPLATE", lambda ctx, ep, memory, prev, **_: dict(
+    existing_experiences="\n".join(f"[{r.id}]. {r.text}" for r in memory.records) or "None", new_experiences=prev),
+    then=lambda text, *_, **__: ops if isinstance(ops := json_block(text), list) and ops else None)
 
-def curate(ctx, memory, deltas):
-    ops = [op for d in deltas for op in d if isinstance(op, dict)]
-    plan = []
-    for _ in range(3):
-        plan = json_block(ask(ctx, "BATCH_EXPERIENCE_UPDATE_TEMPLATE", experiences_and_operations=table(memory, ops)))
-        if plan is not None:
-            break
-    for p in plan if isinstance(plan, list) else []:
-        op, content, id = p.get("operation", "ADD"), p.get("content", ""), str(p.get("id"))
-        if not content:
-            continue
-        if op == "ADD" or op == "UPDATE" and not memory.get(id):
-            memory.add(content)
-        elif op == "UPDATE":
-            memory.edit(id, content)
-        elif op == "DELETE" and memory.get(id):
-            memory.drop(id)
+group_advantage = steps.when(lambda ctx, ep, memory, **_: partial(ep.group, bool(ep.target)),
+                             seq(steps.each_attempt(summarize), summarized, advantage))
+reflect = seq(group_advantage, against_library, lambda ctx, ep, memory, prev, **_: Delta(ops=prev))
 
 
 def table(memory, ops):
@@ -139,6 +117,18 @@ def table(memory, ops):
     if loose:
         out.append("Operations without specific Experience ID:\n" + "\n".join(map(dump, loose)))
     return "\n\n".join(out)
+
+
+def batch_ops(deltas):
+    return [op for d in deltas for op in d.ops if isinstance(op, dict)]
+
+
+plan = retry(template("BATCH_EXPERIENCE_UPDATE_TEMPLATE", lambda ctx, memory, deltas, **_: dict(
+    experiences_and_operations=table(memory, batch_ops(deltas))), then=json_block), 3)
+
+
+def curate(ctx, memory, deltas):
+    stages.apply_ops(lambda p: p if isinstance(p, list) else [])(plan(ctx, memory, deltas), ctx, memory)
 
 
 tfgrpo = Method("tfgrpo", MEMORY, experiences, Feedback("golden"), Update(reflect, curate, every=BATCH),
