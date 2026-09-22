@@ -2,7 +2,8 @@
 from dataclasses import replace
 
 from .. import bound
-from . import scope, tfgrpo
+from .scope import bound as scope_bound, curate as scope_curate, inject as scope_inject, reflect as scope_reflect
+from .tfgrpo import advantage
 from .ace import ace as ACE, reflect as ace_reflect
 from .proto import proto as PROTO
 
@@ -26,7 +27,7 @@ def best_of_2(model, trace, memory):
 
 def group_reflect(model, trace, memory):
     """Сигнал по группе из TF-GRPO: чем верные попытки отличались от неверных; уроки идут в куратор ACE."""
-    s = tfgrpo.advantage(model, trace, memory)
+    s = advantage(model, trace, memory)
     return [s] if s else None
 
 
@@ -34,7 +35,7 @@ def scope_optimize(model, memory, *_):
     """Ограничитель из SCOPE: при переполнении LLM убирает конфликты и дубли."""
     for r in memory.records:
         r.kind = "tactical" if r.kind == "insight" else r.kind
-    scope.bound(model, memory)
+    scope_bound(model, memory)
     for r in memory.records:
         r.kind = "insight" if r.kind == "tactical" else r.kind
 
@@ -42,7 +43,7 @@ def scope_optimize(model, memory, *_):
 ace_bo2 = replace(ACE, name="ace_bo2", reflect=best_of_2)
 ace_group = replace(ACE, name="ace_group", reflect=group_reflect, group=3)
 ace_opt = replace(ACE, name="ace_opt", bound=scope_optimize)
-ace_steps = replace(ACE, name="ace_steps", reflect=scope.reflect, curate=scope.curate, inject=scope.inject)  # память ACE, рефлексия и потоки SCOPE
+ace_steps = replace(ACE, name="ace_steps", reflect=scope_reflect, curate=scope_curate, inject=scope_inject)  # память ACE, рефлексия и потоки SCOPE
 proto_opt = replace(PROTO, name="proto_opt", bound=bound.chain(bound.budget(0.25), scope_optimize))
 
 HYBRIDS = [ace_bo2, ace_group, ace_opt, ace_steps, proto_opt]
