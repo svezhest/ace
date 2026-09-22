@@ -15,6 +15,7 @@ class Reply:
     output: object          # str или объект схемы; None, если модель не справилась
     text: str               # вся траектория текстом: ответы, вызовы tools, их результаты
     truncated: bool
+    steps: list             # вызовы tools: (имя, аргументы, результат)
 
 
 class Model:
@@ -37,7 +38,7 @@ class Model:
         self.calls += len(responses)
         self.prompt_tokens += sum(m.usage.input_tokens for m in responses)
         self.completion_tokens += sum(m.usage.output_tokens for m in responses)
-        return Reply(result, transcript(messages), any(m.finish_reason == "length" for m in responses))
+        return Reply(result, transcript(messages), any(m.finish_reason == "length" for m in responses), steps(messages))
 
     def one(self, system, user, temperature=0):
         return self.run(system, user, temperature=temperature)
@@ -57,3 +58,14 @@ def transcript(messages):
             elif isinstance(p, ToolReturnPart):
                 lines.append(f"[{p.tool_name}] {p.content}")
     return "\n\n".join(lines)
+
+
+def steps(messages):
+    calls, out = {}, []
+    for m in messages:
+        for p in m.parts:
+            if isinstance(p, ToolCallPart):
+                calls[p.tool_call_id] = (p.tool_name, p.args_as_json_str())
+            elif isinstance(p, ToolReturnPart) and p.tool_call_id in calls:
+                out.append((*calls[p.tool_call_id], str(p.content)))
+    return out

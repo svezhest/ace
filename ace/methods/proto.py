@@ -184,4 +184,4 @@ def curate(mode="tools"):
 
 
 proto = Method("proto", inject=inject, reflect=reflect(), curate=curate(), env=Skills(),
-               bound=bound.chain(bound.budget(0.25), bound.gate()))
+               bound=bound.budget(0.25))

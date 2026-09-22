@@ -26,12 +26,14 @@ class Trace:
     correct: bool
     truncated: bool
     used: list = field(default_factory=list)   # id записей, которые решатель вызвал
+    steps: list = field(default_factory=list)  # вызовы tools по шагам: (имя, аргументы, результат)
     group: list = field(default_factory=list)  # сэмплированные попытки того же вопроса (групповой сигнал)
 
 
 @dataclass
 class Method:
     name: str
+    prepare: callable = lambda model, memory, item: None     # правка памяти до решения (DC-RS)
     inject: callable = lambda memory: memory.text()          # память -> текст в системный промпт
     reflect: callable = lambda model, trace, memory: None    # опыт -> дельта (любой объект или None)
     curate: callable = lambda model, memory, delta: None     # дельта -> правка памяти
@@ -53,7 +55,7 @@ def solve(model, task, memory, method, item, temperature=0):
                   rounds=method.env.rounds, temperature=temperature)
     answer = final_answer(r.output or "")
     return Trace(item["context"], item["target"], r.text, answer,
-                 task.check(answer, item["target"]), r.truncated, list(memory.used))
+                 task.check(answer, item["target"]), r.truncated, list(memory.used), r.steps)
 
 
 def run(task, method, model, n=40, out=None, split=""):
@@ -63,6 +65,7 @@ def run(task, method, model, n=40, out=None, split=""):
     log, traces = [], []
     for i, item in enumerate(items):
         t0 = time.time()
+        method.prepare(model, memory, item)
         trace = solve(model, task, memory, method, item)
         trace.group = [solve(model, task, memory, method, item, temperature=0.7) for _ in range(method.group)]
         if method.vote:
