@@ -3,7 +3,7 @@ import os
 os.environ.setdefault("PYDANTIC_AI_NO_BANNER", "1")
 from dataclasses import dataclass
 
-from pydantic_ai import Agent, UsageLimits
+from pydantic_ai import Agent, UsageLimits, capture_run_messages
 from pydantic_ai.exceptions import UnexpectedModelBehavior, UsageLimitExceeded
 from pydantic_ai.messages import ModelResponse, TextPart, ToolCallPart, ToolReturnPart
 from pydantic_ai.models.openai import OpenAIChatModel
@@ -28,12 +28,13 @@ class Model:
 
     def run(self, system, user, output=str, tools=(), deps=None, rounds=0, temperature=0):
         agent = Agent(self.llm, system_prompt=system, output_type=output, tools=tools, retries=3)
-        try:
-            messages = agent.run_sync(user, deps=deps, usage_limits=UsageLimits(request_limit=rounds + 2),
-                                      model_settings={"temperature": temperature, "max_tokens": self.max_tokens})
-            result, messages = messages.output, messages.new_messages()
-        except (UsageLimitExceeded, UnexpectedModelBehavior) as e:
-            result, messages = None, getattr(e, "messages", []) or []
+        # сообщения сохраняются и при сбое: траектория и токены не теряются
+        with capture_run_messages() as messages:
+            try:
+                result = agent.run_sync(user, deps=deps, usage_limits=UsageLimits(request_limit=rounds + 2),
+                                        model_settings={"temperature": temperature, "max_tokens": self.max_tokens}).output
+            except (UsageLimitExceeded, UnexpectedModelBehavior):
+                result = None
         responses = [m for m in messages if isinstance(m, ModelResponse)]
         self.calls += len(responses)
         self.prompt_tokens += sum(m.usage.input_tokens for m in responses)
