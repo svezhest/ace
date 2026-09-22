@@ -15,11 +15,11 @@ from typing import Literal
 from pydantic import BaseModel
 from pydantic_ai import RunContext
 
-from .. import inject, update
+from .. import bound, curate as stages, inject, prompts
 from ..feedback import Feedback
 from ..loop import Method
 from ..memory import ALL, Forbidden, Memory
-from ..update import Delta, Update
+from ..update import Delta, Update, ask
 
 # 1. память
 
@@ -32,30 +32,12 @@ INJECT = inject.catalog(always=("constraint",), listed=("procedure", "insight"))
 
 # 4. обновление
 
-REFLECT = """Judge the attempt and the memory entries the solver actually read: which helped, which misled.
-Then give at most 2 lessons that transfer to other tasks (none is fine). {form}
-constraint = a hard rule that must always hold; procedure = how to do a kind of step; insight = a hint.
-
-## Task
-{question}
-
-## Attempt
-{output}
-
-## Verdict
-{verdict}
-
-## Entries the solver read
-{used}"""
-
-CURATE = """Merge the lessons into memory with as few tool calls as possible: add, patch, merge, narrow.
-Constraints are only added or narrowed, never rewritten. Skip a lesson that duplicates an entry. Reply "done" when finished.
-
-## Lessons
-{lessons}
-
-## Memory
-{memory}"""
+REFLECT = prompts.load("proto_reflect.txt")
+CURATE = prompts.load("proto_curate.txt")
+CURATE_JSON = prompts.Prompt(CURATE.text.replace("tool calls", "operations (ids go in `ids`)"))
+CURATE_REWRITE = prompts.Prompt(CURATE.text.replace(
+    "with as few tool calls as possible: add, patch, merge, narrow",
+    "by returning the full new list of entries; keep the id of an entry you keep, leave it empty for a new one"))
 
 
 class Lesson(BaseModel):
@@ -73,18 +55,24 @@ class Reflection(BaseModel):
     lessons: list[Lesson] = []
 
 
-def reflect(format="json"):
-    def reflect(ctx, ep, memory):
+def reflect_fields(form):
+    def fields(ctx, ep, memory, **extra):
         used = "\n".join(f"[{i}] {memory.get(i).text}" for i in ep.used if memory.get(i)) or "(none)"
-        prompt = REFLECT.format(question=ep.question, output=ep.output, verdict=ep.verdict(), used=used,
-                                form="Write freely." if format == "text" else "")
-        episode = dict(text=f"{ep.verdict()}: {ep.answer}", when=ep.question[:80])
-        if format == "text":
-            text = ctx.model.one("You are a reflector.", prompt).output
-            return Delta(lessons=[text] if text else [], episode=episode)
-        r = ctx.model.run("You are a reflector.", prompt, output=Reflection).output or Reflection()
-        return Delta(lessons=r.lessons, helpful=r.helpful, harmful=r.harmful, episode=episode)
-    return reflect
+        return dict(question=ep.question, output=ep.output, verdict=ep.verdict(), used=used, form=form)
+    return fields
+
+
+def episode(ep):
+    return dict(text=f"{ep.verdict()}: {ep.answer}", when=ep.question[:80])
+
+
+def reflect(format="json"):
+    if format == "text":
+        return ask(REFLECT, reflect_fields("Write freely."), system="You are a reflector.",
+                   then=lambda text, ctx, ep, memory, **_: Delta(lessons=[text] if text else [], episode=episode(ep)))
+    return ask(REFLECT, reflect_fields(""), Reflection, system="You are a reflector.",
+               then=lambda r, ctx, ep, memory, **_: Delta(lessons=(r or Reflection()).lessons, helpful=(r or Reflection()).helpful,
+                                                        harmful=(r or Reflection()).harmful, episode=episode(ep)))
 
 
 # операции куратора; память сама не даст нарушить политику типа
@@ -116,7 +104,7 @@ def narrow(ctx: RunContext[Memory], id: str, when: str) -> str:
 def merge(ctx: RunContext[Memory], ids: list[str], when: str, text: str) -> str:
     """Replace several procedures or insights with one entry."""
     recs = [ctx.deps.get(i) for i in ids if ctx.deps.get(i)]
-    if len(recs) < 2 or any("delete" not in ctx.deps.schema[r.kind] for r in recs):
+    if len(recs) < 2 or any("delete" not in ctx.deps.ops(r.kind) for r in recs):
         return "not allowed"
     keep, *rest = recs
     ctx.deps.edit(keep.id, text, when)
@@ -162,43 +150,50 @@ def apply(memory, op):
     return patch(ctx, id, op.text) if op.op == "patch" else narrow(ctx, id, op.when)
 
 
+def entries(memory):
+    shown = "\n".join(f"[{r.id}] ({r.kind}; when: {r.when}) {r.text}" for r in memory.of("constraint", "procedure", "insight"))
+    return shown or "(empty)"
+
+
+def fields(ctx, memory, d, **extra):
+    return dict(lessons=d.shown(), memory=entries(memory))
+
+
+def apply_all(r, ctx, memory, d, **extra):
+    for op in (r.ops if r else []):
+        apply(memory, op)
+
+
+def replace_all(r, ctx, memory, d, **extra):
+    """Полный новый список: оставленные по id правятся, остальные уходят; constraint не трогаются."""
+    if not r:
+        return
+    keep = {e.id: e for e in r.entries if e.id}
+    for rec in memory.of("constraint", "procedure", "insight"):
+        if rec.id in keep:
+            memory.edit(rec.id, keep[rec.id].text if rec.kind != "constraint" else None, keep[rec.id].when)
+        elif rec.kind != "constraint":
+            memory.drop(rec.id)
+    for e in r.entries:
+        if not e.id:
+            memory.add(e.text, kind=e.kind, when=e.when)
+
+
+def add_episode(ctx, memory, d):
+    if d.episode:
+        memory.add(kind="episode", **d.episode)
+
+
 def curate(mode="tools"):
     """mode: tools — по одной операции за вызов; json — все операции одной схемой; rewrite — все записи заново.
     Эпизоды ни один режим не трогает."""
-    def curate(ctx, memory, deltas):
-        for d in deltas:
-            if d.episode:
-                memory.add(kind="episode", **d.episode)
-            update.count(memory, d.helpful, d.harmful)
-            if d.lessons:
-                merge_lessons(ctx.model, memory, d.shown(), mode)
-    return curate
-
-
-def merge_lessons(model, memory, lessons, mode):
-    shown = "\n".join(f"[{r.id}] ({r.kind}; when: {r.when}) {r.text}" for r in memory.of("constraint", "procedure", "insight"))
-    prompt = CURATE.format(lessons=lessons, memory=shown or "(empty)")
-    if mode == "tools":
-        model.run("You are a curator.", prompt, tools=(add, patch, narrow, merge), deps=memory, rounds=4)
-    elif mode == "json":
-        r = model.run("You are a curator.", prompt.replace("tool calls", "operations (ids go in `ids`)"), output=Ops).output
-        for op in (r.ops if r else []):
-            apply(memory, op)
-    else:
-        r = model.run("You are a curator.", prompt.replace("with as few tool calls as possible: add, patch, merge, narrow",
-                      "by returning the full new list of entries; keep the id of an entry you keep, leave it empty for a new one"),
-                      output=Entries).output
-        if r:
-            keep = {e.id: e for e in r.entries if e.id}
-            for rec in memory.of("constraint", "procedure", "insight"):
-                if rec.id in keep:
-                    memory.edit(rec.id, keep[rec.id].text if rec.kind != "constraint" else None, keep[rec.id].when)
-                elif rec.kind != "constraint":
-                    memory.drop(rec.id)
-            for e in r.entries:
-                if not e.id:
-                    memory.add(e.text, kind=e.kind, when=e.when)
+    merge_lessons = {
+        "tools": stages.tools(CURATE, fields, lambda memory, d: memory, rounds=4, toolset=(add, patch, narrow, merge)),
+        "json": ask(CURATE_JSON, fields, Ops, system="You are a curator.", then=apply_all),
+        "rewrite": ask(CURATE_REWRITE, fields, Entries, system="You are a curator.", then=replace_all),
+    }[mode]
+    return stages.each(add_episode, stages.count, stages.admit(lambda ctx, memory, d: bool(d.lessons), merge_lessons))
 
 
 proto = Method("proto", MEMORY, INJECT, Feedback("golden", usage="env"),
-               Update(reflect(), curate(), update.budget(0.25), needs_usage=True))
+               Update(reflect(), curate(), bound.budget(0.25), needs_usage=True))
