@@ -1,4 +1,6 @@
 """ACE: reflector видит верный ответ и выдаёт уроки, curator правит память по одной записи через tools."""
+from typing import Literal
+
 from pydantic import BaseModel
 from pydantic_ai import RunContext
 
@@ -29,6 +31,16 @@ update a bullet if a lesson refines it. Do nothing for duplicates. When done, re
 
 ## Memory
 {memory}"""
+
+
+class Op(BaseModel):
+    op: Literal["ADD", "UPDATE"]
+    text: str
+    id: str = ""
+
+
+class Ops(BaseModel):
+    ops: list[Op]
 
 
 class Reflection(BaseModel):
@@ -69,10 +81,29 @@ def reflect(format="json"):
     return reflect
 
 
-def curate(model, memory, lessons):
-    shown = lessons if isinstance(lessons, str) else "\n".join(f"- {l}" for l in lessons)
-    model.run("You are a curator.", CURATE.format(lessons=shown, memory=memory.text() or "(empty)"),
-              tools=(add, update), deps=memory, rounds=4)
+def curate(mode="tools"):
+    """mode: tools — по одной операции за вызов; json — все операции одной схемой; rewrite — вся память заново."""
+    def curate(model, memory, lessons):
+        shown = lessons if isinstance(lessons, str) else "\n".join(f"- {l}" for l in lessons)
+        prompt = CURATE.format(lessons=shown, memory=memory.text() or "(empty)")
+        if mode == "tools":
+            model.run("You are a curator.", prompt, tools=(add, update), deps=memory, rounds=4)
+        elif mode == "json":
+            r = model.run("You are a curator.", prompt.replace("using the tools", "as a list of ADD/UPDATE operations"),
+                          output=Ops).output
+            for op in (r.ops if r else []):
+                add(Deps(memory), op.text) if op.op == "ADD" else update(Deps(memory), op.id, op.text)
+        else:
+            new = model.one("You are a curator.", prompt.replace("using the tools", "by rewriting the whole memory")
+                            .replace('reply "done"', "return only the new memory, one bullet per line")).output
+            memory.replace_all(new.strip()) if new else None
+    return curate
+
+
+class Deps:
+    """Подстановка RunContext, когда операции применяем сами, а не через tool."""
+    def __init__(self, memory):
+        self.deps = memory
 
 
 def bound(model, memory, *_):
@@ -81,4 +112,4 @@ def bound(model, memory, *_):
             memory.drop(r.id)
 
 
-ace = Method("ace", reflect=reflect(), curate=curate, bound=bound)
+ace = Method("ace", reflect=reflect(), curate=curate(), bound=bound)

@@ -7,7 +7,7 @@ from ace import bound
 from ace.env import Skills
 from ace.loop import Method, run
 from ace.methods import ace, baseline, proto
-from ace.methods.ace import reflect as ace_reflect
+from ace.methods.ace import curate as ace_curate, reflect as ace_reflect
 from ace.model import Model
 from ace.tasks import TASKS
 
@@ -19,6 +19,8 @@ CHAIN = {
     "sc3": replace(baseline, group=2, vote=True),
     "ace": ace,
     "ace_text": replace(ace, reflect=ace_reflect("text")),                          # Reflect: свободный текст вместо схемы
+    "ace_json": replace(ace, curate=ace_curate("json")),                            # Curate: все операции одним JSON
+    "ace_rewrite": replace(ace, curate=ace_curate("rewrite")),                      # Curate: полная перезапись
     "catalog": replace(ace, inject=proto.inject, env=Skills()),                   # Inject: каталог вместо полной памяти
     "typed": replace(proto, bound=nobound, curate=ace.curate),                     # Store: типы, рефлексия по вызванным
     "ops5": replace(proto, bound=nobound),                                         # Curate: пять операций
