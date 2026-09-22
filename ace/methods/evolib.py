@@ -1,27 +1,27 @@
 """EvoLib (EvoLib/EvoLib/evolib_agent.py, вариант HMMT из eval_main.py: без синтетических тестов).
+Промпты prompts/evolib_*.txt: апстрим, из которого убрано только «math».
 
-    1 память      skills: подзадача целиком (<subtask> с description, solution, result), у неё скаляр IG
-                  и список Future IG; insights «If ..., then ...» со списком Future IG
-    2 инжект      у каждой попытки своя выборка с возвращением: p=0.4 до 10 skills, 0.3 до 10 insights,
-                  0.3 ничего; вес skill = max(IG, eps) + (mean FIG или 0.5), insight = max(mean FIG или 0.5, eps)
+    1 память      skills: подзадача целиком (<subtask> с description, solution, result), в meta скаляр ig,
+                  список fig и doc; insights «If ..., then ...», в meta список fig
+    2 инжект      choose: одно случайное число на попытку — p < 0.4 sample до 10 skills, p < 0.7 до 10 insights,
+                  иначе ничего; выборка с возвращением по весу
     3 сигнал      без метки: попытка верна, если её ответ совпал с ответом большинства
-    4 обновление  IG = log(лучший балл) - log(средний); из лучшего решения один insight, баллы при этом
-                  делятся пополам; skills из ответа решателя идут в библиотеку, только если решение
-                  задачи улучшилось; Future IG всем записям выборки лучшей попытки;
-                  похожее (косинус > 0.8 по условию insight или description skill) сливает LLM
-    решатель      3 попытки при T=0, в зачёт ответ большинства; решение разбито на подзадачи
+    4 обновление  reflect: seq(ранжирование и IG = log_gain, maybe(insight из лучшего решения; баллы пополам),
+                  улучшение по задаче, maybe(сравнение двух решений моделью), skills из ответа, future_gain);
+                  curate: consolidate insight и skills (косинус > 0.8 по условию или description, слияние моделью),
+                  лучшее решение задачи в ctx.state, Future IG в записи
+    решатель      3 попытки при T=0, в зачёт ответ большинства; решение разбито на подзадачи (Solver.hint)
 
-Промпты апстрима, из них убрано только «math»: у нас не только математика.
 Эпох в апстриме тысячи (5000 итераций по кругу), у нас это параметр протокола EPOCHS.
 """
-import math
-import random
 
-from .. import embed
+from .. import curate as stages, inject, prompts
 from ..feedback import Feedback
-from ..inject import View
 from ..loop import Method, Solver, swap
-from ..update import Update
+from ..reflect import future_gain, log_gain
+from ..update import Delta, Update, ask, maybe, seq
+
+P = {n: prompts.load(f"evolib_{n}.txt") for n in ("insight", "merge_skills", "merge_insights", "compare")}
 
 # 1. память
 
@@ -31,95 +31,26 @@ MEMORY = {"skill": ("add", "delete"), "insight": ("add", "delete")}   # delete �
 
 K, W_IG, EPS = 10, 1.0, 0.01
 
-SKILLS = "Here are some subtask solutions which you may reuse or adapt for the problem:\n"
-INSIGHTS = "Here are some insights that may help you solve the problem:\n"
-
 
 def weight(r):
+    """w_IG * max(IG, eps) + (mean FIG или 0.5) у skill, max(mean FIG или 0.5, eps) у insight.
+    В апстриме у skill пола нет: отрицательный вес ломает random.choices молча, поэтому здесь пол eps."""
     fig = r.meta["fig"]
     future = sum(fig) / len(fig) if fig else 0.5
     if r.kind == "skill":
-        return W_IG * max(r.meta["ig"], EPS) + future
+        return max(W_IG * max(r.meta["ig"], EPS) + future, EPS)
     return max(future, EPS)
 
 
-def sample(model, memory, item):
-    skills, insights, p = memory.of("skill"), memory.of("insight"), random.random()
-    if skills and p < 0.4:
-        head, pool = SKILLS, skills
-    elif insights and p < 0.7:
-        head, pool = INSIGHTS, insights
-    else:
-        return View()
-    # в апстриме пола нет: отрицательный вес skill ломает random.choices молча
-    picked = random.choices(pool, [max(weight(r), EPS) for r in pool], k=min(len(pool), K))
-    return View(head + "\n".join(r.text for r in picked), [r.id for r in picked], head="")
+def library(kind, head):
+    return inject.show((kind,), pick=inject.sample(K, weight), line=inject.plain, before=head, head="")
+
+
+sample = inject.choose(
+    (0.4, library("skill", "Here are some subtask solutions which you may reuse or adapt for the problem:\n")),
+    (0.7, library("insight", "Here are some insights that may help you solve the problem:\n")))
 
 # 4. обновление
-
-INSIGHT = """You are an expert. You are given the following problem and a potential solution:
-Problem: {question}
-
-Take the following solution with a grain of salt, they might be wrong or incomplete. Try to spot the mistakes in the solution if any to get a more accurate solution.
-{solution}
-{evaluation}
-Output format (Use exact <...> tags in the following format):
-<mistake>
-If you can identify a mistake in the above reference solution and think of a more accurate one, explain here in a stand-alone manner, you must explain what is the reference solution's final answer, and why is it incorrect. (or write "N/A" if you agree with the reference solution)
-</mistake>
-<improved_solution>
-A paragraph of detailed step-by-step summary of your solution, write thoroughly and in details, note down every steps of calculation you did, and what was the final answer you got. (or write "N/A" if you agree with the reference solution)
-</improved_solution>
-<insight>
-Based on the above mistake identified in the reference solution and the improved solution, write a SINGLE insight in the pseudo-code format of "If (certain situation), then do (what to do)" or "If (certain situation), then do not (what to avoid)" or "If (certain situation), then consider the case (the cases to consider)".
-The insight should be specific enough to help fix the mistake AND also understandable without the context of the specific problem, so that it can be applied to future problems with similar situations.
-(or write "N/A" if you agree with the reference solution)
-</insight>
-"""
-
-MERGE_SKILLS = """You are an expert. Your task is to help students consolidate example problems and solutions into fewer, more generalizable ones to help them solve future problems.
-Here are the example problems and solutions:
-{skills}
-
-Please consolidate these example problems and solutions by merging the ones that solve (almost) identical tasks into a single one that can be referenced for solving future problems.
-If there are example problems that solve different tasks or the same tasks but with different goals, please keep them as separate examples.
-If there are example problems with identical tasks and similar solution approaches, merge them into a single example by keeping the most accurate parts of the solutions.
-NOTE: Please preserve the original logic and reasoning of the solutions, and do not change any existing solution logic unless it is incorrect.
-Output the consolidated example problems and solutions in the same format as the input.
-"""
-
-MERGE_INSIGHTS = """You are an expert that helps consolidate insights for better problem solving.
-Here are some insights generated from previous problems:
-```insights
-{insights}
-```
-Please consolidate these insights by merging the ones with similar conditioning situations into a single insight.
-If there are insights with distinct conditioning situations, please do not merge them together.
-If there are insights with similar conditioning situations, merge them into a single insight by keeping the common conditioning situation and adding the different action parts together.
-NOTE: Please preserve the original meaning of the insights, and do not change any existing insight logic.
-The consolidated insights should follow the pseudo-code format of "If (certain situation), then do (what to do)" or "If (certain situation), then do not (what to avoid)" or "If (certain situation), then consider the case (the cases to consider)".
-Put the consolidated insights within ```insights and ```.
-"""
-
-COMPARE = """You are an expert. You are given the following problem and two solutions:
-Problem: {question}
-
-Take the following solutions with a grain of salt, they might be wrong or incomplete.
-Your task is to judge which solution is more likely to be correct.
-
-Solution 1:
-{a}
-
-Solution 2:
-{b}
-
-First, check each step in solution 1, and list the mistakes made in it, if there is any.
-Next, check each step in solution 2, and list the mistakes made in it, if there is any.
-Finally, make a final judgment of which solution is more likely to be correct in the format:
-```judgment
-Solution <id (1 or 2)> is better.
-```
-"""
 
 SIM, RATE = 0.8, 0.5
 
@@ -152,113 +83,98 @@ def condition(insight):
     return insight.split(", then ")[0].replace("If ", "").strip()
 
 
-def ask(model, prompt):
-    return model.one("", prompt).output or ""
+def rank(ctx, ep, memory, **extra):
+    attempts = [ep, *ep.group]
+    scores = [float(bool(a.ok)) for a in attempts]
+    b = max(range(len(attempts)), key=scores.__getitem__)          # первая из лучших
+    return dict(attempts=attempts, scores=scores, b=b, ig=log_gain(scores[b], scores, EPS), insight="")
+
+
+def with_insight(evaluated):
+    def then(text, ctx, ep, memory, prev, **extra):
+        insight = fenced(text or "", "insight").strip() or between(text or "", "<insight>", "</insight>")
+        insight = "" if insight == "N/A" else insight
+        halve = insight and not evaluated                         # без внешней оценки баллы делятся пополам
+        return dict(prev, insight=insight, scores=[s * 0.5 for s in prev["scores"]] if halve else prev["scores"])
+    return then
+
+
+def improving(ctx, ep, memory, prev, **extra):
+    before = ctx.state.setdefault("best", {}).get(ep.question)
+    return dict(prev, before=before, improving=not before or prev["scores"][prev["b"]] > before["score"])
+
+
+def disputed(evaluated):
+    """Не лучше по баллу, но большинство теперь за другой ответ: решает сравнение решений моделью."""
+    def test(ctx, ep, memory, prev, **extra):
+        best = prev["attempts"][prev["b"]]
+        voted = best.answer if best.ok and not evaluated else None
+        return not prev["improving"] and voted and prev["before"]["answer"] != voted
+    return test
+
+
+def finish(ctx, ep, memory, prev, **extra):
+    attempts, scores, b = prev["attempts"], prev["scores"], prev["b"]
+    best, up = attempts[b], prev["improving"]
+    return Delta(info=dict(question=ep.question, ig=prev["ig"], insight=prev["insight"], fig=future_gain(attempts, scores, b, EPS),
+                           skills=subtasks(best.output) if up else [],
+                           best=dict(score=scores[b], output=best.output, answer=best.answer) if up else None))
 
 
 def reflect(evaluated=False):
     """evaluated: баллы попыток дала внешняя оценка (метка или судья), как синтетические тесты
     в кодовых задачах апстрима: тогда insight только при неудаче лучшей попытки и без деления баллов."""
-    def run(ctx, ep, memory):
-        attempts = [ep, *ep.group]
-        scores = [float(bool(a.ok)) for a in attempts]
-        b = max(range(len(attempts)), key=scores.__getitem__)      # первая из лучших
-        best = attempts[b]
-        ig = math.log(max(scores[b], EPS)) - math.log(max(sum(scores) / len(scores), EPS))
-        insight = ""
-        if not evaluated or scores[b] < 1:
-            text = ask(ctx.model, INSIGHT.format(question=ep.question, solution=best.output,
-                                                 evaluation=f"\nEvaluation: {best.verdict()}\n" if evaluated else ""))
-            insight = fenced(text, "insight").strip() or between(text, "<insight>", "</insight>")
-            insight = "" if insight == "N/A" else insight
-            if insight and not evaluated:
-                scores = [s * 0.5 for s in scores]
-        prev = ctx.state.setdefault("best", {}).get(ep.question)
-        improving = not prev or scores[b] > prev["score"]
-        voted = best.answer if best.ok and not evaluated else None
-        if not improving and voted and prev["answer"] != voted:
-            improving = "solution 2" in fenced(ask(ctx.model, COMPARE.format(
-                question=ep.question, a=prev["output"], b=best.output)), "judgment").lower()
+    insight = ask(P["insight"], lambda ctx, ep, memory, prev, **_: dict(
+        question=ep.question, solution=prev["attempts"][prev["b"]].output,
+        evaluation=f"\nEvaluation: {prev['attempts'][prev['b']].verdict()}\n" if evaluated else ""), then=with_insight(evaluated))
+    compare = ask(P["compare"], lambda ctx, ep, memory, prev, **_: dict(
+        question=ep.question, a=prev["before"]["output"], b=prev["attempts"][prev["b"]].output),
+        then=lambda text, ctx, ep, memory, prev, **_: dict(prev, improving="solution 2" in fenced(text or "", "judgment").lower()))
+    return seq(rank, maybe(lambda ctx, ep, memory, prev, **_: not evaluated or prev["scores"][prev["b"]] < 1, insight),
+               improving, maybe(disputed(evaluated), compare), finish)
+
+
+def merge_insights(ctx, old, text):
+    out = ctx.model.one("", P["merge_insights"].fill(dict(insights=f"{old.text}\n{text}"))).output or ""
+    fig = []                                                        # общий список, как в апстриме
+    return [(l.strip(), {"fig": fig}) for l in fenced(out, "insights").splitlines() if l.strip().startswith("If ")]
+
+
+def merge_skills(ig):
+    def merge(ctx, old, block):
+        out = ctx.model.one("", P["merge_skills"].fill(dict(skills=f"{old.text}\n{block}"))).output or ""
         fig = []
-        for rid in best.shown:                                     # с повторами, как в апстриме
-            rest = [s for s, a in zip(scores, attempts) if rid not in a.shown]
-            if rest:
-                fig.append((rid, math.log(max(scores[b], EPS)) - math.log(max(sum(rest) / len(rest), EPS))))
-        return dict(question=ep.question, ig=ig, insight=insight, fig=fig,
-                    skills=subtasks(best.output) if improving else [],
-                    best=dict(score=scores[b], output=best.output, answer=best.answer) if improving else None)
-    return run
+        return [(b, dict(ig=ig, fig=fig, doc=d)) for b, d in subtasks(out)]
+    return merge
 
 
-def curate(ctx, memory, deltas):
-    for d in deltas:
-        if d["insight"]:
-            add_insight(ctx.model, memory, d["insight"])
-        if d["best"]:
-            ctx.state["best"][d["question"]] = d["best"]
-        for block, doc in d["skills"]:
-            add_skill(ctx.model, memory, block, doc, d["ig"])
-        for rid, v in d["fig"]:
-            if memory.get(rid):
-                memory.get(rid).meta["fig"].append(v)
+add_insight = stages.consolidate("insight", lambda text, meta: condition(text), SIM, merge_insights,
+                                 inherit=lambda old, meta: {"fig": old.meta["fig"]})
 
 
-def nearest(records, text, key):
-    """Записи с косинусом строго больше SIM, от самой близкой."""
-    if not records:
-        return []
-    sims = embed.embed([key(r) for r in records]) @ embed.embed([text])[0]
-    return [records[i] for i in sims.argsort()[::-1] if sims[i] > SIM]
+def add_skill(ig):
+    return stages.consolidate("skill", lambda text, meta: meta["doc"], SIM, merge_skills(ig),
+                              inherit=lambda old, meta: dict(meta, ig=RATE * meta["ig"] + (1 - RATE) * old.meta["ig"], fig=old.meta["fig"]))
 
 
-def add_insight(model, memory, text):
-    near = nearest(memory.of("insight"), condition(text), lambda r: condition(r.text))
-    if not near:
-        memory.add(text, "insight", meta={"fig": []})
-        return
-    old = near[0]
-    merged = [l.strip() for l in fenced(ask(model, MERGE_INSIGHTS.format(insights=f"{old.text}\n{text}")), "insights").splitlines()
-              if l.strip().startswith("If ")]
-    fig = old.meta["fig"] if len(merged) == 1 else []
-    if len(merged) == 1:
-        memory.drop(old.id)
-    for t in merged:
-        if t not in {r.text for r in memory.of("insight")}:
-            memory.add(t, "insight", meta={"fig": fig})
+def curate_one(ctx, memory, d):
+    d = d.info
+    if d["insight"]:
+        add_insight(ctx, memory, d["insight"], {"fig": []})
+    if d["best"]:
+        ctx.state["best"][d["question"]] = d["best"]
+    for block, doc in d["skills"]:
+        add_skill(d["ig"])(ctx, memory, block, dict(ig=d["ig"], fig=[], doc=doc))
+    for rid, v in d["fig"]:
+        if memory.get(rid):
+            memory.get(rid).meta["fig"].append(v)
 
 
-def add_skill(model, memory, block, doc, ig):
-    near = nearest(memory.of("skill"), doc, lambda r: r.meta["doc"])
-    if not near:
-        memory.add(block, "skill", meta=dict(ig=ig, fig=[], doc=doc))
-        return
-    old = near[0]
-    merged = subtasks(ask(model, MERGE_SKILLS.format(skills=f"{old.text}\n{block}")))
-    fig = []
-    if len(merged) == 1:
-        ig, fig = RATE * ig + (1 - RATE) * old.meta["ig"], old.meta["fig"]
-        memory.drop(old.id)
-    for b, d in merged:
-        if b not in {r.text for r in memory.of("skill")}:
-            memory.add(b, "skill", meta=dict(ig=ig, fig=fig, doc=d))
+curate = stages.each(curate_one)
 
 # решатель
 
-SUBTASKS = """
-
-Plan ahead how to break down the problem into several subtasks, then write down the solution.
-The solution should consist of several blocks, where each block represents a subtask:
-<subtask>
-<description>
-Description of the subtask, constraints or conditions and input variable assignment.
-NOTE: the description should be understandable and solvable on its own without the context of the original problem or reference to the other subtasks, so that it can be reused for future problems with similar subtasks.
-</description>
-<solution>
-Solution and computation steps of the subtask.
-</solution>
-<result>...</result>
-</subtask>
-The final block should be the aggregation step that takes the intermediate results from the previous blocks and deduces the final answer."""
+SUBTASKS = prompts.load("evolib_subtasks.txt").text
 
 evolib = Method("evolib", MEMORY, sample, Feedback("majority"), Update(reflect(), curate),
                 Solver(samples=2, temperature=0, vote=True, hint=SUBTASKS))
