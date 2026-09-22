@@ -44,10 +44,11 @@ class Method:
     vote: bool = False                                       # ответ большинством по группе (self-consistency)
     every: int = 0                                           # батчевый сигнал: раз в every задач
     batch: callable = lambda model, memory, traces: None     # что делать с батчем трасс
+    perspectives: tuple = ()                                 # K параллельных решений с разными установками, засчитывается лучшее
 
 
-def solve(model, task, memory, method, item, temperature=0):
-    system = task.system + method.env.hint
+def solve(model, task, memory, method, item, temperature=0, hint=""):
+    system = task.system + method.env.hint + hint
     if memory.records:
         system += "\n\nWhat you learned so far:\n" + method.inject(memory)
     memory.used = []
@@ -66,7 +67,10 @@ def run(task, method, model, n=40, out=None, split=""):
     for i, item in enumerate(items):
         t0 = time.time()
         method.prepare(model, memory, item)
-        trace = solve(model, task, memory, method, item)
+        trace = solve(model, task, memory, method, item, hint="\n\n" + method.perspectives[0] if method.perspectives else "")
+        if method.perspectives:
+            others = [solve(model, task, memory, method, item, hint="\n\n" + p) for p in method.perspectives[1:]]
+            trace = max([trace, *others], key=lambda t: t.correct)
         trace.group = [solve(model, task, memory, method, item, temperature=0.7) for _ in range(method.group)]
         if method.vote:
             trace.answer = Counter(t.answer for t in [trace] + trace.group).most_common(1)[0][0]

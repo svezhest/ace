@@ -1,8 +1,8 @@
 """Dynamic Cheatsheet: один вызов после каждой задачи переписывает всю память целиком, без метки.
 Промпт куратора взят из апстрима как есть (prompts/dc_curator.txt)."""
-from collections import Counter
 from pathlib import Path
 
+from .. import embed
 from ..loop import Method
 
 CURATOR = (Path(__file__).parent / "prompts" / "dc_curator.txt").read_text()
@@ -25,22 +25,16 @@ dc = Method("dc", reflect=reflect, curate=curate, signal="none")
 
 
 # DC-RS: до решения достаём top-3 прошлых пар (вопрос, ответ) и синтезируем из них cheatsheet.
-# В статье косинус по эмбеддингам text-embedding-3-small; здесь косинус по мешку слов, эмбеддингов у стенда нет.
+# Косинус по BGE-M3 (в статье text-embedding-3-small).
 SYNTH = (Path(__file__).parent / "prompts" / "dc_synth.txt").read_text()
 TOP = 3
-
-
-def cosine(a, b):
-    a, b = Counter(a.lower().split()), Counter(b.lower().split())
-    dot = sum(a[w] * b[w] for w in a)
-    return dot / (sum(v * v for v in a.values()) ** 0.5 * sum(v * v for v in b.values()) ** 0.5 or 1)
 
 
 def prepare(model, memory, item):
     pairs = [r for r in memory.records if r.kind == "episode"]
     if not pairs:
         return
-    top = sorted(pairs, key=lambda r: cosine(r.when, item["context"]), reverse=True)[:TOP]
+    top = [pairs[i] for i in embed.top(item["context"], [r.when for r in pairs], TOP)]
     notes = "\n\n".join(f"Input: {r.when}\nOutput: {r.text}" for r in top)
     sheet = next((r.text for r in memory.records if r.kind == "sheet"), "(empty)")
     prompt = (SYNTH.replace("[[PREVIOUS_CHEATSHEET]]", sheet).replace("[[PREVIOUS_INPUT_OUTPUT_PAIRS]]", notes)
