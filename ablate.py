@@ -8,6 +8,7 @@ from ace.env import Skills
 from ace.loop import Method, run
 from ace.methods import ace, baseline, proto
 from ace.methods.ace import curate as ace_curate, reflect as ace_reflect
+from ace.methods.proto import curate as proto_curate
 from ace.model import Model
 from ace.tasks import TASKS
 
@@ -23,7 +24,9 @@ CHAIN = {
     "ace_rewrite": replace(ace, curate=ace_curate("rewrite")),                      # Curate: полная перезапись
     "catalog": replace(ace, inject=proto.inject, env=Skills()),                   # Inject: каталог вместо полной памяти
     "typed": replace(proto, bound=nobound, curate=ace.curate),                     # Store: типы, рефлексия по вызванным
-    "ops5": replace(proto, bound=nobound),                                         # Curate: пять операций
+    "ops5": replace(proto, bound=nobound),                                         # Curate: операции через tools
+    "ops5_json": replace(proto, bound=nobound, curate=proto_curate("json")),       # Curate: операции одной схемой
+    "ops5_rewrite": replace(proto, bound=nobound, curate=proto_curate("rewrite")), # Curate: все записи заново
     "gate": replace(proto, bound=bound.gate()),                                    # Bound: gate
     "budget": replace(proto, bound=bound.budget(0.25)),                            # Bound: доля бюджета
     "proto": proto,
