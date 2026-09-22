@@ -1,5 +1,6 @@
 """Цепочка абляций: каждая ступень отличается от предыдущей одним модулем.
 python ablate.py TASK [N] [STEP ...]"""
+import os
 import sys
 from dataclasses import replace
 
@@ -35,4 +36,4 @@ CHAIN = {
 task = TASKS[sys.argv[1]]
 n = int(sys.argv[2]) if len(sys.argv) > 2 else 40
 for name in sys.argv[3:] or CHAIN:
-    print(run(task, replace(CHAIN[name], name=name), Model(), n, f"results/{task.name}{n}/{name}"))
+    print(run(task, replace(CHAIN[name], name=name), Model(), n, f"{os.getenv('RESULTS', 'results')}/{task.name}{n}/{name}"))
