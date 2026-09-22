@@ -1,28 +1,23 @@
-"""Dynamic Cheatsheet: один вызов после каждой задачи переписывает всю память целиком, без метки."""
+"""Dynamic Cheatsheet: один вызов после каждой задачи переписывает всю память целиком, без метки.
+Промпт куратора взят из апстрима как есть (prompts/dc_curator.txt)."""
+from pathlib import Path
+
 from ..loop import Method
 
-CURATOR = """You maintain a cheatsheet of reusable strategies, formulas and warnings for solving tasks like the one below.
-Rewrite the whole cheatsheet: keep what is useful, fix or remove what is wrong, add new transferable insights. Keep it compact.
-
-## Current cheatsheet
-{cheatsheet}
-
-## Task
-{question}
-
-## Attempted solution
-{output}
-
-Return only the new cheatsheet."""
+CURATOR = (Path(__file__).parent / "prompts" / "dc_curator.txt").read_text()
 
 
 def reflect(model, trace, memory):
-    return model.one("You are a careful curator of a cheatsheet.",
-                     CURATOR.format(cheatsheet=memory.text() or "(empty)", question=trace.question, output=trace.output)).text
+    prompt = (CURATOR.replace("[[PREVIOUS_CHEATSHEET]]", memory.text() or "(empty)")
+              .replace("[[QUESTION]]", trace.question).replace("[[MODEL_ANSWER]]", trace.output))
+    return model.one("You are a careful curator of a cheatsheet.", prompt).text
 
 
 def curate(model, memory, new_text):
-    memory.replace_all(new_text.strip())
+    # апстрим оставляет старый cheatsheet, если блок не найден
+    if "<cheatsheet>" in new_text:
+        new_text = new_text.split("<cheatsheet>", 1)[1].split("</cheatsheet>")[0]
+        memory.replace_all(new_text.strip())
 
 
 dc = Method("dc", reflect=reflect, curate=curate, signal="none")
