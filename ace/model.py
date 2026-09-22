@@ -27,7 +27,7 @@ class Model:
         self.calls = self.prompt_tokens = self.completion_tokens = 0
 
     def run(self, system, user, output=str, tools=(), deps=None, rounds=0, temperature=0):
-        agent = Agent(self.llm, system_prompt=system, output_type=output, tools=tools, retries=1)
+        agent = Agent(self.llm, system_prompt=system, output_type=output, tools=tools, retries=3)
         try:
             messages = agent.run_sync(user, deps=deps, usage_limits=UsageLimits(request_limit=rounds + 2),
                                       model_settings={"temperature": temperature, "max_tokens": self.max_tokens})

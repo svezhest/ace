@@ -99,8 +99,8 @@ def by_kind(memory, *kinds):
 
 def inject(memory):
     rules = "\n".join(f"- {r.text}" for r in by_kind(memory, "constraint")) or "(none)"
-    catalog = "\n".join(f"[{r.id}] {r.when}" for r in by_kind(memory, "procedure", "insight")) or "(none)"
-    return f"Rules:\n{rules}\n\nEntries you can read with use_skill:\n{catalog}"
+    catalog = "\n".join(f"skills/{r.id}  {r.when}" for r in by_kind(memory, "procedure", "insight")) or "(none)"
+    return f"Rules:\n{rules}\n\nEntries you can read with read(path):\n{catalog}"
 
 
 def reflect(format="json"):
@@ -183,5 +183,5 @@ def curate(mode="tools"):
     return curate
 
 
-proto = Method("proto", inject=inject, reflect=reflect(), curate=curate(), env=Skills(),
+proto = Method("proto", inject=inject, reflect=reflect(), curate=curate(), env=Skills(("procedure", "insight")),
                bound=bound.budget(0.25))
