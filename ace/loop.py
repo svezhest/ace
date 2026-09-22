@@ -43,7 +43,7 @@ class Method:
     group: int = 0                                           # сколько сэмплов добавить к жадному ответу
     vote: bool = False                                       # ответ большинством по группе (self-consistency)
     every: int = 0                                           # батчевый сигнал: раз в every задач
-    batch: callable = lambda model, memory, traces: None     # что делать с батчем трасс
+    batch: callable = lambda model, memory, traces, task: None   # что делать с батчем трасс
     perspectives: tuple = ()                                 # K параллельных решений с разными установками, засчитывается лучшее
 
 
@@ -82,7 +82,7 @@ def run(task, method, model, n=40, out=None, split=""):
             method.bound(model, memory, task, method)
         traces.append(trace)
         if method.every and len(traces) % method.every == 0:
-            method.batch(model, memory, traces[-method.every:])
+            method.batch(model, memory, traces[-method.every:], task)
         log.append(dict(i=i, target=trace.target, answer=trace.answer, correct=trace.correct,
                         finish="length" if trace.truncated else "stop", output=trace.output,
                         used=trace.used, gated=memory.gated[-1:], memory_chars=len(method.inject(memory)), sec=round(time.time() - t0, 1)))

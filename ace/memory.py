@@ -11,6 +11,7 @@ class Record:
     when: str = ""             # когда применять
     helpful: int = 0
     harmful: int = 0
+    meta: dict = field(default_factory=dict)   # что ещё метод хранит о записи (веса, история)
 
 
 @dataclass
