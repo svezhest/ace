@@ -1,0 +1,14 @@
+You are merging similar playbook bulletpoints into a single, comprehensive entry.
+
+Given these similar bulletpoints:
+{bullets}
+
+Merge them into ONE bulletpoint that captures all important information while removing redundancy.
+
+Requirements:
+1. Keep the ID from the first entry: [{id}]
+2. Use combined counts: helpful={helpful} harmful={harmful}
+3. Combine the content to be comprehensive but concise
+4. Output ONLY in this format: [{id}] helpful={helpful} harmful={harmful} :: [merged content]
+
+Do NOT include any explanation, just output the merged bulletpoint.
