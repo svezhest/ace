@@ -26,13 +26,13 @@ class Model:
             base_url=base_url or os.getenv("LOCAL_BASE_URL", "http://localhost:8080/v1"), api_key="local"))
         self.calls = self.prompt_tokens = self.completion_tokens = 0
 
-    def run(self, system, user, output=str, tools=(), deps=None, rounds=0, temperature=0):
+    def run(self, system, user, output=str, tools=(), deps=None, rounds=0, temperature=0, max_tokens=None):
         agent = Agent(self.llm, system_prompt=system, output_type=output, tools=tools, retries=3)
         # сообщения сохраняются и при сбое: траектория и токены не теряются
         with capture_run_messages() as messages:
             try:
                 result = agent.run_sync(user, deps=deps, usage_limits=UsageLimits(request_limit=rounds + 2),
-                                        model_settings={"temperature": temperature, "max_tokens": self.max_tokens}).output
+                                        model_settings={"temperature": temperature, "max_tokens": max_tokens or self.max_tokens}).output
             except (UsageLimitExceeded, UnexpectedModelBehavior):
                 result = None
         responses = [m for m in messages if isinstance(m, ModelResponse)]
@@ -41,8 +41,8 @@ class Model:
         self.completion_tokens += sum(m.usage.output_tokens for m in responses)
         return Reply(result, transcript(messages), any(m.finish_reason == "length" for m in responses), steps(messages))
 
-    def one(self, system, user, temperature=0):
-        return self.run(system, user, temperature=temperature)
+    def one(self, system, user, temperature=0, max_tokens=None):
+        return self.run(system, user, temperature=temperature, max_tokens=max_tokens)
 
     def usage(self):
         return dict(calls=self.calls, prompt_tokens=self.prompt_tokens, completion_tokens=self.completion_tokens)

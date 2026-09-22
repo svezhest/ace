@@ -15,6 +15,7 @@ class View:
     tools: tuple = ()                           # чтение памяти по вызову
     fs: object = None                           # FS, к которой привязаны инструменты
     rounds: int = 0                             # сколько лишних шагов агенту на чтение
+    head: str = "What you learned so far:\n"     # заголовок перед text; у методов со своей формулировкой пуст
 
 
 def numbered(records):

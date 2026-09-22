@@ -1,11 +1,12 @@
 """Элемент 4. Обновление: как сигнал становится правкой памяти. Память меняет только оно.
 
     reflect(ctx, episode, memory) -> дельта или None     память не трогает
-    curate(ctx, memory, deltas)                           применяет накопленные дельты раз в every задач
+    curate(ctx, memory, deltas)                           применяет накопленные дельты раз в every задач прохода
     bound(ctx, memory, before)                            ограничение после правки; before = память до неё
 
 ctx: model, task, evaluate(memory) -> [(верно, обрыв)] на val, render(memory) -> что увидит решатель,
-state: своё состояние обновления на прогон (инструкция куратора MCE), gated: решения gate."""
+retry(memory, note) -> новая попытка того же вопроса с заметкой (раунды рефлексии ACE),
+step и total: номер задачи и их число, state: своё состояние обновления на прогон, gated: решения gate."""
 import copy
 from dataclasses import dataclass, field
 
@@ -18,6 +19,7 @@ class Update:
     curate: callable = lambda ctx, memory, deltas: None
     bound: callable = lambda ctx, memory, before: None
     every: int = 1
+    flush: bool = False         # неполный батч в конце прохода применить; иначе он отбрасывается (TF-GRPO)
     needs_usage: bool = False   # опирается на то, что решатель прочёл: сигнал обязан это отдавать
 
 
@@ -27,6 +29,9 @@ class Ctx:
     task: object
     evaluate: callable
     render: callable
+    retry: callable = None
+    step: int = 0
+    total: int = 0
     state: dict = field(default_factory=dict)
     gated: list = field(default_factory=list)
 
@@ -75,30 +80,6 @@ def gate():
         if not ok:
             memory.records = before.records
         ctx.gated.append(ok)
-    return bound
-
-
-def dedup(threshold=0.75, max_records=None):
-    """Grow-and-refine из ACE: новая запись, близкая по эмбеддингу к старой (косинус >= threshold;
-    на BGE-M3 перефразировки дают 0.74-0.81, разные уроки 0.4-0.67), сливается с ней:
-    счётчики складываются, остаётся старая. При max_records лишние уходят по порядку добавления."""
-    from . import embed
-
-    def bound(ctx, memory, before):
-        was = {r.id for r in before.records}
-        old = [r for r in memory.records if r.id in was]
-        new = [r for r in memory.records if r.id not in was]
-        if old and new:
-            sims = embed.embed([r.text for r in new]) @ embed.embed([r.text for r in old]).T
-            for i, r in enumerate(new):
-                j = int(sims[i].argmax())
-                if sims[i][j] >= threshold:
-                    old[j].helpful += r.helpful
-                    old[j].harmful += r.harmful
-                    memory.drop(r.id)
-        if max_records:
-            for r in memory.records[:-max_records]:
-                memory.drop(r.id)
     return bound
 
 

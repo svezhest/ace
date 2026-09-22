@@ -1,12 +1,14 @@
 """Элемент 3. Сигнал: что после попытки возвращается в систему.
 
 Обновление видит только Episode, а не пример из датасета. Верный ответ попадает в эпизод
-лишь при verdict = golden; при judge вердикт ставит сама модель; при none вердикта нет.
+лишь при verdict = golden; при judge вердикт ставит сама модель; при majority попытка верна,
+если её ответ совпал с самым частым ответом группы (EvoLib без метки); при none вердикта нет.
 Что решатель прочёл (usage):
     env   чтения через инструменты инжекта: факт, записанный средой
     self  самоотчёт в ответе решателя (bullet_ids): слова модели, не факт
     none  неизвестно
 """
+from collections import Counter
 from dataclasses import dataclass, field
 
 JUDGE = """Check the solution below. Recompute the key quantities yourself and compare with the solution's final answer.
@@ -32,6 +34,7 @@ class Episode:
     ok: bool = None             # вердикт; None, если его нет
     target: str = ""            # верный ответ, только при golden
     group: list = field(default_factory=list)   # остальные попытки того же вопроса, тоже Episode
+    perspective: str = ""       # чья часть памяти была у решателя (SCOPE K=2)
 
     def verdict(self):
         if self.ok is None:
@@ -43,12 +46,12 @@ class Episode:
 
 @dataclass
 class Feedback:
-    verdict: str = "golden"     # golden | yes_no | judge | none
+    verdict: str = "golden"     # golden | yes_no | judge | majority | none
     usage: str = "none"         # env | self | none
 
     def observe(self, model, attempt, group=()):
         ep = Episode(attempt.question, attempt.output, attempt.answer, attempt.steps, attempt.truncated,
-                     attempt.context, attempt.shown)
+                     attempt.context, attempt.shown, perspective=attempt.perspective)
         ep.used = {"env": attempt.reads, "self": attempt.reported}.get(self.usage, [])
         if self.verdict in ("golden", "yes_no"):
             ep.ok = attempt.correct
@@ -57,6 +60,11 @@ class Feedback:
         if self.verdict == "judge":
             ep.ok = judge(model, attempt)
         ep.group = [self.observe(model, a) for a in group]
+        if self.verdict == "majority":
+            votes = Counter(e.answer for e in [ep, *ep.group] if e.answer)
+            top = votes.most_common(1)[0][0] if votes else None
+            for e in [ep, *ep.group]:
+                e.ok = bool(top) and e.answer == top
         return ep
 
 

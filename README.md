@@ -16,10 +16,13 @@
 uv venv .venv && uv pip install -p .venv/bin/python "pydantic-ai-slim[openai]"
 python ace/env/sandbox.py --build        # образ docker для исполнения кода
 python run.py formula ace 40             # результаты в results/formula40/ace/
+EPOCHS=3 OFFLINE=1 python run.py formula mce 40   # офлайн: обучение на train, тест с лучшей по val памятью
 python ablate.py formula 40              # вся цепочка абляций, или список ступеней после N
 python report.py                         # таблица по results/
 python ace/tasks.py meb results/meb40/ace/log.json   # переоценить лог
 ```
 
-Методы: baseline, dc, dc_rs, ace, scope, scope_k2, tfgrpo, evolib, mce, proto (`ace/methods/`). Retrieval-варианты считают эмбеддинги BGE-M3 (`ace/embed.py`). Ступени абляции в `ablate.py`.
+Методы (`ace/methods/`): baseline; dc, dc_rs и контроли dc_retrieval, dc_history, dc_code; ace (вариант стенда),
+ace_exact и ace_exact_dedup (как в апстриме); scope, scope_bo2, scope_k2; tfgrpo; evolib, evolib_judge; mce; proto.
+В docstring каждого метода: что взято из апстрима (файлы) и где расходимся. Retrieval-варианты считают эмбеддинги BGE-M3 (`ace/embed.py`). Ступени абляции в `ablate.py`.
 Окружение: `LOCAL_BASE_URL`, `MODEL`, `MAX_TOKENS` (MEB: 8192), `SEED`.

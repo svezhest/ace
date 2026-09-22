@@ -28,9 +28,11 @@ from .update import Ctx, Update, snapshot
 @dataclass
 class Solver:
     env: Env = field(default_factory=Env)
-    samples: int = 0            # сколько ещё попыток при temperature 0.7 (группа для сигнала или голосования)
+    samples: int = 0            # сколько ещё попыток (группа для сигнала или голосования)
+    temperature: float = 0.7    # температура дополнительных попыток
     vote: bool = False          # ответ большинством по всем попыткам (self-consistency)
-    perspectives: tuple = ()    # K решений с разными установками, засчитывается лучшее
+    perspectives: tuple = ()    # K решений, у каждого своя часть памяти; засчитывается лучшее
+    hint: str = ""              # добавка метода к системному промпту решателя (формат ответа)
 
 
 @dataclass
@@ -41,6 +43,7 @@ class Method:
     feedback: Feedback = field(default_factory=Feedback)
     update: Update = field(default_factory=Update)
     solver: Solver = field(default_factory=Solver)
+    epochs: int = 1             # проходов по train по умолчанию, как в апстриме
 
     def __post_init__(self):
         if self.update.needs_usage and self.feedback.usage == "none":
@@ -70,23 +73,26 @@ class Attempt:
     shown: list
     reads: list                 # что прочитано инструментами инжекта
     reported: list              # что решатель назвал сам
+    perspective: str = ""
 
 
-def solve(model, task, method, memory, item, temperature=0, hint=""):
+def solve(model, task, method, memory, item, temperature=0, note=""):
     env, view = method.solver.env, method.inject(model, memory, item)
     self_report = method.feedback.usage == "self"
-    system = task.system + env.hint + hint
+    system = task.system + env.hint + method.solver.hint
     if view.text:
-        system += "\n\nWhat you learned so far:\n" + view.text
+        system += "\n\n" + view.head + view.text
     if self_report and memory.records:
         system += ("\n\nRight before the final answer line, write one line 'USED: <ids of the memory bullets "
                    "you actually relied on, comma-separated, or none>'.")
-    r = model.run(system, f"{task.instr}\n\n{item['context']}", tools=env.tools + view.tools, deps=view.fs,
+    user = f"{task.instr}\n\n{item['context']}" + (f"\n\nReflection:\n{note}" if note else "")
+    r = model.run(system, user, tools=env.tools + view.tools, deps=view.fs,
                   rounds=env.rounds + view.rounds, temperature=temperature)
     answer = final_answer(r.output or "")
     reported = [i for i in used_line(r.output or "") if memory.get(i)] if self_report else []
     return Attempt(item["context"], item["target"], r.text, answer, task.check(answer, item["target"]), r.truncated,
-                   r.steps, view.text, view.shown, list(view.fs.reads) if view.fs else [], reported)
+                   r.steps, view.text, view.shown, list(view.fs.reads) if view.fs else [], reported,
+                   item.get("perspective", ""))
 
 
 def used_line(text):
@@ -96,47 +102,91 @@ def used_line(text):
 
 
 def attempt(model, task, method, memory, item):
-    """Попытка, которая идёт в зачёт, и остальные попытки группы."""
+    """Попытка, которая идёт в зачёт, и остальные попытки (группа)."""
     s = method.solver
-    a = solve(model, task, method, memory, item, hint="\n\n" + s.perspectives[0] if s.perspectives else "")
     if s.perspectives:
-        others = [solve(model, task, method, memory, item, hint="\n\n" + p) for p in s.perspectives[1:]]
-        a = max([a, *others], key=lambda t: t.correct)
-    group = [solve(model, task, method, memory, item, temperature=0.7) for _ in range(s.samples)]
+        # у каждой перспективы своя память (SCOPE K=2): инжект и обновление читают item["perspective"]
+        tried = [solve(model, task, method, memory, dict(item, perspective=p)) for p in s.perspectives]
+        a = max(tried, key=lambda t: t.correct)
+        group = [t for t in tried if t is not a]
+    else:
+        a, group = solve(model, task, method, memory, item), []
+    group += [solve(model, task, method, memory, item, temperature=s.temperature) for _ in range(s.samples)]
     if s.vote:
-        a.answer = Counter(t.answer for t in [a] + group).most_common(1)[0][0]
+        a.answer = majority([a] + group)
         a.correct = task.check(a.answer, a.target)
     return a, group
 
 
-def run(task, method, model, n=40, out=None, split=""):
-    items = task.load(split)[:n]
+def majority(attempts):
+    """Самый частый непустой ответ; при равенстве первый встреченный."""
+    votes = Counter(t.answer for t in attempts if t.answer)
+    return votes.most_common(1)[0][0] if votes else ""
+
+
+def run(task, method, model, n=40, out=None, split="", epochs=None, offline=False):
+    """Онлайн: поток split, память обновляется по ходу, epochs проходов, в зачёт последний.
+    Офлайн (ACE offline, MCE): обучение на train, после каждого прохода val, затем split
+    с лучшей по val памятью без обновлений."""
     random.seed(int(os.getenv("SEED", 0)))
+    epochs = epochs or method.epochs
     memory = Memory(dict(method.memory))
     item = None
-    ctx = Ctx(model, task,
-              evaluate=lambda m: [(t.correct, t.truncated) for t in (solve(model, task, method, m, it) for it in task.load("val"))],
-              render=lambda m: method.inject(model, m, item).text)
+    scores = {}
+
+    def evaluate(m):
+        """(верно, обрыв) на val; одна и та же память не считается дважды."""
+        key = tuple((r.kind, r.text, r.when) for r in m.records)
+        if key not in scores:
+            scores[key] = [(t.correct, t.truncated) for t in (solve(model, task, method, m, it) for it in task.load("val"))]
+        return scores[key]
+
+    ctx = Ctx(model, task, evaluate=evaluate,
+              render=lambda m: method.inject(model, m, item).text,
+              retry=lambda m, note: solve(model, task, method, m, item, note=note))
     log, pending = [], []
-    for i, item in enumerate(items):
-        t0 = time.time()
-        a, group = attempt(model, task, method, memory, item)
-        episode = method.feedback.observe(model, a, group)
-        delta = method.update.reflect(ctx, episode, memory)
-        if delta:
-            pending.append(delta)
-        if (i + 1) % method.update.every == 0 and pending:
-            before = snapshot(memory)
-            method.update.curate(ctx, memory, pending)
-            method.update.bound(ctx, memory, before)
-            pending = []
-        log.append(dict(i=i, question=a.question, target=a.target, answer=a.answer, correct=a.correct,
-                        finish="length" if a.truncated else "stop", output=a.output, shown=a.shown, read=a.reads,
-                        reported=a.reported, gated=ctx.gated[-1:], memory_chars=memory.chars(), sec=round(time.time() - t0, 1)))
-        print(f"{task.name} {method.name} {i:3} {'+' if a.correct else '-'} "
-              f"{sum(r['correct'] for r in log)}/{i + 1} mem={memory.chars()}", flush=True)
-    summary = dict(task=task.name, method=method.name, model=model.name, n=len(log),
-                   correct=sum(r["correct"] for r in log), truncated=sum(r["finish"] == "length" for r in log),
+
+    def record(phase, epoch, i, a, t0):
+        log.append(dict(phase=phase, epoch=epoch, i=i, question=a.question, target=a.target, answer=a.answer,
+                        correct=a.correct, finish="length" if a.truncated else "stop", output=a.output, shown=a.shown,
+                        read=a.reads, reported=a.reported, gated=ctx.gated[-1:], memory_chars=memory.chars(),
+                        sec=round(time.time() - t0, 1)))
+        done = [r for r in log if r["phase"] == phase and r["epoch"] == epoch]
+        print(f"{task.name} {method.name} {phase}{epoch} {i:3} {'+' if a.correct else '-'} "
+              f"{sum(r['correct'] for r in done)}/{len(done)} mem={memory.chars()}", flush=True)
+
+    best, best_val = snapshot(memory), -1
+    for epoch in range(epochs):
+        items = task.load("train" if offline else split)[:n]
+        for i, item in enumerate(items):
+            t0 = time.time()
+            ctx.step, ctx.total = i + 1, len(items)
+            a, group = attempt(model, task, method, memory, item)
+            episode = method.feedback.observe(model, a, group)
+            delta = method.update.reflect(ctx, episode, memory)
+            if delta:
+                pending.append(delta)
+            last = i == len(items) - 1
+            if ((i + 1) % method.update.every == 0 or last and method.update.flush) and pending:
+                before = snapshot(memory)
+                method.update.curate(ctx, memory, pending)
+                method.update.bound(ctx, memory, before)
+            if (i + 1) % method.update.every == 0 or last:
+                pending = []            # неполный батч в конце прохода без flush отбрасывается
+            record("train" if offline else "online", epoch, i, a, t0)
+        if offline:
+            score = sum(c for c, _ in ctx.evaluate(memory))
+            print(f"val after epoch {epoch}: {score}", flush=True)
+            if score > best_val:
+                best, best_val = snapshot(memory), score
+    if offline:
+        memory = best
+        for i, item in enumerate(task.load(split)[:n]):
+            t0 = time.time()
+            record("test", 0, i, attempt(model, task, method, memory, item)[0], t0)
+    final = [r for r in log if r["phase"] == "test" or r["phase"] == "online" and r["epoch"] == epochs - 1]
+    summary = dict(task=task.name, method=method.name, model=model.name, n=len(final), epochs=epochs, offline=offline,
+                   correct=sum(r["correct"] for r in final), truncated=sum(r["finish"] == "length" for r in final),
                    **model.usage())
     if out:
         Path(out).mkdir(parents=True, exist_ok=True)
