@@ -1,0 +1,21 @@
+You are resolving a conflict between two rules.
+
+Rule {idx1}:
+  Text: {rule1_text}
+  Rationale: {rule1_rationale}
+
+Rule {idx2}:
+  Text: {rule2_text}
+  Rationale: {rule2_rationale}
+
+These rules appear to conflict. Your task is to:
+1. Verify the conflict is real
+2. Synthesize a single rule that reconciles both OR pick the better rule with justification
+
+Return JSON:
+{{
+  "rule": "The resolved rule text",
+  "rationale": "Explanation of how this resolves the conflict"
+}}
+
+JSON Response:

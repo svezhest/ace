@@ -1,0 +1,54 @@
+You are a rule optimization analyzer. Analyze these {num_rules} rules and identify optimization opportunities.
+
+{rules_text}
+
+Your task is to identify three types of optimization opportunities:
+
+1. **CONFLICTS**: Pairs of rules that give contradictory guidance.
+   - Example: "Minimize tool calls" vs "Call verification after each step"
+   - PRIORITY: Highest - conflicts must be resolved first
+
+2. **SUBSUMPTION**: Pairs where a specific rule is entirely covered by a more general rule.
+   - Example: If "Check all file paths" exists, then "Check image file paths" is redundant
+   - Format: [general_rule_index, specific_rule_index]
+   - PRIORITY: High - clear redundancy should be removed
+
+3. **CONSOLIDATION**: Groups of rules that express similar concepts and can be merged into a single, more comprehensive rule.
+   - Example: "Validate file paths" + "Check file existence" → can merge
+   - PRIORITY: Medium - merge rules that address the same concern from different angles
+
+**IMPORTANT PRIORITY RULES** (to avoid overlaps):
+1. If two rules CONFLICT, do NOT also mark them for consolidation or subsumption
+2. If one rule SUBSUMES another, do NOT also mark them for consolidation
+3. A rule pair should appear in AT MOST ONE category
+4. When in doubt between categories, prefer: Conflicts > Subsumption > Consolidation
+
+Guidelines:
+- Only flag conflicts if there's a REAL contradiction (not just different aspects)
+- For subsumption, the specific rule must be COMPLETELY covered by the general one
+- Only group rules for consolidation if they truly address the same concern AND don't conflict
+- Return empty arrays if no opportunities found
+- Be conservative - only suggest optimizations you're confident about
+
+You MUST respond with ONLY valid JSON in this exact format (no extra text before or after):
+{{
+  "consolidation": [[idx1, idx2], [idx3, idx4]],
+  "subsumption": [[general_idx, specific_idx]],
+  "conflicts": [[idx1, idx2]]
+}}
+
+Example valid response:
+{{
+  "consolidation": [[0, 1, 2], [5, 6]],
+  "subsumption": [[3, 7]],
+  "conflicts": [[4, 8]]
+}}
+
+If no opportunities found, return:
+{{
+  "consolidation": [],
+  "subsumption": [],
+  "conflicts": []
+}}
+
+JSON Response:

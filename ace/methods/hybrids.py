@@ -27,7 +27,7 @@ def best_of_2(ctx, ep, memory):
 
 def group_reflect(ctx, ep, memory):
     """Семантическое преимущество TF-GRPO по группе попыток; дальше куратор ACE."""
-    s = advantage(ctx, ep, memory)
+    s = advantage(ctx, ep)
     return Delta(lessons=[s]) if s else None
 
 
@@ -35,7 +35,7 @@ ace_bo2 = swap(ACE, "ace_bo2", reflect=best_of_2)
 ace_group = swap(ACE, "ace_group", reflect=group_reflect, solver=Solver(samples=3))
 ace_opt = swap(ACE, "ace_opt", bound=optimize(("bullet",)))
 # потоки SCOPE вместо пунктов ACE: память, инжект, рефлексия и куратор SCOPE, ограничитель ACE
-ace_steps = swap(ACE, "ace_steps", memory=STREAMS, inject=streams, reflect=scope_reflect, curate=scope_curate)
+ace_steps = swap(ACE, "ace_steps", memory=STREAMS, inject=streams, reflect=scope_reflect(), curate=scope_curate)
 proto_opt = swap(PROTO, "proto_opt", bound=update.chain(update.budget(0.25), optimize(("insight",))))
 
 HYBRIDS = [ace_bo2, ace_group, ace_opt, ace_steps, proto_opt]
