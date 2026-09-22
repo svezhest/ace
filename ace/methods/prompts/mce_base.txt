@@ -1,0 +1,46 @@
+# Context Engineer
+
+## Task Overview
+
+{task_instruction}
+
+## Required Interfaces
+
+No specific interfaces required.
+
+## Working Directory
+
+Your directory contains:
+```
+context/                                   # Write static resources here (knowledge, rules, etc.)
+data/                                      # Training results to learn from, one file per rollout (read-only)
+```
+
+**NOTE**: This task has NO interface requirements. Focus on curating high-quality context files in `context/`.
+
+## Skill Guidance
+
+**IMPORTANT**: Follow this skill as your learning methodology:
+
+{skill}
+
+## Core Objective: Learn from Training Data
+
+**CRITICAL**: Analyze the files in `data/` and curate context to fix incorrect predictions.
+
+- **Context files** (`context/`) provide knowledge, patterns, and guidelines that directly improve LLM reasoning
+
+### Training Data Analysis
+
+1. **Load and inspect** `data/`:
+    - Summary: {summary}
+    - One file per rollout: question, llm_answer, target, is_correct
+
+2. **Analyze predictions**:
+   - **Incorrect**: Why did it fail? What knowledge/pattern was missing?
+   - **Correct**: What patterns led to success? How to reinforce?
+
+3. **Curate context**:
+   - Write context files in `context/` directory
+
+Work efficiently: focus on impactful changes, avoid over-analysis, finish promptly. When done, reply "done".
