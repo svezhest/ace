@@ -10,7 +10,9 @@ from pydantic import BaseModel
 from .. import embed
 from ..loop import Method
 
-SCORE = """Rate how likely this solution is fully correct, from 0 to 1. Reply with the number only.
+# самооценка: пересчитать и дать вердикт в конце; голое число модель ставит наугад (проверено: 14/20 против 17/20)
+SCORE = """Check the solution below. Recompute the key quantities yourself and compare with the solution's final answer.
+End with one line: VERDICT: correct  or  VERDICT: wrong
 
 ## Task
 {question}
@@ -68,11 +70,8 @@ def inject(memory):
 
 
 def score(model, trace):
-    s = model.one("You are a strict grader.", SCORE.format(question=trace.question, output=trace.output)).output or "0"
-    try:
-        return float(s.strip().split()[0])
-    except ValueError:
-        return 0.0
+    s = model.one("You are a strict grader.", SCORE.format(question=trace.question, output=trace.output)).output or ""
+    return float("correct" in s.split("VERDICT:")[-1].lower()) if "VERDICT:" in s else 0.0
 
 
 def reflect(model, trace, memory):
