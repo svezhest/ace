@@ -83,7 +83,7 @@ def run(task, method, model, n=40, out=None, split=""):
         traces.append(trace)
         if method.every and len(traces) % method.every == 0:
             method.batch(model, memory, traces[-method.every:], task)
-        log.append(dict(i=i, target=trace.target, answer=trace.answer, correct=trace.correct,
+        log.append(dict(i=i, question=trace.question, target=trace.target, answer=trace.answer, correct=trace.correct,
                         finish="length" if trace.truncated else "stop", output=trace.output,
                         used=trace.used, gated=memory.gated[-1:], memory_chars=len(method.inject(memory)), sec=round(time.time() - t0, 1)))
         print(f"{task.name} {method.name} {i:3} {'+' if trace.correct else '-'} "
