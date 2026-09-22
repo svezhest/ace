@@ -19,17 +19,17 @@ DC-RS
 Контроли апстрима: dc_retrieval (пары без синтеза), dc_history (все прошлые пары подряд).
 Исполнение кода в апстриме включено по умолчанию (execute_python_code=True): вариант dc_code с Sandbox.
 Куратор и синтез в апстриме пишут до 2 * max_tokens.
-"""
-from pathlib import Path
 
-from .. import embed
+Сборка: dc — show(sheet) + reflect ask(curator) + curate rewrite; dc_rs — synth(show(pair, topk, пары)) +
+reflect keep + curate remember(пара) и rewrite(показанный cheatsheet).
+"""
+from .. import curate as stages, inject, prompts, reflect
 from ..env import Sandbox
 from ..feedback import Feedback
-from ..inject import View
 from ..loop import Method, Solver, swap
-from ..update import Update
+from ..update import Delta, Update, ask
 
-PROMPTS = Path(__file__).parent / "prompts"
+SYNTH, CURATOR = prompts.load("dc_synth.txt", "brackets"), prompts.load("dc_curator.txt", "brackets")
 EMPTY = "(empty)"
 
 # 1. память
@@ -39,7 +39,6 @@ MEMORY_RS = {"pair": ("add",), "sheet": ("add", "edit")}
 
 # 2. инжект
 
-SYNTH = (PROMPTS / "dc_synth.txt").read_text()
 TOP = 3
 NOTE = ("Note: The input-output pairs listed below are taken from previous test cases and are meant to assist you in "
         "understanding potential solution strategies or tool usages. While they can offer insight and inspiration, they "
@@ -50,7 +49,7 @@ NOTE = ("Note: The input-output pairs listed below are taken from previous test 
 
 def cheatsheet(block):
     """Текст внутри <cheatsheet>; None, если блока нет (апстрим тогда оставляет старый)."""
-    if "<cheatsheet>" not in block:
+    if not block or "<cheatsheet>" not in block:
         return None
     return block.split("<cheatsheet>", 1)[1].strip().split("</cheatsheet>")[0].strip()
 
@@ -59,77 +58,43 @@ def sheet(memory):
     return memory.of("sheet")[0].text if memory.of("sheet") else EMPTY
 
 
-def whole(model, memory, item):
-    return View(sheet(memory))
+def pairs(scored):
+    """Пары в оформлении апстрима. scored (retrieval): с пояснением, близостью, самая похожая последней;
+    иначе (полная история) по порядку."""
+    def layout(records):
+        text = "### PREVIOUS SOLUTIONS (START)\n\n" + (f"{NOTE}\n\n" if scored else "")
+        for i, r in enumerate(records[::-1] if scored else records):
+            if scored:
+                text += (f"#### Previous Input #{i + 1} (Similarity: {r.meta['score']:.2f}):\n\n{r.when}\n\n"
+                         f"#### Model Solution to Previous Input  #{i + 1}:\n\n{r.text}\n---\n---\n\n")
+            else:
+                text += (f"#### Previous Input #{i + 1}:\n\n{r.when}\n\n"
+                         f"#### Model Solution to Previous Input #{i + 1}:\n\n{r.text}\n---\n---\n\n")
+        return (text.strip() + "\n\n" if scored else text) + "#### PREVIOUS SOLUTIONS (END)"
+    return layout
 
 
-def retrieved(memory, item):
-    """Top-k прошлых пар в оформлении апстрима и их id."""
-    pairs = memory.of("pair")
-    if not pairs:
-        return EMPTY, []
-    sims = embed.embed([r.when for r in pairs]) @ embed.embed([item["context"]])[0]
-    top = list(sims.argsort()[::-1][:TOP])
-    text = f"### PREVIOUS SOLUTIONS (START)\n\n{NOTE}\n\n"
-    for i, j in enumerate(top[::-1]):
-        text += (f"#### Previous Input #{i + 1} (Similarity: {sims[j]:.2f}):\n\n{pairs[j].when}\n\n"
-                 f"#### Model Solution to Previous Input  #{i + 1}:\n\n{pairs[j].text}\n---\n---\n\n")
-    return text.strip() + "\n\n#### PREVIOUS SOLUTIONS (END)", [pairs[j].id for j in top]
-
-
-def retrieval(model, memory, item):
-    return View(*retrieved(memory, item))
-
-
-def retrieve_synth(model, memory, item):
-    pairs, ids = retrieved(memory, item)
-    prompt = (SYNTH.replace("[[PREVIOUS_INPUT_OUTPUT_PAIRS]]", pairs).replace("[[NEXT_INPUT]]", item["context"])
-              .replace("[[PREVIOUS_CHEATSHEET]]", sheet(memory)))
-    new = cheatsheet(model.one("", prompt, max_tokens=2 * model.max_tokens).text)
-    return View(new if new is not None else pairs, ids)
-
-
-def history(model, memory, item):
-    pairs = memory.of("pair")
-    if not pairs:
-        return View(EMPTY)
-    text = "### PREVIOUS SOLUTIONS (START)\n\n"
-    for i, r in enumerate(pairs):
-        text += (f"#### Previous Input #{i + 1}:\n\n{r.when}\n\n"
-                 f"#### Model Solution to Previous Input #{i + 1}:\n\n{r.text}\n---\n---\n\n")
-    return View(text + "#### PREVIOUS SOLUTIONS (END)", [r.id for r in pairs])
+whole = inject.show(("sheet",), line=inject.plain, empty=EMPTY)
+retrieval = inject.show(("pair",), pick=inject.topk(TOP, key=lambda r: r.when), layout=pairs(scored=True), empty=EMPTY)
+history = inject.show(("pair",), layout=pairs(scored=False), empty=EMPTY)
+retrieve_synth = inject.synth(retrieval, SYNTH, lambda view, memory, item: {
+    "PREVIOUS_INPUT_OUTPUT_PAIRS": view.text, "NEXT_INPUT": item["context"], "PREVIOUS_CHEATSHEET": sheet(memory)}, cheatsheet)
 
 # 4. обновление
 
-CURATOR = (PROMPTS / "dc_curator.txt").read_text()
+def new_sheet(out, *_, **__):
+    s = cheatsheet(out)
+    return Delta(lessons=[s]) if s is not None else None
 
 
-def reflect(ctx, ep, memory):
-    prompt = (CURATOR.replace("[[QUESTION]]", ep.question).replace("[[MODEL_ANSWER]]", ep.output)
-              .replace("[[PREVIOUS_CHEATSHEET]]", sheet(memory)))
-    return cheatsheet(ctx.model.one("", prompt, max_tokens=2 * ctx.model.max_tokens).text)
+curator = ask(CURATOR, lambda ctx, ep, memory, **_: {"QUESTION": ep.question, "MODEL_ANSWER": ep.output,
+                                                     "PREVIOUS_CHEATSHEET": sheet(memory)}, tokens=2, then=new_sheet)
+rewrite = stages.each(stages.rewrite("sheet", text=lambda d: d.lessons[0]))
+pair = stages.remember("pair", text=lambda ep: ep.output, when=lambda ep: ep.question)
+store = stages.each(pair, stages.rewrite("sheet", text=lambda ep: ep.context))
 
-
-def curate(ctx, memory, sheets):
-    for s in sheets:
-        memory.rewrite("sheet", s)
-
-
-def remember(ctx, ep, memory):
-    return ep
-
-
-def store(keep_sheet=True):
-    def curate(ctx, memory, episodes):
-        for ep in episodes:
-            memory.add(ep.output, kind="pair", when=ep.question)
-            if keep_sheet:
-                memory.rewrite("sheet", ep.context)
-    return curate
-
-
-dc = Method("dc", MEMORY, whole, Feedback("none"), Update(reflect, curate))
+dc = Method("dc", MEMORY, whole, Feedback("none"), Update(curator, rewrite))
 dc_code = swap(dc, "dc_code", solver=Solver(env=Sandbox()))
-dc_rs = Method("dc_rs", MEMORY_RS, retrieve_synth, Feedback("none"), Update(remember, store()))
-dc_retrieval = Method("dc_retrieval", MEMORY_RS, retrieval, Feedback("none"), Update(remember, store(keep_sheet=False)))
-dc_history = Method("dc_history", MEMORY_RS, history, Feedback("none"), Update(remember, store(keep_sheet=False)))
+dc_rs = Method("dc_rs", MEMORY_RS, retrieve_synth, Feedback("none"), Update(reflect.keep, store))
+dc_retrieval = Method("dc_retrieval", MEMORY_RS, retrieval, Feedback("none"), Update(reflect.keep, stages.each(pair)))
+dc_history = Method("dc_history", MEMORY_RS, history, Feedback("none"), Update(reflect.keep, stages.each(pair)))
