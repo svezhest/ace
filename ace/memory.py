@@ -21,6 +21,7 @@ class Memory:
     used: list = field(default_factory=list)   # что решатель вызвал в текущей задаче
     before: list = field(default_factory=list) # снимок до последней правки (для gate)
     gated: list = field(default_factory=list)  # решения gate: принято / откачено
+    query: str = ""                            # текущий вопрос, для retrieval при inject
 
     def add(self, text, **fields):
         self.counter += 1
