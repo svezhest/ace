@@ -10,17 +10,20 @@
 | обновление | reflect, curate, bound, раз в every задач | `ace/update.py`, `reflect.py`, `curate.py`, `bound.py` |
 | решатель | среда задачи, число попыток, температура, голосование, перспективы, формат ответа | `ace/loop.py` |
 
-Метод — сборка из блоков плюс промпты апстрима файлами (`ace/methods/prompts/`, `ace/prompts.py`):
+Метод — только сборка: параметры, промпты апстрима файлами (`ace/methods/prompts/`, `ace/prompts.py`) и блоки
+библиотеки. Код любого уровня лежит в модуле этого уровня рядом с остальными вариантами, даже если пока
+его использует один метод:
 
 | Где | Блоки |
 |---|---|
-| память | схема вид -> операции; `Kind(ops, per="task")` — записи на одну задачу; поле `group` (раздел, домен) |
-| инжект | `show(kinds, pick, line/layout, before, empty, head)`; pick: `topk`, `sample`, `where`; `by_group`; `choose`, `concat`, `synth`, `fixed`, `catalog` |
-| сигнал | `Feedback(verdict: golden / yes_no / judge / majority / none, usage: env / self / none)` |
-| общие | `ask` (вызов модели по промпту), `seq`, `when`, `maybe`, `retry` |
-| reflect | `keep`, `rounds`, `per_step`, `perspectives`, `best_of`, `each_attempt`, `log_gain`, `future_gain` |
-| curate | `each`, `per_lesson`, `count`, `add`, `apply_ops`, `remember`, `rewrite`, `tools`, `admit`, `limit`, `consolidate`, `duplicate_words` |
-| bound | `prune`, `budget`, `gate`, `merge_similar`, `best_by_val`, `chain`; `optimize` SCOPE |
+| память `memory.py` | схема вид -> операции; `Kind(ops, per="task")` — записи на одну задачу; поле `group`; `perspectives`, `slug` |
+| инжект `inject.py` | `show(kinds, pick, line/layout, before, empty, head)`; pick: `topk`, `sample` (`gain_weight`), `where`; line: `plain`, `dashed`, `numbered`, `dotted`, `counted`, `prefixed`; layout: `by_group`, `sections`, `pairs`; `choose`, `concat`, `synth`, `fixed`, `catalog` |
+| сигнал `feedback.py` | `Feedback(verdict: golden / yes_no / judge / majority / none, usage: env / self / none)` |
+| общие `update.py` | `ask` (вызов модели: промпт, поля, схема, parse, then), `paired`, `seq`, `when`, `maybe`, `on_prev`, `retry` |
+| разбор `parse.py` | `opened`, `enclosed`, `between`, `fenced`, `json_block`, `subtasks`, `counted_line` |
+| reflect `reflect.py` | обёртки `keep`, `rounds`, `per_step`, `perspectives`, `best_of`, `each_attempt`; поля, схемы и then: уроки ACE стенда и прототипа, диагноз ACE, правило на шаг SCOPE, групповое преимущество TF-GRPO, IG EvoLib, cheatsheet DC |
+| curate `curate.py` | обёртки `each`, `per_lesson`, `admit`, `limit`, `planned`, `chain`; правки `count`, `add`, `apply_ops`, `remember`, `rewrite`, `tools`, `consolidate`; поля, схемы и then: плейбук ACE, классификатор SCOPE, план батча TF-GRPO, библиотека EvoLib, итерации MCE, операции прототипа |
+| bound `bound.py` | `prune`, `budget`, `gate`, `merge_similar` (`merge_counted`), `optimize` (`rule_optimizer` SCOPE), `best_by_val`, `chain` |
 
 Абляция это замена одной части: `swap(ace, inject=inject.catalog())` или `swap(ace, curate=...)`.
 Новый метод — новая сборка; если блока не хватает, существующий делится на два.

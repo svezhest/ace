@@ -6,8 +6,8 @@ import sys
 from ace import bound, inject
 from ace.loop import Solver, run, swap
 from ace.methods import ace, baseline, proto
-from ace.methods.ace import stand_curate as ace_curate, stand_reflect as ace_reflect
-from ace.methods.proto import curate as proto_curate
+from ace.methods.ace import curate_json, curate_rewrite, curate_tools, reflect_text
+from ace.methods.proto import curate_json as proto_json, curate_rewrite as proto_rewrite
 from ace.model import Model
 from ace.tasks import TASKS
 
@@ -18,14 +18,14 @@ CHAIN = {
     "placebo": swap(baseline, inject=inject.fixed(PLACEBO)),                    # та же длина промпта без знаний
     "sc3": swap(baseline, solver=Solver(samples=2, vote=True)),                  # столько же вызовов без памяти
     "ace": ace,
-    "ace_text": swap(ace, reflect=ace_reflect("text")),                         # обновление: рефлексия свободным текстом
-    "ace_json": swap(ace, curate=ace_curate("json")),                           # обновление: все операции одним JSON
-    "ace_rewrite": swap(ace, curate=ace_curate("rewrite")),                     # обновление: полная перезапись
+    "ace_text": swap(ace, reflect=reflect_text),                         # обновление: рефлексия свободным текстом
+    "ace_json": swap(ace, curate=curate_json),                           # обновление: все операции одним JSON
+    "ace_rewrite": swap(ace, curate=curate_rewrite),                     # обновление: полная перезапись
     "catalog": swap(ace, inject=inject.catalog()),                              # инжект: каталог вместо всей памяти
-    "typed": swap(proto, bound=nobound, curate=ace_curate()),                   # память: типы; сигнал: прочитанное
+    "typed": swap(proto, bound=nobound, curate=curate_tools),                   # память: типы; сигнал: прочитанное
     "ops5": swap(proto, bound=nobound),                                         # обновление: операции прототипа через tools
-    "ops5_json": swap(proto, bound=nobound, curate=proto_curate("json")),       # операции одной схемой
-    "ops5_rewrite": swap(proto, bound=nobound, curate=proto_curate("rewrite")), # все записи заново
+    "ops5_json": swap(proto, bound=nobound, curate=proto_json),       # операции одной схемой
+    "ops5_rewrite": swap(proto, bound=nobound, curate=proto_rewrite), # все записи заново
     "gate": swap(proto, bound=bound.gate()),                                   # ограничение: gate на val
     "budget": swap(proto, bound=bound.budget(0.25)),                           # ограничение: доля бюджета
     "proto": proto,

@@ -5,8 +5,10 @@
 
 Инжект собирается из блоков:
     show(kinds, pick, line | layout, before, after, empty, head)   какие записи и как они выглядят
-        pick     какие из записей видов: все, topk по эмбеддингу, sample по весу, where по условию
-        line     строка записи; layout — весь текст из записей (группы с заголовками, пары)
+        pick     какие из записей видов: все, topk по эмбеддингу, sample по весу (gain_weight EvoLib),
+                 where по условию
+        line     строка записи: plain, dashed, numbered, dotted, counted, prefixed
+        layout   весь текст из записей: by_group и sections (разделы ACE, домены SCOPE), pairs (DC)
     choose((p, inject), ...)     одно случайное число выбирает ветку (EvoLib: skills, insights или ничего)
     concat(inject, ...)          несколько блоков подряд (SCOPE: strategic, затем tactical)
     synth(inject, prompt, ...)   модель переписывает показанное под вопрос (DC-RS)
@@ -18,6 +20,7 @@ import random
 from dataclasses import dataclass, field, replace
 
 from . import embed, fs
+from .memory import slug
 
 HEAD = "What you learned so far:\n"
 
@@ -46,8 +49,16 @@ def numbered(r):
     return f"[{r.id}] {r.text}"
 
 
+def dotted(r):
+    return f"[{r.id}]. {r.text}"
+
+
 def counted(r):
     return f"[{r.id}] helpful={r.helpful} harmful={r.harmful} :: {r.text}"
+
+
+def prefixed(prefix):
+    return lambda r: prefix + r.text
 
 # какие записи
 
@@ -71,6 +82,20 @@ def where(test):
     return lambda records, item: [r for r in records if test(r, item)]
 
 
+def gain_weight(w_ig, eps):
+    """Вес EvoLib: skill — w_IG * max(IG, eps) + (среднее FIG или 0.5), insight — max(среднее FIG или 0.5, eps).
+    В апстриме у skill пола нет: отрицательный вес ломает random.choices молча, поэтому здесь пол eps."""
+    def weight(r):
+        fig = r.meta["fig"]
+        future = sum(fig) / len(fig) if fig else 0.5
+        if r.kind == "skill":
+            return max(w_ig * max(r.meta["ig"], eps) + future, eps)
+        return max(future, eps)
+    return weight
+
+# вид всего текста
+
+
 def by_group(line, order=(), header="## {}", sep="\n\n", title=str):
     """Записи под заголовками по полю group. order — пары (группа, заголовок), показываются все,
     даже пустые; без order группы идут по первому появлению."""
@@ -78,6 +103,37 @@ def by_group(line, order=(), header="## {}", sep="\n\n", title=str):
         groups = list(order) or [(g, title(g)) for g in dict.fromkeys(r.group for r in records)]
         return sep.join("\n".join([header.format(t)] + [line(r) for r in records if r.group == g]) for g, t in groups)
     return layout
+
+
+def titled(group):
+    """tool_usage -> Tool Usage (домены SCOPE)."""
+    return group.replace("_", " ").title()
+
+
+def sections(names, line=counted):
+    """Разделы ACE: все по порядку, даже пустые; группа записи — slug заголовка."""
+    return by_group(line, order=[(slug(s), s) for s in names])
+
+
+def pairs(scored, note=""):
+    """Пары (вопрос в when, решение в text) в оформлении DC. scored (retrieval): с пояснением note и близостью,
+    самая похожая последней; иначе (полная история) по порядку."""
+    def layout(records):
+        text = "### PREVIOUS SOLUTIONS (START)\n\n" + (f"{note}\n\n" if scored else "")
+        for i, r in enumerate(records[::-1] if scored else records):
+            if scored:
+                text += (f"#### Previous Input #{i + 1} (Similarity: {r.meta['score']:.2f}):\n\n{r.when}\n\n"
+                         f"#### Model Solution to Previous Input  #{i + 1}:\n\n{r.text}\n---\n---\n\n")
+            else:
+                text += (f"#### Previous Input #{i + 1}:\n\n{r.when}\n\n"
+                         f"#### Model Solution to Previous Input #{i + 1}:\n\n{r.text}\n---\n---\n\n")
+        return (text.strip() + "\n\n" if scored else text) + "#### PREVIOUS SOLUTIONS (END)"
+    return layout
+
+
+def text_of(memory, kind, empty):
+    """Текст единственной записи вида или empty (DC: cheatsheet)."""
+    return memory.of(kind)[0].text if memory.of(kind) else empty
 
 # сборка
 
@@ -141,6 +197,12 @@ def synth(base, prompt, fields, parse, max_tokens=2):
         out = parse(model.one("", prompt.fill(fields(view, memory, item)), max_tokens=max_tokens * model.max_tokens).text)
         return replace(view, text=out if out is not None else view.text)
     return inject
+
+
+def pairs_and_sheet(kind, empty):
+    """Поля синтеза DC-RS: показанные пары, следующий вопрос, прошлый cheatsheet."""
+    return lambda view, memory, item: {"PREVIOUS_INPUT_OUTPUT_PAIRS": view.text, "NEXT_INPUT": item["context"],
+                                       "PREVIOUS_CHEATSHEET": text_of(memory, kind, empty)}
 
 
 def catalog(always=(), listed=()):

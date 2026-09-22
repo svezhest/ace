@@ -1,21 +1,45 @@
 """Стадия curate обновления: накопленные дельты -> правка памяти. Стадия: stage(ctx, memory, deltas).
-Блок по одной дельте: block(ctx, memory, delta).
+Блок по одной дельте: block(ctx, memory, delta). Вызов модели — update.ask с полями и then отсюда.
 
+Обёртки
+    chain(*stages)                  стадии по очереди
     each(*blocks)                   блоки по очереди для каждой дельты
     per_lesson(*blocks)             блоки для каждого урока каждой дельты
+    admit(test, block)              блок только для дельт, прошедших проверку; has_lessons
     limit(n, key)                   не больше n принятых за прогон (SCOPE: 20)
-    consolidate(kind, key, ...)     добавление с консолидацией: похожую запись сливает модель (EvoLib)
+    planned(plan, then)             один план на весь батч, затем then (TF-GRPO)
+    by_label                        промпт по тому, была ли метка у эпизода (ACE)
+
+Правки
     count                           счётчики helpful / harmful по меткам дельты (ACE)
-    ask(...)                        вызов модели по промпту метода (update.ask), then применяет ответ
     add(items, ...)                 новые записи из ответа модели
-    apply_ops(ops)                  операции ADD / UPDATE / DELETE / NONE (TF-GRPO; ADD-only куратор ACE)
+    apply_ops(ops)                  операции ADD / UPDATE / DELETE / NONE (TF-GRPO; ACE стенда одной схемой: Ops, op_dicts)
     remember(kind, text, ...)       запись прямо из дельты или эпизода (DC-RS)
-    rewrite(kind, text)             все записи вида заменяются одним текстом (DC)
-    tools(prompt, fields, deps)     агент правит память инструментами: файловыми (ACE стенда, MCE) или своими (прототип)
-    admit(test, block)              блок только для дельт, прошедших проверку (SCOPE: классификатор)
-    chain(*stages)                  стадии по очереди"""
-from . import embed, fs, update
-from .update import ask, seq, when  # noqa: F401  общие блоки reflect и curate
+    rewrite(kind, text)             все записи вида заменяются одним текстом (DC); rewrite_first — ответом модели
+    tools(prompt, fields, deps)     агент правит память инструментами: файловыми (memory_files; ACE стенда, MCE)
+                                    или операциями прототипа (TYPED_TOOLS над memory_itself)
+    consolidate(kind, key, ...)     добавление с консолидацией: похожую запись сливает модель (EvoLib)
+
+Что видит куратор: lessons_fields(view), view — files_view, text_view, entries_view
+
+Плейбук ACE: playbook_stats, playbook_fields, Curation, additions, in_section
+Классификатор SCOPE: Classification, classify_fields, settle, accepted, add_tactical, promotable, promote
+План батча TF-GRPO: plan_fields, op_list
+Библиотека EvoLib: condition, add_insight, add_skill, gains
+Итерации MCE: meta_fields, new_skill, iteration, skill_fields, context_and_results
+Прототип: TYPED_TOOLS, TypedOps, apply_typed, Entries, replace_entries, add_episode"""
+import json
+from typing import Literal
+
+from pydantic import BaseModel
+from pydantic_ai import RunContext
+
+from . import bound, embed, fs, parse, update
+from .memory import Forbidden, Memory, perspective_kind, slug
+from .reflect import Lesson, Typed
+from .update import snapshot
+
+# обёртки
 
 
 def chain(*stages):
@@ -43,6 +67,17 @@ def per_lesson(*blocks):
     return stage
 
 
+def admit(test, inner):
+    def block(ctx, memory, delta):
+        if test(ctx, memory, delta):
+            inner(ctx, memory, delta)
+    return block
+
+
+def has_lessons(ctx, memory, d):
+    return bool(d.lessons)
+
+
 def limit(n, key):
     """Не больше n принятых за прогон по ключу key(урок); пропускает prev дальше или обрывает цепочку."""
     def block(ctx, memory, lesson, prev=None, **extra):
@@ -52,6 +87,19 @@ def limit(n, key):
         ctx.state[k] = ctx.state.get(k, 0) + 1
         return prev if prev is not None else lesson
     return block
+
+
+def planned(plan, then):
+    """plan(ctx, memory, deltas) по всему батчу, затем then(план, ctx, memory)."""
+    def stage(ctx, memory, deltas):
+        then(plan(ctx, memory, deltas), ctx, memory)
+    return stage
+
+
+def by_label(labeled, unlabeled):
+    return lambda memory, d, **extra: labeled if d.info["labeled"] else unlabeled
+
+# правки
 
 
 def count(ctx, memory, delta):
@@ -83,6 +131,20 @@ def apply_ops(ops, missing="add"):
     return then
 
 
+class Op(BaseModel):
+    op: Literal["ADD", "UPDATE"]
+    text: str
+    id: str = ""
+
+
+class Ops(BaseModel):
+    ops: list[Op]
+
+
+def op_dicts(r):
+    return [dict(operation=o.op, id=o.id, content=o.text) for o in (r.ops if r else [])]
+
+
 def remember(kind, text, **fields):
     """Запись из дельты или эпизода: text(d) и прочие поля функциями от d (DC-RS: пара вопрос-решение)."""
     def block(ctx, memory, d):
@@ -96,6 +158,11 @@ def rewrite(kind, text=lambda d: d):
     return block
 
 
+def rewrite_first(new, ctx, memory, d, **extra):
+    """then: ответ модели заменяет все записи первого вида схемы."""
+    return new and memory.rewrite(next(iter(memory.schema)), new.strip())
+
+
 def tools(prompt, fields, deps, rounds, toolset=fs.TOOLS, system="You are a curator."):
     """Агент с инструментами toolset над deps(memory, delta) (fs.FS для файловых); работает, пока не ответит текстом."""
     def block(ctx, memory, delta):
@@ -103,11 +170,12 @@ def tools(prompt, fields, deps, rounds, toolset=fs.TOOLS, system="You are a cura
     return block
 
 
-def admit(test, inner):
-    def block(ctx, memory, delta):
-        if test(ctx, memory, delta):
-            inner(ctx, memory, delta)
-    return block
+def memory_files(memory, d):
+    return fs.FS({"memory": fs.Mount(memory)})
+
+
+def memory_itself(memory, d):
+    return memory
 
 
 def duplicate_words(text, texts, overlap=0.7):
@@ -146,3 +214,388 @@ def consolidate(kind, key, threshold, merge, inherit):
             if t not in {r.text for r in memory.of(kind)}:
                 memory.add(t, kind, meta=m)
     return add
+
+# что видит куратор
+
+
+def lessons_fields(view):
+    return lambda ctx, memory, d, **extra: dict(lessons=d.shown(), memory=view(memory))
+
+
+def files_view(memory):
+    return "\n".join(f"memory/{r.id}: {r.text}" for r in memory.records) or "(empty)"
+
+
+def text_view(memory):
+    return memory.text() or "(empty)"
+
+
+def entries_view(memory):
+    shown = "\n".join(f"[{r.id}] ({r.kind}; when: {r.when}) {r.text}" for r in memory.of("constraint", "procedure", "insight"))
+    return shown or "(empty)"
+
+# плейбук ACE
+
+
+class Addition(BaseModel):
+    type: str = "ADD"
+    section: str = "others"
+    content: str
+
+
+class Curation(BaseModel):
+    reasoning: str
+    operations: list[Addition] = []
+
+
+def playbook_stats(memory, sections):
+    stats = dict(total_bullets=0, high_performing=0, problematic=0, unused=0, by_section={})
+    for s in sections:
+        for r in (r for r in memory.records if r.group == slug(s)):
+            stats["total_bullets"] += 1
+            if r.helpful > 5 and r.harmful < 2:
+                stats["high_performing"] += 1
+            elif r.harmful >= r.helpful and r.harmful > 0:
+                stats["problematic"] += 1
+            elif r.helpful + r.harmful == 0:
+                stats["unused"] += 1
+            sec = stats["by_section"].setdefault(s, dict(count=0, helpful=0, harmful=0))
+            sec["count"] += 1
+            sec["helpful"] += r.helpful
+            sec["harmful"] += r.harmful
+    return stats
+
+
+def playbook_fields(sections, token_budget, layout):
+    """Куратор ACE видит последнюю рефлексию, вопрос, бюджет токенов, статистику и весь плейбук (layout)."""
+    def fields(ctx, memory, d, **extra):
+        return dict(token_budget=token_budget, current_step=ctx.step, total_samples=ctx.total,
+                    playbook_stats=json.dumps(playbook_stats(memory, sections), indent=2), recent_reflection=d.lessons[-1],
+                    current_playbook=layout(memory.records), question_context=d.info["question"])
+    return fields
+
+
+def additions(r):
+    return [op for op in (r.operations if r else []) if op.type == "ADD"]
+
+
+def in_section(sections, default="others"):
+    """Группа операции: раздел из списка или default."""
+    return lambda op: slug(op.section) if slug(op.section) in map(slug, sections) else default
+
+# классификатор SCOPE; урок — словарь perspective, text, rationale, confidence
+
+
+class Classification(BaseModel):
+    is_duplicate: bool = False
+    scope: str = "tactical"
+    confidence: float | None = None
+    domain: str = "general"
+
+
+def classify_fields(domains, intro, layout):
+    """Классификатор видит strategic по доменам (layout, как get_strategic_rules_text апстрима) и tactical списком."""
+    def fields(ctx, memory, g, **extra):
+        strategic = memory.of(perspective_kind("strategic", g["perspective"]))
+        tactical = memory.of(perspective_kind("tactical", g["perspective"]))
+        strategic_text = "\n" + intro + layout(strategic) if strategic else ""
+        rules = ("\n=== STRATEGIC RULES (Cross-task, persistent): ===\n" + (strategic_text or "No strategic rules yet.")
+                 + "\n\n=== TACTICAL RULES (Current task only): ===\n"
+                 + ("".join(f"{i}. {r.text}\n" for i, r in enumerate(tactical, 1)) or "No tactical rules yet.\n"))
+        return dict(allowed_domains=", ".join(domains), update_text=g["text"], rationale=g["rationale"],
+                    initial_confidence=g["confidence"], all_rules_context=rules)
+    return fields
+
+
+def settle(domains):
+    """Сбой классификатора: tactical с исходной confidence; домен вне списка -> general."""
+    def then(c, ctx, memory, g, **extra):
+        if not c:
+            return Classification(confidence=g["confidence"])
+        if c.confidence is None:
+            c.confidence = g["confidence"]
+        if c.scope == "strategic" and c.domain not in domains:
+            c.domain = "general"
+        return c
+    return then
+
+
+def accepted(threshold):
+    """Не дубль и confidence не ниже порога: классификация идёт дальше, иначе цепочка обрывается."""
+    return lambda ctx, memory, g, prev, **extra: prev if not prev.is_duplicate and prev.confidence >= threshold else None
+
+
+def add_tactical(ctx, memory, g, prev, **extra):
+    memory.add(g["text"], perspective_kind("tactical", g["perspective"]))
+    return prev
+
+
+def promotable(threshold):
+    return lambda ctx, memory, g, prev, **extra: prev.scope == "strategic" and prev.confidence >= threshold
+
+
+def promote(cap, target, optimizer):
+    """add_strategic_rule: без дубля по словам, домен по убыванию confidence, сверх cap — optimizer до target."""
+    def block(ctx, memory, g, prev, **extra):
+        strategic = perspective_kind("strategic", g["perspective"])
+        same = [r for r in memory.of(strategic) if r.group == prev.domain]
+        if duplicate_words(g["text"], [r.text for r in same]):
+            return None
+        rules = sorted([bound.as_rule(r) for r in same] + [dict(rule=g["text"], rationale=g["rationale"], confidence=prev.confidence)],
+                       key=lambda x: -x["confidence"])
+        if len(rules) > cap:
+            rules = optimizer(ctx.model, rules, target)[:cap]
+        bound.put_rules(memory, strategic, prev.domain, rules)
+        return prev
+    return block
+
+# план батча TF-GRPO
+
+
+def batch_table(memory, ops):
+    """Опыты с относящимися к ним операциями, затем операции без id."""
+    if not ops:
+        return "No batch operations."
+    dump = lambda op: json.dumps(op, ensure_ascii=False, indent=2)
+    out = []
+    for r in memory.records:
+        related = [op for op in ops if op.get("id") == r.id]
+        out.append(f"Experience {r.id}:\nContent: {r.text}\n"
+                   + ("Related Operations:\n" + "\n".join(map(dump, related)) if related else "No related operations."))
+    loose = [op for op in ops if not op.get("id")]
+    if loose:
+        out.append("Operations without specific Experience ID:\n" + "\n".join(map(dump, loose)))
+    return "\n\n".join(out)
+
+
+def plan_fields(ctx, memory, deltas, **extra):
+    return dict(experiences_and_operations=batch_table(memory, [op for d in deltas for op in d.ops if isinstance(op, dict)]))
+
+
+def op_list(plan):
+    return plan if isinstance(plan, list) else []
+
+# библиотека EvoLib; дельта с info от reflect.finish
+
+
+def condition(insight):
+    return insight.split(", then ")[0].replace("If ", "").strip()
+
+
+def add_insight(prompt, threshold):
+    """insight «If ..., then ...»: сравнение по условию, слияние моделью по prompt."""
+    def merge(ctx, old, text):
+        out = ctx.model.one("", prompt.fill(dict(insights=f"{old.text}\n{text}"))).output or ""
+        fig = []                                                        # общий список, как в апстриме
+        return [(l.strip(), {"fig": fig}) for l in parse.fenced(out, "insights").splitlines() if l.strip().startswith("If ")]
+    return consolidate("insight", lambda text, meta: condition(text), threshold, merge,
+                       inherit=lambda old, meta: {"fig": old.meta["fig"]})
+
+
+def add_skill(prompt, threshold, rate):
+    """skill по IG задачи -> блок добавления: сравнение по description, слияние моделью;
+    слитая запись берёт IG как скользящее среднее с долей rate."""
+    def with_gain(ig):
+        def merge(ctx, old, block):
+            out = ctx.model.one("", prompt.fill(dict(skills=f"{old.text}\n{block}"))).output or ""
+            fig = []
+            return [(b, dict(ig=ig, fig=fig, doc=d)) for b, d in parse.subtasks(out)]
+        return consolidate("skill", lambda text, meta: meta["doc"], threshold, merge,
+                           inherit=lambda old, meta: dict(meta, ig=rate * meta["ig"] + (1 - rate) * old.meta["ig"], fig=old.meta["fig"]))
+    return with_gain
+
+
+def gains(add_insight, add_skill):
+    """insight и skills в библиотеку, лучшее решение задачи в ctx.state, Future IG в записи."""
+    def block(ctx, memory, d):
+        d = d.info
+        if d["insight"]:
+            add_insight(ctx, memory, d["insight"], {"fig": []})
+        if d["best"]:
+            ctx.state["best"][d["question"]] = d["best"]
+        for text, doc in d["skills"]:
+            add_skill(d["ig"])(ctx, memory, text, dict(ig=d["ig"], fig=[], doc=doc))
+        for rid, v in d["fig"]:
+            if memory.get(rid):
+                memory.get(rid).meta["fig"].append(v)
+    return block
+
+# итерации MCE; история в ctx.state["iterations"], её же читает bound.best_by_val
+
+
+def overview(skill):
+    """Раздел «## Skill Overview» навыка."""
+    lines, out, inside = skill.splitlines(), [], False
+    for l in lines:
+        if l.strip().lower().replace(" ", "") == "##skilloverview":
+            inside = True
+            continue
+        if inside and l.startswith("## "):
+            break
+        if inside:
+            out.append(l)
+    text = "\n".join(out).strip()
+    return "\n".join(f"  {l}" if l.strip() else "" for l in text.splitlines()) if text else "  (no '## Skill Overview' section found)"
+
+
+def meta_fields(ctx, memory, deltas, history, **extra):
+    done = history[1:]
+    if not done:
+        database = "No previous iterations (this is iteration 1, iter0 is baseline). Design an initial skill based on the task."
+    else:
+        database = "\n\n".join(f"### Iteration {i}\n- **Train**: {h['train']:.2%} | **Val**: {h['val']:.2%}\n"
+                               f"- **Skill Overview**:\n{overview(h['skill'])}" for i, h in enumerate(done, 1))
+    evaluations = json.dumps({f"iter{i}": dict(val_accuracy=h["val"], train_accuracy=h["train"])
+                              for i, h in enumerate(history)}, indent=2)
+    skills = "\n\n".join(f"### iter{i}/SKILL.md\n{h['skill']}" for i, h in enumerate(done, 1)) or "(none)"
+    return dict(task_instruction=f"{ctx.task.system} {ctx.task.instr}", skill_database=database,
+                evaluations=evaluations, skills=skills)
+
+
+def new_skill(out, ctx, memory, deltas, history, **extra):
+    """Пустой ответ: навык прошлой итерации."""
+    done = history[1:]
+    return (out or "").strip() or (done[-1]["skill"] if done else "")
+
+
+def iteration(meta):
+    """Итерация 0 — val пустой памяти; первый батч прохода открывает итерацию с навыком meta(..., history)."""
+    def stage(ctx, memory, deltas):
+        history = ctx.state.setdefault("iterations", [])
+        if not history:
+            history.append(dict(skill=None, train=None, val=bound.accuracy(ctx.evaluate(memory)), memory=snapshot(memory)))
+        if ctx.step == len(deltas):
+            history.append(dict(skill=meta(ctx, memory, deltas, history=history), train=None, val=None, memory=None))
+        history[-1]["train"] = sum(bool(ep.ok) for ep in deltas) / len(deltas)
+    return stage
+
+
+def skill_fields(ctx, memory, deltas, **extra):
+    return dict(task_instruction=f"{ctx.task.system} {ctx.task.instr}", skill=ctx.state["iterations"][-1]["skill"],
+                summary=f"train_accuracy {sum(bool(ep.ok) for ep in deltas)}/{len(deltas)}")
+
+
+def results(deltas):
+    data = Memory({"result": ("add",)})
+    for ep in deltas:
+        data.add(f"is_correct: {bool(ep.ok)}\nllm_answer: {ep.answer}\ntarget: {ep.target}\nquestion:\n{ep.question}")
+    return data
+
+
+def context_and_results(memory, deltas):
+    """context/ — память на запись, data/ — итоги батча только на чтение."""
+    return fs.FS({"context": fs.Mount(memory), "data": fs.Mount(results(deltas), mode="ro")})
+
+# прототип: операции куратора над типизированной памятью; память сама не даст нарушить политику типа
+
+
+def named(name):
+    """Имя инструмента для модели."""
+    def wrap(f):
+        f.__name__ = name
+        return f
+    return wrap
+
+
+@named("add")
+def add_entry(ctx: RunContext[Memory], kind: Typed, when: str, text: str) -> str:
+    """Add a new entry."""
+    return ctx.deps.add(text, kind=kind, when=when).id
+
+
+@named("patch")
+def patch_entry(ctx: RunContext[Memory], id: str, text: str) -> str:
+    """Rewrite the text of a procedure or insight."""
+    if not ctx.deps.get(id):
+        return "no such id"
+    try:
+        ctx.deps.edit(id, text)
+    except Forbidden:
+        return "not allowed"
+    return "ok"
+
+
+@named("narrow")
+def narrow_entry(ctx: RunContext[Memory], id: str, when: str) -> str:
+    """Make the applicability condition of an entry more specific."""
+    if not ctx.deps.get(id):
+        return "no such id"
+    ctx.deps.edit(id, when=when)
+    return "ok"
+
+
+@named("merge")
+def merge_entries(ctx: RunContext[Memory], ids: list[str], when: str, text: str) -> str:
+    """Replace several procedures or insights with one entry."""
+    recs = [ctx.deps.get(i) for i in ids if ctx.deps.get(i)]
+    if len(recs) < 2 or any("delete" not in ctx.deps.ops(r.kind) for r in recs):
+        return "not allowed"
+    keep, *rest = recs
+    ctx.deps.edit(keep.id, text, when)
+    keep.helpful, keep.harmful = sum(r.helpful for r in recs), sum(r.harmful for r in recs)
+    for r in rest:
+        ctx.deps.drop(r.id)
+    return keep.id
+
+
+TYPED_TOOLS = (add_entry, patch_entry, narrow_entry, merge_entries)
+
+
+class TypedOp(BaseModel):
+    op: Literal["add", "patch", "narrow", "merge"]
+    kind: Typed = "insight"
+    ids: list[str] = []
+    when: str = ""
+    text: str = ""
+
+
+class TypedOps(BaseModel):
+    ops: list[TypedOp] = []
+
+
+class Deps:
+    """Подстановка RunContext, когда операции применяет код, а не модель через tool."""
+    def __init__(self, memory):
+        self.deps = memory
+
+
+def apply_typed(r, ctx, memory, d, **extra):
+    """then: операции одной схемой через те же инструменты."""
+    for op in (r.ops if r else []):
+        deps, id = Deps(memory), op.ids[0] if op.ids else ""
+        if op.op == "add":
+            add_entry(deps, op.kind, op.when, op.text)
+        elif op.op == "merge":
+            merge_entries(deps, op.ids, op.when, op.text)
+        elif op.op == "patch":
+            patch_entry(deps, id, op.text)
+        else:
+            narrow_entry(deps, id, op.when)
+
+
+class Entry(Lesson):
+    id: str = ""
+
+
+class Entries(BaseModel):
+    entries: list[Entry] = []
+
+
+def replace_entries(r, ctx, memory, d, **extra):
+    """then: полный новый список; оставленные по id правятся, остальные уходят; constraint не трогаются."""
+    if not r:
+        return
+    keep = {e.id: e for e in r.entries if e.id}
+    for rec in memory.of("constraint", "procedure", "insight"):
+        if rec.id in keep:
+            memory.edit(rec.id, keep[rec.id].text if rec.kind != "constraint" else None, keep[rec.id].when)
+        elif rec.kind != "constraint":
+            memory.drop(rec.id)
+    for e in r.entries:
+        if not e.id:
+            memory.add(e.text, kind=e.kind, when=e.when)
+
+
+def add_episode(ctx, memory, d):
+    if d.episode:
+        memory.add(kind="episode", **d.episode)

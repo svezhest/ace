@@ -5,8 +5,9 @@
     bound(ctx, memory, before)                            ограничение после правки         bound.py
 
 Стадии собираются из блоков этих модулей; общие блоки здесь: ask — один вызов модели по промпту метода,
-seq — цепочка блоков, when — блок по условию (иначе цепочка обрывается), maybe — блок по условию
-(иначе цепочка идёт дальше), retry — повтор до разбора.
+paired — то же по паре промптов системный / пользовательский, seq — цепочка блоков, when — блок по условию
+(иначе цепочка обрывается), maybe — блок по условию (иначе цепочка идёт дальше), on_prev — then над
+результатом предыдущего блока, retry — повтор до разбора.
 
 ctx: model, task, evaluate(memory) -> [(верно, обрыв)] на val, render(memory) -> что увидит решатель,
 retry(memory, note) -> новая попытка того же вопроса с заметкой (раунды рефлексии ACE),
@@ -53,9 +54,10 @@ class Delta(BaseModel):
         return "\n".join(f"- {l}" for l in self.lessons)
 
 
-def ask(prompt, fields, output=str, then=None, system="", temperature=0, tokens=1):
+def ask(prompt, fields, output=str, then=None, system="", temperature=0, tokens=1, parse=None):
     """Блок одного вызова модели. prompt — Prompt или функция от аргументов стадии, fields(ctx, *args, **extra)
-    -> поля промпта, then(ответ или None, ctx, *args, **extra) -> результат блока. system — строка или
+    -> поля промпта, parse(ответ) — разбор (parse.py), then(разобранный ответ или None, ctx, *args, **extra)
+    -> результат блока. system — строка или
     функция от ctx (TF-GRPO: цели агента зависят от задачи). Температуру может задать обёртка (best_of).
     tokens — множитель бюджета генерации (DC пишет cheatsheet вдвое длиннее)."""
     def block(ctx, *args, **extra):
@@ -63,8 +65,22 @@ def ask(prompt, fields, output=str, then=None, system="", temperature=0, tokens=
         out = ctx.model.run(system(ctx) if callable(system) else system, p.fill(fields(ctx, *args, **extra)), output=output,
                             temperature=extra.get("temperature", temperature),
                             max_tokens=tokens * ctx.model.max_tokens if tokens != 1 else None).output
+        if parse:
+            out = parse(out)
         return then(out, ctx, *args, **extra) if then else out
     return block
+
+
+def paired(prompts, name, fields, system_fields, then=None, parse=None):
+    """Пара промптов апстрима: prompts[name_SP] — системный с полями system_fields(ctx),
+    prompts[name_UP] — пользовательский (TF-GRPO)."""
+    return ask(prompts[f"{name}_UP"], fields, system=lambda ctx: prompts[f"{name}_SP"].fill(system_fields(ctx)),
+               then=then, parse=parse)
+
+
+def objectives(agent, learning, num):
+    """Поля системных промптов TF-GRPO: цель агента по задаче, цель обучения, сколько опытов за раз."""
+    return lambda ctx: dict(agent_objective=agent[ctx.task.name], learning_objective=learning, num_experiences=num)
 
 
 def retry(inner, n):
@@ -98,6 +114,11 @@ def when(test, inner):
 def maybe(test, inner):
     """В цепочке: inner, если test(ctx, *args, **extra), иначе результат предыдущего блока дальше без изменений."""
     return lambda ctx, *args, **extra: inner(ctx, *args, **extra) if test(ctx, *args, **extra) else extra.get("prev")
+
+
+def on_prev(then):
+    """В цепочке: then(результат предыдущего блока, ctx, *args, **extra)."""
+    return lambda ctx, *args, prev=None, **extra: then(prev, ctx, *args, **extra)
 
 
 def count(memory, helpful, harmful):

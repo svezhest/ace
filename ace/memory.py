@@ -9,6 +9,9 @@
     edit    новый текст (и условие применения)
     narrow  только условие применения
     delete  удаление
+
+Помощники схем: perspectives — своя копия видов на каждую перспективу (SCOPE K=2), slug — имя группы
+из заголовка раздела (ACE).
 """
 import json
 from dataclasses import dataclass, field, asdict
@@ -24,6 +27,19 @@ class Forbidden(Exception):
 class Kind:
     ops: tuple = ALL
     per: str = "run"           # run | task
+
+
+def perspectives(schema, names):
+    """Виды «вид:перспектива» для каждой перспективы."""
+    return {f"{kind}:{p}": ops for p in names for kind, ops in schema.items()}
+
+
+def perspective_kind(base, perspective):
+    return f"{base}:{perspective}" if perspective else base
+
+
+def slug(name):
+    return name.lower().strip().replace(" ", "_").replace("&", "and")
 
 
 @dataclass

@@ -13,12 +13,10 @@ configs/practice/math_reasoning.yaml.
 
 Батч в апстриме 50 из 100 задач, 2 шага за эпоху; у нас 20 из 40, те же 2 шага. Неполный батч отбрасывается.
 """
-import json
-
-from .. import curate as stages, inject, prompts, reflect as steps
+from .. import curate, inject, parse, prompts, reflect
 from ..feedback import Feedback
 from ..loop import Method, Solver
-from ..update import Delta, Update, ask, retry, seq
+from ..update import Update, objectives, paired, retry, seq
 
 Y = prompts.load_yaml("tfgrpo.yaml")
 
@@ -28,7 +26,7 @@ MEMORY = {"experience": ("add", "edit", "delete")}
 
 # 2. инжект
 
-experiences = inject.show(line=lambda r: f"[{r.id}]. {r.text}", head="",
+experiences = inject.show(line=inject.dotted, head="",
                           before="When solving problems, you MUST first carefully read and understand the helpful instructions and experiences:\n")
 
 # 4. обновление
@@ -41,95 +39,16 @@ OBJECTIVE = {
 }
 LEARNING = "Help the agent to improve the solving capability on these questions by extracting general and concise guidelines."
 NUM, BATCH = 1, 20
+GOALS = objectives(OBJECTIVE, LEARNING, NUM)
 
+summarize = paired(Y, "SINGLE_ROLLOUT_SUMMARY_TEMPLATE", reflect.rollout_fields, GOALS)
+advantage = paired(Y, "SINGLE_QUERY_GROUP_ADVANTAGE", reflect.advantage_fields, GOALS, parse=parse.enclosed("Experiences"))
+against_library = paired(Y, "GROUP_EXPERIENCE_UPDATE_TEMPLATE", reflect.library_fields, GOALS, parse=reflect.nonempty_ops)
 
-def template(name, fields, then=None):
-    """Пара промптов апстрима: name_SP с целями агента и обучения — системный, name_UP — пользовательский."""
-    system = lambda ctx: Y[f"{name}_SP"].fill(dict(agent_objective=OBJECTIVE[ctx.task.name], learning_objective=LEARNING,
-                                                   num_experiences=NUM))
-    return ask(Y[f"{name}_UP"], fields, system=system, then=then)
+group_advantage = reflect.when(reflect.partial_group, seq(reflect.each_attempt(summarize), reflect.summarized, advantage))
+plan = retry(paired(Y, "BATCH_EXPERIENCE_UPDATE_TEMPLATE", curate.plan_fields, GOALS, parse=parse.json_block), 3)
 
-
-def json_block(text, *_, **__):
-    try:
-        return json.loads(text.split("```json")[-1].split("```")[0])
-    except (json.JSONDecodeError, AttributeError):
-        return None
-
-
-def partial(rollouts, labeled):
-    """С меткой в работу идут только группы, где верна часть попыток."""
-    if not labeled:
-        return bool(rollouts)
-    mean = sum(bool(g.ok) for g in rollouts) / len(rollouts) if rollouts else 0
-    return 0 < mean < 1
-
-
-def answer(ep):
-    return ep.target or "[REDACTED]"
-
-
-summarize = template("SINGLE_ROLLOUT_SUMMARY_TEMPLATE", lambda ctx, g, memory, **_: dict(
-    question=g.question, trajectory=g.output, answer=answer(g), critique="[No critique provided]"))
-
-
-def summarized(ctx, ep, memory, prev, **extra):
-    kept = [(g, s) for g, s in prev if s]
-    return kept if partial([g for g, _ in kept], bool(ep.target)) else None
-
-
-def experiences_of(critique, *_, **__):
-    """Текст внутри <Experiences>, регистр не важен; без блока пусто."""
-    if critique is None:
-        return None
-    low = critique.lower()
-    if "<experiences>" in low and "</experiences>" in low:
-        start = low.index("<experiences>") + len("<experiences>")
-        return critique[start:low.index("</experiences>", start)].strip()
-    return ""
-
-
-advantage = template("SINGLE_QUERY_GROUP_ADVANTAGE", lambda ctx, ep, memory, prev, **_: dict(
-    question=ep.question, answer=answer(ep), trajectories="\n\n".join(
-        f"Attempt {i + 1} (Reward {float(bool(g.ok)) if ep.target else '[REDACTED]'}):\n{s}" for i, (g, s) in enumerate(prev))),
-    then=experiences_of)
-
-against_library = template("GROUP_EXPERIENCE_UPDATE_TEMPLATE", lambda ctx, ep, memory, prev, **_: dict(
-    existing_experiences="\n".join(f"[{r.id}]. {r.text}" for r in memory.records) or "None", new_experiences=prev),
-    then=lambda text, *_, **__: ops if isinstance(ops := json_block(text), list) and ops else None)
-
-group_advantage = steps.when(lambda ctx, ep, memory, **_: partial(ep.group, bool(ep.target)),
-                             seq(steps.each_attempt(summarize), summarized, advantage))
-reflect = seq(group_advantage, against_library, lambda ctx, ep, memory, prev, **_: Delta(ops=prev))
-
-
-def table(memory, ops):
-    """Опыты с относящимися к ним операциями, затем операции без id."""
-    if not ops:
-        return "No batch operations."
-    dump = lambda op: json.dumps(op, ensure_ascii=False, indent=2)
-    out = []
-    for r in memory.records:
-        related = [op for op in ops if op.get("id") == r.id]
-        out.append(f"Experience {r.id}:\nContent: {r.text}\n"
-                   + ("Related Operations:\n" + "\n".join(map(dump, related)) if related else "No related operations."))
-    loose = [op for op in ops if not op.get("id")]
-    if loose:
-        out.append("Operations without specific Experience ID:\n" + "\n".join(map(dump, loose)))
-    return "\n\n".join(out)
-
-
-def batch_ops(deltas):
-    return [op for d in deltas for op in d.ops if isinstance(op, dict)]
-
-
-plan = retry(template("BATCH_EXPERIENCE_UPDATE_TEMPLATE", lambda ctx, memory, deltas, **_: dict(
-    experiences_and_operations=table(memory, batch_ops(deltas))), then=json_block), 3)
-
-
-def curate(ctx, memory, deltas):
-    stages.apply_ops(lambda p: p if isinstance(p, list) else [])(plan(ctx, memory, deltas), ctx, memory)
-
-
-tfgrpo = Method("tfgrpo", MEMORY, experiences, Feedback("golden"), Update(reflect, curate, every=BATCH),
+tfgrpo = Method("tfgrpo", MEMORY, experiences, Feedback("golden"),
+                Update(seq(group_advantage, against_library, reflect.as_ops), curate.planned(plan, curate.apply_ops(curate.op_list)),
+                       every=BATCH),
                 Solver(samples=5, temperature=0.7))
