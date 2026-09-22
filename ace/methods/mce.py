@@ -1,8 +1,23 @@
-"""MCE: два уровня. Базовый куратор раз в батч переписывает контекст по инструкции (skill).
-Мета-уровень раз в несколько батчей предлагает новую инструкцию, (1+1)-ES: кандидат
-принимается, если контекст по нему даёт на val не меньше верных, чем по текущей."""
-from ..loop import Method, solve
-from ..memory import Memory
+"""MCE (Meta Context Engineering).
+
+    1 память      один файл знаний
+    2 инжект      весь файл
+    3 сигнал      верный ответ
+    4 обновление  раз в батч куратор переписывает файл по своей инструкции (skill);
+                  мета-уровень раз в несколько батчей предлагает новую инструкцию, (1+1)-ES:
+                  кандидат принимается, если файл по нему даёт на val не меньше верных.
+                  Инструкция и история это состояние обновления, а не память.
+"""
+from .. import inject
+from ..feedback import Feedback
+from ..loop import Method
+from ..update import Update, snapshot
+
+# 1. память
+
+MEMORY = {"knowledge": ("add", "edit")}
+
+# 4. обновление
 
 SEED_SKILL = """Keep a compact knowledge file for this task family. After each batch of attempts:
 keep rules that led to correct answers, fix or remove rules that led to mistakes,
@@ -32,36 +47,36 @@ Propose a changed instruction (one or two concrete changes) so the next batches 
 Return only the new instruction."""
 
 BATCH, META_EVERY = 5, 3
-skill, history, tried = SEED_SKILL, [], []
 
 
-def rewrite(model, memory, traces, instruction):
-    shown = "\n\n".join(f"### {'correct' if t.correct else f'wrong, expected {t.target}'}\n{t.output}" for t in traces)
+def keep(ctx, ep, memory):
+    return ep
+
+
+def rewrite(model, memory, episodes, skill):
+    shown = "\n\n".join(f"### {ep.verdict()}\n{ep.output}" for ep in episodes)
     new = model.one("You are a context curator.", CURATE.format(
-        skill=instruction, memory=memory.text() or "(empty)", correct=sum(t.correct for t in traces), n=len(traces), batch=shown)).text
-    memory.replace_all(new.strip())
+        skill=skill, memory=inject.plain(memory.records) or "(empty)", correct=sum(bool(ep.ok) for ep in episodes),
+        n=len(episodes), batch=shown)).text
+    memory.rewrite("knowledge", new.strip())
 
 
-def val_score(model, task, memory):
-    return sum(solve(model, task, memory, mce, item).correct for item in task.load("val"))
-
-
-def batch(model, memory, traces, task):
-    global skill
-    history.append(sum(t.correct for t in traces))
-    before = list(memory.records)
-    rewrite(model, memory, traces, skill)
+def curate(ctx, memory, episodes):
+    st = ctx.state
+    skill, history, tried = st.setdefault("skill", SEED_SKILL), st.setdefault("history", []), st.setdefault("tried", [])
+    history.append(sum(bool(ep.ok) for ep in episodes))
+    before = snapshot(memory)
+    rewrite(ctx.model, memory, episodes, skill)
     if len(history) % META_EVERY:
         return
-    candidate = model.one("You are a meta-curator.", META.format(
+    candidate = ctx.model.one("You are a meta-curator.", META.format(
         history=history, tried="\n".join(f"- {s:.60}... -> {v}" for s, v in tried) or "(none)",
-        skill=skill, memory=memory.text())).text.strip()
-    trial = Memory(records=before, counter=memory.counter)
-    rewrite(model, trial, traces, candidate)
-    cur, new = val_score(model, task, memory), val_score(model, task, trial)
+        skill=skill, memory=inject.plain(memory.records))).text.strip()
+    rewrite(ctx.model, before, episodes, candidate)
+    cur, new = sum(c for c, _ in ctx.evaluate(memory)), sum(c for c, _ in ctx.evaluate(before))
     tried.append((candidate, new))
     if new >= cur:
-        skill, memory.records = candidate, trial.records
+        st["skill"], memory.records, memory.counter = candidate, before.records, before.counter
 
 
-mce = Method("mce", every=BATCH, batch=batch, signal="golden")
+mce = Method("mce", MEMORY, inject.full(inject.plain), Feedback("golden"), Update(keep, curate, every=BATCH))

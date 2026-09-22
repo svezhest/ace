@@ -1,11 +1,38 @@
-"""SCOPE: правила по шагам траектории, два потока (tactical / strategic) по уверенности,
-синтез Best-of-N с выбором, оптимизация памяти при переполнении, K перспектив при решении."""
-from dataclasses import replace
+"""SCOPE.
+
+    1 память      два потока правил: tactical и strategic
+    2 инжект      оба потока целиком
+    3 сигнал      верный ответ и шаги траектории
+    4 обновление  по каждому шагу: судья -> два кандидата правила при temperature 0.7 -> селектор;
+                  поток по уверенности; при переполнении потока LLM-оптимизатор
+    решатель      scope_k2: K = 2 перспективы, засчитывается лучшая (max по оценке, как в статье)
+"""
 from typing import Literal
 
 from pydantic import BaseModel
 
-from ..loop import Method, solve
+from ..feedback import Feedback
+from ..inject import View
+from ..loop import Method, Solver
+from ..memory import ALL
+from ..update import Update
+
+# 1. память
+
+MEMORY = {"tactical": ALL, "strategic": ALL}
+
+# 2. инжект
+
+
+def streams(model, memory, item):
+    return View(render(memory), [r.id for r in memory.records])
+
+
+def render(memory):
+    lines = lambda kind: "\n".join(f"- {r.text}" for r in memory.of(kind)) or "(none)"
+    return f"Strategic guidelines:\n{lines('strategic')}\n\nTactical guidelines:\n{lines('tactical')}"
+
+# 4. обновление
 
 JUDGE = """Look at one step of an agent solving a task and decide whether it needs a guideline.
 "corrective": the step contains an error whose fix is visible in the step itself.
@@ -54,8 +81,6 @@ and merge near-duplicates into one. Do not invent new rules.
 {rules}"""
 
 CAP, TARGET, N, STRATEGIC = 10, 8, 2, 0.85
-PERSPECTIVES = ("Perspective: efficiency. Prefer the shortest reliable path.",
-                "Perspective: thoroughness. Check every intermediate quantity.")
 
 
 class Verdict(BaseModel):
@@ -72,21 +97,20 @@ class Rules(BaseModel):
     rules: list[str]
 
 
-def steps_of(trace):
-    """Шаги = вызовы tools; без tools вся траектория — один шаг."""
-    return [f"[{name}] {args}\n-> {result}" for name, args, result in trace.steps] or [trace.output]
+def steps_of(ep):
+    """Шаги = вызовы инструментов; без них вся траектория — один шаг."""
+    return [f"[{name}] {args}\n-> {result}" for name, args, result in ep.steps] or [ep.output]
 
 
-def reflect(model, trace, memory):
-    outcome = "correct" if trace.correct else f"wrong, expected {trace.target}"
-    if trace.truncated:
-        outcome = "output truncated"
+def reflect(ctx, ep, memory):
+    model = ctx.model
+    outcome = "output truncated" if ep.truncated else ep.verdict()
     found = []
-    for step in steps_of(trace):
-        v = model.run("You are a judge.", JUDGE.format(question=trace.question, step=step, outcome=outcome), output=Verdict).output
+    for step in steps_of(ep):
+        v = model.run("You are a judge.", JUDGE.format(question=ep.question, step=step, outcome=outcome), output=Verdict).output
         if not v or v.kind == "none":
             continue
-        prompt = SYNTH.format(question=trace.question, step=step, why=f"{v.kind}: {v.why}", memory=inject(memory))
+        prompt = SYNTH.format(question=ep.question, step=step, why=f"{v.kind}: {v.why}", memory=render(memory))
         cands = [model.run("You are a guideline synthesizer.", prompt, output=Guideline, temperature=0.7).output for _ in range(N)]
         cands = [c for c in cands if c]
         if len(cands) == N:
@@ -96,34 +120,36 @@ def reflect(model, trace, memory):
     return found or None
 
 
-def curate(model, memory, guidelines):
-    for g in guidelines:
-        stream = "strategic" if g.confidence >= STRATEGIC else "tactical"
-        if g.text not in {x.text for x in memory.records}:
-            memory.add(g.text, kind=stream)
+def curate(ctx, memory, deltas):
+    for guidelines in deltas:
+        for g in guidelines:
+            if g.text not in {x.text for x in memory.records}:
+                memory.add(g.text, kind="strategic" if g.confidence >= STRATEGIC else "tactical")
 
 
-def bound(model, memory, *_):
-    for stream in ("tactical", "strategic"):
-        for _ in range(2):                               # не больше двух проходов
-            same = [x for x in memory.records if x.kind == stream]
-            if len(same) <= CAP:
-                break
-            r = model.run("You are a memory optimizer.", OPTIMIZE.format(
-                target=TARGET, rules="\n".join(f"- {x.text}" for x in same)), output=Rules).output
-            if not r:
-                break
-            for x in same:
-                memory.drop(x.id)
-            for text in r.rules[:CAP]:
-                memory.add(text, kind=stream)
+def optimize(kinds=("tactical", "strategic")):
+    """При переполнении вида LLM убирает конфликты и поглощённые правила, сливает дубли; не больше двух проходов."""
+    def bound(ctx, memory, before):
+        for kind in kinds:
+            for _ in range(2):
+                same = memory.of(kind)
+                if len(same) <= CAP:
+                    break
+                r = ctx.model.run("You are a memory optimizer.", OPTIMIZE.format(
+                    target=TARGET, rules="\n".join(f"- {x.text}" for x in same)), output=Rules).output
+                if not r:
+                    break
+                for x in same:
+                    memory.drop(x.id)
+                for text in r.rules[:CAP]:
+                    memory.add(text, kind=kind)
+    return bound
 
+# решатель
 
-def inject(memory):
-    lines = lambda kind: "\n".join(f"- {r.text}" for r in memory.records if r.kind == kind) or "(none)"
-    return f"Strategic guidelines:\n{lines('strategic')}\n\nTactical guidelines:\n{lines('tactical')}"
+PERSPECTIVES = ("Perspective: efficiency. Prefer the shortest reliable path.",
+                "Perspective: thoroughness. Check every intermediate quantity.")
 
-
-scope = Method("scope", inject=inject, reflect=reflect, curate=curate, bound=bound)
-# K=2 перспектив, засчитывается лучшая из двух попыток (max по оценке, как в статье)
-scope_k2 = replace(scope, name="scope_k2", perspectives=PERSPECTIVES)
+scope = Method("scope", MEMORY, streams, Feedback("golden"), Update(reflect, curate, optimize()))
+scope_k2 = Method("scope_k2", MEMORY, streams, Feedback("golden"), Update(reflect, curate, optimize()),
+                  Solver(perspectives=PERSPECTIVES))

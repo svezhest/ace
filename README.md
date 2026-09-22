@@ -1,6 +1,16 @@
 # ace
 
-Стенд для сравнения методов агентного контекст-инжиниринга (ACE, Dynamic Cheatsheet, SCOPE, TF-GRPO, EvoLib, MCE) на одном цикле. Метод — набор функций `inject / reflect / curate / bound` плюс среда; абляция — замена одной из них.
+Стенд для сравнения методов агентного контекст-инжиниринга (ACE, Dynamic Cheatsheet, SCOPE, TF-GRPO, EvoLib, MCE) на одном цикле. Метод это четыре элемента и решатель:
+
+| Элемент | Что определяет | Модуль |
+|---|---|---|
+| память | виды записей и разрешённые операции | `ace/memory.py` |
+| инжект | что из памяти видит решатель | `ace/inject.py` |
+| сигнал | что после попытки возвращается в систему | `ace/feedback.py` |
+| обновление | reflect, curate, bound, раз в every задач | `ace/update.py` |
+| решатель | среда задачи, число попыток, голосование, перспективы | `ace/loop.py` |
+
+Абляция это замена одной части: `swap(ace, inject=inject.catalog())` или `swap(ace, curate=...)`.
 
 ```
 uv venv .venv && uv pip install -p .venv/bin/python "pydantic-ai-slim[openai]"

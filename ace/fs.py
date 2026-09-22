@@ -1,12 +1,12 @@
 """Виртуальная файловая система поверх памяти. Запись = файл, точка монтирования = набор записей
-с режимом доступа. Инструменты привязаны к объекту FS через deps, чужую память не видят.
-Правила edit те же, что у агентских харнесов: литеральная замена, old один раз, replace_all явно,
-перед правкой файл надо прочитать."""
+с режимом доступа. Инструменты получают FS через deps и чужую память не видят.
+Правила edit те же, что у агентских харнесов: литеральная замена, old_string один раз, replace_all
+явно, перед правкой файл надо прочитать. Сверх режима монтирования действует схема памяти."""
 from dataclasses import dataclass, field
 
 from pydantic_ai import ModelRetry, RunContext
 
-from .memory import Memory
+from .memory import Forbidden, Memory
 
 
 @dataclass
@@ -14,13 +14,14 @@ class Mount:
     memory: Memory
     kinds: tuple = ()          # какие записи видны; () = все
     mode: str = "rw"           # rw | ro
-    track: bool = False        # чтения складывать в memory.used (сигнал среды)
+    track: bool = False        # чтения складывать в FS.reads
 
 
 @dataclass
 class FS:
     mounts: dict               # имя -> Mount
-    seen: set = field(default_factory=set)   # что уже читали: без этого edit запрещён
+    seen: set = field(default_factory=set)    # что уже читали: без этого правка запрещена
+    reads: list = field(default_factory=list) # id прочитанных записей с отслеживаемых точек
 
     def split(self, path):
         name, _, id = path.strip("/").partition("/")
@@ -46,8 +47,7 @@ class FS:
 
 def listing(fs, name):
     m = fs.mounts[name]
-    recs = [r for r in m.memory.records if not m.kinds or r.kind in m.kinds]
-    return "\n".join(f"{name}/{r.id}  {r.when or r.text.splitlines()[0][:80]}" for r in recs) or "(empty)"
+    return "\n".join(f"{name}/{r.id}  {r.when or r.text.splitlines()[0][:80]}" for r in m.memory.of(*m.kinds)) or "(empty)"
 
 
 def ls(ctx: RunContext[FS], path: str = "") -> str:
@@ -65,8 +65,8 @@ def read(ctx: RunContext[FS], path: str) -> str:
         return ls(ctx, path)
     m, rec = ctx.deps.record(path)
     ctx.deps.seen.add(path)
-    if m.track and rec.id not in m.memory.used:
-        m.memory.used.append(rec.id)
+    if m.track and rec.id not in ctx.deps.reads:
+        ctx.deps.reads.append(rec.id)
     return "\n".join(f"{i}: {l}" for i, l in enumerate(rec.text.splitlines(), 1))
 
 
@@ -75,7 +75,10 @@ def create(ctx: RunContext[FS], directory: str, content: str) -> str:
     name, m, _ = ctx.deps.split(directory)
     if m.mode != "rw":
         raise ModelRetry(f"{name} is read-only")
-    rec = m.memory.add(content.strip(), kind=m.kinds[0] if m.kinds else "insight")
+    try:
+        rec = m.memory.add(content.strip(), kind=m.kinds[0] if m.kinds else None)
+    except Forbidden as e:
+        raise ModelRetry(str(e))
     ctx.deps.seen.add(f"{name}/{rec.id}")
     return f"{name}/{rec.id}"
 
@@ -83,7 +86,10 @@ def create(ctx: RunContext[FS], directory: str, content: str) -> str:
 def append(ctx: RunContext[FS], path: str, text: str) -> str:
     """Append text as new lines at the end of a file."""
     m, rec = ctx.deps.writable(path)
-    rec.text = rec.text.rstrip("\n") + "\n" + text.strip()
+    try:
+        m.memory.edit(rec.id, rec.text.rstrip("\n") + "\n" + text.strip())
+    except Forbidden as e:
+        raise ModelRetry(str(e))
     return "ok"
 
 
@@ -96,14 +102,20 @@ def edit(ctx: RunContext[FS], path: str, old_string: str, new_string: str, repla
         raise ModelRetry("old_string not found in the file")
     if n > 1 and not replace_all:
         raise ModelRetry(f"old_string occurs {n} times; add surrounding context or set replace_all")
-    rec.text = rec.text.replace(old_string, new_string).strip()
+    try:
+        m.memory.edit(rec.id, rec.text.replace(old_string, new_string).strip())
+    except Forbidden as e:
+        raise ModelRetry(str(e))
     return "ok"
 
 
 def delete(ctx: RunContext[FS], path: str) -> str:
     """Delete a file."""
     m, rec = ctx.deps.writable(path)
-    m.memory.drop(rec.id)
+    try:
+        m.memory.drop(rec.id)
+    except Forbidden as e:
+        raise ModelRetry(str(e))
     return "ok"
 
 

@@ -1,11 +1,27 @@
-"""Training-Free GRPO. Две стадии: по группе из G попыток модель пишет, чем верные отличались
-от неверных (семантическое преимущество); раз в батч такие тексты сводятся в библиотеку
-опытов операциями Add / Modify / Delete / Keep. Опыт — до 32 слов."""
+"""Training-Free GRPO.
+
+    1 память      библиотека опытов, каждый до 32 слов
+    2 инжект      вся библиотека
+    3 сигнал      верный ответ для каждой из G попыток
+    4 обновление  по группе попыток модель пишет, чем верные отличались от неверных (семантическое
+                  преимущество); раз в батч сводки сводятся в библиотеку операциями add / modify / delete / keep
+    решатель      G = 1 + 4 попытки на вопрос
+"""
 from typing import Literal
 
 from pydantic import BaseModel
 
-from ..loop import Method
+from .. import inject
+from ..feedback import Feedback
+from ..loop import Method, Solver
+from ..memory import ALL
+from ..update import Update
+
+# 1. память
+
+MEMORY = {"experience": ALL}
+
+# 4. обновление
 
 ADVANTAGE = """Below are several attempts at the same task; some are correct, some are not.
 Write what the correct ones did that the wrong ones did not, in one or two sentences.
@@ -41,41 +57,26 @@ class Ops(BaseModel):
     ops: list[Op] = []
 
 
-def advantage(model, trace, memory):
-    attempts = [trace] + trace.group
-    good, bad = [t for t in attempts if t.correct], [t for t in attempts if not t.correct]
-    if not good or not bad:
+def advantage(ctx, ep, memory):
+    attempts = [ep] + ep.group
+    if all(a.ok for a in attempts) or not any(a.ok for a in attempts):
         return None                                   # без контраста преимущества нет
-    shown = "\n\n".join(f"## Attempt ({'correct' if t.correct else 'wrong'})\n{t.output}" for t in attempts)
-    return model.one("You are a reflector.", ADVANTAGE.format(
-        question=trace.question, target=trace.target, attempts=shown)).output
+    shown = "\n\n".join(f"## Attempt ({'correct' if a.ok else 'wrong'})\n{a.output}" for a in attempts)
+    return ctx.model.one("You are a reflector.", ADVANTAGE.format(question=ep.question, target=ep.target, attempts=shown)).output
 
 
-def stash(model, memory, summary):
-    memory.add(summary, kind="episode")               # эпизоды решателю не показываются
-
-
-def consolidate(model, memory, traces):
-    summaries = [r for r in memory.records if r.kind == "episode"]
-    if not summaries:
-        return
-    shown = "\n".join(f"[{r.id}] {r.text}" for r in memory.records if r.kind == "insight") or "(empty)"
-    r = model.run("You are a curator.", CONSOLIDATE.format(
-        memory=shown, summaries="\n".join(f"- {s.text}" for s in summaries)), output=Ops).output
+def consolidate(ctx, memory, summaries):
+    r = ctx.model.run("You are a curator.", CONSOLIDATE.format(
+        memory=memory.text() or "(empty)", summaries="\n".join(f"- {s}" for s in summaries)), output=Ops).output
     for op in (r.ops if r else []):
         text = " ".join(op.text.split()[:WORDS])
         if op.op == "add" and text:
             memory.add(text)
         elif op.op == "modify" and memory.get(op.id) and text:
-            memory.get(op.id).text = text
+            memory.edit(op.id, text)
         elif op.op == "delete" and memory.get(op.id):
             memory.drop(op.id)
-    for s in summaries:
-        memory.drop(s.id)
 
 
-def inject(memory):
-    return "\n".join(f"- {r.text}" for r in memory.records if r.kind == "insight")
-
-
-tfgrpo = Method("tfgrpo", inject=inject, reflect=advantage, curate=stash, group=4, every=BATCH, batch=consolidate)
+tfgrpo = Method("tfgrpo", MEMORY, inject.full(inject.dashed), Feedback("golden"),
+                Update(advantage, consolidate, every=BATCH), Solver(samples=4))

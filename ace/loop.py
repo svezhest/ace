@@ -1,110 +1,140 @@
-"""Один цикл на все методы. Метод = набор функций, подменяемых по отдельности.
+"""Один цикл на все методы. Метод = четыре элемента памяти и решатель:
 
-    вопрос -> inject(memory) -> решатель -> signal -> reflect -> curate -> bound -> memory
+    1 память     схема: виды записей и разрешённые операции      memory.py
+    2 инжект     что из памяти видит решатель                     inject.py
+    3 сигнал     что после попытки возвращается в систему         feedback.py
+    4 обновление reflect -> curate -> bound, раз в every задач    update.py
+
+    решатель     среда задачи, число попыток, голосование, перспективы
+
+    память -> инжект -> решатель -> сигнал -> обновление -> память
 """
-import copy
 import json
 import os
 import random
 import time
 from collections import Counter
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
-from pydantic import BaseModel
-
+from . import inject as injects
 from .env import Env
-from .memory import Memory
+from .feedback import Feedback
+from .memory import ALL, Memory
 from .tasks import final_answer
-
-
-class Answer(BaseModel):
-    """Ответ с самоотчётом: какие записи памяти пригодились (ACE bullet_ids)."""
-    reasoning: str
-    bullet_ids: list[str] = []
-    final_answer: str
+from .update import Ctx, Update, snapshot
 
 
 @dataclass
-class Trace:
-    """Всё, что известно об одной попытке."""
+class Solver:
+    env: Env = field(default_factory=Env)
+    samples: int = 0            # сколько ещё попыток при temperature 0.7 (группа для сигнала или голосования)
+    vote: bool = False          # ответ большинством по всем попыткам (self-consistency)
+    perspectives: tuple = ()    # K решений с разными установками, засчитывается лучшее
+
+
+@dataclass
+class Method:
+    name: str
+    memory: dict = field(default_factory=lambda: {"note": ALL})
+    inject: callable = field(default_factory=injects.full)
+    feedback: Feedback = field(default_factory=Feedback)
+    update: Update = field(default_factory=Update)
+    solver: Solver = field(default_factory=Solver)
+
+    def __post_init__(self):
+        if self.update.needs_usage and self.feedback.usage == "none":
+            raise ValueError(f"{self.name}: обновлению нужно, что решатель прочёл, а сигнал этого не отдаёт (usage=none)")
+        if self.feedback.usage == "env" and not getattr(self.inject, "reads", False):
+            raise ValueError(f"{self.name}: usage=env, но инжект не даёт инструментов чтения")
+
+
+def swap(method, name=None, **parts):
+    """Метод с заменёнными частями: элементами (memory, inject, feedback, solver) или стадиями
+    обновления (reflect, curate, bound, every). Проверки метода выполняются заново."""
+    stages = {k: parts.pop(k) for k in ("reflect", "curate", "bound", "every", "needs_usage") if k in parts}
+    return replace(method, name=name or method.name, update=replace(method.update, **stages), **parts)
+
+
+@dataclass
+class Attempt:
+    """Всё, что известно об одной попытке, включая верный ответ. Обновлению идёт через сигнал."""
     question: str
     target: str
     output: str
     answer: str
     correct: bool
     truncated: bool
-    used: list = field(default_factory=list)   # id записей, которые решатель вызвал
-    steps: list = field(default_factory=list)  # вызовы tools по шагам: (имя, аргументы, результат)
-    group: list = field(default_factory=list)  # сэмплированные попытки того же вопроса (групповой сигнал)
+    steps: list
+    context: str
+    shown: list
+    reads: list                 # что прочитано инструментами инжекта
+    reported: list              # что решатель назвал сам
 
 
-@dataclass
-class Method:
-    name: str
-    prepare: callable = lambda model, memory, item: None     # правка памяти до решения (DC-RS)
-    inject: callable = lambda memory: memory.text()          # память -> текст в системный промпт
-    reflect: callable = lambda model, trace, memory: None    # опыт -> дельта (любой объект или None)
-    curate: callable = lambda model, memory, delta: None     # дельта -> правка памяти
-    bound: callable = lambda model, memory, task, method: None   # ограничение роста
-    signal: str = "golden"                                   # golden | yes_no | none
-    used_from: str = "none"                                  # откуда известно, что решатель прочёл: env (tool read) | self (самоотчёт в ответе) | none
-    env: Env = field(default_factory=Env)                    # Env | Sandbox | Skills
-    group: int = 0                                           # сколько сэмплов добавить к жадному ответу
-    vote: bool = False                                       # ответ большинством по группе (self-consistency)
-    every: int = 0                                           # батчевый сигнал: раз в every задач
-    batch: callable = lambda model, memory, traces, task: None   # что делать с батчем трасс
-    perspectives: tuple = ()                                 # K параллельных решений с разными установками, засчитывается лучшее
+def solve(model, task, method, memory, item, temperature=0, hint=""):
+    env, view = method.solver.env, method.inject(model, memory, item)
+    self_report = method.feedback.usage == "self"
+    system = task.system + env.hint + hint
+    if view.text:
+        system += "\n\nWhat you learned so far:\n" + view.text
+    if self_report and memory.records:
+        system += ("\n\nRight before the final answer line, write one line 'USED: <ids of the memory bullets "
+                   "you actually relied on, comma-separated, or none>'.")
+    r = model.run(system, f"{task.instr}\n\n{item['context']}", tools=env.tools + view.tools, deps=view.fs,
+                  rounds=env.rounds + view.rounds, temperature=temperature)
+    answer = final_answer(r.output or "")
+    reported = [i for i in used_line(r.output or "") if memory.get(i)] if self_report else []
+    return Attempt(item["context"], item["target"], r.text, answer, task.check(answer, item["target"]), r.truncated,
+                   r.steps, view.text, view.shown, list(view.fs.reads) if view.fs else [], reported)
 
 
-def solve(model, task, memory, method, item, temperature=0, hint=""):
-    system = task.system + method.env.hint + hint
-    if memory.records:
-        system += "\n\nWhat you learned so far:\n" + method.inject(memory)
-    memory.used = []
-    if method.used_from == "self" and memory.records:
-        system += "\n\nIn bullet_ids list the ids of the memory bullets you actually relied on."
-    r = model.run(system, f"{task.instr}\n\n{item['context']}", tools=method.env.tools, deps=method.env.deps(memory),
-                  rounds=method.env.rounds, temperature=temperature,
-                  output=Answer if method.used_from == "self" else str)
-    if isinstance(r.output, Answer):
-        memory.used = [i for i in r.output.bullet_ids if memory.get(i)]
-        answer = r.output.final_answer
-    else:
-        answer = final_answer(r.output or "")
-    return Trace(item["context"], item["target"], r.text, answer,
-                 task.check(answer, item["target"]), r.truncated, list(memory.used), r.steps)
+def used_line(text):
+    """Самоотчёт ACE (bullet_ids) строкой «USED: r1, r3» в обычном ответе: решатель рассуждает так же, как у остальных методов."""
+    lines = [l for l in text.splitlines() if l.strip().upper().startswith("USED:")]
+    return [i.strip(" []") for i in lines[-1].split(":", 1)[1].split(",")] if lines else []
+
+
+def attempt(model, task, method, memory, item):
+    """Попытка, которая идёт в зачёт, и остальные попытки группы."""
+    s = method.solver
+    a = solve(model, task, method, memory, item, hint="\n\n" + s.perspectives[0] if s.perspectives else "")
+    if s.perspectives:
+        others = [solve(model, task, method, memory, item, hint="\n\n" + p) for p in s.perspectives[1:]]
+        a = max([a, *others], key=lambda t: t.correct)
+    group = [solve(model, task, method, memory, item, temperature=0.7) for _ in range(s.samples)]
+    if s.vote:
+        a.answer = Counter(t.answer for t in [a] + group).most_common(1)[0][0]
+        a.correct = task.check(a.answer, a.target)
+    return a, group
 
 
 def run(task, method, model, n=40, out=None, split=""):
     items = task.load(split)[:n]
     random.seed(int(os.getenv("SEED", 0)))
-    memory = Memory()
-    log, traces = [], []
+    memory = Memory(dict(method.memory))
+    item = None
+    ctx = Ctx(model, task,
+              evaluate=lambda m: [(t.correct, t.truncated) for t in (solve(model, task, method, m, it) for it in task.load("val"))],
+              render=lambda m: method.inject(model, m, item).text)
+    log, pending = [], []
     for i, item in enumerate(items):
         t0 = time.time()
-        method.prepare(model, memory, item)
-        trace = solve(model, task, memory, method, item, hint="\n\n" + method.perspectives[0] if method.perspectives else "")
-        if method.perspectives:
-            others = [solve(model, task, memory, method, item, hint="\n\n" + p) for p in method.perspectives[1:]]
-            trace = max([trace, *others], key=lambda t: t.correct)
-        trace.group = [solve(model, task, memory, method, item, temperature=0.7) for _ in range(method.group)]
-        if method.vote:
-            trace.answer = Counter(t.answer for t in [trace] + trace.group).most_common(1)[0][0]
-            trace.correct = task.check(trace.answer, trace.target)
-        delta = method.reflect(model, trace, memory)
+        a, group = attempt(model, task, method, memory, item)
+        episode = method.feedback.observe(model, a, group)
+        delta = method.update.reflect(ctx, episode, memory)
         if delta:
-            memory.before = copy.deepcopy(memory.records)
-            method.curate(model, memory, delta)
-            method.bound(model, memory, task, method)
-        traces.append(trace)
-        if method.every and len(traces) % method.every == 0:
-            method.batch(model, memory, traces[-method.every:], task)
-        log.append(dict(i=i, question=trace.question, target=trace.target, answer=trace.answer, correct=trace.correct,
-                        finish="length" if trace.truncated else "stop", output=trace.output,
-                        used=trace.used, gated=memory.gated[-1:], memory_chars=len(method.inject(memory)), sec=round(time.time() - t0, 1)))
-        print(f"{task.name} {method.name} {i:3} {'+' if trace.correct else '-'} "
-              f"{sum(r['correct'] for r in log)}/{i + 1} mem={len(method.inject(memory))}", flush=True)
+            pending.append(delta)
+        if (i + 1) % method.update.every == 0 and pending:
+            before = snapshot(memory)
+            method.update.curate(ctx, memory, pending)
+            method.update.bound(ctx, memory, before)
+            pending = []
+        log.append(dict(i=i, question=a.question, target=a.target, answer=a.answer, correct=a.correct,
+                        finish="length" if a.truncated else "stop", output=a.output, shown=a.shown, read=a.reads,
+                        reported=a.reported, gated=ctx.gated[-1:], memory_chars=memory.chars(), sec=round(time.time() - t0, 1)))
+        print(f"{task.name} {method.name} {i:3} {'+' if a.correct else '-'} "
+              f"{sum(r['correct'] for r in log)}/{i + 1} mem={memory.chars()}", flush=True)
     summary = dict(task=task.name, method=method.name, model=model.name, n=len(log),
                    correct=sum(r["correct"] for r in log), truncated=sum(r["finish"] == "length" for r in log),
                    **model.usage())

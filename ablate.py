@@ -1,12 +1,10 @@
-"""Цепочка абляций: каждая ступень отличается от предыдущей одним модулем.
+"""Цепочка абляций: каждая ступень отличается от предыдущей одной частью.
 python ablate.py TASK [N] [STEP ...]"""
 import os
 import sys
-from dataclasses import replace
 
-from ace import bound
-from ace.env import Skills
-from ace.loop import Method, run
+from ace import inject, update
+from ace.loop import Solver, run, swap
 from ace.methods import ace, baseline, proto
 from ace.methods.ace import curate as ace_curate, reflect as ace_reflect
 from ace.methods.proto import curate as proto_curate
@@ -17,23 +15,23 @@ nobound = lambda *_: None
 PLACEBO = "\n".join(f"[r{i}] Read the question carefully and check units before answering." for i in range(1, 9))
 CHAIN = {
     "baseline": baseline,
-    "placebo": replace(baseline, inject=lambda memory: PLACEBO, reflect=lambda *_: True, curate=lambda model, memory, _: memory.records or memory.add("placebo")),
-    "sc3": replace(baseline, group=2, vote=True),
+    "placebo": swap(baseline, inject=inject.fixed(PLACEBO)),                    # та же длина промпта без знаний
+    "sc3": swap(baseline, solver=Solver(samples=2, vote=True)),                  # столько же вызовов без памяти
     "ace": ace,
-    "ace_text": replace(ace, reflect=ace_reflect("text")),                          # Reflect: свободный текст вместо схемы
-    "ace_json": replace(ace, curate=ace_curate("json")),                            # Curate: все операции одним JSON
-    "ace_rewrite": replace(ace, curate=ace_curate("rewrite")),                      # Curate: полная перезапись
-    "catalog": replace(ace, inject=proto.inject, env=Skills()),                   # Inject: каталог вместо полной памяти
-    "typed": replace(proto, bound=nobound, curate=ace.curate),                     # Store: типы, рефлексия по вызванным
-    "ops5": replace(proto, bound=nobound),                                         # Curate: операции через tools
-    "ops5_json": replace(proto, bound=nobound, curate=proto_curate("json")),       # Curate: операции одной схемой
-    "ops5_rewrite": replace(proto, bound=nobound, curate=proto_curate("rewrite")), # Curate: все записи заново
-    "gate": replace(proto, bound=bound.gate()),                                    # Bound: gate
-    "budget": replace(proto, bound=bound.budget(0.25)),                            # Bound: доля бюджета
+    "ace_text": swap(ace, reflect=ace_reflect("text")),                         # обновление: рефлексия свободным текстом
+    "ace_json": swap(ace, curate=ace_curate("json")),                           # обновление: все операции одним JSON
+    "ace_rewrite": swap(ace, curate=ace_curate("rewrite")),                     # обновление: полная перезапись
+    "catalog": swap(ace, inject=inject.catalog()),                              # инжект: каталог вместо всей памяти
+    "typed": swap(proto, bound=nobound, curate=ace_curate()),                   # память: типы; сигнал: прочитанное
+    "ops5": swap(proto, bound=nobound),                                         # обновление: операции прототипа через tools
+    "ops5_json": swap(proto, bound=nobound, curate=proto_curate("json")),       # операции одной схемой
+    "ops5_rewrite": swap(proto, bound=nobound, curate=proto_curate("rewrite")), # все записи заново
+    "gate": swap(proto, bound=update.gate()),                                   # ограничение: gate на val
+    "budget": swap(proto, bound=update.budget(0.25)),                           # ограничение: доля бюджета
     "proto": proto,
 }
 
 task = TASKS[sys.argv[1]]
 n = int(sys.argv[2]) if len(sys.argv) > 2 else 40
 for name in sys.argv[3:] or CHAIN:
-    print(run(task, replace(CHAIN[name], name=name), Model(), n, f"{os.getenv('RESULTS', 'results')}/{task.name}{n}/{name}"))
+    print(run(task, swap(CHAIN[name], name), Model(), n, f"{os.getenv('RESULTS', 'results')}/{task.name}{n}/{name}"))

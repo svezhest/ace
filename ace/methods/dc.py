@@ -1,57 +1,84 @@
-"""Dynamic Cheatsheet: один вызов после каждой задачи переписывает всю память целиком, без метки.
-Промпт куратора взят из апстрима как есть (prompts/dc_curator.txt)."""
+"""Dynamic Cheatsheet. Промпты куратора и синтеза взяты из апстрима как есть (prompts/).
+
+DC-Cu
+    1 память      один текст (cheatsheet)
+    2 инжект      весь текст
+    3 сигнал      без метки
+    4 обновление  один вызов после задачи переписывает текст целиком
+
+DC-RS
+    1 память      пары (вопрос, решение) и последний синтезированный cheatsheet
+    2 инжект      до решения достаём top-3 похожих пары (BGE-M3; в статье text-embedding-3-small)
+                  и синтезируем из них cheatsheet под этот вопрос
+    3 сигнал      без метки
+    4 обновление  пара добавляется, синтезированный cheatsheet сохраняется
+"""
 from pathlib import Path
 
-from .. import embed
+from .. import embed, inject
+from ..feedback import Feedback
+from ..inject import View
 from ..loop import Method
+from ..update import Update
 
-CURATOR = (Path(__file__).parent / "prompts" / "dc_curator.txt").read_text()
+PROMPTS = Path(__file__).parent / "prompts"
 
+# 1. память
 
-def reflect(model, trace, memory):
-    prompt = (CURATOR.replace("[[PREVIOUS_CHEATSHEET]]", memory.text() or "(empty)")
-              .replace("[[QUESTION]]", trace.question).replace("[[MODEL_ANSWER]]", trace.output))
-    return model.one("You are a careful curator of a cheatsheet.", prompt).text
+MEMORY = {"sheet": ("add", "edit")}
+MEMORY_RS = {"pair": ("add",), "sheet": ("add", "edit")}
 
+# 2. инжект
 
-def curate(model, memory, new_text):
-    # апстрим оставляет старый cheatsheet, если блок не найден
-    if "<cheatsheet>" in new_text:
-        new_text = new_text.split("<cheatsheet>", 1)[1].split("</cheatsheet>")[0]
-        memory.replace_all(new_text.strip())
-
-
-dc = Method("dc", reflect=reflect, curate=curate, signal="none")
-
-
-# DC-RS: до решения достаём top-3 прошлых пар (вопрос, ответ) и синтезируем из них cheatsheet.
-# Косинус по BGE-M3 (в статье text-embedding-3-small).
-SYNTH = (Path(__file__).parent / "prompts" / "dc_synth.txt").read_text()
+SYNTH = (PROMPTS / "dc_synth.txt").read_text()
 TOP = 3
 
 
-def prepare(model, memory, item):
-    pairs = [r for r in memory.records if r.kind == "episode"]
+def cheatsheet(block):
+    """Текст внутри <cheatsheet>; None, если блока нет (апстрим тогда оставляет старый)."""
+    if "<cheatsheet>" not in block:
+        return None
+    return block.split("<cheatsheet>", 1)[1].split("</cheatsheet>")[0].strip()
+
+
+def retrieve_synth(model, memory, item):
+    pairs = memory.of("pair")
+    sheet = memory.of("sheet")[0].text if memory.of("sheet") else ""
     if not pairs:
-        return
+        return View(sheet)
     top = [pairs[i] for i in embed.top(item["context"], [r.when for r in pairs], TOP)]
     notes = "\n\n".join(f"Input: {r.when}\nOutput: {r.text}" for r in top)
-    sheet = next((r.text for r in memory.records if r.kind == "sheet"), "(empty)")
-    prompt = (SYNTH.replace("[[PREVIOUS_CHEATSHEET]]", sheet).replace("[[PREVIOUS_INPUT_OUTPUT_PAIRS]]", notes)
+    prompt = (SYNTH.replace("[[PREVIOUS_CHEATSHEET]]", sheet or "(empty)").replace("[[PREVIOUS_INPUT_OUTPUT_PAIRS]]", notes)
               .replace("[[NEXT_INPUT]]", item["context"]))
-    new = model.one("You are a careful curator of a cheatsheet.", prompt).text
-    if "<cheatsheet>" in new:
-        memory.records = [r for r in memory.records if r.kind != "sheet"]
-        memory.add(new.split("<cheatsheet>", 1)[1].split("</cheatsheet>")[0].strip(), kind="sheet")
+    new = cheatsheet(model.one("You are a careful curator of a cheatsheet.", prompt).text)
+    return View(new if new is not None else sheet, [r.id for r in top])
+
+# 4. обновление
+
+CURATOR = (PROMPTS / "dc_curator.txt").read_text()
 
 
-def remember(model, trace, memory):
-    memory.add(trace.output, kind="episode", when=trace.question)
-    return None
+def reflect(ctx, ep, memory):
+    prompt = (CURATOR.replace("[[PREVIOUS_CHEATSHEET]]", inject.plain(memory.records) or "(empty)")
+              .replace("[[QUESTION]]", ep.question).replace("[[MODEL_ANSWER]]", ep.output))
+    return cheatsheet(ctx.model.one("You are a careful curator of a cheatsheet.", prompt).text)
 
 
-def inject_rs(memory):
-    return next((r.text for r in memory.records if r.kind == "sheet"), "")
+def curate(ctx, memory, sheets):
+    for s in sheets:
+        memory.rewrite("sheet", s)
 
 
-dc_rs = Method("dc_rs", prepare=prepare, inject=inject_rs, reflect=remember, signal="none")
+def remember(ctx, ep, memory):
+    return ep
+
+
+def store(ctx, memory, episodes):
+    for ep in episodes:
+        memory.add(ep.output, kind="pair", when=ep.question)
+        if ep.context:
+            memory.rewrite("sheet", ep.context)
+
+
+dc = Method("dc", MEMORY, inject.full(inject.plain), Feedback("none"), Update(reflect, curate))
+dc_rs = Method("dc_rs", MEMORY_RS, retrieve_synth, Feedback("none"), Update(remember, store))
