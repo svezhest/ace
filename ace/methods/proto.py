@@ -1,10 +1,10 @@
 """Прототип.
 
-    1 память      типизированные записи с политикой по типу:
+    1 память      типизированные записи (Entry: условие when и счётчики) с политикой по типу:
                   constraint  только add и narrow
                   procedure   любые операции
                   insight     любые операции, первый кандидат на удаление
-                  episode     только add; решателю не показывается, это provenance
+                  episode     только add; скрытый вид: решателю не показывается, это provenance
     2 инжект      constraint целиком в промпте, procedure и insight каталогом, тело по read(path)
     3 сигнал      верный ответ; что решатель прочёл, записывает среда (read)
     4 обновление  рефлексия только по прочитанным записям -> куратор операциями add / patch / narrow / merge
@@ -13,12 +13,13 @@
 from .. import bound, curate, inject, prompts, reflect
 from ..feedback import Feedback
 from ..loop import Method
-from ..memory import ALL
+from ..memory import ALL, Entry, Kind
 from ..update import Update, ask
 
 # 1. память
 
-MEMORY = {"constraint": ("add", "narrow"), "procedure": ALL, "insight": ALL, "episode": ("add",)}
+MEMORY = {"constraint": Kind(Entry, ("add", "narrow")), "procedure": Kind(Entry, ALL), "insight": Kind(Entry, ALL),
+          "episode": Kind(Entry, ("add",), private=True, ids="e")}
 
 # 2. инжект
 

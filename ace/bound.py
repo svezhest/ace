@@ -7,14 +7,16 @@
                                     merge_counted — слияние моделью (ACE BulletpointAnalyzer)
     optimize(kinds, optimizer, ...) группа сверх cap записей сжимается до target; rule_optimizer — MemoryOptimizer
                                     SCOPE (конфликты, поглощение, слияние); as_rule, put_rules — записи <-> правила
-    best_by_val()                   в конце прохода память откатывается к лучшей по val (MCE)
-    chain(*bounds)                  по очереди"""
-import copy
+    chain(*bounds)                  по очереди
+Обработчик конца прохода (update.epoch), не после каждой правки:
+    best_by_val()                   память откатывается к лучшей по val (MCE)"""
+from dataclasses import asdict, fields
 
 from pydantic import BaseModel
 
 from . import embed, parse
 from .inject import counted
+from .memory import needs
 
 
 def chain(*bounds):
@@ -26,7 +28,7 @@ def chain(*bounds):
 
 def prune(test):
     def bound(ctx, memory, before):
-        for r in list(memory.records):
+        for r in memory.of():
             if test(r):
                 memory.drop(r.id)
     return bound
@@ -34,13 +36,14 @@ def prune(test):
 
 def more_harmful(n):
     """Вредных меток не меньше n и больше, чем полезных."""
-    return lambda r: r.harmful >= n and r.harmful > r.helpful
+    return needs("helpful", "harmful", kinds="*")(lambda r: r.harmful >= n and r.harmful > r.helpful)
 
 
 def budget(share, max_tokens=4096):
     """Память в промпте занимает не больше share бюджета генерации. Первыми уходят слабые insight, потом procedure."""
     limit = share * max_tokens * 4                        # символов, грубо 4 на токен
 
+    @needs("helpful", "harmful", kinds=("insight", "procedure"))
     def bound(ctx, memory, before):
         weak = sorted(memory.of("insight", "procedure"), key=lambda r: (r.kind == "procedure", r.helpful - r.harmful))
         while len(ctx.render(memory)) > limit and weak:
@@ -57,7 +60,7 @@ def gate():
         after, prev = ctx.evaluate(memory), ctx.evaluate(before)
         ok = sum(c for c, _ in after) >= sum(c for c, _ in prev) and sum(t for _, t in after) <= sum(t for _, t in prev)
         if not ok:
-            memory.records = before.records
+            memory.restore(before.of())       # скрытые записи (эпизоды) остаются
         ctx.gated.append(ok)
     return bound
 
@@ -65,8 +68,9 @@ def gate():
 def merge_similar(threshold, merge):
     """Группы по всем парам: к записи i все следующие с косинусом >= threshold, уже попавшие в группу
     пропускаются. merge(ctx, group) -> (текст, helpful, harmful) или None; группа сводится к первой записи."""
+    @needs("helpful", "harmful", kinds="*")
     def bound(ctx, memory, before):
-        recs = list(memory.records)
+        recs = memory.of()
         if len(recs) < 2:
             return
         vecs = embed.embed([r.text for r in recs])
@@ -90,6 +94,7 @@ def merge_similar(threshold, merge):
 
 def merge_counted(prompt, temperature=0.3):
     """Слияние группы моделью по prompt; ответ «[id] helpful=N harmful=M :: текст» с id первой записи."""
+    @needs("helpful", "harmful")
     def merge(ctx, group):
         first = group[0]
         helpful, harmful = sum(r.helpful for r in group), sum(r.harmful for r in group)
@@ -117,18 +122,22 @@ class Subsumed(BaseModel):
 
 
 def as_rule(r):
-    return dict(rule=r.text, rationale=r.meta.get("rationale", ""), confidence=r.meta.get("confidence", 0.85),
-                when=r.when, helpful=r.helpful, harmful=r.harmful)
+    """Запись -> правило оптимизатора; прочие поля записи едут с правилом и возвращаются в put_rules."""
+    values = {k: v for k, v in asdict(r).items() if k not in ("id", "text", "kind")}
+    return dict(rule=r.text, rationale=values.get("rationale", ""), confidence=values.get("confidence", 0.85), values=values)
 
 
-def put_rules(memory, kind, group, rules):
-    """Записи вида kind в группе group заменяются правилами."""
+def put_rules(memory, kind, rules, **group):
+    """Записи вида kind из группы (поле=значение) заменяются правилами. У правила из записи — её прочие поля,
+    у нового — rationale и confidence, если у записей вида такие поля есть."""
     for r in memory.of(kind):
-        if r.group == group:
+        if all(getattr(r, k) == v for k, v in group.items()):
             memory.drop(r.id)
+    names = {f.name for f in fields(memory.spec(kind).record)}
     for x in rules:
-        memory.add(x["rule"], kind, when=x.get("when", ""), helpful=x.get("helpful", 0), harmful=x.get("harmful", 0),
-                   group=group, meta=dict(rationale=x.get("rationale", ""), confidence=x.get("confidence", 0.85)))
+        values = dict(x.get("values", {}), **group)
+        values.update({k: x[k] for k in ("rationale", "confidence") if k in names and k in x})
+        memory.add(x["rule"], kind, **values)
 
 
 def rule_optimizer(prompts, passes=2):
@@ -194,33 +203,32 @@ def rule_optimizer(prompts, passes=2):
     return optimize
 
 
-def optimize(kinds, optimizer, cap, target):
-    """Вид (и группа) сверх cap записей сжимается optimizer до target, остаток обрезается до cap."""
+def optimize(kinds, optimizer, cap, target, by=None):
+    """Вид (или каждая группа вида по полю by) сверх cap записей сжимается optimizer до target, остаток
+    обрезается до cap."""
+    @needs(*[by] if by else [], kinds=kinds)
     def bound(ctx, memory, before):
         for k in kinds:
-            for group in dict.fromkeys(r.group for r in memory.of(k)):
-                same = [r for r in memory.of(k) if r.group == group]
+            for group in dict.fromkeys(getattr(r, by) for r in memory.of(k)) if by else [None]:
+                same = [r for r in memory.of(k) if not by or getattr(r, by) == group]
                 if len(same) > cap:
-                    put_rules(memory, k, group, optimizer(ctx.model, [as_rule(r) for r in same], target)[:cap])
+                    put_rules(memory, k, optimizer(ctx.model, [as_rule(r) for r in same], target)[:cap], **({by: group} if by else {}))
     return bound
 
 
-def best_by_val(history_key="iterations"):
-    """В конце прохода: val текущей памяти в историю, память — лучшая по val (строго больше, при равенстве
-    ранняя). Первая запись истории — пустая память до обучения. История в ctx.state[history_key]."""
-    def bound(ctx, memory, before):
-        history = ctx.state.setdefault(history_key, [])
-        if ctx.step != ctx.total:
-            return
-        current = history[-1]
-        current["val"], current["memory"] = accuracy(ctx.evaluate(memory)), copy.deepcopy(memory)
+def best_by_val(kind="iterations"):
+    """Конец прохода: val текущей памяти в историю, память — лучшая по val (строго больше, при равенстве
+    ранняя). Первая запись истории — пустая память до обучения. История — скрытый вид kind."""
+    @needs("val", "records", kinds=(kind,))
+    def epoch(ctx, memory):
+        history = memory.of(kind)
+        memory.edit(history[-1].id, val=accuracy(ctx.evaluate(memory)), records=memory.opened())
         best = history[0]
         for h in history[1:]:
-            if h["val"] > best["val"]:
+            if h.val > best.val:
                 best = h
-        memory.records = copy.deepcopy(best["memory"].records)
-        memory.counter = max(memory.counter, best["memory"].counter)
-    return bound
+        memory.restore(best.records)
+    return epoch
 
 
 def accuracy(results):

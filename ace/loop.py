@@ -1,13 +1,15 @@
 """Один цикл на все методы. Метод = четыре элемента памяти и решатель:
 
-    1 память     схема: виды записей и разрешённые операции      memory.py
-    2 инжект     что из памяти видит решатель                     inject.py
-    3 сигнал     что после попытки возвращается в систему         feedback.py
-    4 обновление reflect -> curate -> bound, раз в every задач    update.py
+    1 память     схема: виды записей, их поля и разрешённые операции   memory.py
+    2 инжект     что из памяти видит решатель: при запуске, по запросу, после шага   inject.py
+    3 сигнал     что после попытки возвращается в систему              feedback.py
+    4 обновление обработчики событий: шаг, задача, батч, проход         update.py
 
     решатель     среда задачи, число попыток, голосование, перспективы
 
-    память -> инжект -> решатель -> сигнал -> обновление -> память
+    память -> инжект -> решатель (шаги: обновление, хук инжекта) -> сигнал -> обновление -> память
+
+При сборке метод сверяет, что блоки инжекта и обновления требуют от памяти (needs), со схемой памяти.
 """
 import json
 import os
@@ -19,8 +21,8 @@ from pathlib import Path
 
 from . import inject as injects
 from .env import Env
-from .feedback import Feedback
-from .memory import ALL, Memory
+from .feedback import Episode, Feedback
+from .memory import Kind, Memory, check, requirements
 from .tasks import final_answer
 from .update import Ctx, Update, snapshot
 
@@ -38,7 +40,7 @@ class Solver:
 @dataclass
 class Method:
     name: str
-    memory: dict = field(default_factory=lambda: {"note": ALL})
+    memory: dict = field(default_factory=lambda: {"note": Kind()})
     inject: callable = field(default_factory=injects.full)
     feedback: Feedback = field(default_factory=Feedback)
     update: Update = field(default_factory=Update)
@@ -50,13 +52,17 @@ class Method:
             raise ValueError(f"{self.name}: обновлению нужно, что решатель прочёл, а сигнал этого не отдаёт (usage=none)")
         if self.feedback.usage == "env" and not getattr(self.inject, "reads", False):
             raise ValueError(f"{self.name}: usage=env, но инжект не даёт инструментов чтения")
+        u = self.update
+        problems = check(self.memory, requirements(self.inject, u.reflect, u.curate, u.bound, u.step, u.epoch))
+        if problems:
+            raise ValueError(f"{self.name}: блоки не сходятся с памятью: " + "; ".join(problems))
 
 
 def swap(method, name=None, **parts):
-    """Метод с заменёнными частями: элементами (memory, inject, feedback, solver) или стадиями
-    обновления (reflect, curate, bound, every). Проверки метода выполняются заново."""
-    stages = {k: parts.pop(k) for k in ("reflect", "curate", "bound", "every", "needs_usage") if k in parts}
-    return replace(method, name=name or method.name, update=replace(method.update, **stages), **parts)
+    """Метод с заменёнными частями: элементами (memory, inject, feedback, solver) или частями
+    обновления (reflect, curate, bound, every, step, epoch). Проверки метода выполняются заново."""
+    stages = {k: parts.pop(k) for k in ("reflect", "curate", "bound", "every", "step", "epoch", "needs_usage") if k in parts}
+    return replace(method, name=name or method.name, update=replace(parts.pop("update", method.update), **stages), **parts)
 
 
 @dataclass
@@ -76,23 +82,43 @@ class Attempt:
     perspective: str = ""
 
 
-def solve(model, task, method, memory, item, temperature=0, note=""):
+def solve(model, task, method, memory, item, temperature=0, note="", ctx=None):
+    """ctx — идёт обучение: тогда на шагах решателя срабатывает обновление (update.step)."""
     env, view = method.solver.env, method.inject(model, memory, item)
     self_report = method.feedback.usage == "self"
     system = task.system + env.hint + method.solver.hint
     if view.text:
         system += "\n\n" + view.head + view.text
-    if self_report and memory.records:
+    if self_report and memory.of():
         system += ("\n\nRight before the final answer line, write one line 'USED: <ids of the memory bullets "
                    "you actually relied on, comma-separated, or none>'.")
     user = f"{task.instr}\n\n{item['context']}" + (f"\n\nReflection:\n{note}" if note else "")
+    learn = ctx is not None and method.update.step
+    events = on_step(ctx, method, memory, item, view) if env.tools + view.tools and (learn or view.hook) else None
     r = model.run(system, user, tools=env.tools + view.tools, deps=view.fs,
-                  rounds=env.rounds + view.rounds, temperature=temperature)
+                  rounds=env.rounds + view.rounds, temperature=temperature, on_step=events)
     answer = final_answer(r.output or "")
     reported = [i for i in used_line(r.output or "") if memory.get(i)] if self_report else []
     return Attempt(item["context"], item["target"], r.text, answer, task.check(answer, item["target"]), r.truncated,
                    r.steps, view.text, view.shown, list(view.fs.reads) if view.fs else [], reported,
                    item.get("perspective", ""))
+
+
+def on_step(ctx, method, memory, item, view):
+    """Событие шага: при обучении обновление правит память сразу; хук инжекта отдаёт текст к системному промпту."""
+    done = []
+
+    def handler(new):
+        text = None
+        for step in new:
+            done.append(step)
+            if ctx is not None and method.update.step:
+                ep = Episode(item["context"], "", "", list(done), False, view.text, view.shown, perspective=item.get("perspective", ""))
+                method.update.step(ctx, ep, memory, step=step)
+            if view.hook:
+                text = view.hook(step) or text
+        return text
+    return handler
 
 
 def used_line(text):
@@ -101,17 +127,17 @@ def used_line(text):
     return [i.strip(" []") for i in lines[-1].split(":", 1)[1].split(",")] if lines else []
 
 
-def attempt(model, task, method, memory, item):
+def attempt(model, task, method, memory, item, ctx=None):
     """Попытка, которая идёт в зачёт, и остальные попытки (группа)."""
     s = method.solver
     if s.perspectives:
         # у каждой перспективы своя память (SCOPE K=2): инжект и обновление читают item["perspective"]
-        tried = [solve(model, task, method, memory, dict(item, perspective=p)) for p in s.perspectives]
+        tried = [solve(model, task, method, memory, dict(item, perspective=p), ctx=ctx) for p in s.perspectives]
         a = max(tried, key=lambda t: t.correct)
         group = [t for t in tried if t is not a]
     else:
-        a, group = solve(model, task, method, memory, item), []
-    group += [solve(model, task, method, memory, item, temperature=s.temperature) for _ in range(s.samples)]
+        a, group = solve(model, task, method, memory, item, ctx=ctx), []
+    group += [solve(model, task, method, memory, item, temperature=s.temperature, ctx=ctx) for _ in range(s.samples)]
     if s.vote:
         a.answer = majority([a] + group)
         a.correct = task.check(a.answer, a.target)
@@ -135,16 +161,16 @@ def run(task, method, model, n=40, out=None, split="", epochs=None, offline=Fals
     scores = {}
 
     def evaluate(m):
-        """(верно, обрыв) на val; одна и та же память не считается дважды."""
-        key = tuple((r.kind, r.text, r.when) for r in m.records)
+        """(верно, обрыв) на val; одна и та же память (открытые записи) не считается дважды."""
+        key = m.key()
         if key not in scores:
             scores[key] = [(t.correct, t.truncated) for t in (solve(model, task, method, m, it) for it in task.load("val"))]
         return scores[key]
 
     ctx = Ctx(model, task, evaluate=evaluate,
               render=lambda m: method.inject(model, m, item).text,
-              retry=lambda m, note: solve(model, task, method, m, item, note=note))
-    log, pending = [], []
+              retry=lambda m, note: solve(model, task, method, m, item, note=note), update=method.update)
+    log = []
 
     def record(phase, epoch, i, a, t0):
         log.append(dict(phase=phase, epoch=epoch, i=i, question=a.question, target=a.target, answer=a.answer,
@@ -162,19 +188,17 @@ def run(task, method, model, n=40, out=None, split="", epochs=None, offline=Fals
             t0 = time.time()
             ctx.step, ctx.total = i + 1, len(items)
             memory.new_task()
-            a, group = attempt(model, task, method, memory, item)
+            a, group = attempt(model, task, method, memory, item, ctx)
             episode = method.feedback.observe(model, a, group)
             delta = method.update.reflect(ctx, episode, memory)
             if delta:
-                pending.append(delta)
-            last = i == len(items) - 1
-            if ((i + 1) % method.update.every == 0 or last and method.update.flush) and pending:
-                before = snapshot(memory)
-                method.update.curate(ctx, memory, pending)
-                method.update.bound(ctx, memory, before)
-            if (i + 1) % method.update.every == 0 or last:
-                pending = []            # неполный батч в конце прохода без flush отбрасывается
+                ctx.pending.append(delta)
+            if (i + 1) % method.update.every == 0:
+                method.update.batch(ctx, memory)
             record("train" if offline else "online", epoch, i, a, t0)
+        if method.update.epoch:
+            method.update.epoch(ctx, memory)
+        ctx.pending = []                # неполный батч без обработчика прохода отбрасывается
         if offline:
             score = sum(c for c, _ in ctx.evaluate(memory))
             print(f"val after epoch {epoch}: {score}", flush=True)

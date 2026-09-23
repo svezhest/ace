@@ -1,14 +1,14 @@
 """ACE (Agentic Context Engineering). Два варианта из одних блоков.
 
 ace — вариант стенда, основа цепочки абляций:
-    1 память      пункты со всеми операциями и счётчиками helpful / harmful
+    1 память      пункты (Bullet) со всеми операциями и счётчиками helpful / harmful
     2 инжект      все пункты «[id] текст»
     3 сигнал      верный ответ
     4 обновление  reflect: ask -> уроки и метки пунктов; curate: счётчики, затем пункты правит агент файловыми
                   инструментами (или одной схемой операций, или перезаписью); bound: prune вредных
 
 ace_exact — как в апстриме (ace/ace/ace.py, core/, playbook_utils.py; промпты prompts/ace_*.txt дословно):
-    1 память      playbook: пункты по 7 разделам (поле group), только добавляются
+    1 память      playbook: пункты по 7 разделам (поле section), только добавляются
     2 инжект      весь playbook по разделам, строка «[id] helpful=X harmful=Y :: текст»
     3 сигнал      верный ответ и id пунктов, названных решателем (строка USED вместо bullet_ids)
     4 обновление  reflect: rounds(ask) — при неверном ответе до 3 раундов «рефлексия -> счётчики -> новая
@@ -20,12 +20,12 @@ ace_exact — как в апстриме (ace/ace/ace.py, core/, playbook_utils.
 from .. import bound, curate, inject, prompts, reflect
 from ..feedback import Feedback
 from ..loop import Method, swap
-from ..memory import ALL
+from ..memory import Bullet, Kind
 from ..update import Update, ask
 
 # ace
 
-MEMORY = {"bullet": ALL}
+MEMORY = {"bullet": Kind(Bullet)}
 
 REFLECT = prompts.load("ace_stand_reflect.txt")
 CURATE = {m: prompts.load(f"ace_stand_curate{s}.txt") for m, s in (("tools", ""), ("json", "_json"), ("rewrite", "_rewrite"))}
@@ -54,16 +54,16 @@ SECTIONS = ["STRATEGIES & INSIGHTS", "FORMULAS & CALCULATIONS", "CODE SNIPPETS &
             "PROBLEM-SOLVING HEURISTICS", "CONTEXT CLUES & INDICATORS", "OTHERS"]
 ROUNDS, TOKEN_BUDGET = 3, 80000
 
-PLAYBOOK = {"bullet": ("add",)}
+PLAYBOOK = {"bullet": Kind(Bullet, ("add",))}
 LAYOUT = inject.sections(SECTIONS)
 
 diagnosis = ask(reflect.by_label(P["reflector"], P["reflector_nogt"]), reflect.diagnosis_fields, reflect.Diagnosis,
                 then=reflect.diagnosis_delta)
 curator = ask(curate.by_label(P["curator"], P["curator_nogt"]), curate.playbook_fields(SECTIONS, TOKEN_BUDGET, LAYOUT),
-              curate.Curation, then=curate.add(curate.additions, text=lambda op: op.content, group=curate.in_section(SECTIONS)))
+              curate.Curation, then=curate.add(curate.additions, text=lambda op: op.content, section=curate.in_section(SECTIONS)))
 
 ace_exact = Method("ace_exact", PLAYBOOK, inject.show(layout=LAYOUT), Feedback("golden", usage="self"),
                    Update(reflect.rounds(diagnosis, ROUNDS), curate.each(curate.count, curator), needs_usage=True))
 # порог апстрима 0.90 подобран под all-mpnet; у BGE-M3 косинусы ниже
-ace_exact_dedup = swap(ace_exact, "ace_exact_dedup", memory={"bullet": ("add", "edit", "delete")},
+ace_exact_dedup = swap(ace_exact, "ace_exact_dedup", memory={"bullet": Kind(Bullet, ("add", "edit", "delete"))},
                        bound=bound.merge_similar(0.85, bound.merge_counted(P["merge"])))

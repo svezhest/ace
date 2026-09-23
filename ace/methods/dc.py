@@ -27,6 +27,7 @@ from .. import curate, inject, parse, prompts, reflect
 from ..env import Sandbox
 from ..feedback import Feedback
 from ..loop import Method, Solver, swap
+from ..memory import Kind, Note, Pair
 from ..update import Update, ask
 
 SYNTH, CURATOR = prompts.load("dc_synth.txt", "brackets"), prompts.load("dc_curator.txt", "brackets")
@@ -36,15 +37,15 @@ CHEATSHEET = parse.opened("cheatsheet")
 
 # 1. память
 
-MEMORY = {"sheet": ("add", "edit")}
-MEMORY_RS = {"pair": ("add",), "sheet": ("add", "edit")}
+MEMORY = {"sheet": Kind(Note, ("add", "edit"))}
+MEMORY_RS = {"pair": Kind(Pair, ("add",)), "sheet": Kind(Note, ("add", "edit"))}
 
 # 2. инжект
 
 TOP = 3
 
 whole = inject.show(("sheet",), line=inject.plain, empty=EMPTY)
-retrieval = inject.show(("pair",), pick=inject.topk(TOP, key=lambda r: r.when), layout=inject.pairs(scored=True, note=NOTE), empty=EMPTY)
+retrieval = inject.show(("pair",), pick=inject.topk(TOP, key=lambda r: r.question), layout=inject.pairs(scored=True, note=NOTE), empty=EMPTY)
 history = inject.show(("pair",), layout=inject.pairs(scored=False), empty=EMPTY)
 retrieve_synth = inject.synth(retrieval, SYNTH, inject.pairs_and_sheet("sheet", EMPTY), CHEATSHEET)
 
@@ -52,7 +53,7 @@ retrieve_synth = inject.synth(retrieval, SYNTH, inject.pairs_and_sheet("sheet", 
 
 curator = ask(CURATOR, reflect.answer_and_sheet("sheet", EMPTY), tokens=2, parse=CHEATSHEET, then=reflect.rewritten)
 rewrite = curate.each(curate.rewrite("sheet", text=lambda d: d.lessons[0]))
-pair = curate.remember("pair", text=lambda ep: ep.output, when=lambda ep: ep.question)
+pair = curate.remember("pair", text=lambda ep: ep.output, question=lambda ep: ep.question)
 store = curate.each(pair, curate.rewrite("sheet", text=lambda ep: ep.context))
 
 dc = Method("dc", MEMORY, whole, Feedback("none"), Update(curator, rewrite))

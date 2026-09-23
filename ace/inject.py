@@ -3,12 +3,20 @@
 Вариант: inject(model, memory, item) -> View. View это текст в системный промпт и, если память
 читается по вызову, инструменты чтения. Память инжект не меняет.
 
+Когда память доходит до решателя:
+    при запуске      текст в системном промпте (show и остальные ниже)
+    по запросу       инструменты чтения (catalog)
+    по событию       hooked(base, hook, on): после шага решателя, для которого on(шаг), текст hook
+                     дописывается к системному промпту (SCOPE: правила текущей задачи; on_failure —
+                     после отбивки инструмента, например записи, ближайшие к тексту ошибки)
+
 Инжект собирается из блоков:
     show(kinds, pick, line | layout, before, after, empty, head)   какие записи и как они выглядят
-        pick     какие из записей видов: все, topk по эмбеддингу, sample по весу (gain_weight EvoLib),
-                 where по условию
+        pick     какие из записей видов: все, topk по эмбеддингу (запрос — вопрос или ошибка шага),
+                 sample по весу (gain_weight EvoLib), where по условию
         line     строка записи: plain, dashed, numbered, dotted, counted, prefixed
-        layout   весь текст из записей: by_group и sections (разделы ACE, домены SCOPE), pairs (DC)
+        layout   весь текст из записей: by_group по полю (sections — разделы ACE, домены SCOPE), pairs (DC)
+    Пустые kinds — все открытые виды; скрытые (private) не показываются никогда.
     choose((p, inject), ...)     одно случайное число выбирает ветку (EvoLib: skills, insights или ничего)
     concat(inject, ...)          несколько блоков подряд (SCOPE: strategic, затем tactical)
     synth(inject, prompt, ...)   модель переписывает показанное под вопрос (DC-RS)
@@ -20,7 +28,8 @@ import random
 from dataclasses import dataclass, field, replace
 
 from . import embed, fs
-from .memory import slug
+from .feedback import failed
+from .memory import Skill, needs, requirements, slug
 
 HEAD = "What you learned so far:\n"
 
@@ -33,6 +42,7 @@ class View:
     fs: object = None                           # FS, к которой привязаны инструменты
     rounds: int = 0                             # сколько лишних шагов агенту на чтение
     head: str = HEAD                            # заголовок перед text; у методов со своей формулировкой пуст
+    hook: callable = None                       # hook(шаг) -> текст к системному промпту или None
 
 # строка записи
 
@@ -53,6 +63,7 @@ def dotted(r):
     return f"[{r.id}]. {r.text}"
 
 
+@needs("helpful", "harmful")
 def counted(r):
     return f"[{r.id}] helpful={r.helpful} harmful={r.harmful} :: {r.text}"
 
@@ -63,11 +74,29 @@ def prefixed(prefix):
 # какие записи
 
 
-def topk(k, key=lambda r: r.text):
-    """k ближайших к вопросу по эмбеддингу, от самой близкой; близость в копии записи, meta["score"]."""
+class Scored:
+    """Запись с близостью к запросу: только для показа, в памяти близости нет."""
+    def __init__(self, record, score):
+        self.record, self.score = record, score
+
+    def __getattr__(self, name):
+        return getattr(self.record, name)
+
+
+def question(item):
+    return item["context"]
+
+
+def step_error(item):
+    """Текст ошибки последнего шага (для hooked)."""
+    return item["step"][2]
+
+
+def topk(k, key=lambda r: r.text, query=question):
+    """k ближайших к запросу query(item) по эмбеддингу, от самой близкой; у каждой score."""
     def pick(records, item):
-        sims = embed.embed([key(r) for r in records]) @ embed.embed([item["context"]])[0]
-        return [replace(records[i], meta={**records[i].meta, "score": float(sims[i])}) for i in sims.argsort()[::-1][:k]]
+        sims = embed.embed([key(r) for r in records]) @ embed.embed([query(item)])[0]
+        return [Scored(records[i], float(sims[i])) for i in sims.argsort()[::-1][:k]]
     return pick
 
 
@@ -85,23 +114,25 @@ def where(test):
 def gain_weight(w_ig, eps):
     """Вес EvoLib: skill — w_IG * max(IG, eps) + (среднее FIG или 0.5), insight — max(среднее FIG или 0.5, eps).
     В апстриме у skill пола нет: отрицательный вес ломает random.choices молча, поэтому здесь пол eps."""
+    @needs("fig")
     def weight(r):
-        fig = r.meta["fig"]
-        future = sum(fig) / len(fig) if fig else 0.5
-        if r.kind == "skill":
-            return max(w_ig * max(r.meta["ig"], eps) + future, eps)
+        future = sum(r.fig) / len(r.fig) if r.fig else 0.5
+        if isinstance(r, Skill):
+            return max(w_ig * max(r.ig, eps) + future, eps)
         return max(future, eps)
     return weight
 
 # вид всего текста
 
 
-def by_group(line, order=(), header="## {}", sep="\n\n", title=str):
-    """Записи под заголовками по полю group. order — пары (группа, заголовок), показываются все,
+def by_group(line, by, order=(), header="## {}", sep="\n\n", title=str):
+    """Записи под заголовками по полю by. order — пары (группа, заголовок), показываются все,
     даже пустые; без order группы идут по первому появлению."""
+    @needs(by)
     def layout(records):
-        groups = list(order) or [(g, title(g)) for g in dict.fromkeys(r.group for r in records)]
-        return sep.join("\n".join([header.format(t)] + [line(r) for r in records if r.group == g]) for g, t in groups)
+        group = lambda r: getattr(r, by)
+        groups = list(order) or [(g, title(g)) for g in dict.fromkeys(map(group, records))]
+        return sep.join("\n".join([header.format(t)] + [line(r) for r in records if group(r) == g]) for g, t in groups)
     return layout
 
 
@@ -111,21 +142,22 @@ def titled(group):
 
 
 def sections(names, line=counted):
-    """Разделы ACE: все по порядку, даже пустые; группа записи — slug заголовка."""
-    return by_group(line, order=[(slug(s), s) for s in names])
+    """Разделы ACE: все по порядку, даже пустые; раздел записи — slug заголовка."""
+    return by_group(line, "section", order=[(slug(s), s) for s in names])
 
 
 def pairs(scored, note=""):
-    """Пары (вопрос в when, решение в text) в оформлении DC. scored (retrieval): с пояснением note и близостью,
+    """Пары (вопрос, решение) в оформлении DC. scored (retrieval): с пояснением note и близостью,
     самая похожая последней; иначе (полная история) по порядку."""
+    @needs("question")
     def layout(records):
         text = "### PREVIOUS SOLUTIONS (START)\n\n" + (f"{note}\n\n" if scored else "")
         for i, r in enumerate(records[::-1] if scored else records):
             if scored:
-                text += (f"#### Previous Input #{i + 1} (Similarity: {r.meta['score']:.2f}):\n\n{r.when}\n\n"
+                text += (f"#### Previous Input #{i + 1} (Similarity: {r.score:.2f}):\n\n{r.question}\n\n"
                          f"#### Model Solution to Previous Input  #{i + 1}:\n\n{r.text}\n---\n---\n\n")
             else:
-                text += (f"#### Previous Input #{i + 1}:\n\n{r.when}\n\n"
+                text += (f"#### Previous Input #{i + 1}:\n\n{r.question}\n\n"
                          f"#### Model Solution to Previous Input #{i + 1}:\n\n{r.text}\n---\n---\n\n")
         return (text.strip() + "\n\n" if scored else text) + "#### PREVIOUS SOLUTIONS (END)"
     return layout
@@ -144,7 +176,10 @@ def kinds_of(kinds, item):
 
 
 def show(kinds=(), pick=None, line=numbered, sep="\n", layout=None, before="", after="", empty=None, head=HEAD):
-    """Записи видов kinds (все, если не заданы). empty: текст при пустой выборке, иначе в промпт ничего."""
+    """Записи видов kinds (все открытые, если не заданы). empty: текст при пустой выборке, иначе в промпт ничего."""
+    shown = [n for _, names in requirements(line, layout, pick) for n in names]
+
+    @needs(*shown, kinds=kinds or "*")
     def inject(model, memory, item):
         recs = memory.of(*kinds_of(kinds, item))
         if pick and recs:
@@ -201,13 +236,14 @@ def synth(base, prompt, fields, parse, max_tokens=2):
 
 def pairs_and_sheet(kind, empty):
     """Поля синтеза DC-RS: показанные пары, следующий вопрос, прошлый cheatsheet."""
-    return lambda view, memory, item: {"PREVIOUS_INPUT_OUTPUT_PAIRS": view.text, "NEXT_INPUT": item["context"],
-                                       "PREVIOUS_CHEATSHEET": text_of(memory, kind, empty)}
+    return needs(kinds=(kind,))(lambda view, memory, item: {"PREVIOUS_INPUT_OUTPUT_PAIRS": view.text, "NEXT_INPUT": item["context"],
+                                       "PREVIOUS_CHEATSHEET": text_of(memory, kind, empty)})
 
 
 def catalog(always=(), listed=()):
     """Записи видов always целиком в промпте; видов listed только путь и условие применения,
     тело по read(path) из skills/, смонтированного только на чтение. Чтения отслеживаются."""
+    @needs(kinds=always + listed)
     def inject(model, memory, item):
         rules = memory.of(*always) if always else []
         entries = [r for r in memory.of(*listed) if r not in rules]
@@ -221,3 +257,21 @@ def catalog(always=(), listed=()):
         return View(text, [r.id for r in rules], fs.READ_TOOLS, skills, rounds=3)
     inject.reads = True
     return inject
+
+
+def hooked(base, hook, on=None):
+    """base при запуске; после каждого шага решателя, для которого on(шаг), hook(model, memory, item + step)
+    -> View, и его текст дописывается к системному промпту вместо прошлого текста hook."""
+    def inject(model, memory, item):
+        def after(step):
+            if on and not on(step):
+                return None
+            return hook(model, memory, dict(item, step=step)).text
+        return replace(base(model, memory, item), hook=after)
+    inject.reads = getattr(base, "reads", False)
+    return inject
+
+
+def on_failure(step):
+    """Отбивка: инструмент вернул ошибку (traceback, ModelRetry)."""
+    return failed(step[2])

@@ -7,7 +7,8 @@
     seq, when, maybe, on_prev       общие блоки цепочки (update.py)
     rounds(block, n)                при неверном ответе: рефлексия -> счётчики на копии памяти -> новая
                                     попытка с рефлексией, до n раз или до верного ответа (ACE)
-    per_step(block, steps)          по шагам траектории; найденное раньше в extra["found"] (SCOPE)
+    on_answer(block)                итоговый шаг задачи: сводка ответа и ошибка (SCOPE, событие задачи)
+    on_tool(block)                  шаг с инструментом: сводка и отбивка (SCOPE, событие шага)
     perspectives(block)             по попытке каждой перспективы (SCOPE K=2)
     best_of(block, n, select)       n кандидатов и выбор (SCOPE Best-of-N); two_fields, one_or_two — выбор из двух
     each_attempt(block)             по каждой попытке группы, список пар (попытка, результат) (TF-GRPO)
@@ -19,12 +20,12 @@
     labeled_lessons, free_lessons   ответ схемой или свободным текстом -> дельта; episode — запись для provenance
 
 Диагноз ACE: Diagnosis, diagnosis_fields, diagnosis_delta
-Правило на шаг SCOPE: agent_steps, Proposal, rule_fields, Selection, selector_fields, selected_index,
+Правило на шаг SCOPE: answer_step, tool_step, Proposal, rule_fields, Selection, selector_fields, selected_index,
     meaningful, rule_lesson, as_lessons
 Групповое преимущество TF-GRPO: partial_group, rollout_fields, summarized, advantage_fields, library_fields,
     nonempty_ops, as_ops
-Библиотека EvoLib: rank, insight_needed, insight_fields, with_insight, improving, disputed, compare_fields,
-    second_better, finish; log_gain, future_gain — прирост лучшей попытки (IG и Future IG)
+Библиотека EvoLib: rank, insight_needed, insight_fields, with_insight, best_solution, improving, disputed,
+    compare_fields, second_better, finish; log_gain, future_gain — прирост лучшей попытки (IG и Future IG)
 Cheatsheet DC: answer_and_sheet, rewritten"""
 import math
 from dataclasses import replace
@@ -33,8 +34,9 @@ from typing import Literal
 from pydantic import BaseModel
 
 from . import parse
+from .feedback import failed
 from .inject import counted, text_of
-from .memory import perspective_kind
+from .memory import needs, perspective_kind
 from .update import Delta, count, maybe, on_prev, seq, snapshot, when  # noqa: F401  общие блоки цепочки
 
 # обёртки
@@ -47,6 +49,7 @@ def keep(ctx, ep, memory, **extra):
 def rounds(inner, n=3, note=lambda d: d.lessons[-1]):
     """inner -> Delta. Счётчики каждого раунда сразу идут в копию памяти: следующую попытку решатель
     делает уже с ними; в итоговой дельте метки всех раундов, уроки последнего."""
+    @needs("helpful", "harmful")
     def block(ctx, ep, memory, **extra):
         local, attempt, helpful, harmful, last = snapshot(memory), ep, [], [], None
         for _ in range(n if ep.ok is False else 1):
@@ -67,15 +70,21 @@ def rounds(inner, n=3, note=lambda d: d.lessons[-1]):
     return block
 
 
-def per_step(inner, steps):
-    """steps(ep) -> [(сводка шага, ошибка или None)]; inner вызывается с extra step, error, found."""
+def on_answer(inner):
+    """inner с extra step (сводка итогового шага) и error; результат списком из одного."""
     def block(ctx, ep, memory, **extra):
-        found = []
-        for step, error in steps(ep):
-            out = inner(ctx, ep, memory, **{**extra, "step": step, "error": error, "found": found})
-            if out is not None:
-                found.append(out)
-        return found or None
+        step, error = answer_step(ep)
+        out = inner(ctx, ep, memory, **{**extra, "step": step, "error": error})
+        return [out] if out is not None else None
+    return block
+
+
+def on_tool(inner):
+    """Событие шага: шаг с инструментом (extra step) -> inner со сводкой и отбивкой; результат одним уроком."""
+    def block(ctx, ep, memory, step, **extra):
+        summary, error = tool_step(step)
+        out = inner(ctx, ep, memory, **{**extra, "step": summary, "error": error})
+        return Delta(lessons=[out]) if out is not None else None
     return block
 
 
@@ -205,6 +214,7 @@ class Diagnosis(BaseModel):
     bullet_tags: list[Tag] = []
 
 
+@needs("helpful", "harmful")
 def diagnosis_fields(ctx, ep, memory, **extra):
     """Позиционные поля рефлектора ACE; без метки нет верного ответа."""
     used = [counted(memory.get(i)) for i in ep.used if memory.get(i)]
@@ -243,20 +253,21 @@ def step_summary(output="", tools="", observations=""):
     return "\n".join(p for p in parts if p) or "(no step details)"
 
 
-def agent_steps(ep):
-    """Шаги агента: вызовы инструментов, затем итоговый ответ. У шага сводка и ошибка (тип, сообщение) или None."""
-    out = []
-    for name, args, result in ep.steps:
-        failed = "Traceback" in result or result.startswith("Error")
-        out.append((step_summary(tools=f"{name} {args}", observations=result), ("ToolError", result[-500:]) if failed else None))
+def tool_step(step):
+    """Шаг с инструментом -> сводка и ошибка (тип, сообщение) или None."""
+    name, args, result = step
+    return step_summary(tools=f"{name} {args}", observations=result), ("ToolError", result[-500:]) if failed(result) else None
+
+
+def answer_step(ep):
+    """Итоговый шаг -> сводка ответа и ошибка: неверный ответ (с верным, если он есть) или обрыв."""
     error = None
     if ep.ok is False:
         error = ("IncorrectAnswer", f"Incorrect answer. Model answered '{ep.answer}'" + (f", expected '{ep.target}'." if ep.target else "."))
     elif ep.truncated:
         error = ("Truncated", "The output was cut at the token limit before the final answer.")
     seen = "" if ep.ok is None else f"Answer {'correct' if ep.ok else 'incorrect'}"
-    out.append((step_summary(ep.output, observations=seen), error))
-    return out
+    return step_summary(ep.output, observations=seen), error
 
 
 def agent_context(ctx, ep):
@@ -264,9 +275,10 @@ def agent_context(ctx, ep):
                 current_system_prompt=f"{ctx.task.system}\n\n{ep.context}".strip())
 
 
-def rule_fields(ctx, ep, memory, step, error, found, **extra):
-    """Уже действующие правила: tactical перспективы и найденные раньше в этой задаче."""
-    rules = [r.text for r in memory.of(perspective_kind("tactical", ep.perspective))] + [g["text"] for g in found]
+@needs(kinds=("tactical",))
+def rule_fields(ctx, ep, memory, step, error, **extra):
+    """Уже действующие правила: tactical перспективы, то есть принятые в этой задаче."""
+    rules = [r.text for r in memory.of(perspective_kind("tactical", ep.perspective))]
     fields = dict(agent_context(ctx, ep), last_step_summary=step, applied_rules="\n".join(f"- {r}" for r in rules) or "(none)")
     return dict(fields, error_type=error[0], error_message=error[1]) if error else fields
 
@@ -335,7 +347,7 @@ def advantage_fields(ctx, ep, memory, prev, **extra):
 
 
 def library_fields(ctx, ep, memory, prev, **extra):
-    return dict(existing_experiences="\n".join(f"[{r.id}]. {r.text}" for r in memory.records) or "None", new_experiences=prev)
+    return dict(existing_experiences="\n".join(f"[{r.id}]. {r.text}" for r in memory.of()) or "None", new_experiences=prev)
 
 
 def nonempty_ops(text):
@@ -379,10 +391,15 @@ def with_insight(evaluated):
     return then
 
 
+def best_solution(memory, question):
+    return next((r for r in memory.of("best") if r.question == question), None)
+
+
+@needs(kinds=("best",))
 def improving(ctx, ep, memory, prev, **extra):
-    """Лучшее решение задачи в ctx.state["best"]; улучшение — строго выше по баллу."""
-    before = ctx.state.setdefault("best", {}).get(ep.question)
-    return dict(prev, before=before, improving=not before or prev["scores"][prev["b"]] > before["score"])
+    """Лучшее решение задачи — в скрытом виде best; улучшение — строго выше по баллу."""
+    before = best_solution(memory, ep.question)
+    return dict(prev, before=before, improving=not before or prev["scores"][prev["b"]] > before.score)
 
 
 def disputed(evaluated):
@@ -390,12 +407,12 @@ def disputed(evaluated):
     def test(ctx, ep, memory, prev, **extra):
         best = prev["attempts"][prev["b"]]
         voted = best.answer if best.ok and not evaluated else None
-        return not prev["improving"] and voted and prev["before"]["answer"] != voted
+        return not prev["improving"] and voted and prev["before"].answer != voted
     return test
 
 
 def compare_fields(ctx, ep, memory, prev, **extra):
-    return dict(question=ep.question, a=prev["before"]["output"], b=prev["attempts"][prev["b"]].output)
+    return dict(question=ep.question, a=prev["before"].text, b=prev["attempts"][prev["b"]].output)
 
 
 def second_better(text, ctx, ep, memory, prev, **extra):
@@ -432,8 +449,8 @@ def future_gain(attempts, scores, best, eps=0.01):
 
 
 def answer_and_sheet(kind, empty):
-    return lambda ctx, ep, memory, **extra: {"QUESTION": ep.question, "MODEL_ANSWER": ep.output,
-                                             "PREVIOUS_CHEATSHEET": text_of(memory, kind, empty)}
+    return needs(kinds=(kind,))(lambda ctx, ep, memory, **extra: {"QUESTION": ep.question, "MODEL_ANSWER": ep.output,
+                                                                  "PREVIOUS_CHEATSHEET": text_of(memory, kind, empty)})
 
 
 def rewritten(text, *_, **__):

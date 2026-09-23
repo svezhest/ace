@@ -7,6 +7,8 @@
     env   чтения через инструменты инжекта: факт, записанный средой
     self  самоотчёт в ответе решателя (bullet_ids): слова модели, не факт
     none  неизвестно
+Отбивка (failed) — шаг, на котором инструмент вернул ошибку: traceback исполнения или ModelRetry;
+на неё реагируют событие шага (SCOPE) и хук инжекта.
 """
 from collections import Counter
 from dataclasses import dataclass, field
@@ -72,3 +74,7 @@ def judge(model, attempt):
     """Самопроверка с вердиктом в конце; голое число модель ставит наугад (14/20 против 17/20)."""
     s = model.one("You are a strict grader.", JUDGE.format(question=attempt.question, output=attempt.output)).output or ""
     return "VERDICT:" in s and "correct" in s.split("VERDICT:")[-1].lower()
+
+
+def failed(result):
+    return "Traceback" in result or result.startswith("Error")

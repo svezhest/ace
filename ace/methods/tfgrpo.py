@@ -16,13 +16,14 @@ configs/practice/math_reasoning.yaml.
 from .. import curate, inject, parse, prompts, reflect
 from ..feedback import Feedback
 from ..loop import Method, Solver
+from ..memory import Kind, Note
 from ..update import Update, objectives, paired, retry, seq
 
 Y = prompts.load_yaml("tfgrpo.yaml")
 
 # 1. память
 
-MEMORY = {"experience": ("add", "edit", "delete")}
+MEMORY = {"experience": Kind(Note, ("add", "edit", "delete"))}
 
 # 2. инжект
 

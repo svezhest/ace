@@ -1,21 +1,30 @@
 """Элемент 4. Обновление: как сигнал становится правкой памяти. Память меняет только оно.
+Обновление подписано на события цикла:
 
-    reflect(ctx, episode, memory) -> дельта или None     память не трогает              reflect.py
-    curate(ctx, memory, deltas)                           применяет дельты раз в every     curate.py
-    bound(ctx, memory, before)                            ограничение после правки         bound.py
+    шаг       step(ctx, эпизод до шага, memory, step=шаг)   правка сразу, внутри прогона (SCOPE); только
+                                                            при обучении, не на val и не на тесте
+    задача    reflect(ctx, episode, memory) -> дельта       память не трогает                  reflect.py
+    батч      раз в every задач: curate(ctx, memory, deltas) -> bound(ctx, memory, before)
+                                                            правка и ограничение после неё     curate.py, bound.py
+    проход    epoch(ctx, memory)                            конец прохода (MCE: flush неполного батча,
+                                                            best_by_val); без epoch неполный батч отбрасывается
 
-Стадии собираются из блоков этих модулей; общие блоки здесь: ask — один вызов модели по промпту метода,
+Стадии собираются из блоков этих модулей; общие блоки здесь: at_once — событие шага из reflect и curate без
+батча, flush — неполный батч в конце прохода, chain — обработчики подряд; ask — один вызов модели по промпту метода,
 paired — то же по паре промптов системный / пользовательский, seq — цепочка блоков, when — блок по условию
 (иначе цепочка обрывается), maybe — блок по условию (иначе цепочка идёт дальше), on_prev — then над
 результатом предыдущего блока, retry — повтор до разбора.
 
 ctx: model, task, evaluate(memory) -> [(верно, обрыв)] на val, render(memory) -> что увидит решатель,
 retry(memory, note) -> новая попытка того же вопроса с заметкой (раунды рефлексии ACE),
-step и total: номер задачи в проходе и их число, state: своё состояние обновления на прогон, gated: решения gate."""
+step и total: номер задачи в проходе и их число, state: своё состояние обновления на прогон, gated: решения gate,
+pending: дельты текущего батча."""
 import copy
 from dataclasses import dataclass, field
 
 from pydantic import BaseModel
+
+from .memory import needs
 
 
 @dataclass
@@ -24,8 +33,16 @@ class Update:
     curate: callable = lambda ctx, memory, deltas: None
     bound: callable = lambda ctx, memory, before: None
     every: int = 1
-    flush: bool = False         # неполный батч в конце прохода применить; иначе он отбрасывается (TF-GRPO)
+    epoch: callable = None
+    step: callable = None
     needs_usage: bool = False   # опирается на то, что решатель прочёл: сигнал обязан это отдавать
+
+    def batch(self, ctx, memory):
+        if ctx.pending:
+            before = snapshot(memory)
+            self.curate(ctx, memory, ctx.pending)
+            self.bound(ctx, memory, before)
+        ctx.pending = []
 
 
 @dataclass
@@ -39,6 +56,29 @@ class Ctx:
     total: int = 0
     state: dict = field(default_factory=dict)
     gated: list = field(default_factory=list)
+    pending: list = field(default_factory=list)
+    update: Update = None
+
+
+def flush(ctx, memory):
+    """Неполный батч в конце прохода применяется (MCE)."""
+    ctx.update.batch(ctx, memory)
+
+
+def chain(*handlers):
+    def handler(*args, **extra):
+        for h in handlers:
+            h(*args, **extra)
+    return handler
+
+
+def at_once(reflect, curate):
+    """Дельта reflect сразу идёт в curate, без батча (событие шага SCOPE: правило действует со следующего шага)."""
+    def handler(ctx, ep, memory, **extra):
+        d = reflect(ctx, ep, memory, **extra)
+        if d:
+            curate(ctx, memory, [d])
+    return handler
 
 
 class Delta(BaseModel):
@@ -121,6 +161,7 @@ def on_prev(then):
     return lambda ctx, *args, prev=None, **extra: then(prev, ctx, *args, **extra)
 
 
+@needs("helpful", "harmful")
 def count(memory, helpful, harmful):
     for id in helpful:
         if memory.get(id):
