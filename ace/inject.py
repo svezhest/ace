@@ -42,7 +42,7 @@ class View:
     fs: object = None                           # FS, к которой привязаны инструменты
     rounds: int = 0                             # сколько лишних шагов агенту на чтение
     head: str = HEAD                            # заголовок перед text; у методов со своей формулировкой пуст
-    hook: callable = None                       # hook(шаг) -> текст к системному промпту или None
+    hook: callable = None                       # hook(шаг) -> View, чей текст идёт к системному промпту, или None
 
 # строка записи
 
@@ -266,7 +266,7 @@ def hooked(base, hook, on=None):
         def after(step):
             if on and not on(step):
                 return None
-            return hook(model, memory, dict(item, step=step)).text
+            return hook(model, memory, dict(item, step=step))
         return replace(base(model, memory, item), hook=after)
     inject.reads = getattr(base, "reads", False)
     return inject

@@ -27,7 +27,9 @@
 Библиотека EvoLib: rank, insight_needed, insight_fields, with_insight, best_solution, improving, disputed,
     compare_fields, second_better, finish; log_gain, future_gain — прирост лучшей попытки (IG и Future IG)
 Cheatsheet DC: answer_and_sheet, rewritten
-Хуки по ошибкам инструментов: also, has_failures, failure_fields, HookLessons, confident_hooks"""
+Хуки по ошибкам инструментов: also; рефлексией — has_failures, failure_fields (с хуками, которые не помогли,
+    для доработки), HookLessons, confident_hooks; из траектории без модели, как пары DC — raw_hooks;
+    исходы показанных хуков — fired"""
 import math
 from dataclasses import replace
 from typing import Literal
@@ -461,17 +463,22 @@ def rewritten(text, *_, **__):
 # хуки по ошибкам инструментов
 
 
-def also(main, extra, key):
-    """main -> дельта метода; extra по тому же эпизоду -> список в delta.info[key] (хуки рядом с уроками метода)."""
+def also(main, **extras):
+    """main -> дельта метода; каждый extras[key] по тому же эпизоду -> delta.info[key], если не пуст
+    (хуки и их исходы рядом с уроками метода)."""
     def block(ctx, ep, memory, **kw):
         d = main(ctx, ep, memory, **kw)
-        more = extra(ctx, ep, memory, **kw)
+        more = {k: v for k, v in ((k, b(ctx, ep, memory, **kw)) for k, b in extras.items()) if v}
         if not more:
             return d
         d = d or Delta()
-        d.info = {**d.info, key: more}
+        d.info = {**d.info, **more}
         return d
     return block
+
+
+def fired(ctx, ep, memory, **extra):
+    return ep.fired or None
 
 
 def failures(ep):
@@ -483,8 +490,11 @@ def has_failures(ctx, ep, memory, **extra):
 
 
 def failure_fields(ctx, ep, memory, **extra):
+    """Ошибки эпизода и хуки, которые в нём показывались, но ошибка повторилась: их можно переписать."""
     errors = "\n\n".join(f"{i}. {name} {args[:300]}\n{result[-500:]}" for i, (name, args, result) in enumerate(failures(ep), 1))
-    return dict(question=ep.question, errors=errors, output=ep.output, verdict=ep.verdict())
+    missed = [memory.get(i) for i in dict.fromkeys(i for i, ok in ep.fired if not ok) if memory.get(i)]
+    return dict(question=ep.question, errors=errors, output=ep.output, verdict=ep.verdict(),
+                missed="\n".join(f"- trigger: {r.trigger}\n  lesson: {r.text}" for r in missed) or "(none)")
 
 
 class HookLesson(BaseModel):
@@ -509,3 +519,19 @@ def confident_hooks(level="high"):
                 and any(h.trigger.strip().lower() in e for e in errors)]
         return keep or None
     return then
+
+
+def error_kind(result):
+    """Последняя строка ошибки до двоеточия (ZeroDivisionError) или её начало."""
+    line = [l for l in result.strip().splitlines() if l.strip()][-1].strip()
+    head = line.split(":")[0].strip()
+    return head if head and head != "Error" and " " not in head else line[:60]
+
+
+def raw_hooks(ctx, ep, memory, **extra):
+    """Как пары DC, без модели: ошибка и следующий вызов, который прошёл без ошибки."""
+    out = []
+    for (name, args, result), nxt in zip(ep.steps, ep.steps[1:]):
+        if failed(result) and not failed(nxt[2]):
+            out.append(dict(trigger=error_kind(result), text=f"Earlier the same error was followed by a call that worked:\n{nxt[0]} {nxt[1][:500]}"))
+    return out or None

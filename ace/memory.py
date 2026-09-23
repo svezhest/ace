@@ -93,11 +93,17 @@ class Entry(Note):
 
 @dataclass(slots=True)
 class Hook(Note):
-    """Урок по ошибке инструмента: показывается, когда текст ошибки содержит trigger."""
+    """Урок по ошибке инструмента: показывается, когда текст ошибки содержит trigger. helpful — после показа
+    ошибка с этим trigger не повторилась, harmful — повторилась на следующем шаге."""
     trigger: str = ""
+    helpful: int = 0
+    harmful: int = 0
 
     def head(self):
         return self.trigger
+
+    def recurred(self, result):
+        return self.trigger.lower() in result.lower()
 
 
 @dataclass(slots=True)

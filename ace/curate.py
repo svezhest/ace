@@ -28,7 +28,7 @@
 Библиотека EvoLib: condition, add_insight, add_skill, gains (лучшее решение задачи — в скрытом виде best)
 Итерации MCE: meta_fields, new_skill, iteration (история — скрытый вид iterations), skill_fields, context_and_results
 Прототип: TYPED_TOOLS, TypedOps, apply_typed, Entries, replace_entries, add_episode
-Хуки по ошибкам: add_hooks"""
+Хуки по ошибкам: add_hooks (новые хуки, переписанные, исходы показов в счётчики)"""
 import json
 from dataclasses import asdict
 from typing import Literal
@@ -629,14 +629,19 @@ def add_episode(ctx, memory, d):
 # хуки по ошибкам инструментов; дельта с info["hooks"] от reflect.also
 
 
-def add_hooks(kind="hook", key="hooks"):
-    """Новый хук; хук с тем же trigger получает новый текст."""
-    @needs("trigger", kinds=(kind,))
+def add_hooks(kind="hook"):
+    """Исходы показов (info["fired"]) в счётчики; новый хук (info["hooks"]) добавляется, хук с тем же trigger
+    получает новый текст и счётчики с нуля: это уже другой урок."""
+    @needs("trigger", "helpful", "harmful", kinds=(kind,))
     def block(ctx, memory, d):
-        for h in d.info.get(key, []):
+        for id, ok in d.info.get("fired", []):
+            if memory.get(id):
+                r = memory.get(id)
+                r.helpful, r.harmful = r.helpful + ok, r.harmful + (not ok)
+        for h in d.info.get("hooks", []):
             old = next((r for r in memory.of(kind) if r.trigger.lower() == h["trigger"].lower()), None)
-            if old:
-                memory.edit(old.id, h["text"])
-            else:
+            if not old:
                 memory.add(h["text"], kind, trigger=h["trigger"])
+            elif old.text != h["text"]:
+                memory.edit(old.id, h["text"], helpful=0, harmful=0)
     return block

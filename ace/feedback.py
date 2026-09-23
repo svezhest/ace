@@ -8,7 +8,7 @@
     self  самоотчёт в ответе решателя (bullet_ids): слова модели, не факт
     none  неизвестно
 Отбивка (failed) — шаг, на котором инструмент вернул ошибку: traceback исполнения или ModelRetry;
-на неё реагируют событие шага (SCOPE) и хук инжекта.
+на неё реагируют событие шага (SCOPE) и хук инжекта. Что стало после показа хука, записывает среда (fired).
 """
 from collections import Counter
 from dataclasses import dataclass, field
@@ -37,6 +37,7 @@ class Episode:
     target: str = ""            # верный ответ, только при golden
     group: list = field(default_factory=list)   # остальные попытки того же вопроса, тоже Episode
     perspective: str = ""       # чья часть памяти была у решателя (SCOPE K=2)
+    fired: list = field(default_factory=list)   # (id хука, помог ли): ошибка с его trigger не повторилась
 
     def verdict(self):
         if self.ok is None:
@@ -53,7 +54,7 @@ class Feedback:
 
     def observe(self, model, attempt, group=()):
         ep = Episode(attempt.question, attempt.output, attempt.answer, attempt.steps, attempt.truncated,
-                     attempt.context, attempt.shown, perspective=attempt.perspective)
+                     attempt.context, attempt.shown, perspective=attempt.perspective, fired=attempt.fired)
         ep.used = {"env": attempt.reads, "self": attempt.reported}.get(self.usage, [])
         if self.verdict in ("golden", "yes_no"):
             ep.ok = attempt.correct

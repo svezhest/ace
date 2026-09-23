@@ -16,7 +16,7 @@ from pydantic import BaseModel
 
 from . import embed, parse
 from .inject import counted
-from .memory import needs
+from .memory import needs, requirements
 
 
 def chain(*bounds):
@@ -26,9 +26,13 @@ def chain(*bounds):
     return bound
 
 
-def prune(test):
+def prune(test, kinds=()):
+    """Записи видов kinds (все открытые, если не заданы), для которых test(r), удаляются."""
+    names = [n for _, ns in requirements(test) for n in ns]
+
+    @needs(*names, kinds=kinds or "*")
     def bound(ctx, memory, before):
-        for r in memory.of():
+        for r in memory.of(*kinds):
             if test(r):
                 memory.drop(r.id)
     return bound
@@ -36,7 +40,7 @@ def prune(test):
 
 def more_harmful(n):
     """Вредных меток не меньше n и больше, чем полезных."""
-    return needs("helpful", "harmful", kinds="*")(lambda r: r.harmful >= n and r.harmful > r.helpful)
+    return needs("helpful", "harmful")(lambda r: r.harmful >= n and r.harmful > r.helpful)
 
 
 def budget(share, max_tokens=4096):

@@ -21,8 +21,8 @@ from pathlib import Path
 
 from . import inject as injects
 from .env import Env
-from .feedback import Episode, Feedback
-from .memory import Kind, Memory, check, requirements
+from .feedback import Episode, Feedback, failed
+from .memory import Hook, Kind, Memory, check, requirements
 from .tasks import final_answer
 from .update import Ctx, Update, snapshot
 
@@ -80,6 +80,7 @@ class Attempt:
     reads: list                 # что прочитано инструментами инжекта
     reported: list              # что решатель назвал сам
     perspective: str = ""
+    fired: list = field(default_factory=list)   # (id хука, помог ли)
 
 
 def solve(model, task, method, memory, item, temperature=0, note="", ctx=None):
@@ -94,31 +95,43 @@ def solve(model, task, method, memory, item, temperature=0, note="", ctx=None):
                    "you actually relied on, comma-separated, or none>'.")
     user = f"{task.instr}\n\n{item['context']}" + (f"\n\nReflection:\n{note}" if note else "")
     learn = ctx is not None and method.update.step
-    events = on_step(ctx, method, memory, item, view) if env.tools + view.tools and (learn or view.hook) else None
+    events = Steps(ctx, method, memory, item, view) if env.tools + view.tools and (learn or view.hook) else None
     r = model.run(system, user, tools=env.tools + view.tools, deps=view.fs,
                   rounds=env.rounds + view.rounds, temperature=temperature, on_step=events)
+    fired = events.finish() if events else []
     answer = final_answer(r.output or "")
     reported = [i for i in used_line(r.output or "") if memory.get(i)] if self_report else []
     return Attempt(item["context"], item["target"], r.text, answer, task.check(answer, item["target"]), r.truncated,
                    r.steps, view.text, view.shown, list(view.fs.reads) if view.fs else [], reported,
-                   item.get("perspective", ""))
+                   item.get("perspective", ""), fired)
 
 
-def on_step(ctx, method, memory, item, view):
-    """Событие шага: при обучении обновление правит память сразу; хук инжекта отдаёт текст к системному промпту."""
-    done = []
+class Steps:
+    """Событие шага: при обучении обновление правит память сразу; хук инжекта отдаёт текст к системному
+    промпту. Показанные хуки по ошибкам судятся следующим шагом: помог, если их ошибка не повторилась;
+    без следующего шага исход неизвестен и не считается."""
+    def __init__(self, ctx, method, memory, item, view):
+        self.ctx, self.method, self.memory, self.item, self.view = ctx, method, memory, item, view
+        self.done, self.waiting, self.fired = [], [], []
 
-    def handler(new):
+    def __call__(self, new):
         text = None
         for step in new:
-            done.append(step)
-            if ctx is not None and method.update.step:
-                ep = Episode(item["context"], "", "", list(done), False, view.text, view.shown, perspective=item.get("perspective", ""))
-                method.update.step(ctx, ep, memory, step=step)
-            if view.hook:
-                text = view.hook(step) or text
+            self.fired += [(r.id, not (failed(step[2]) and r.recurred(step[2]))) for r in self.waiting]
+            self.waiting = []
+            self.done.append(step)
+            if self.ctx is not None and self.method.update.step:
+                ep = Episode(self.item["context"], "", "", list(self.done), False, self.view.text, self.view.shown,
+                             perspective=self.item.get("perspective", ""))
+                self.method.update.step(self.ctx, ep, self.memory, step=step)
+            v = self.view.hook(step) if self.view.hook else None
+            if v and v.text:
+                text = v.text
+                self.waiting = [r for r in map(self.memory.get, v.shown) if isinstance(r, Hook)]
         return text
-    return handler
+
+    def finish(self):
+        return self.fired
 
 
 def used_line(text):
