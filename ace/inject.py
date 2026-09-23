@@ -8,7 +8,7 @@
     по запросу       инструменты чтения (catalog)
     по событию       hooked(base, hook, on): после шага решателя, для которого on(шаг), текст hook
                      дописывается к системному промпту (SCOPE: правила текущей задачи; on_failure —
-                     после отбивки инструмента, например записи, ближайшие к тексту ошибки)
+                     после отбивки инструмента; triggered — выученные хуки, чей trigger есть в тексте ошибки)
 
 Инжект собирается из блоков:
     show(kinds, pick, line | layout, before, after, empty, head)   какие записи и как они выглядят
@@ -275,3 +275,9 @@ def hooked(base, hook, on=None):
 def on_failure(step):
     """Отбивка: инструмент вернул ошибку (traceback, ModelRetry)."""
     return failed(step[2])
+
+
+def triggered(kind="hook", before="Known fix for this error:\n"):
+    """Хуки вида kind, чей trigger встречается в тексте ошибки шага (без учёта регистра)."""
+    fires = lambda r, item: r.trigger.lower() in step_error(item).lower()
+    return needs("trigger", kinds=(kind,))(show((kind,), pick=where(fires), line=dashed, before=before, head=""))

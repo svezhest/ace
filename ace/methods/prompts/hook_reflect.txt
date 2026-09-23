@@ -1,0 +1,19 @@
+An agent solved a task, and some of its tool calls failed. For each distinct error, decide whether you are confident about a short lesson that would help the agent the next time the same error appears.
+
+## Task
+{question}
+
+## Failed calls
+{errors}
+
+## Whole trajectory
+{output}
+
+## Outcome
+{verdict}
+
+For each lesson give:
+- trigger: a short fragment copied literally from the error message that identifies this kind of error (for example the exception name and a key phrase); nothing specific to this task's numbers or names;
+- lesson: what to do when this error appears, one or two sentences;
+- confidence: high only if the trajectory shows what fixed the error or makes the fix certain.
+Return an empty list if no lesson is reliable.

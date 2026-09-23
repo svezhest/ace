@@ -26,7 +26,8 @@
     nonempty_ops, as_ops
 Библиотека EvoLib: rank, insight_needed, insight_fields, with_insight, best_solution, improving, disputed,
     compare_fields, second_better, finish; log_gain, future_gain — прирост лучшей попытки (IG и Future IG)
-Cheatsheet DC: answer_and_sheet, rewritten"""
+Cheatsheet DC: answer_and_sheet, rewritten
+Хуки по ошибкам инструментов: also, has_failures, failure_fields, HookLessons, confident_hooks"""
 import math
 from dataclasses import replace
 from typing import Literal
@@ -456,3 +457,55 @@ def answer_and_sheet(kind, empty):
 def rewritten(text, *_, **__):
     """Новый текст целиком; None (нет блока) — старый остаётся."""
     return Delta(lessons=[text]) if text is not None else None
+
+# хуки по ошибкам инструментов
+
+
+def also(main, extra, key):
+    """main -> дельта метода; extra по тому же эпизоду -> список в delta.info[key] (хуки рядом с уроками метода)."""
+    def block(ctx, ep, memory, **kw):
+        d = main(ctx, ep, memory, **kw)
+        more = extra(ctx, ep, memory, **kw)
+        if not more:
+            return d
+        d = d or Delta()
+        d.info = {**d.info, key: more}
+        return d
+    return block
+
+
+def failures(ep):
+    return [s for s in ep.steps if failed(s[2])]
+
+
+def has_failures(ctx, ep, memory, **extra):
+    return bool(failures(ep))
+
+
+def failure_fields(ctx, ep, memory, **extra):
+    errors = "\n\n".join(f"{i}. {name} {args[:300]}\n{result[-500:]}" for i, (name, args, result) in enumerate(failures(ep), 1))
+    return dict(question=ep.question, errors=errors, output=ep.output, verdict=ep.verdict())
+
+
+class HookLesson(BaseModel):
+    trigger: str
+    lesson: str
+    confidence: Literal["low", "medium", "high"]
+
+
+class HookLessons(BaseModel):
+    hooks: list[HookLesson] = []
+
+
+LEVELS = ("low", "medium", "high")
+
+
+def confident_hooks(level="high"):
+    """then: хуки не ниже level, чей trigger дословно есть в тексте одной из ошибок эпизода."""
+    def then(r, ctx, ep, memory, **extra):
+        errors = [s[2].lower() for s in failures(ep)]
+        keep = [dict(trigger=h.trigger.strip(), text=h.lesson.strip()) for h in (r.hooks if r else [])
+                if LEVELS.index(h.confidence) >= LEVELS.index(level) and h.trigger.strip()
+                and any(h.trigger.strip().lower() in e for e in errors)]
+        return keep or None
+    return then

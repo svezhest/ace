@@ -2,7 +2,7 @@
 
 Метод объявляет память схемой: вид -> Kind(класс записи, операции, срок жизни, скрыт ли от решателя).
 Класс записи задаёт её поля: у пункта ACE раздел и счётчики, у правила SCOPE домен и уверенность, у skill
-EvoLib прирост. Поля, которого у класса нет, нет вовсе: ни прочитать, ни записать.
+EvoLib прирост, у хука — фрагмент ошибки, на который он срабатывает. Поля, которого у класса нет, нет вовсе: ни прочитать, ни записать.
 
     add     новая запись
     edit    новый текст или другие поля
@@ -11,7 +11,8 @@ EvoLib прирост. Поля, которого у класса нет, нет
 
 Счётчики и приросты (helpful, harmful, fig) — статистика: обновление меняет их без операции.
 Скрытые виды (private) решатель не видит: эпизоды прототипа, лучшие решения EvoLib, история итераций MCE.
-Их берут только по имени: memory.of("episode"); memory.of() без видов отдаёт открытые.
+Отдельные виды (apart) решатель видит, но не в общем показе, а только через блок, назвавший вид (хуки по ошибкам).
+И те и другие берут только по имени: memory.of("episode"); memory.of() без видов отдаёт остальные (открытые).
 
 Блоки объявляют, что им нужно от памяти: needs(поля, kinds=виды). Method при сборке сверяет это со схемой
 (check), поэтому, например, ограничитель по счётчикам ACE на правилах SCOPE не соберётся.
@@ -91,6 +92,15 @@ class Entry(Note):
 
 
 @dataclass(slots=True)
+class Hook(Note):
+    """Урок по ошибке инструмента: показывается, когда текст ошибки содержит trigger."""
+    trigger: str = ""
+
+    def head(self):
+        return self.trigger
+
+
+@dataclass(slots=True)
 class Skill(Note):
     """Skill EvoLib: подзадача целиком; doc — её description, по нему ищутся похожие; ig — прирост задачи,
     fig — приросты попыток, где skill был в промпте (Future IG)."""
@@ -127,6 +137,7 @@ class Kind:
     ops: tuple = ALL
     per: str = "run"           # run | task: записи вида стираются перед каждой задачей
     private: bool = False      # решатель не видит никогда
+    apart: bool = False        # решатель видит только через блок, назвавший вид
     ids: str = "r"             # префикс id; у скрытых видов свой, чтобы не сдвигать нумерацию открытых
 
 
@@ -165,6 +176,10 @@ class Memory:
 
     def private(self, r):
         return self.spec(r.kind).private
+
+    def visible(self):
+        """Всё, что может увидеть решатель: открытые и отдельные виды."""
+        return [r for r in self.records if not self.private(r)]
 
     def new_task(self):
         """Записи видов, живущих одну задачу, уходят без операции delete: это срок жизни, а не правка."""
@@ -212,23 +227,23 @@ class Memory:
         """Записи видов kinds; без видов — все открытые."""
         if kinds:
             return [r for r in self.records if r.kind in kinds]
-        return [r for r in self.records if not self.private(r)]
+        return [r for r in self.visible() if not self.spec(r.kind).apart]
 
     def text(self, *kinds):
         return "\n".join(f"[{r.id}] {r.text}" for r in self.of(*kinds))
 
     def chars(self):
-        return sum(len(r.text) for r in self.of())
+        return sum(len(r.text) for r in self.visible())
 
     def key(self):
-        return tuple(r.key() for r in self.of())
+        return tuple(r.key() for r in self.visible())
 
     def opened(self):
-        """Копия открытых записей (снимок для отката)."""
-        return copy.deepcopy(self.of())
+        """Копия видимых решателю записей (снимок для отката)."""
+        return copy.deepcopy(self.visible())
 
     def restore(self, records):
-        """Открытые записи заменяются копией records; скрытые остаются."""
+        """Видимые решателю записи заменяются копией records; скрытые остаются."""
         self.records = copy.deepcopy(records) + [r for r in self.records if self.private(r)]
 
     def save(self, path):
@@ -276,7 +291,7 @@ def check(schema, reqs):
     problems = []
     for kinds, names in reqs:
         if kinds == "*":
-            kinds = tuple(k for k, s in schema.items() if not s.private)
+            kinds = tuple(k for k, s in schema.items() if not s.private and not s.apart)
         if not kinds:
             if all(missing(s, names) for s in schema.values()):
                 problems.append(f"ни у одного вида нет полей {', '.join(names)}")

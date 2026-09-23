@@ -27,7 +27,8 @@
 План батча TF-GRPO: plan_fields, op_list
 Библиотека EvoLib: condition, add_insight, add_skill, gains (лучшее решение задачи — в скрытом виде best)
 Итерации MCE: meta_fields, new_skill, iteration (история — скрытый вид iterations), skill_fields, context_and_results
-Прототип: TYPED_TOOLS, TypedOps, apply_typed, Entries, replace_entries, add_episode"""
+Прототип: TYPED_TOOLS, TypedOps, apply_typed, Entries, replace_entries, add_episode
+Хуки по ошибкам: add_hooks"""
 import json
 from dataclasses import asdict
 from typing import Literal
@@ -623,3 +624,19 @@ def replace_entries(r, ctx, memory, d, **extra):
 def add_episode(ctx, memory, d):
     if d.episode:
         memory.add(kind="episode", **d.episode)
+
+
+# хуки по ошибкам инструментов; дельта с info["hooks"] от reflect.also
+
+
+def add_hooks(kind="hook", key="hooks"):
+    """Новый хук; хук с тем же trigger получает новый текст."""
+    @needs("trigger", kinds=(kind,))
+    def block(ctx, memory, d):
+        for h in d.info.get(key, []):
+            old = next((r for r in memory.of(kind) if r.trigger.lower() == h["trigger"].lower()), None)
+            if old:
+                memory.edit(old.id, h["text"])
+            else:
+                memory.add(h["text"], kind, trigger=h["trigger"])
+    return block

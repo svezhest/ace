@@ -60,7 +60,7 @@ def gate():
         after, prev = ctx.evaluate(memory), ctx.evaluate(before)
         ok = sum(c for c, _ in after) >= sum(c for c, _ in prev) and sum(t for _, t in after) <= sum(t for _, t in prev)
         if not ok:
-            memory.restore(before.of())       # скрытые записи (эпизоды) остаются
+            memory.restore(before.visible())       # скрытые записи (эпизоды) остаются
         ctx.gated.append(ok)
     return bound
 

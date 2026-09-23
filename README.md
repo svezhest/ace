@@ -40,6 +40,6 @@ python ace/tasks.py meb results/meb40/ace/log.json   # переоценить л
 
 Методы (`ace/methods/`): baseline; dc, dc_rs и контроли dc_retrieval, dc_history, dc_code; ace (вариант стенда),
 ace_exact и ace_exact_dedup (как в апстриме); scope, scope_code (с исполнением python), scope_bo2, scope_k2; tfgrpo;
-evolib, evolib_judge; mce; proto. Гибриды (`hybrids.py`): ace_bo2, ace_group, ace_opt, proto_opt, proto_hook (хук на отбивку).
+evolib, evolib_judge; mce; proto. Гибриды (`hybrids.py`): ace_bo2, ace_group, ace_opt, proto_opt, ace_hooks и proto_hooks (выученные хуки по ошибкам инструментов).
 В docstring каждого метода: что взято из апстрима (файлы) и где расходимся. Retrieval-варианты считают эмбеддинги BGE-M3 (`ace/embed.py`). Ступени абляции в `ablate.py`.
 Окружение: `LOCAL_BASE_URL`, `MODEL`, `MAX_TOKENS` (MEB: 8192), `SEED`.
