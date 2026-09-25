@@ -235,8 +235,8 @@ class ByPerspective(Show):
 STRATEGIC_RULES = ByPerspective(Whole(layout=lambda records, book: render.domains(book.domains.items()), before=INTRO, head=""))
 
 
-def guidelines(book):
-    return render.lines(book.tactical, render.prefixed(GUIDELINE), "\n\n")
+def guidelines(rules):
+    return render.lines(rules, render.prefixed(GUIDELINE), "\n\n")
 
 # ученик
 
@@ -244,7 +244,10 @@ def guidelines(book):
 @dataclass
 class Scope(Learner):
     """Учится на шаге с инструментом (правило сразу, со следующего запроса оно в системном промпте) и на
-    итоговом ответе (после вопроса, на батче)."""
+    итоговом ответе (после вопроса, на батче). patch="append" — абляция: новое правило дописывается
+    сообщением в конец истории, системный промпт и префикс истории целы."""
+    patch: str = "system"
+
     def prompt(self, ex, item, k, memory=None):
         (memory or self.memory).book(k).begin()
         return super().prompt(ex, item, k, memory)
@@ -262,7 +265,9 @@ class Scope(Learner):
             book.learn(ex, [x])
         if len(book.tactical) == before:
             return None
-        return Patch(system=attempt.system + "\n\n" + guidelines(book))
+        if self.patch == "append":
+            return Patch(append=guidelines(book.tactical[before:]))
+        return Patch(system=attempt.system + "\n\n" + guidelines(book.tactical))
 
     def on_question(self, ex, group):
         self.pending += self.extract.answers(ex, group, self.memory)
