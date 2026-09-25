@@ -10,7 +10,7 @@ configs/practice/math_reasoning.yaml и configs/agents/practice/math_agent.yaml.
                 преимущества, не больше 1 опыта -> сверки с библиотекой -> операции
     память      библиотека опытов, план батча раз в 20 вопросов (memory/tfgrpo.py); неполный батч отбрасывается
     решатель    агент апстрима: опыты в задаче rollout и в инструкциях итогового агента (solver/tfgrpo.py)
-Батч в апстриме 50 из 100 задач, 2 шага за эпоху; у нас 20 из 40."""
+Батч в апстриме 50 из 100 вопросов, 2 шага за эпоху; у нас 20 из 40."""
 from ..extract.tfgrpo import Contrast
 from ..learner import Learner
 from ..loop import Attempts, Protocol, first

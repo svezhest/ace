@@ -39,7 +39,7 @@ CODE_FILE = "/tmp/code.py"  # код исполняется файлом, как
 
 
 def dc_input(task, i, question):
-    """Вход задачи i (с нуля), как его строит run_benchmark.py апстрима: у meb — вступление MathEquationBalancer."""
+    """Вход вопроса i (с нуля), как его строит run_benchmark.py апстрима: у meb — вступление MathEquationBalancer."""
     text = DC.question(n=i + 1, text=question)
     return MEB + text if variant("dc", task) == "meb" else text
 

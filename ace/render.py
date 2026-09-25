@@ -372,7 +372,7 @@ def signature_args(inputs):
 
 
 def train_json(summary, results):
-    """data/train.json под-итерации: сводка батча и итоги его задач."""
+    """data/train.json под-итерации: сводка батча и итоги его вопросов."""
     return json.dumps(dict(summary=summary, detailed_results=results), indent=2, ensure_ascii=False)
 
 

@@ -2,10 +2,10 @@
 (сверка с эталонами: tests/bridge/test_bridge_tasks.py), dapo — как в TF-GRPO, hmmt — как в EvoLib, gpqa — наша.
 
 dapo — DAPO-Math-17k в порядке апстрима TF-GRPO (scripts/data/process_training_free_GRPO_data.py: без дублей,
-shuffle Random(42)), задачи на английском с условием короче 160 символов: train — первые 40, val — следующие 10,
+shuffle Random(42)), вопросы на английском с условием короче 160 символов: train — первые 40, val — следующие 10,
 тест — ещё 40.
 hmmt — бенчмарк EvoLib (eval_main.py _build_hmmt_task): MathArena/hmmt_feb_2025, hmmt_nov_2025, hmmt_feb_2026 подряд
-(93 задачи, в hmmt40 — первые 40), ответ — answer без пробелов по краям; только онлайн, без train и val.
+(93 вопроса, в hmmt40 — первые 40), ответ — answer без пробелов по краям; только онлайн, без train и val.
 symptom — бенчмарк MCE (env/symptom_diagnosis апстрима, данные gretelai/symptom_to_diagnosis) целиком, строки как у
 апстрима: train 200, val 50, тест 212; выборки — первые SIZE / VAL_SIZE. Проверка — _normalize апстрима; решатель
 среды апстрима (get_context и промпт диагноза) — у mce (solver/mce.py), общий решатель — ответ FINAL ANSWER."""
@@ -34,23 +34,31 @@ class Task:
         """Файл данных: самая малая выборка с размером в имени не меньше size (formula_train40.jsonl), иначе
         бенчмарк целиком (symptom_train.jsonl); нет ни того ни другого — None. split: "" (тест) | "train" | "val";
         size по умолчанию из config."""
-        size = size or (config.VAL_SIZE if split == "val" else config.SIZE)
-        name = f"{self.name}{'_' + split if split else ''}"
-        sized = sorted((int(p.stem[len(name):]), p) for p in config.DATA.glob(f"{name}[0-9]*.jsonl")
-                       if p.stem[len(name):].isdigit())
+        size = size or default_size(split)
+        name = f"{self.name}_{split}" if split else self.name
+        sized = []              # (размер выборки, файл)
+        for path in config.DATA.glob(f"{name}[0-9]*.jsonl"):
+            suffix = path.stem[len(name):]
+            if suffix.isdigit():
+                sized.append((int(suffix), path))
+        for n, path in sorted(sized):
+            if n >= size:
+                return path
         whole = config.DATA / f"{name}.jsonl"
-        return next((p for n, p in sized if n >= size), whole if whole.exists() else None)
+        return whole if whole.exists() else None
 
     def load(self, split="", size=None, whole=False):
         """Первые size вопросов файла (whole — все); поля апстримов: input | context | question, target | answer.
         Нет файла или в нём меньше size вопросов — ошибка, а не молча меньше."""
-        size = size or (config.VAL_SIZE if split == "val" else config.SIZE)
+        size = size or default_size(split)
         path = self.file(split, size)
         if path is None:
             raise FileNotFoundError(f"{self.name}: нет выборки {split or 'test'} на {size} вопросов в {config.DATA}")
-        rows = [json.loads(l) for l in path.open() if l.strip()]
-        items = [{"question": r.get("context") or r.get("input") or r["question"], "target": r.get("target", r.get("answer"))}
-                 for r in rows]
+        rows = [json.loads(line) for line in path.open() if line.strip()]
+        items = []
+        for r in rows:
+            question = r.get("context") or r.get("input") or r["question"]
+            items.append({"question": question, "target": r.get("target", r.get("answer"))})
         if len(items) < size and not whole:
             raise ValueError(f"{self.name}: в {path.name} {len(items)} вопросов, а нужно {size}")
         return items if whole else items[:size]
@@ -63,11 +71,16 @@ class Task:
             return False
 
 
+def default_size(split):
+    return config.VAL_SIZE if split == "val" else config.SIZE
+
+
 def finer_counts(pred, tgt):
     """_finer_answer_is_correct апстрима ACE (eval/finance/data_processor.py:126) со счётом: (верных сущностей, всего).
     Ответ режется по запятой (и число с запятой тоже), лишнее отрезается, недостающее — пустые; пара сравнивается
     после eval, если он удался (у ответа снимается $), иначе строками."""
-    got, want = [v.lower().strip() for v in pred.split(",")], [v.lower().strip() for v in tgt.split(",")]
+    got = [v.lower().strip() for v in pred.split(",")]
+    want = [v.lower().strip() for v in tgt.split(",")]
     got = (got + [""] * len(want))[: len(want)]
     return sum(finer_same(p, g) for p, g in zip(got, want)), len(want)
 
@@ -112,11 +125,18 @@ def meb_ok(pred, tgt):
     """eval_equation_balancer апстрима DC (dynamic_cheatsheet/utils/evaluation.py:151): левая часть ответа с теми же
     числами, что у эталона (операторы и пробелы не считаются), по значению равна правой части эталона.
     Знаки × ÷ апстрим не принимает."""
-    out, want, ref = pred.split("=")[0].strip(), tgt.split("=")[1].strip(), tgt.split("=")[0].strip()
-    nums = lambda s: s.replace("+", "").replace("-", "").replace("*", "").replace("/", "").replace(" ", "").strip()
-    if nums(out) != nums(ref):
+    out = pred.split("=")[0].strip()
+    left, right = [part.strip() for part in tgt.split("=")[:2]]
+    if numbers(out) != numbers(left):
         return False
-    return abs(arithmetic_eval(out) - arithmetic_eval(want)) < MEB_EPS
+    return abs(arithmetic_eval(out) - arithmetic_eval(right)) < MEB_EPS
+
+
+def numbers(expression):
+    """Числа выражения подряд: без + - * / и пробелов."""
+    for sign in ("+", "-", "*", "/", " "):
+        expression = expression.replace(sign, "")
+    return expression.strip()
 
 
 def dapo_ok(pred, tgt):
@@ -164,7 +184,7 @@ def gpqa_ok(pred, tgt):
 CHECK = {"finer": finer_ok, "formula": formula_ok, "meb": meb_ok, "gpqa": gpqa_ok, "dapo": dapo_ok, "hmmt": hmmt_ok,
          "symptom": symptom_ok}
 
-TASKS = {name: Task(name) for name in ("finer", "formula", "meb", "gpqa", "dapo", "hmmt", "symptom")}
+TASKS = {name: Task(name) for name in CHECK}
 
 # Метод × задача — единственное место, где метод узнаёт задачу по имени. На бенчмарке своего апстрима метод берёт
 # его тексты, разбор входа и параметры (вариант); на остальных задачах — запасной вариант стенда "" (DEVIATIONS S2).
@@ -195,6 +215,9 @@ def accuracy(task, answers, targets):
 
 def final_answer(text):
     """Строка после последнего 'FINAL ANSWER:', иначе последняя строка."""
-    tail = text.rsplit("FINAL ANSWER:", 1)[-1] if "FINAL ANSWER:" in text else text.strip().rsplit("\n", 1)[-1]
+    if "FINAL ANSWER:" in text:
+        tail = text.rsplit("FINAL ANSWER:", 1)[-1]
+    else:
+        tail = text.strip().rsplit("\n", 1)[-1]
     return tail.strip().split("\n")[0].strip("`*. ")
 
