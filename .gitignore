@@ -1,5 +1,7 @@
 .env
 .venv/
 __pycache__/
-results/*/*/log.json
+*.pyc
+.DS_Store
+results/
 logs/
