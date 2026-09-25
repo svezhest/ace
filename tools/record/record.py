@@ -3,7 +3,7 @@
         [--embeddings-upstream URL] [--seed] [--cache REC.jsonl --normalize mce]
 Клиенту — base_url http://127.0.0.1:PORT/v1. Каждая пара пишется строкой JSONL:
 {"path", "request": канонический JSON, "n": номер повтора такого же запроса, "seed", "status", "response"}.
---seed: если в запросе chat/completions нет seed, подставить seed_for(запрос, n).
+--seed: если в запросе chat/completions нет seed, подставить seed_for(запрос, n) (--seed-salt S — другая серия).
 Клиенту, просившему stream, заголовки ответа идут сразу, наверх — тоже stream; в запись — ответ, собранный из
 кадров (wire.assemble), клиенту — он же кадрами wire.sse, как у воспроизведения. Остальное наверх — без stream.
 --cache: ответ прошлой записи на запрос, совпавший с её запросом после normalize (k-й такой же запрос — её k-й
@@ -22,8 +22,9 @@ from tools.record import wire
 
 class Recorder(wire.Server):
     def __init__(self, addr, out: Path, upstream: str, emb_upstream: str | None, seed: bool, cache: Path = None,
-                 normalize=None):
+                 normalize=None, salt=""):
         super().__init__(addr, RecordHandler)
+        self.salt = salt
         self.normalize = normalize or (lambda c: c)
         self.cache, self.hits = defaultdict(list), Counter()
         for line in cache.read_text().splitlines() if cache else []:
@@ -74,7 +75,7 @@ class Recorder(wire.Server):
         sent = {x: v for x, v in body.items() if x not in ("stream", "stream_options")}
         seed = None
         if self.seed and path == wire.PATHS[0] and "seed" not in body:
-            seed = sent["seed"] = wire.seed_for(c, n)
+            seed = sent["seed"] = wire.seed_for(c, n, self.salt)
         return sent, seed
 
     def handle(self, path: str, body: dict, headers):
@@ -153,11 +154,12 @@ def main():
     ap.add_argument("--seed", action="store_true")
     ap.add_argument("--cache", type=Path)
     ap.add_argument("--normalize", choices=["mce"])
+    ap.add_argument("--seed-salt", default="")
     a = ap.parse_args()
     normalize = None
     if a.normalize == "mce":
         from tools.record.mce import normalize
-    wire.serve(Recorder, a.port, a.out, a.upstream, a.embeddings_upstream, a.seed, a.cache, normalize).serve_forever()
+    wire.serve(Recorder, a.port, a.out, a.upstream, a.embeddings_upstream, a.seed, a.cache, normalize, a.seed_salt).serve_forever()
 
 
 if __name__ == "__main__":

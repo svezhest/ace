@@ -21,9 +21,10 @@ def key(path: str, c: str) -> str:
     return path + " " + c
 
 
-def seed_for(c: str, n: int) -> int:
-    """Сид из канонического запроса и номера повтора: одинаковый запрос в n-й раз — тот же сид."""
-    h = hashlib.sha256(f"{c}#{n}".encode()).digest()
+def seed_for(c: str, n: int, salt: str = "") -> int:
+    """Сид из канонического запроса и номера повтора: одинаковый запрос в n-й раз — тот же сид; salt — другая
+    серия сидов (другая попытка записи)."""
+    h = hashlib.sha256(f"{c}#{n}{salt}".encode()).digest()
     return int.from_bytes(h[:8], "big") >> 1
 
 
