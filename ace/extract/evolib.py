@@ -55,8 +55,14 @@ def future_gains(attribution, scores, eps=EPS):
 
 
 def insight_of(text):
-    insight = parse.fenced(text, "insight").strip() or parse.between(text or "", "<insight>", "</insight>")
+    """Первый блок ```insight, иначе первый <insight>...</insight>; N/A — нет (generate_insight апстрима)."""
+    insight = parse.first_fenced(text, "insight") or parse.between(text or "", "<insight>", "</insight>").replace("<insight>", "").strip()
     return "" if insight == "N/A" else insight
+
+
+def second_better(judgment):
+    """Сравнение решений в пользу второго: «solution 2» в первом блоке ```judgment (is_better_solution апстрима)."""
+    return "solution 2" in parse.first_fenced(judgment, "judgment").lower()
 
 
 class Gains(Extractor):
@@ -64,6 +70,10 @@ class Gains(Extractor):
 
     def __init__(self, evaluated=False):
         self.evaluated = evaluated
+
+    def insight(self, ex, group, best, evaluation):
+        return insight_of(ex.model.run("", P["insight"].fill(question=group.question, solution=best.output,
+                                                            evaluation=evaluation)).output)
 
     def __call__(self, ex, group, memory):
         eps = group.episodes
@@ -73,17 +83,17 @@ class Gains(Extractor):
             scores = [1.0 if group.vote and e.answer == group.vote else 0.0 for e in eps]
         b = max(range(len(eps)), key=scores.__getitem__)
         best, ig, insight = eps[b], log_gain(scores[b], scores), ""
-        if not self.evaluated or scores[b] < 1:
-            evaluation = render.evaluation(render.verdict(best.ok, best.target)) if self.evaluated else ""
-            insight = insight_of(ex.model.run("", P["insight"].fill(question=group.question, solution=best.output,
-                                                                   evaluation=evaluation)).output)
-            if insight and not self.evaluated:
+        if self.evaluated and scores[b] < 1:
+            insight = self.insight(ex, group, best, render.evaluation(render.verdict(best.ok, best.target)))
+        elif not self.evaluated and best.output:
+            insight = self.insight(ex, group, best, "")
+            if insight:
                 scores = [s * UNEVALUATED for s in scores]
         before = memory.best(group.question)
         improving = before is None or scores[b] > before.score
         if not improving and not self.evaluated and group.vote and not ex.task.check(before.answer, group.vote):
             judgment = ex.model.run("", P["compare"].fill(question=group.question, a=before.output, b=best.output)).output
-            improving = "solution 2" in parse.fenced(judgment, "judgment").lower()
+            improving = second_better(judgment)
         return Extraction(group, [insight] if insight else [], scores,
                           {IG: ig, BEST_ANSWER: Best(best.output, best.answer, scores[b]) if improving else None,
                            ATTRIBUTION: Attribution([e.shown for e in eps], b)})

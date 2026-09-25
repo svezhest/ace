@@ -31,6 +31,7 @@ from ..show import Choose, Sample, Show
 
 P = {n: prompts.load(f"evolib_{n}") for n in ("merge_skills", "merge_insights")}
 K, W_IG = 10, 1.0
+LEGACY_W_IG = 100           # при w_IG от 100 апстрим не прибавляет Future IG к весу skill
 FIG_PRIOR = 0.5             # Future IG записи, которая ещё ни разу не была в промпте лучшей попытки
 P_SKILLS, P_INSIGHTS = 0.4, 0.7     # накопленные вероятности веток показа
 SIM, RATE = 0.8, 0.5        # порог слияния похожих, доля нового IG у слитого skill
@@ -46,7 +47,8 @@ class Insight(Record):
 
 @dataclass(frozen=True, eq=False)
 class Skill(Insight):
-    """Подзадача целиком; doc — её description, по нему ищутся похожие; ig — IG вопроса при рождении."""
+    """Подзадача целиком; doc — её <description>...</description> с тегами, по нему ищутся похожие; ig — IG вопроса
+    при рождении."""
     doc: str = ""
     ig: float = 0.0
 
@@ -55,8 +57,9 @@ def future(r):
     return sum(r.outcomes) / len(r.outcomes) if r.outcomes else FIG_PRIOR
 
 
-def skill_weight(r):
-    return max(W_IG * max(r.ig, EPS) + future(r), EPS)
+def skill_weight(r, w_ig=W_IG):
+    w = w_ig * max(r.ig, EPS)
+    return max(w + future(r) if w_ig < LEGACY_W_IG else w, EPS)
 
 
 def insight_weight(r):
@@ -65,6 +68,11 @@ def insight_weight(r):
 
 def condition(insight):
     return insight.split(", then ")[0].replace("If ", "").strip()
+
+
+def merged_insights(text):
+    """Строки «If ...» из всех блоков ```insights ответа слияния (consolidate_insights апстрима)."""
+    return [l.strip() for l in parse.fenced(text, "insights").split("\n") if l.strip().startswith("If ")]
 
 
 class Library:
@@ -104,8 +112,7 @@ class Library:
         def merge(old):
             out = ex.model.one("", P["merge_insights"].fill(insights=f"{old.text}\n{text}")).output or ""
             fig = []
-            return [(l.strip(), dict(outcomes=fig)) for l in parse.fenced(out, "insights").splitlines()
-                    if l.strip().startswith("If ")]
+            return [(t, dict(outcomes=fig)) for t in merged_insights(out)]
         self.consolidate(self.insights, text, condition(text), lambda r: condition(r.text), dict(outcomes=[]), merge,
                          lambda old, born: dict(outcomes=old.outcomes))
 
@@ -173,13 +180,18 @@ class Hint(Show):
         return p
 
 
-def sample(weight, intro):
-    return Sample(K, weight, line=render.plain, head="", before=prompts.text(intro))
+def sample(k, weight, intro):
+    return Sample(k, weight, line=render.plain, head="", before=prompts.text(intro))
 
 
-SHOW = Hint(prompts.text("evolib_subtasks"), Choose(
-    (P_SKILLS, Part(lambda m: m.skills, sample(skill_weight, "evolib_skills_intro"))),
-    (P_INSIGHTS, Part(lambda m: m.insights, sample(insight_weight, "evolib_insights_intro")))))
+def show(k=K, w_ig=W_IG):
+    """Выборка из библиотеки (_sample_from_library апстрима): k записей ветки, вес skill с w_ig."""
+    return Hint(prompts.text("evolib_subtasks"), Choose(
+        (P_SKILLS, Part(lambda m: m.skills, sample(k, lambda r: skill_weight(r, w_ig), "evolib_skills_intro"))),
+        (P_INSIGHTS, Part(lambda m: m.insights, sample(k, insight_weight, "evolib_insights_intro")))))
+
+
+SHOW = show()
 
 evolib = Learner("evolib", memory=Library(), show=SHOW, extract=Gains(), attempts=Attempts(ATTEMPTS, pick=vote),
                  verdict=verdict.none, group_verdict=verdict.vote)

@@ -90,12 +90,12 @@ def extraction(insight=None, best=None, ig=0.5, shown=([], [], []), scores=(1, 0
 
 def test_library_learn(monkeypatch):
     """insight, лучшее решение (скрыто) и skills из него с IG, Future IG в журнал записи из промпта лучшей."""
-    fake_embed(monkeypatch, {"a": [1, 0], "d1": [0, 1], "d2": [1, 0]})
+    fake_embed(monkeypatch, {"a": [1, 0], "<description>d1</description>": [0, 1], "<description>d2</description>": [1, 0]})
     m = Library()
     best = Best("Plan.\n" + SKILL.format("d1") + "\n" + SKILL.format("d2") + "\nFINAL ANSWER: 1", "1", 1.0)
     m.learn(Ex(Stub()), [extraction("If a, then b.", best, ig=0.4)])
     assert [(r.id, type(r).__name__) for r in m.records()] == [("r1", "Insight"), ("r2", "Skill"), ("r3", "Skill")]
-    assert m.get("r2").doc == "d1" and m.get("r2").ig == 0.4 and m.best("q") is best
+    assert m.get("r2").doc == "<description>d1</description>" and m.get("r2").ig == 0.4 and m.best("q") is best
     assert all(r.text != best.output for r in m.records())
     m.learn(Ex(Stub()), [extraction(shown=[["r1", "r1", "r3"], ["r3"], []], scores=[1, 0, 0.5])])
     assert m.get("r1").outcomes == [math.log(4), math.log(4)] and m.get("r3").outcomes == [math.log(2)]
@@ -123,12 +123,12 @@ def test_merge_insight(monkeypatch):
 
 def test_merge_skill(monkeypatch):
     """Слитый skill: IG — скользящее среднее с долей 0.5, журнал старого."""
-    fake_embed(monkeypatch, {"d1": [1, 0], "d1b": [1, 0], "d": [1, 0]})
+    fake_embed(monkeypatch, {"d1": [1, 0], "d1b": [1, 0], "<description>d</description>": [1, 0]})
     m = Library()
     m.skills.add(SKILL.format("d1"), doc="d1", ig=1.0, outcomes=[0.2])
     m.add_skill(Ex(Stub(lambda call: SKILL.format("d"))), SKILL.format("d1b"), "d1b", 0.0)
     [r] = m.records()
-    assert (r.doc, r.ig, r.outcomes) == ("d", 0.5, [0.2])
+    assert (r.doc, r.ig, r.outcomes) == ("<description>d</description>", 0.5, [0.2])
 
 
 def test_weights_and_show():
