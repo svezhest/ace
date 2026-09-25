@@ -231,11 +231,6 @@ def answer_seen(ok):
     return "" if ok is None else f"Answer {'correct' if ok else 'incorrect'}"
 
 
-def system_prompt(system, context):
-    """Системный промпт агента, как его видит SCOPE: роль и показанная память."""
-    return f"{system}\n\n{context}".strip()
-
-
 def rules(texts):
     return "\n".join(f"- {r}" for r in texts) or NONE
 

@@ -11,7 +11,8 @@
     counted_line(id)    «[id] helpful=N harmful=M :: текст» -> (текст, N, M) (ACE BulletpointAnalyzer)
     ace_json            extract_json_from_text ACE: весь текст, ```json, первый объект {...} (ACE)
     bullet_tags         _extract_bullet_tags рефлектора ACE без json_mode: массив после "bullet_tags" (ACE)
-    ace_operations      _extract_and_validate_operations куратора ACE: операции или None (ACE)"""
+    ace_operations      _extract_and_validate_operations куратора ACE: операции или None (ACE)
+    scope_*             ответы синтезатора, селектора, классификатора и оптимизатора SCOPE, с откатами апстрима"""
 import json
 import re
 
@@ -185,3 +186,132 @@ def ace_operations(text):
     except TypeError:
         return None
     return info["operations"]
+
+# SCOPE (SCOPE/scope 4dc0da5): разбор ответов дословно, с откатами апстрима
+
+
+def scope_json(text):
+    """GuidelineSynthesizer._extract_json: весь текст, первый блок ```{...}```, первый {...} с update_text."""
+    try:
+        return json.loads(text)
+    except (json.JSONDecodeError, TypeError):
+        pass
+    matches = re.findall(r'```(?:json)?\s*(\{.*?\})\s*```', text or "", re.DOTALL)
+    if matches:
+        try:
+            return json.loads(matches[0])
+        except json.JSONDecodeError:
+            pass
+    for match in re.findall(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', text or "", re.DOTALL):
+        try:
+            data = json.loads(match)
+            if "update_text" in data:
+                return data
+        except json.JSONDecodeError:
+            continue
+    return None
+
+
+def scope_guideline(text, quality=False):
+    """Кандидат синтезатора -> dict(update_text, rationale, confidence) или None. На качестве (одна модель) текст
+    правила без пробелов по краям, пустой и «no improvement needed» / «none» — None; на ошибке и у кандидатов
+    Best-of-N — как есть. Не словарь — None (у апстрима падает .get)."""
+    try:
+        data = scope_json(text)
+        if not data:
+            return None
+        update = data.get("update_text", "")
+        if not isinstance(update, str):         # у апстрима дальше падает on_step_complete
+            return None
+        if quality:
+            update = update.strip()
+            if not update or update.lower() in ("", "no improvement needed", "none"):
+                return None
+        return dict(update_text=update, rationale=data.get("rationale", ""), confidence=data.get("confidence", "medium"))
+    except (AttributeError, TypeError):
+        return None
+
+
+def scope_selection(text, n):
+    """_select_best_update: номер selected_index, если он в [0, n), иначе 0; сбой разбора — 0."""
+    try:
+        data = scope_json(text)
+        if data and "selected_index" in data:
+            i = data["selected_index"]
+            return i if 0 <= i < n else 0
+        return 0
+    except TypeError:
+        return 0
+
+
+def scope_fenced(text):
+    """Блок ```json, иначе ```, иначе весь текст (как у классификатора и оптимизатора SCOPE)."""
+    text = (text or "").strip()
+    for fence in ("```json", "```"):
+        if fence in text:
+            start = text.find(fence) + len(fence)
+            return text[start:text.find("```", start)].strip()
+    return text
+
+
+def scope_object(text):
+    """Разбор оптимизатора SCOPE (RuleAnalyzer, слияние, поглощение, конфликт): блок, затем от первой { до
+    последней }, затем одинарные кавычки -> двойные; None, если не разобралось."""
+    text = scope_fenced(text)
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+    start, end = text.find("{"), text.rfind("}") + 1
+    if start == -1 or end <= start:
+        return None
+    text = text[start:end]
+    for candidate in (text, text.replace("'", '"')):
+        try:
+            return json.loads(candidate)
+        except json.JSONDecodeError:
+            continue
+    return None
+
+
+def scope_analysis(text):
+    """RuleAnalyzer.analyze -> dict(consolidation, subsumption, conflicts); сбой — пустые списки."""
+    data = scope_object(text)
+    if not isinstance(data, dict):
+        return dict(consolidation=[], subsumption=[], conflicts=[])
+    for key in ("consolidation", "subsumption", "conflicts"):
+        data.setdefault(key, [])
+    return data
+
+
+def scope_rule(text):
+    """Слитое или исправленное правило -> (rule, rationale); без обоих ключей — None (KeyError апстрима)."""
+    data = scope_object(text)
+    try:
+        return data["rule"], data["rationale"]
+    except (KeyError, TypeError, IndexError):
+        return None
+
+
+def scope_subsumed(text):
+    """_verify_subsumption: result.get("subsumed", False); сбой — False."""
+    data = scope_object(text)
+    return bool(data.get("subsumed", False)) if isinstance(data, dict) else False
+
+
+def scope_classification(text, initial, domains):
+    """_classify_and_check_duplicate: значения по умолчанию, домен не из списка у strategic -> general,
+    confidence -> float; любой сбой — tactical с исходной confidence."""
+    fallback = dict(is_duplicate=False, scope="tactical", confidence=initial, domain="general")
+    try:
+        c = json.loads(scope_fenced(text))
+        c.setdefault("is_duplicate", False)
+        c.setdefault("scope", "tactical")
+        c.setdefault("confidence", initial)
+        c.setdefault("domain", "general")
+        if c["scope"] == "strategic" and c.get("domain", "general") not in domains:
+            c["domain"] = "general"
+        c["confidence"] = float(c["confidence"])
+        return c
+    except (ValueError, TypeError, AttributeError, KeyError):
+        return fallback

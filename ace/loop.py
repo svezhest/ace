@@ -64,6 +64,7 @@ class Episode:
     patches: list
     ok: bool = None             # вердикт попытки; None — его нет
     target: str = ""            # верный ответ — только при golden
+    system: str = ""            # системный промпт при запуске попытки (роль задачи, подсказка среды, показ)
 
     @property
     def shown(self):
@@ -150,7 +151,7 @@ class Experiment:
             env.close()
         final = reply.output or ""
         ep = Episode(a.question, k, prompt, reply.text, final, final_answer(final), reply.steps, reply.truncated,
-                     list(prompt.deps.reads) if prompt.deps is not None else [], a.fired, a.patches)
+                     list(prompt.deps.reads) if prompt.deps is not None else [], a.fired, a.patches, system=a.system)
         self.learner.verdict(self, ep, item["target"])
         return ep
 

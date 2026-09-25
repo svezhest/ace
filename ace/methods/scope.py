@@ -8,8 +8,9 @@
                 дубля по словам (0.85 ещё раз зашито в strategic_store.py:201, у нас одна константа); домен
                 по убыванию confidence, сверх 10 правил оптимизатор (конфликты, поглощение, слияние, до двух
                 проходов) сжимает до 8, остаток обрезается до 10
-    показ       при запуске strategic по доменам; когда на шаге принято правило, Patch переписывает системный
-                промпт: исходный + «## Learned Guideline:» на каждое tactical правило (как в апстриме)
+    показ       при запуске strategic по доменам, текстом get_strategic_rules_text сразу за системным промптом;
+                когда на шаге принято правило, Patch переписывает системный промпт: исходный + «## Learned
+                Guideline:» на каждое tactical правило (как в апстриме)
     извлечение  правило на шаг (extract/scope.py): на каждом шаге с инструментом — сразу, посреди попытки; на
                 итоговом ответе — после вопроса
     вердикт     верный ответ (адаптер repro: неверный итог — ошибка шага)
@@ -20,20 +21,17 @@ scope_bo2 — Best-of-2 с селектором. scope_code — решатель
 """
 from dataclasses import dataclass
 
-from pydantic import BaseModel
-
-from .. import prompts, render
+from .. import parse, prompts, render
 from ..env import Sandbox
 from ..extract import CONFIDENCE, DOMAIN, RATIONALE
-from ..extract.scope import INTRO, Rules
+from ..extract.scope import Rules, current_system, strategic_text
 from ..learner import Learner, swap
-from ..loop import Attempts, best
+from ..loop import Attempts, Prompt, best
 from ..memory import Container, Ids, Record
 from ..model import Patch
-from ..show import Show, Whole
+from ..show import Show
 
 P = {n: prompts.load(f"scope_{n}") for n in ("analyze", "merge", "subsumed", "conflict")}
-GUIDELINE = prompts.text("scope_guideline")
 
 ACCEPT = 0.5                # auto_accept_threshold "medium"
 STRATEGIC = 0.85            # strategic_confidence_threshold
@@ -48,25 +46,10 @@ THOROUGHNESS, EFFICIENCY = "thoroughness", "efficiency"
 # правило пришло из записи памяти и не менялось
 
 
-class Analysis(BaseModel):
-    consolidation: list[list[int]] = []
-    subsumption: list[list[int]] = []
-    conflicts: list[list[int]] = []
-
-
-class Rule(BaseModel):
-    rule: str
-    rationale: str = ""
-
-
-class Subsumed(BaseModel):
-    subsumed: bool = False
-
-
 def rule_optimizer(passes=OPTIMIZER_PASSES):
     """-> optimize(model, rules, target): анализ, затем конфликты, поглощение, слияние, до passes проходов;
-    номера правил стабильны между проходами."""
-    llm = lambda model, name, fields, output: model.run("", P[name].fill(fields), output=output).output
+    номера правил стабильны между проходами. Модель отвечает текстом, разбор — parse.scope_* (как у апстрима)."""
+    llm = lambda model, name, fields: model.run("", P[name].fill(fields)).output
 
     def resolve(model, rules, pairs):
         by_id, done, fixed = {x["id"]: x for x in rules}, set(), {}
@@ -74,11 +57,11 @@ def rule_optimizer(passes=OPTIMIZER_PASSES):
             if len(pair) < 2 or pair[0] not in by_id or pair[1] not in by_id or pair[0] in done or pair[1] in done:
                 continue
             a, b = by_id[pair[0]], by_id[pair[1]]
-            r = llm(model, "conflict", dict(idx1=a["id"], rule1_text=a["rule"], rule1_rationale=a["rationale"],
-                                            idx2=b["id"], rule2_text=b["rule"], rule2_rationale=b["rationale"]), Rule)
+            r = parse.scope_rule(llm(model, "conflict", dict(idx1=a["id"], rule1_text=a["rule"], rule1_rationale=a["rationale"],
+                                                             idx2=b["id"], rule2_text=b["rule"], rule2_rationale=b["rationale"])))
             if r:
                 done |= {a["id"], b["id"]}
-                fixed[a["id"]] = dict(rule=r.rule, rationale=r.rationale, id=a["id"],
+                fixed[a["id"]] = dict(rule=r[0], rationale=r[1], id=a["id"],
                                       confidence=max(a.get("confidence", RULE_CONFIDENCE), b.get("confidence", RULE_CONFIDENCE)))
         return [fixed.get(x["id"], x) for x in rules if x["id"] not in done or x["id"] in fixed]
 
@@ -86,8 +69,8 @@ def rule_optimizer(passes=OPTIMIZER_PASSES):
         by_id, gone = {x["id"]: x for x in rules}, set()
         for pair in pairs:
             if len(pair) >= 2 and pair[0] in by_id and pair[1] in by_id:
-                r = llm(model, "subsumed", dict(general_rule=by_id[pair[0]]["rule"], specific_rule=by_id[pair[1]]["rule"]), Subsumed)
-                if r and r.subsumed:
+                if parse.scope_subsumed(llm(model, "subsumed", dict(general_rule=by_id[pair[0]]["rule"],
+                                                                    specific_rule=by_id[pair[1]]["rule"]))):
                     gone.add(pair[1])
         return [x for x in rules if x["id"] not in gone]
 
@@ -100,9 +83,12 @@ def rule_optimizer(passes=OPTIMIZER_PASSES):
             if len(group) < 2 or not parts:
                 out += parts
                 continue
-            r = llm(model, "merge", dict(rules_text=render.rule_group(parts)), Rule)
+            # номера в промпте — из группы по порядку, как в апстриме (_merge_rules: indices[i]), даже если
+            # какого-то номера среди правил нет
+            numbered = [dict(x, id=i) for i, x in zip(group, parts)]
+            r = parse.scope_rule(llm(model, "merge", dict(rules_text=render.rule_group(numbered))))
             if r:
-                out.append(dict(rule=r.rule, rationale=r.rationale, id=parts[0]["id"],
+                out.append(dict(rule=r[0], rationale=r[1], id=parts[0]["id"],
                                 confidence=max(x.get("confidence", RULE_CONFIDENCE) for x in parts)))
             else:
                 out += parts
@@ -114,24 +100,31 @@ def rule_optimizer(passes=OPTIMIZER_PASSES):
         for _ in range(passes):
             if len(rules) <= target:
                 break
-            a = llm(model, "analyze", dict(num_rules=len(rules), rules_text=render.rule_list(rules)), Analysis) or Analysis()
-            if not (a.conflicts or a.subsumption or a.consolidation):
+            # с одним правилом апстрим модель не зовёт
+            a = (parse.scope_analysis(llm(model, "analyze", dict(num_rules=len(rules), rules_text=render.rule_list(rules))))
+                 if len(rules) > 1 else parse.scope_analysis(""))
+            if not (a["conflicts"] or a["subsumption"] or a["consolidation"]):
                 break
-            rules = resolve(model, rules, a.conflicts)
-            rules = prune_subsumed(model, rules, a.subsumption)
-            rules = consolidate(model, rules, a.consolidation)
+            rules = resolve(model, rules, a["conflicts"])
+            rules = prune_subsumed(model, rules, a["subsumption"])
+            rules = consolidate(model, rules, a["consolidation"])
         return rules
     return optimize
 
 
 def compress(model, records, optimizer, target, cap, new):
     """Записи сверх cap сжимаются оптимизатором до target, остаток обрезается до cap. Нетронутая запись
-    остаётся собой (id и статистика); исправленное и слитое — новые записи new(правило)."""
+    остаётся собой (id и статистика); исправленное и слитое — новые записи new(правило). Сбой оптимизатора
+    (ответ не той формы) — только усечение, как в _optimize_domain_rules апстрима."""
     if len(records) <= cap:
         return records
     rules = [dict(rule=r.text, rationale=getattr(r, "rationale", ""), confidence=getattr(r, "confidence", RULE_CONFIDENCE),
                   record=r) for r in records]
-    return [x["record"] if "record" in x else new(x) for x in optimizer(model, rules, target)][:cap]
+    try:
+        rules = optimizer(model, rules, target)
+    except Exception:           # апстрим ловит любое исключение оптимизатора
+        pass
+    return [x["record"] if "record" in x else new(x) for x in rules][:cap]
 
 
 def duplicate_words(text, texts, overlap=DUPLICATE_OVERLAP):
@@ -162,8 +155,8 @@ class Book(Container):
     как в апстриме); tactical — правила текущей попытки, живут до начала следующей."""
     requires = frozenset({CONFIDENCE, DOMAIN, RATIONALE})
 
-    def __init__(self, name=THOROUGHNESS, optimizer=None):
-        self.name, self.optimizer = name, optimizer or rule_optimizer()
+    def __init__(self, name=THOROUGHNESS, optimizer=None, cap=CAP, target=TARGET):
+        self.name, self.optimizer, self.cap, self.target = name, optimizer or rule_optimizer(), cap, target
         self.ids, self.domains, self.tactical, self.accepted = Ids(), {}, [], 0
 
     def records(self):
@@ -193,7 +186,7 @@ class Book(Container):
             return
         rules = sorted(rules + [Strategic(self.ids.next(), text, domain, rationale, confidence)], key=lambda r: -r.confidence)
         new = lambda x: Strategic(self.ids.next(), x["rule"], domain, x["rationale"], x["confidence"])
-        self.domains[domain] = compress(ex.model, rules, self.optimizer, TARGET, CAP, new)
+        self.domains[domain] = compress(ex.model, rules, self.optimizer, self.target, self.cap, new)
 
     def dump(self, suffix=""):
         """tactical, затем strategic по доменам; suffix — перспектива в имени вида, когда их несколько."""
@@ -223,20 +216,16 @@ class Perspectives(Container):
 # показ
 
 
-class ByPerspective(Show):
-    """Показ base над памятью перспективы попытки."""
-    def __init__(self, base):
-        self.base = base
-
+class StrategicRules(Show):
+    """Strategic правила перспективы попытки сразу за системным промптом, как get_strategic_rules_for_agent
+    апстрима (текст начинается с перевода строки)."""
     def prompt(self, ex, memory, item, k):
-        return self.base.prompt(ex, memory.book(k), item, k)
+        book = memory.book(k)
+        text = strategic_text(book)
+        return Prompt(text, shown=[r.id for r in book.records()]) if text else Prompt()
 
 
-STRATEGIC_RULES = ByPerspective(Whole(layout=lambda records, book: render.domains(book.domains.items()), before=INTRO, head=""))
-
-
-def guidelines(book):
-    return render.lines(book.tactical, render.prefixed(GUIDELINE), "\n\n")
+STRATEGIC_RULES = StrategicRules()
 
 # ученик
 
@@ -262,7 +251,7 @@ class Scope(Learner):
             book.learn(ex, [x])
         if len(book.tactical) == before:
             return None
-        return Patch(system=attempt.system + "\n\n" + guidelines(book))
+        return Patch(system=current_system(attempt.system, book))
 
     def on_question(self, ex, group):
         self.pending += self.extract.answers(ex, group, self.memory)

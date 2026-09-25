@@ -1,15 +1,34 @@
 """SCOPE: правило на шаг (ошибка и качество, Best-of-N с селектором, классификатор), память перспективы
 (допуск, предел 20 за прогон, tactical на попытку, strategic при 0.85, дубль по словам, предел домена с
 оптимизатором), Patch системного промпта на шаге, перспективы K=2 с зачётом pass@k."""
+import json
+
 from stub import TASK, Stub, episode, right
 
 from ace.extract import CONFIDENCE, DOMAIN, RATIONALE, Extraction
-from ace.extract.scope import Classification, Proposal, Rules, Selection, answer_step, tool_step
+from ace.extract.scope import Proposal, Rules, answer_step, tool_step
 from ace.learner import swap
 from ace.loop import Attempt, Group, Prompt, run
-from ace.methods.scope import (CAP, PER_RUN, TARGET, Analysis, Book, Perspectives, Rule, Strategic, compress,
-                               duplicate_words, scope, scope_k2)
+from ace.methods.scope import CAP, PER_RUN, TARGET, Book, Perspectives, Strategic, compress, duplicate_words, scope, scope_k2
 from ace.model import Patch, Step
+
+MARK = dict(error="analyzing agent execution errors", quality="analyzing agent execution quality",
+            select="evaluating multiple candidate", classify="You are a rule classifier", analyze="rule optimization analyzer",
+            merge="merging similar rules")
+
+
+def texts(solver=lambda call: "FINAL ANSWER: 0", **replies):
+    """Ответ модели текстом по маркеру промпта; ответ — строка или функция от вызова."""
+    def answer(call):
+        for key, r in replies.items():
+            if MARK[key] in call["user"]:
+                return r(call) if callable(r) else r
+        return solver(call)
+    return answer
+
+
+def js(**fields):
+    return json.dumps(fields)
 
 
 class Ex:
@@ -40,21 +59,22 @@ def test_steps():
 
 
 def test_propose_error_and_quality():
-    model = Stub(schemas={"Proposal": Proposal(update_text="Check the denominator.", confidence="high")})
+    reply = {"text": js(update_text="Check the denominator.", confidence="high")}
+    model = Stub(lambda call: reply["text"])
     book = Book()
     assert Rules().propose(Ex(model), attempt(), book, *tool_step(ERROR)).update_text == "Check the denominator."
     assert "analyzing agent execution errors" in model.calls[0]["user"] and "ZeroDivisionError" in model.calls[0]["user"]
-    model.schemas["Proposal"] = Proposal(update_text="No improvement needed")
+    reply["text"] = js(update_text="No improvement needed")
     assert Rules().propose(Ex(model), attempt(), book, *tool_step(FINE)) is None
     assert "**Correctness & Logic**" in model.calls[1]["user"]          # перспектива по умолчанию — thoroughness
     # с ошибкой «none» не отбрасывается, как в апстриме
-    model.schemas["Proposal"] = Proposal(update_text="none")
+    reply["text"] = js(update_text="none")
     assert Rules().propose(Ex(model), attempt(), book, *tool_step(ERROR)).update_text == "none"
 
 
 def test_best_of_two():
-    texts = iter(["first", "second"])
-    model = Stub(schemas={"Proposal": lambda call: Proposal(update_text=next(texts)), "Selection": Selection(selected_index=1)})
+    cands = iter(["first", "second"])
+    model = Stub(texts(quality=lambda call: js(update_text=next(cands)), select=js(selected_index=1)))
     p = Rules(n=2).propose(Ex(model), attempt(), Book(), *tool_step(FINE))
     assert p.update_text == "second"
     assert [c["temperature"] for c in model.calls] == [0.7, 0.7, 0]
@@ -62,16 +82,17 @@ def test_best_of_two():
 
 
 def test_classify():
-    model = Stub(schemas={"Classification": Classification(scope="strategic", confidence=0.95, domain="made_up")})
+    reply = {"text": js(scope="strategic", confidence=0.95, domain="made_up")}
+    model = Stub(lambda call: reply["text"])
     x = Rules().classify(Ex(model), Proposal(update_text="Always check units.", rationale="r", confidence="low"), Book())
     assert x.lessons == ["Always check units."] and x.extras == {CONFIDENCE: [0.95], DOMAIN: ["general"], RATIONALE: ["r"]}
     assert "Initial Confidence: 0.30" in model.calls[0]["user"]
-    model.schemas["Classification"] = Classification(scope="tactical", confidence=None)
+    reply["text"] = js(scope="tactical")
     assert Rules().classify(Ex(model), Proposal(update_text="x", confidence="high"), Book()).extras[DOMAIN] == [None]
     assert Rules().classify(Ex(model), Proposal(update_text="x", confidence="high"), Book()).extras[CONFIDENCE] == [0.9]
-    model.schemas["Classification"] = Classification(is_duplicate=True)
+    reply["text"] = js(is_duplicate=True)
     assert Rules().classify(Ex(model), Proposal(update_text="x"), Book()) is None
-    model.schemas["Classification"] = None           # сбой классификатора: tactical с исходной confidence
+    reply["text"] = "no json"           # сбой классификатора: tactical с исходной confidence
     assert Rules().classify(Ex(model), Proposal(update_text="x", confidence="medium"), Book()).extras[DOMAIN] == [None]
 
 
@@ -96,14 +117,13 @@ def test_limit_per_run_is_not_reset():
 
 
 def test_domain_cap_optimizer():
-    analysis = Analysis(consolidation=[[0, 1, 2, 3]])
-    model = Stub(schemas={"Analysis": analysis, "Rule": Rule(rule="merged", rationale="m")})
+    model = Stub(texts(analyze=js(consolidation=[[0, 1, 2, 3]]), merge=js(rule="merged", rationale="m")))
     book, ex = Book(), Ex(model)
     for i in range(CAP + 1):
         book.learn(ex, [rule(" ".join(f"w{i}{j}" for j in range(5)), 0.86 + i / 1000)])
-    texts = [r.text for r in book.records()]
-    assert len(texts) == TARGET and texts[-1] == "merged"
-    assert [c["output"].__name__ for c in model.calls] == ["Analysis", "Rule"]          # после слияния 8 правил: второго прохода нет
+    kept = [r.text for r in book.records()]
+    assert len(kept) == TARGET and kept[-1] == "merged"
+    assert [MARK["analyze"] in c["user"] for c in model.calls] == [True, False]        # после слияния 8 правил: второго прохода нет
     # нетронутая запись осталась собой
     assert all(isinstance(r, Strategic) for r in book.records())
 
@@ -122,14 +142,16 @@ def test_duplicate_words():
 
 
 def test_step_patch_rewrites_system():
-    model = Stub(schemas={"Proposal": Proposal(update_text="Guard division.", confidence="high"),
-                          "Classification": Classification(scope="strategic", confidence=0.9)})
+    update = {"text": "Guard division."}
+    model = Stub(texts(error=lambda call: js(update_text=update["text"], confidence="high"),
+                       quality=lambda call: js(update_text=update["text"], confidence="high"),
+                       classify=js(scope="strategic", confidence=0.9)))
     memory = Perspectives()
     s = swap(scope, memory=memory)
     a = attempt()
     patch = s.on_step(Ex(model), a, ERROR)
     assert patch == Patch(system="SYS\n\n## Learned Guideline:\nGuard division.")
-    model.schemas["Proposal"] = Proposal(update_text="Print intermediate values.", confidence="high")
+    update["text"] = "Print intermediate values."
     patch = s.on_step(Ex(model), a, FINE)
     assert patch.system == "SYS\n\n## Learned Guideline:\nGuard division.\n\n## Learned Guideline:\nPrint intermediate values."
     assert [r.text for r in memory.book(0).records()] == ["Guard division.", "Print intermediate values."]
@@ -138,25 +160,26 @@ def test_step_patch_rewrites_system():
     # новая попытка: tactical прошлой ушли, strategic показаны при запуске
     p = s.prompt(Ex(model), {"context": "q"}, 0)
     assert memory.book(0).tactical == []
-    assert p.system.startswith("\n\n## Strategic Guidelines") and "### General:\n- Guard division." in p.system
+    assert p.system.startswith("\n## Strategic Guidelines") and "### General:\n- Guard division." in p.system
 
 
 def test_k2_own_memory_per_perspective():
-    model = Stub(lambda call: right(call) if "## Strategic" not in call["system"] else "FINAL ANSWER: 0",
-                 schemas={"Proposal": Proposal(update_text="u", confidence="high"),
-                          "Classification": Classification(scope="strategic", confidence=0.9)})
+    model = Stub(texts(lambda call: right(call) if "## Strategic" not in call["system"] else "FINAL ANSWER: 0",
+                       error=js(update_text="u", confidence="high"), quality=js(update_text="u", confidence="high"),
+                       classify=js(scope="strategic", confidence=0.9)))
     run(TASK, scope_k2, model, 1)
-    proposals = [c for c in model.calls if c["output"] is Proposal]
+    proposals = [c for c in model.calls if MARK["error"] in c["user"] or MARK["quality"] in c["user"]]
     assert len(proposals) == 2
     # в зачёт первая попытка (efficiency), она и учится первой; вторая — thoroughness
     assert "**Correctness & Logic**" not in proposals[0]["user"] and "**Correctness & Logic**" in proposals[1]["user"]
 
 
 def test_answer_order_chosen_first():
-    model = Stub(schemas={"Proposal": lambda call: Proposal(update_text=f"u{len(model.calls)}"),
-                          "Classification": Classification(scope="tactical", confidence=0.9)})
+    model = Stub(texts(error=lambda call: js(update_text=f"u{len(model.calls)}"),
+                       quality=lambda call: js(update_text=f"u{len(model.calls)}"), classify=js(scope="tactical", confidence=0.9)))
     memory = Perspectives(("efficiency", "thoroughness"))
     g = Group("q", [episode("1", ok=False, k=0), episode("2", ok=True, k=1)], chosen=1)
     out = Rules().answers(Ex(model), g, memory)
     assert [k for k, _ in out] == [1, 0]
-    assert [c["output"].__name__ for c in model.calls] == ["Proposal", "Proposal", "Classification", "Classification"]
+    kinds = ["classify" if MARK["classify"] in c["user"] else "propose" for c in model.calls]
+    assert kinds == ["propose", "propose", "classify", "classify"]
