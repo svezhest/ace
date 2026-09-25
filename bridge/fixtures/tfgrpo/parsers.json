@@ -1,0 +1,245 @@
+{
+ "header": {
+  "repo": "youtu-agent",
+  "path": "/Users/user/Projects/upstreams/youtu-agent",
+  "commit": "c2caa539f4c95ae1c39ed24dc8a99cb3651e1d5d",
+  "functions": {
+   "ExperienceUpdater.run": "utu/practice/experience_updater.py:30",
+   "ExperienceUpdater._single_rollout_summary": "utu/practice/experience_updater.py:74",
+   "ExperienceUpdater._group_advantage": "utu/practice/experience_updater.py:141",
+   "ExperienceUpdater._group_update": "utu/practice/experience_updater.py:210",
+   "ExperienceUpdater._batch_update": "utu/practice/experience_updater.py:266",
+   "ExperienceUpdater._format_exp_and_ops": "utu/practice/experience_updater.py:329",
+   "prompts": "utu/prompts/practice/experience.yaml"
+  },
+  "command": "$UPSTREAMS/.venvs/youtu/bin/python bridge/capture_tfgrpo.py",
+  "python": "3.12.8",
+  "note": "шим utu из repro/tfgrpo_run.py:58-140; FileUtils как utu/utils/path.py:75,108; asyncio.as_completed заменён на порядок создания; model_params из config.json ({})"
+ },
+ "data": {
+  "advantage": {
+   "one_tag": {
+    "response": "<Experiences>\n1. A: a.\n</Experiences>",
+    "experiences": [
+     "1. A: a."
+    ]
+   },
+   "two_tags": {
+    "response": "<Experiences>\n1. first\n</Experiences>\n<Experiences>\n1. second\n</Experiences>",
+    "experiences": [
+     "1. first"
+    ]
+   },
+   "no_closing": {
+    "response": "<Experiences>\n1. A: a.\n",
+    "experiences": [
+     ""
+    ]
+   },
+   "lower_case": {
+    "response": "<experiences>\n1. a\n</experiences>",
+    "experiences": [
+     "1. a"
+    ]
+   },
+   "mixed_case": {
+    "response": "<EXPERIENCES>  1. a  </Experiences>",
+    "experiences": [
+     "1. a"
+    ]
+   },
+   "empty": {
+    "response": "<Experiences>\n</Experiences>",
+    "experiences": [
+     ""
+    ]
+   },
+   "no_tag": {
+    "response": "1. A: a.",
+    "experiences": [
+     ""
+    ]
+   },
+   "template_echo": {
+    "response": "<Experiences>\n  [Extract AT MOST **1** experiences]\n  1. [experience 1]\n</Experiences>",
+    "experiences": [
+     "[Extract AT MOST **1** experiences]\n  1. [experience 1]"
+    ]
+   }
+  },
+  "group_update": {
+   "fenced": {
+    "response": "```json\n[\n  {\n    \"operation\": \"ADD\",\n    \"id\": null,\n    \"content\": \"X: a.\"\n  }\n]\n```",
+    "operations": [
+     [
+      {
+       "operation": "ADD",
+       "id": null,
+       "content": "X: a."
+      }
+     ]
+    ],
+    "dropped": false,
+    "log": []
+   },
+   "bare_json": {
+    "response": "[{\"operation\": \"ADD\", \"id\": null, \"content\": \"X: a.\"}]",
+    "operations": [
+     [
+      {
+       "operation": "ADD",
+       "id": null,
+       "content": "X: a."
+      }
+     ]
+    ],
+    "dropped": false,
+    "log": []
+   },
+   "two_fences": {
+    "response": "```json\n[\n  {\n    \"operation\": \"ADD\",\n    \"content\": \"first\"\n  }\n]\n```\nthen\n```json\n[\n  {\n    \"operation\": \"ADD\",\n    \"content\": \"second\"\n  }\n]\n```",
+    "operations": [
+     [
+      {
+       "operation": "ADD",
+       "content": "second"
+      }
+     ]
+    ],
+    "dropped": false,
+    "log": []
+   },
+   "upper_JSON_fence": {
+    "response": "```JSON\n[{\"operation\": \"ADD\", \"content\": \"X\"}]\n```",
+    "operations": [],
+    "dropped": true,
+    "log": [
+     "Warning: failed in group update experience, Expecting value: line 1 column 1 (char 0)"
+    ]
+   },
+   "plain_fence": {
+    "response": "```\n[{\"operation\": \"ADD\", \"content\": \"X\"}]\n```",
+    "operations": [],
+    "dropped": true,
+    "log": [
+     "Warning: failed in group update experience, Expecting value: line 1 column 1 (char 0)"
+    ]
+   },
+   "truncated": {
+    "response": "```json\n[{\"operation\": \"ADD\", \"content\": \"X",
+    "operations": [],
+    "dropped": true,
+    "log": [
+     "Warning: failed in group update experience, Unterminated string starting at: line 2 column 34 (char 34)"
+    ]
+   },
+   "no_closing_fence": {
+    "response": "```json\n[{\"operation\": \"ADD\", \"content\": \"X\"}]",
+    "operations": [
+     [
+      {
+       "operation": "ADD",
+       "content": "X"
+      }
+     ]
+    ],
+    "dropped": false,
+    "log": []
+   },
+   "object_not_list": {
+    "response": "```json\n{\n  \"operation\": \"ADD\",\n  \"content\": \"X\"\n}\n```",
+    "operations": [
+     {
+      "operation": "ADD",
+      "content": "X"
+     }
+    ],
+    "dropped": false,
+    "log": []
+   },
+   "prose_before": {
+    "response": "Here is the plan:\n```json\n[\n  {\n    \"operation\": \"NONE\",\n    \"id\": null,\n    \"content\": \"X\"\n  }\n]\n```\nDone.",
+    "operations": [
+     [
+      {
+       "operation": "NONE",
+       "id": null,
+       "content": "X"
+      }
+     ]
+    ],
+    "dropped": false,
+    "log": []
+   }
+  },
+  "batch_update": {
+   "fenced": {
+    "response": "```json\n[\n  {\n    \"operation\": \"ADD\",\n    \"id\": null,\n    \"content\": \"X: a.\"\n  }\n]\n```",
+    "experiences": {
+     "G0": "old",
+     "1": "X: a."
+    },
+    "llm_calls": 1
+   },
+   "bare_json": {
+    "response": "[{\"operation\": \"ADD\", \"id\": null, \"content\": \"X: a.\"}]",
+    "experiences": {
+     "G0": "old",
+     "1": "X: a."
+    },
+    "llm_calls": 1
+   },
+   "two_fences": {
+    "response": "```json\n[\n  {\n    \"operation\": \"ADD\",\n    \"content\": \"first\"\n  }\n]\n```\nthen\n```json\n[\n  {\n    \"operation\": \"ADD\",\n    \"content\": \"second\"\n  }\n]\n```",
+    "experiences": {
+     "G0": "old",
+     "1": "second"
+    },
+    "llm_calls": 1
+   },
+   "upper_JSON_fence": {
+    "response": "```JSON\n[{\"operation\": \"ADD\", \"content\": \"X\"}]\n```",
+    "experiences": {
+     "G0": "old"
+    },
+    "llm_calls": 3
+   },
+   "plain_fence": {
+    "response": "```\n[{\"operation\": \"ADD\", \"content\": \"X\"}]\n```",
+    "experiences": {
+     "G0": "old"
+    },
+    "llm_calls": 3
+   },
+   "truncated": {
+    "response": "```json\n[{\"operation\": \"ADD\", \"content\": \"X",
+    "experiences": {
+     "G0": "old"
+    },
+    "llm_calls": 3
+   },
+   "no_closing_fence": {
+    "response": "```json\n[{\"operation\": \"ADD\", \"content\": \"X\"}]",
+    "experiences": {
+     "G0": "old",
+     "1": "X"
+    },
+    "llm_calls": 1
+   },
+   "object_not_list": {
+    "response": "```json\n{\n  \"operation\": \"ADD\",\n  \"content\": \"X\"\n}\n```",
+    "experiences": {
+     "error": "AttributeError: 'str' object has no attribute 'get'"
+    },
+    "llm_calls": 1
+   },
+   "prose_before": {
+    "response": "Here is the plan:\n```json\n[\n  {\n    \"operation\": \"NONE\",\n    \"id\": null,\n    \"content\": \"X\"\n  }\n]\n```\nDone.",
+    "experiences": {
+     "G0": "old"
+    },
+    "llm_calls": 1
+   }
+  }
+ }
+}

@@ -1,0 +1,273 @@
+{
+ "header": {
+  "repo": "SCOPE",
+  "path": "/Users/user/Projects/upstreams/SCOPE",
+  "commit": "4dc0da5e7843dce84a851bd7a53e4e45932b27d0",
+  "functions": {
+   "GuidelineSynthesizer._extract_json": "scope/synthesizer.py:525",
+   "RuleAnalyzer.analyze": "scope/memory_optimizer.py:50",
+   "SubsumptionOptimizer._verify_subsumption": "scope/memory_optimizer.py:340",
+   "SCOPEOptimizer._classify_and_check_duplicate": "scope/optimizer.py:230"
+  },
+  "command": "$UPSTREAMS/.venvs/light/bin/python bridge/capture_scope.py",
+  "python": "3.11.11"
+ },
+ "data": {
+  "synthesizer._extract_json": {
+   "plain": {
+    "ok": {
+     "update_text": "A",
+     "rationale": "r",
+     "confidence": "high"
+    }
+   },
+   "fenced_json": {
+    "ok": {
+     "update_text": "A",
+     "rationale": "r"
+    }
+   },
+   "fenced_plain": {
+    "ok": {
+     "update_text": "A",
+     "rationale": "r"
+    }
+   },
+   "two_objects": {
+    "ok": {
+     "update_text": "first"
+    }
+   },
+   "two_fenced": {
+    "ok": {
+     "update_text": "first"
+    }
+   },
+   "garbage_around": {
+    "ok": {
+     "update_text": "A",
+     "confidence": 0.9
+    }
+   },
+   "no_update_text_key": {
+    "ok": null
+   },
+   "truncated": {
+    "ok": null
+   },
+   "list": {
+    "ok": [
+     {
+      "update_text": "A"
+     }
+    ]
+   },
+   "nested": {
+    "ok": {
+     "update_text": "A",
+     "meta": {
+      "k": 1
+     }
+    }
+   },
+   "deep_nested": {
+    "ok": null
+   },
+   "single_quotes": {
+    "ok": null
+   },
+   "think_prefix": {
+    "ok": {
+     "update_text": "A"
+    }
+   },
+   "empty": {
+    "ok": null
+   }
+  },
+  "RuleAnalyzer.analyze": {
+   "inputs": {
+    "plain": "{\"consolidation\": [[0, 1]], \"subsumption\": [], \"conflicts\": []}",
+    "fenced_json": "Analysis:\n```json\n{\"consolidation\": [[0, 1]]}\n```",
+    "fenced_plain": "```\n{\"conflicts\": [[0, 1]]}\n```",
+    "garbage_around": "I found: {\"subsumption\": [[0, 1]]} end",
+    "single_quotes": "{'consolidation': [[0, 1]]}",
+    "two_objects": "{\"consolidation\": [[0, 1]]} {\"conflicts\": [[0, 1]]}",
+    "unclosed_fence": "```json\n{\"consolidation\": [[0, 1]]}",
+    "truncated": "{\"consolidation\": [[0, 1]",
+    "list": "[[0, 1]]",
+    "empty": ""
+   },
+   "results": {
+    "plain": {
+     "consolidation": [
+      [
+       0,
+       1
+      ]
+     ],
+     "subsumption": [],
+     "conflicts": []
+    },
+    "fenced_json": {
+     "consolidation": [
+      [
+       0,
+       1
+      ]
+     ],
+     "subsumption": [],
+     "conflicts": []
+    },
+    "fenced_plain": {
+     "conflicts": [
+      [
+       0,
+       1
+      ]
+     ],
+     "consolidation": [],
+     "subsumption": []
+    },
+    "garbage_around": {
+     "subsumption": [
+      [
+       0,
+       1
+      ]
+     ],
+     "consolidation": [],
+     "conflicts": []
+    },
+    "single_quotes": {
+     "consolidation": [
+      [
+       0,
+       1
+      ]
+     ],
+     "subsumption": [],
+     "conflicts": []
+    },
+    "two_objects": {
+     "consolidation": [],
+     "subsumption": [],
+     "conflicts": []
+    },
+    "unclosed_fence": {
+     "consolidation": [],
+     "subsumption": [],
+     "conflicts": []
+    },
+    "truncated": {
+     "consolidation": [],
+     "subsumption": [],
+     "conflicts": []
+    },
+    "list": {
+     "consolidation": [],
+     "subsumption": [],
+     "conflicts": []
+    },
+    "empty": {
+     "consolidation": [],
+     "subsumption": [],
+     "conflicts": []
+    }
+   }
+  },
+  "SubsumptionOptimizer._verify_subsumption": {
+   "note": "входы BLOCK_CASES с заменой consolidation->subsumed и [[0, 1]]->true",
+   "results": {
+    "plain": true,
+    "fenced_json": true,
+    "fenced_plain": false,
+    "garbage_around": false,
+    "single_quotes": true,
+    "two_objects": false,
+    "unclosed_fence": false,
+    "truncated": false,
+    "list": false,
+    "empty": false
+   }
+  },
+  "SCOPEOptimizer._classify_and_check_duplicate": {
+   "inputs": {
+    "full": "{\"is_duplicate\": false, \"scope\": \"strategic\", \"confidence\": 0.9, \"domain\": \"efficiency\", \"reason\": \"ok\"}",
+    "fenced": "```json\n{\"is_duplicate\": true, \"scope\": \"tactical\", \"confidence\": \"0.4\"}\n```",
+    "unknown_domain": "{\"scope\": \"strategic\", \"confidence\": 0.95, \"domain\": \"finance_tags\"}",
+    "tactical_unknown_domain": "{\"scope\": \"tactical\", \"confidence\": 0.95, \"domain\": \"finance_tags\"}",
+    "missing_keys": "{}",
+    "garbage_around": "Result: {\"scope\": \"strategic\", \"confidence\": 0.9} ok",
+    "string_confidence_word": "{\"scope\": \"strategic\", \"confidence\": \"high\"}",
+    "two_fences": "```json\n{\"scope\": \"strategic\"}\n```\n```json\n{\"scope\": \"tactical\"}\n```",
+    "empty": ""
+   },
+   "results": {
+    "full": {
+     "is_duplicate": false,
+     "scope": "strategic",
+     "confidence": 0.9,
+     "domain": "efficiency",
+     "reason": "ok"
+    },
+    "fenced": {
+     "is_duplicate": true,
+     "scope": "tactical",
+     "confidence": 0.4,
+     "domain": "general",
+     "reason": "Classification completed"
+    },
+    "unknown_domain": {
+     "scope": "strategic",
+     "confidence": 0.95,
+     "domain": "general",
+     "is_duplicate": false,
+     "reason": "Classification completed"
+    },
+    "tactical_unknown_domain": {
+     "scope": "tactical",
+     "confidence": 0.95,
+     "domain": "finance_tags",
+     "is_duplicate": false,
+     "reason": "Classification completed"
+    },
+    "missing_keys": {
+     "is_duplicate": false,
+     "scope": "tactical",
+     "confidence": 0.6,
+     "domain": "general",
+     "reason": "Classification completed"
+    },
+    "garbage_around": {
+     "is_duplicate": false,
+     "scope": "tactical",
+     "confidence": 0.6,
+     "domain": "general",
+     "reason": "Classification failed: Expecting value: line 1 column 1 (char 0)"
+    },
+    "string_confidence_word": {
+     "is_duplicate": false,
+     "scope": "tactical",
+     "confidence": 0.6,
+     "domain": "general",
+     "reason": "Classification failed: could not convert string to float: 'high'"
+    },
+    "two_fences": {
+     "scope": "strategic",
+     "is_duplicate": false,
+     "confidence": 0.6,
+     "domain": "general",
+     "reason": "Classification completed"
+    },
+    "empty": {
+     "is_duplicate": false,
+     "scope": "tactical",
+     "confidence": 0.6,
+     "domain": "general",
+     "reason": "Classification failed: Expecting value: line 1 column 1 (char 0)"
+    }
+   }
+  }
+ }
+}

@@ -1,0 +1,503 @@
+{
+ "header": {
+  "repo": "ace",
+  "path": "/Users/user/Projects/upstreams/ace",
+  "commit": "82709de050e1db6e6ef2f07bcb0393560b94992a",
+  "functions": {
+   "parse_playbook_line": "playbook_utils.py:13",
+   "get_section_slug": "utils.py:52",
+   "get_next_global_id": "playbook_utils.py:29",
+   "update_bullet_counts": "playbook_utils.py:50",
+   "apply_curator_operations": "playbook_utils.py:96",
+   "extract_playbook_bullets": "playbook_utils.py:335",
+   "get_playbook_stats": "playbook_utils.py:218"
+  },
+  "command": "$UPSTREAMS/.venvs/ace/bin/python bridge/capture_ace.py",
+  "python": "3.11.11"
+ },
+ "data": {
+  "parse_playbook_line": [
+   {
+    "in": "[calc-00001] helpful=3 harmful=1 :: Use the formula.",
+    "out": {
+     "ok": {
+      "id": "calc-00001",
+      "helpful": 3,
+      "harmful": 1,
+      "content": "Use the formula.",
+      "raw_line": "[calc-00001] helpful=3 harmful=1 :: Use the formula."
+     }
+    }
+   },
+   {
+    "in": "  [ph-00002] helpful=0 harmful=0 ::   spaced content  ",
+    "out": {
+     "ok": {
+      "id": "ph-00002",
+      "helpful": 0,
+      "harmful": 0,
+      "content": "spaced content",
+      "raw_line": "  [ph-00002] helpful=0 harmful=0 ::   spaced content  "
+     }
+    }
+   },
+   {
+    "in": "[calc-00003] helpful=1 harmful=0 :: a :: b",
+    "out": {
+     "ok": {
+      "id": "calc-00003",
+      "helpful": 1,
+      "harmful": 0,
+      "content": "a :: b",
+      "raw_line": "[calc-00003] helpful=1 harmful=0 :: a :: b"
+     }
+    }
+   },
+   {
+    "in": "[x] helpful=1 harmful=2 :: short id",
+    "out": {
+     "ok": {
+      "id": "x",
+      "helpful": 1,
+      "harmful": 2,
+      "content": "short id",
+      "raw_line": "[x] helpful=1 harmful=2 :: short id"
+     }
+    }
+   },
+   {
+    "in": "[calc-00004] helpful=-1 harmful=0 :: negative",
+    "out": {
+     "ok": null
+    }
+   },
+   {
+    "in": "[calc-00005] helpful=1 harmful=0 no separator",
+    "out": {
+     "ok": null
+    }
+   },
+   {
+    "in": "- plain bullet",
+    "out": {
+     "ok": null
+    }
+   },
+   {
+    "in": "## FORMULAS & CALCULATIONS",
+    "out": {
+     "ok": null
+    }
+   }
+  ],
+  "get_section_slug": [
+   {
+    "in": "STRATEGIES & INSIGHTS",
+    "out": {
+     "ok": "sai"
+    }
+   },
+   {
+    "in": "FORMULAS & CALCULATIONS",
+    "out": {
+     "ok": "calc"
+    }
+   },
+   {
+    "in": "CODE SNIPPETS & TEMPLATES",
+    "out": {
+     "ok": "code"
+    }
+   },
+   {
+    "in": "COMMON MISTAKES TO AVOID",
+    "out": {
+     "ok": "err"
+    }
+   },
+   {
+    "in": "PROBLEM-SOLVING HEURISTICS",
+    "out": {
+     "ok": "ph"
+    }
+   },
+   {
+    "in": "problem_solving_heuristics",
+    "out": {
+     "ok": "prob"
+    }
+   },
+   {
+    "in": "CONTEXT CLUES & INDICATORS",
+    "out": {
+     "ok": "ctx"
+    }
+   },
+   {
+    "in": "OTHERS",
+    "out": {
+     "ok": "misc"
+    }
+   },
+   {
+    "in": "others",
+    "out": {
+     "ok": "misc"
+    }
+   },
+   {
+    "in": "meta_strategies",
+    "out": {
+     "ok": "meta"
+    }
+   },
+   {
+    "in": "financial_strategies_and_insights",
+    "out": {
+     "ok": "fin"
+    }
+   },
+   {
+    "in": "strategies_and_insights",
+    "out": {
+     "ok": "sai"
+    }
+   },
+   {
+    "in": "formulas_and_calculations",
+    "out": {
+     "ok": "calc"
+    }
+   },
+   {
+    "in": "Problem Heuristics",
+    "out": {
+     "ok": "ph"
+    }
+   },
+   {
+    "in": "general",
+    "out": {
+     "ok": "gene"
+    }
+   },
+   {
+    "in": "a",
+    "out": {
+     "ok": "a"
+    }
+   },
+   {
+    "in": "one two three four five six",
+    "out": {
+     "ok": "ottff"
+    }
+   },
+   {
+    "in": "  Mixed Case  ",
+    "out": {
+     "ok": "mc"
+    }
+   }
+  ],
+  "get_next_global_id": [
+   {
+    "in": "## STRATEGIES & INSIGHTS\n[sai-00001] helpful=2 harmful=0 :: Read the units before computing.\n\n## FORMULAS & CALCULATIONS\n[calc-00002] helpful=0 harmful=1 :: Operating margin = operating income / revenue * 100.\n\n## PROBLEM-SOLVING HEURISTICS\n[ph-00003] helpful=0 harmful=0 :: Check the sign of every growth rate.\n\n## OTHERS",
+    "out": {
+     "ok": 4
+    }
+   },
+   {
+    "in": "## STRATEGIES & INSIGHTS\n\n## FORMULAS & CALCULATIONS\n\n## CODE SNIPPETS & TEMPLATES\n\n## COMMON MISTAKES TO AVOID\n\n## PROBLEM-SOLVING HEURISTICS\n\n## CONTEXT CLUES & INDICATORS\n\n## OTHERS",
+    "out": {
+     "ok": 1
+    }
+   },
+   {
+    "in": "[a-7] helpful=0 harmful=0 :: x\n[b-00003] helpful=0 harmful=0 :: y",
+    "out": {
+     "ok": 8
+    }
+   },
+   {
+    "in": "[abc] helpful=0 harmful=0 :: no number",
+    "out": {
+     "ok": 1
+    }
+   }
+  ],
+  "update_bullet_counts": {
+   "helpful_harmful_neutral": {
+    "ok": "## STRATEGIES & INSIGHTS\n[sai-00001] helpful=3 harmful=0 :: Read the units before computing.\n\n## FORMULAS & CALCULATIONS\n[calc-00002] helpful=0 harmful=2 :: Operating margin = operating income / revenue * 100.\n\n## PROBLEM-SOLVING HEURISTICS\n[ph-00003] helpful=0 harmful=0 :: Check the sign of every growth rate.\n\n## OTHERS"
+   },
+   "bullet_key": {
+    "ok": "## STRATEGIES & INSIGHTS\n[sai-00001] helpful=2 harmful=0 :: Read the units before computing.\n\n## FORMULAS & CALCULATIONS\n[calc-00002] helpful=1 harmful=1 :: Operating margin = operating income / revenue * 100.\n\n## PROBLEM-SOLVING HEURISTICS\n[ph-00003] helpful=0 harmful=0 :: Check the sign of every growth rate.\n\n## OTHERS"
+   },
+   "unknown_id_and_tag": {
+    "ok": "## STRATEGIES & INSIGHTS\n[sai-00001] helpful=2 harmful=0 :: Read the units before computing.\n\n## FORMULAS & CALCULATIONS\n[calc-00002] helpful=0 harmful=1 :: Operating margin = operating income / revenue * 100.\n\n## PROBLEM-SOLVING HEURISTICS\n[ph-00003] helpful=0 harmful=0 :: Check the sign of every growth rate.\n\n## OTHERS"
+   },
+   "duplicate_id_last_wins": {
+    "ok": "## STRATEGIES & INSIGHTS\n[sai-00001] helpful=2 harmful=1 :: Read the units before computing.\n\n## FORMULAS & CALCULATIONS\n[calc-00002] helpful=0 harmful=1 :: Operating margin = operating income / revenue * 100.\n\n## PROBLEM-SOLVING HEURISTICS\n[ph-00003] helpful=0 harmful=0 :: Check the sign of every growth rate.\n\n## OTHERS"
+   },
+   "empty": {
+    "ok": "## STRATEGIES & INSIGHTS\n[sai-00001] helpful=2 harmful=0 :: Read the units before computing.\n\n## FORMULAS & CALCULATIONS\n[calc-00002] helpful=0 harmful=1 :: Operating margin = operating income / revenue * 100.\n\n## PROBLEM-SOLVING HEURISTICS\n[ph-00003] helpful=0 harmful=0 :: Check the sign of every growth rate.\n\n## OTHERS"
+   },
+   "strings": {
+    "ok": "## STRATEGIES & INSIGHTS\n[sai-00001] helpful=2 harmful=0 :: Read the units before computing.\n\n## FORMULAS & CALCULATIONS\n[calc-00002] helpful=0 harmful=1 :: Operating margin = operating income / revenue * 100.\n\n## PROBLEM-SOLVING HEURISTICS\n[ph-00003] helpful=0 harmful=0 :: Check the sign of every growth rate.\n\n## OTHERS"
+   }
+  },
+  "apply_curator_operations": {
+   "add_existing_snake/playbook": {
+    "ok": [
+     "## STRATEGIES & INSIGHTS\n[sai-00001] helpful=2 harmful=0 :: Read the units before computing.\n\n## FORMULAS & CALCULATIONS\n[calc-00002] helpful=0 harmful=1 :: Operating margin = operating income / revenue * 100.\n\n[calc-00004] helpful=0 harmful=0 :: A\n## PROBLEM-SOLVING HEURISTICS\n[ph-00003] helpful=0 harmful=0 :: Check the sign of every growth rate.\n\n## OTHERS",
+     5
+    ]
+   },
+   "add_existing_snake/empty": {
+    "ok": [
+     "## STRATEGIES & INSIGHTS\n\n## FORMULAS & CALCULATIONS\n\n[calc-00004] helpful=0 harmful=0 :: A\n## CODE SNIPPETS & TEMPLATES\n\n## COMMON MISTAKES TO AVOID\n\n## PROBLEM-SOLVING HEURISTICS\n\n## CONTEXT CLUES & INDICATORS\n\n## OTHERS",
+     5
+    ]
+   },
+   "add_existing_snake/no_others": {
+    "ok": [
+     "## STRATEGIES & INSIGHTS\n[sai-00001] helpful=2 harmful=0 :: Read the units before computing.\n\n## FORMULAS & CALCULATIONS\n[calc-00002] helpful=0 harmful=1 :: Operating margin = operating income / revenue * 100.\n\n[calc-00004] helpful=0 harmful=0 :: A\n## PROBLEM-SOLVING HEURISTICS\n[ph-00003] helpful=0 harmful=0 :: Check the sign of every growth rate.",
+     5
+    ]
+   },
+   "add_existing_header_case/playbook": {
+    "ok": [
+     "## STRATEGIES & INSIGHTS\n[sai-00001] helpful=2 harmful=0 :: Read the units before computing.\n\n## FORMULAS & CALCULATIONS\n[calc-00002] helpful=0 harmful=1 :: Operating margin = operating income / revenue * 100.\n\n[calc-00004] helpful=0 harmful=0 :: B\n## PROBLEM-SOLVING HEURISTICS\n[ph-00003] helpful=0 harmful=0 :: Check the sign of every growth rate.\n\n## OTHERS",
+     5
+    ]
+   },
+   "add_existing_header_case/empty": {
+    "ok": [
+     "## STRATEGIES & INSIGHTS\n\n## FORMULAS & CALCULATIONS\n\n[calc-00004] helpful=0 harmful=0 :: B\n## CODE SNIPPETS & TEMPLATES\n\n## COMMON MISTAKES TO AVOID\n\n## PROBLEM-SOLVING HEURISTICS\n\n## CONTEXT CLUES & INDICATORS\n\n## OTHERS",
+     5
+    ]
+   },
+   "add_existing_header_case/no_others": {
+    "ok": [
+     "## STRATEGIES & INSIGHTS\n[sai-00001] helpful=2 harmful=0 :: Read the units before computing.\n\n## FORMULAS & CALCULATIONS\n[calc-00002] helpful=0 harmful=1 :: Operating margin = operating income / revenue * 100.\n\n[calc-00004] helpful=0 harmful=0 :: B\n## PROBLEM-SOLVING HEURISTICS\n[ph-00003] helpful=0 harmful=0 :: Check the sign of every growth rate.",
+     5
+    ]
+   },
+   "add_hyphen_header/playbook": {
+    "ok": [
+     "## STRATEGIES & INSIGHTS\n[sai-00001] helpful=2 harmful=0 :: Read the units before computing.\n\n## FORMULAS & CALCULATIONS\n[calc-00002] helpful=0 harmful=1 :: Operating margin = operating income / revenue * 100.\n\n## PROBLEM-SOLVING HEURISTICS\n[ph-00003] helpful=0 harmful=0 :: Check the sign of every growth rate.\n\n[ph-00004] helpful=0 harmful=0 :: C\n## OTHERS",
+     5
+    ]
+   },
+   "add_hyphen_header/empty": {
+    "ok": [
+     "## STRATEGIES & INSIGHTS\n\n## FORMULAS & CALCULATIONS\n\n## CODE SNIPPETS & TEMPLATES\n\n## COMMON MISTAKES TO AVOID\n\n## PROBLEM-SOLVING HEURISTICS\n\n[ph-00004] helpful=0 harmful=0 :: C\n## CONTEXT CLUES & INDICATORS\n\n## OTHERS",
+     5
+    ]
+   },
+   "add_hyphen_header/no_others": {
+    "ok": [
+     "## STRATEGIES & INSIGHTS\n[sai-00001] helpful=2 harmful=0 :: Read the units before computing.\n\n## FORMULAS & CALCULATIONS\n[calc-00002] helpful=0 harmful=1 :: Operating margin = operating income / revenue * 100.\n\n## PROBLEM-SOLVING HEURISTICS\n[ph-00003] helpful=0 harmful=0 :: Check the sign of every growth rate.\n[ph-00004] helpful=0 harmful=0 :: C",
+     5
+    ]
+   },
+   "add_hyphen_snake/playbook": {
+    "ok": [
+     "## STRATEGIES & INSIGHTS\n[sai-00001] helpful=2 harmful=0 :: Read the units before computing.\n\n## FORMULAS & CALCULATIONS\n[calc-00002] helpful=0 harmful=1 :: Operating margin = operating income / revenue * 100.\n\n## PROBLEM-SOLVING HEURISTICS\n[ph-00003] helpful=0 harmful=0 :: Check the sign of every growth rate.\n\n## OTHERS\n[misc-00004] helpful=0 harmful=0 :: D",
+     5
+    ]
+   },
+   "add_hyphen_snake/empty": {
+    "ok": [
+     "## STRATEGIES & INSIGHTS\n\n## FORMULAS & CALCULATIONS\n\n## CODE SNIPPETS & TEMPLATES\n\n## COMMON MISTAKES TO AVOID\n\n## PROBLEM-SOLVING HEURISTICS\n\n## CONTEXT CLUES & INDICATORS\n\n## OTHERS\n[misc-00004] helpful=0 harmful=0 :: D",
+     5
+    ]
+   },
+   "add_hyphen_snake/no_others": {
+    "ok": [
+     "## STRATEGIES & INSIGHTS\n[sai-00001] helpful=2 harmful=0 :: Read the units before computing.\n\n## FORMULAS & CALCULATIONS\n[calc-00002] helpful=0 harmful=1 :: Operating margin = operating income / revenue * 100.\n\n## PROBLEM-SOLVING HEURISTICS\n[ph-00003] helpful=0 harmful=0 :: Check the sign of every growth rate.\n[misc-00004] helpful=0 harmful=0 :: D",
+     5
+    ]
+   },
+   "add_missing/playbook": {
+    "ok": [
+     "## STRATEGIES & INSIGHTS\n[sai-00001] helpful=2 harmful=0 :: Read the units before computing.\n\n## FORMULAS & CALCULATIONS\n[calc-00002] helpful=0 harmful=1 :: Operating margin = operating income / revenue * 100.\n\n## PROBLEM-SOLVING HEURISTICS\n[ph-00003] helpful=0 harmful=0 :: Check the sign of every growth rate.\n\n## OTHERS\n[misc-00004] helpful=0 harmful=0 :: E",
+     5
+    ]
+   },
+   "add_missing/empty": {
+    "ok": [
+     "## STRATEGIES & INSIGHTS\n\n## FORMULAS & CALCULATIONS\n\n## CODE SNIPPETS & TEMPLATES\n\n## COMMON MISTAKES TO AVOID\n\n## PROBLEM-SOLVING HEURISTICS\n\n## CONTEXT CLUES & INDICATORS\n\n## OTHERS\n[misc-00004] helpful=0 harmful=0 :: E",
+     5
+    ]
+   },
+   "add_missing/no_others": {
+    "ok": [
+     "## STRATEGIES & INSIGHTS\n[sai-00001] helpful=2 harmful=0 :: Read the units before computing.\n\n## FORMULAS & CALCULATIONS\n[calc-00002] helpful=0 harmful=1 :: Operating margin = operating income / revenue * 100.\n\n## PROBLEM-SOLVING HEURISTICS\n[ph-00003] helpful=0 harmful=0 :: Check the sign of every growth rate.\n[misc-00004] helpful=0 harmful=0 :: E",
+     5
+    ]
+   },
+   "add_general/playbook": {
+    "ok": [
+     "## STRATEGIES & INSIGHTS\n[sai-00001] helpful=2 harmful=0 :: Read the units before computing.\n\n## FORMULAS & CALCULATIONS\n[calc-00002] helpful=0 harmful=1 :: Operating margin = operating income / revenue * 100.\n\n## PROBLEM-SOLVING HEURISTICS\n[ph-00003] helpful=0 harmful=0 :: Check the sign of every growth rate.\n\n## OTHERS\n[gene-00004] helpful=0 harmful=0 :: F",
+     5
+    ]
+   },
+   "add_general/empty": {
+    "ok": [
+     "## STRATEGIES & INSIGHTS\n\n## FORMULAS & CALCULATIONS\n\n## CODE SNIPPETS & TEMPLATES\n\n## COMMON MISTAKES TO AVOID\n\n## PROBLEM-SOLVING HEURISTICS\n\n## CONTEXT CLUES & INDICATORS\n\n## OTHERS\n[gene-00004] helpful=0 harmful=0 :: F",
+     5
+    ]
+   },
+   "add_general/no_others": {
+    "ok": [
+     "## STRATEGIES & INSIGHTS\n[sai-00001] helpful=2 harmful=0 :: Read the units before computing.\n\n## FORMULAS & CALCULATIONS\n[calc-00002] helpful=0 harmful=1 :: Operating margin = operating income / revenue * 100.\n\n## PROBLEM-SOLVING HEURISTICS\n[ph-00003] helpful=0 harmful=0 :: Check the sign of every growth rate.\n[gene-00004] helpful=0 harmful=0 :: F",
+     5
+    ]
+   },
+   "add_no_section/playbook": {
+    "ok": [
+     "## STRATEGIES & INSIGHTS\n[sai-00001] helpful=2 harmful=0 :: Read the units before computing.\n\n## FORMULAS & CALCULATIONS\n[calc-00002] helpful=0 harmful=1 :: Operating margin = operating income / revenue * 100.\n\n## PROBLEM-SOLVING HEURISTICS\n[ph-00003] helpful=0 harmful=0 :: Check the sign of every growth rate.\n\n## OTHERS\n[gene-00004] helpful=0 harmful=0 :: G",
+     5
+    ]
+   },
+   "add_no_section/empty": {
+    "ok": [
+     "## STRATEGIES & INSIGHTS\n\n## FORMULAS & CALCULATIONS\n\n## CODE SNIPPETS & TEMPLATES\n\n## COMMON MISTAKES TO AVOID\n\n## PROBLEM-SOLVING HEURISTICS\n\n## CONTEXT CLUES & INDICATORS\n\n## OTHERS\n[gene-00004] helpful=0 harmful=0 :: G",
+     5
+    ]
+   },
+   "add_no_section/no_others": {
+    "ok": [
+     "## STRATEGIES & INSIGHTS\n[sai-00001] helpful=2 harmful=0 :: Read the units before computing.\n\n## FORMULAS & CALCULATIONS\n[calc-00002] helpful=0 harmful=1 :: Operating margin = operating income / revenue * 100.\n\n## PROBLEM-SOLVING HEURISTICS\n[ph-00003] helpful=0 harmful=0 :: Check the sign of every growth rate.\n[gene-00004] helpful=0 harmful=0 :: G",
+     5
+    ]
+   },
+   "add_others/playbook": {
+    "ok": [
+     "## STRATEGIES & INSIGHTS\n[sai-00001] helpful=2 harmful=0 :: Read the units before computing.\n\n## FORMULAS & CALCULATIONS\n[calc-00002] helpful=0 harmful=1 :: Operating margin = operating income / revenue * 100.\n\n## PROBLEM-SOLVING HEURISTICS\n[ph-00003] helpful=0 harmful=0 :: Check the sign of every growth rate.\n\n## OTHERS\n[misc-00004] helpful=0 harmful=0 :: H",
+     5
+    ]
+   },
+   "add_others/empty": {
+    "ok": [
+     "## STRATEGIES & INSIGHTS\n\n## FORMULAS & CALCULATIONS\n\n## CODE SNIPPETS & TEMPLATES\n\n## COMMON MISTAKES TO AVOID\n\n## PROBLEM-SOLVING HEURISTICS\n\n## CONTEXT CLUES & INDICATORS\n\n## OTHERS\n[misc-00004] helpful=0 harmful=0 :: H",
+     5
+    ]
+   },
+   "add_others/no_others": {
+    "ok": [
+     "## STRATEGIES & INSIGHTS\n[sai-00001] helpful=2 harmful=0 :: Read the units before computing.\n\n## FORMULAS & CALCULATIONS\n[calc-00002] helpful=0 harmful=1 :: Operating margin = operating income / revenue * 100.\n\n## PROBLEM-SOLVING HEURISTICS\n[ph-00003] helpful=0 harmful=0 :: Check the sign of every growth rate.\n[misc-00004] helpful=0 harmful=0 :: H",
+     5
+    ]
+   },
+   "update_delete_merge/playbook": {
+    "ok": [
+     "## STRATEGIES & INSIGHTS\n[sai-00001] helpful=2 harmful=0 :: Read the units before computing.\n\n## FORMULAS & CALCULATIONS\n[calc-00002] helpful=0 harmful=1 :: Operating margin = operating income / revenue * 100.\n\n## PROBLEM-SOLVING HEURISTICS\n[ph-00003] helpful=0 harmful=0 :: Check the sign of every growth rate.\n\n## OTHERS",
+     4
+    ]
+   },
+   "update_delete_merge/empty": {
+    "ok": [
+     "## STRATEGIES & INSIGHTS\n\n## FORMULAS & CALCULATIONS\n\n## CODE SNIPPETS & TEMPLATES\n\n## COMMON MISTAKES TO AVOID\n\n## PROBLEM-SOLVING HEURISTICS\n\n## CONTEXT CLUES & INDICATORS\n\n## OTHERS",
+     4
+    ]
+   },
+   "update_delete_merge/no_others": {
+    "ok": [
+     "## STRATEGIES & INSIGHTS\n[sai-00001] helpful=2 harmful=0 :: Read the units before computing.\n\n## FORMULAS & CALCULATIONS\n[calc-00002] helpful=0 harmful=1 :: Operating margin = operating income / revenue * 100.\n\n## PROBLEM-SOLVING HEURISTICS\n[ph-00003] helpful=0 harmful=0 :: Check the sign of every growth rate.",
+     4
+    ]
+   },
+   "unknown_type/playbook": {
+    "ok": [
+     "## STRATEGIES & INSIGHTS\n[sai-00001] helpful=2 harmful=0 :: Read the units before computing.\n\n## FORMULAS & CALCULATIONS\n[calc-00002] helpful=0 harmful=1 :: Operating margin = operating income / revenue * 100.\n\n## PROBLEM-SOLVING HEURISTICS\n[ph-00003] helpful=0 harmful=0 :: Check the sign of every growth rate.\n\n## OTHERS",
+     4
+    ]
+   },
+   "unknown_type/empty": {
+    "ok": [
+     "## STRATEGIES & INSIGHTS\n\n## FORMULAS & CALCULATIONS\n\n## CODE SNIPPETS & TEMPLATES\n\n## COMMON MISTAKES TO AVOID\n\n## PROBLEM-SOLVING HEURISTICS\n\n## CONTEXT CLUES & INDICATORS\n\n## OTHERS",
+     4
+    ]
+   },
+   "unknown_type/no_others": {
+    "ok": [
+     "## STRATEGIES & INSIGHTS\n[sai-00001] helpful=2 harmful=0 :: Read the units before computing.\n\n## FORMULAS & CALCULATIONS\n[calc-00002] helpful=0 harmful=1 :: Operating margin = operating income / revenue * 100.\n\n## PROBLEM-SOLVING HEURISTICS\n[ph-00003] helpful=0 harmful=0 :: Check the sign of every growth rate.",
+     4
+    ]
+   },
+   "several/playbook": {
+    "ok": [
+     "## STRATEGIES & INSIGHTS\n[sai-00001] helpful=2 harmful=0 :: Read the units before computing.\n\n[sai-00004] helpful=0 harmful=0 :: J\n[sai-00006] helpful=0 harmful=0 :: L\n## FORMULAS & CALCULATIONS\n[calc-00002] helpful=0 harmful=1 :: Operating margin = operating income / revenue * 100.\n\n[calc-00005] helpful=0 harmful=0 :: K\n## PROBLEM-SOLVING HEURISTICS\n[ph-00003] helpful=0 harmful=0 :: Check the sign of every growth rate.\n\n## OTHERS",
+     7
+    ]
+   },
+   "several/empty": {
+    "ok": [
+     "## STRATEGIES & INSIGHTS\n\n[sai-00004] helpful=0 harmful=0 :: J\n[sai-00006] helpful=0 harmful=0 :: L\n## FORMULAS & CALCULATIONS\n\n[calc-00005] helpful=0 harmful=0 :: K\n## CODE SNIPPETS & TEMPLATES\n\n## COMMON MISTAKES TO AVOID\n\n## PROBLEM-SOLVING HEURISTICS\n\n## CONTEXT CLUES & INDICATORS\n\n## OTHERS",
+     7
+    ]
+   },
+   "several/no_others": {
+    "ok": [
+     "## STRATEGIES & INSIGHTS\n[sai-00001] helpful=2 harmful=0 :: Read the units before computing.\n\n[sai-00004] helpful=0 harmful=0 :: J\n[sai-00006] helpful=0 harmful=0 :: L\n## FORMULAS & CALCULATIONS\n[calc-00002] helpful=0 harmful=1 :: Operating margin = operating income / revenue * 100.\n\n[calc-00005] helpful=0 harmful=0 :: K\n## PROBLEM-SOLVING HEURISTICS\n[ph-00003] helpful=0 harmful=0 :: Check the sign of every growth rate.",
+     7
+    ]
+   }
+  },
+  "extract_playbook_bullets": [
+   {
+    "ids": [
+     "calc-00002",
+     "ph-00003"
+    ],
+    "out": {
+     "ok": "[calc-00002] helpful=0 harmful=1 :: Operating margin = operating income / revenue * 100.\n[ph-00003] helpful=0 harmful=0 :: Check the sign of every growth rate."
+    }
+   },
+   {
+    "ids": [],
+    "out": {
+     "ok": "(No bullets used by generator)"
+    }
+   },
+   {
+    "ids": [
+     "nope-00001"
+    ],
+    "out": {
+     "ok": "(Generator referenced bullet IDs but none were found in playbook)"
+    }
+   }
+  ],
+  "get_playbook_stats": {
+   "ok": {
+    "total_bullets": 3,
+    "high_performing": 0,
+    "problematic": 1,
+    "unused": 1,
+    "by_section": {
+     "STRATEGIES & INSIGHTS": {
+      "count": 1,
+      "helpful": 2,
+      "harmful": 0
+     },
+     "FORMULAS & CALCULATIONS": {
+      "count": 1,
+      "helpful": 0,
+      "harmful": 1
+     },
+     "PROBLEM-SOLVING HEURISTICS": {
+      "count": 1,
+      "helpful": 0,
+      "harmful": 0
+     }
+    }
+   }
+  },
+  "format_playbook_line": {
+   "ok": "[calc-00001] helpful=0 harmful=0 :: text"
+  }
+ }
+}

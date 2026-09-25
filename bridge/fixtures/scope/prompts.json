@@ -1,0 +1,303 @@
+{
+ "header": {
+  "repo": "SCOPE",
+  "path": "/Users/user/Projects/upstreams/SCOPE",
+  "commit": "4dc0da5e7843dce84a851bd7a53e4e45932b27d0",
+  "functions": {
+   "prompts": "scope/prompts.py:0",
+   "GuidelineSynthesizer.generate_update_from_error": "scope/synthesizer.py:285",
+   "GuidelineSynthesizer.generate_update_from_quality": "scope/synthesizer.py:394",
+   "GuidelineSynthesizer._select_best_update": "scope/synthesizer.py:185",
+   "SCOPEOptimizer._classify_and_check_duplicate": "scope/optimizer.py:230",
+   "SCOPEOptimizer._build_step_summary": "scope/optimizer.py:565",
+   "MemoryOptimizer.optimize_rules": "scope/memory_optimizer.py:586",
+   "StrategicMemoryStore.get_strategic_rules_text": "scope/strategic_store.py:330",
+   "OpenAIAdapter.generate": "scope/models/openai_adapter.py:65"
+  },
+  "command": "$UPSTREAMS/.venvs/light/bin/python bridge/capture_scope.py",
+  "python": "3.11.11"
+ },
+ "data": {
+  "templates": {
+   "ERROR_REFLECTION_PROMPT": "You are a prompt engineering expert analyzing agent execution errors.\n\nYour task: Generate a SHORT, TARGETED system prompt addition (1-3 lines) that will help prevent this error in the future.\n\nContext:\n- Agent Name: {agent_name}\n- Agent Role: {agent_role}\n- Task: {task}\n- Error Type: {error_type}\n- Error Message: {error_message}\n\nPrevious actions taken:\n{last_step_summary}\n\nCurrent system prompt (for reference, to avoid duplication):\n{current_system_prompt}\n\nAlready applied rules (DO NOT duplicate these):\n{applied_rules}\n\nGuidelines:\n1. Be SPECIFIC and ACTIONABLE - target the exact error cause\n2. Be BRIEF - max 1-3 lines\n3. Use imperative language (\"Always...\", \"Never...\", \"When X, do Y...\")\n4. Don't repeat what's already in the current system prompt\n5. Focus on formatting, structure, or procedure constraints\n\nOutput ONLY valid JSON with this exact format:\n{{\n  \"update_text\": \"The actual prompt addition text here\",\n  \"rationale\": \"Brief 1-sentence why this helps\",\n  \"confidence\": \"low|medium|high\"\n}}",
+   "QUALITY_REFLECTION_PROMPT_EFFICIENCY": "You are a prompt engineering expert analyzing agent execution quality.\n\nYour task: Analyze this successful step and determine if there are inefficiencies or areas for improvement. If found, generate a SHORT, TARGETED system prompt addition (1-3 lines).\n\nContext:\n- Agent Name: {agent_name}\n- Agent Role: {agent_role}\n- Task: {task}\n\nStep details:\n{last_step_summary}\n\nCurrent system prompt (for reference):\n{current_system_prompt}\n\nAlready applied rules (DO NOT duplicate these):\n{applied_rules}\n\nAnalyze for:\n1. **Inefficient tool usage**: Multiple calls when one would suffice, redundant operations\n2. **Verbose outputs**: Unnecessarily long reasoning or outputs\n3. **Missing best practices**: Not following domain-specific best practices\n4. **Suboptimal approaches**: Using less efficient methods when better ones exist\n\nGuidelines:\n- Only suggest an update if there's a CLEAR, ACTIONABLE improvement\n- Be SPECIFIC about what to improve\n- Be BRIEF - max 1-3 lines\n- Use imperative language (\"Always...\", \"Prefer...\", \"When X, use Y instead of Z...\")\n- Don't repeat what's already in the current system prompt\n\nOutput ONLY valid JSON with this exact format:\n{{\n  \"update_text\": \"The actual prompt addition text here (or empty string if no improvement needed)\",\n  \"rationale\": \"Brief 1-sentence why this helps (or 'No improvement needed')\",\n  \"confidence\": \"low|medium|high\"\n}}",
+   "QUALITY_REFLECTION_PROMPT_THOROUGHNESS": "You are a prompt engineering expert analyzing agent execution quality.\n\nYour task: Analyze this successful step and determine if there are inefficiencies or areas for improvement. If found, generate a SHORT, TARGETED system prompt addition (1-3 lines).\n\nContext:\n- Agent Name: {agent_name}\n- Agent Role: {agent_role}\n- Task: {task}\n\nStep details:\n{last_step_summary}\n\nCurrent system prompt (for reference):\n{current_system_prompt}\n\nAlready applied rules (DO NOT duplicate these):\n{applied_rules}\n\nAnalyze for improvements in these dimensions:\n\n1. **Correctness & Logic**:\n   - Are there incorrect assumptions or flawed reasoning?\n   - Are edge cases or special conditions being missed?\n   - Is the approach fundamentally sound for this problem type?\n   - Are validation/sanity checks missing?\n   Examples: \"Check if 1 ∈ S before computing\", \"Verify units match\", \"Confirm UTF-8 encoding\"\n\n2. **Domain-Specific Strategies**:\n   - What terminology variants, synonyms, or phrasings should be searched?\n     Examples: \"ASEP/TASEP/exclusion process\", \"Émile/Emile\", \"Cafi/Caffi/Cafí\"\n   - Which authoritative sources, databases, or experts are most reliable?\n     Examples: \"arXiv for math\", \"uboat.net for naval\", \"cite Mumford/Milne\"\n   - What heuristics or shortcuts apply in this domain?\n     Examples: \"Check order-of-magnitude for physics\", \"Use closed-form when n<10\"\n   - What validation methods are domain-appropriate?\n     Examples: \"Verify stereochemistry\", \"Check orbital symmetry\", \"Confirm timestamp format\"\n   - Are there problem-type recognition patterns?\n     Examples: \"Sparse results → try variants\"\n\n3. **Strategic Planning & Approach**:\n   - Is there a better problem decomposition or sequencing?\n   - Should simpler methods be tried first? (trivial cases, closed forms, local computation)\n   - Are batch operations being used where possible?\n   - Is there missing lookahead or early termination logic?\n   Examples: \"Handle trivial case locally first\", \"Batch preprocessing before analysis\"\n\n4. **Tool Usage Efficiency**:\n   - Multiple tool calls when one comprehensive call would suffice?\n   - Missing consolidation opportunities?\n   - Redundant fetches of the same information?\n   - Could local computation replace a tool call?\n   Examples: \"Combine search + extraction\", \"Cache plan state\", \"Count locally\"\n\n5. **Information Preservation**:\n   - Is critical context being lost between steps?\n   - Are sources/citations/evidence being properly tracked?\n   - Are intermediate results preserved for verification?\n   Examples: \"Attach artifact_refs\", \"Log clicked URLs\", \"Preserve evidence chain\"\n\n6. **Robustness & Error Recovery**:\n   - Are there missing fallback strategies?\n   - Is retry logic appropriate?\n   - Are error conditions anticipated?\n   Examples: \"If search fails, try broader query\", \"Rate limit → exponential backoff\"\n\n7. **Output Quality**:\n   - Is reasoning unnecessarily verbose?\n   - Are outputs well-structured and parseable?\n   - Is the answer format user-friendly?\n   Examples: \"Limit to ≤200 chars\", \"Return structured JSON\", \"Include confidence score\"\n\nGuidelines:\n- PRIORITIZE correctness over efficiency\n- Only suggest if there's a CLEAR, ACTIONABLE, GENERALIZABLE improvement\n- For domain rules: Include SPECIFIC terms/sources/values, not placeholders\n  Good: \"Search 'Bean model' OR 'critical state' OR 'Brandt' on arXiv\"\n  Bad: \"Use relevant search terms on appropriate databases\"\n- Be BRIEF - max 1-3 lines\n- Use imperative language (\"Always...\", \"Prefer...\", \"When X, do Y...\")\n- Don't repeat what's already in the current system prompt\n- Look for PATTERNS that generalize beyond this single instance\n\nOutput ONLY valid JSON with this exact format:\n{{\n  \"update_text\": \"The actual prompt addition text here (or empty string if no improvement needed)\",\n  \"rationale\": \"Brief 1-sentence why this helps (or 'No improvement needed')\",\n  \"confidence\": \"low|medium|high\"\n}}",
+   "SELECTOR_PROMPT": "You are a prompt engineering expert evaluating multiple candidate prompt updates.\n\nYour task: Select the BEST candidate update from the options below.\n\nContext:\n- Agent Name: {agent_name}\n- Agent Role: {agent_role}\n- Task: {task}\n- Issue Type: {issue_type}\n\nIssue Details:\n{issue_details}\n\nCurrent system prompt (for reference):\n{current_system_prompt}\n\nCandidate Updates:\n{candidates}\n\nEvaluation Criteria (in priority order):\n1. **Specificity & Relevance**: Most directly addresses the actual issue/error\n2. **Actionability**: Clear, implementable instructions that the agent can follow\n3. **Generalizability**: Useful beyond just this instance, but not too vague\n4. **Brevity**: Concise and clear without unnecessary words\n5. **Non-duplication**: Doesn't repeat what's already in the system prompt\n\nSelect the candidate that best balances these criteria for the current situation.\n\nOutput ONLY valid JSON with this exact format:\n{{\n  \"selected_index\": 0,\n  \"rationale\": \"Brief 1-2 sentence explanation of why this candidate is best\"\n}}",
+   "CLASSIFICATION_PROMPT": "You are a rule classifier. Analyze the proposed update and determine:\n\n1. **Is it a DUPLICATE/REDUNDANT?** Check if it's already covered by existing strategic or tactical rules.\n2. **What is its SCOPE?** \n   - STRATEGIC: General best practice that applies across different tasks (e.g., \"Always validate inputs\", \"Use batch operations when possible\")\n   - TACTICAL: Task-specific constraint for current task only (e.g., \"This dataset has missing values in column X\", \"API rate limit is 100/min\")\n3. **Refined CONFIDENCE**: Assess confidence (0.0-1.0) based on how actionable and useful this rule is.\n4. **DOMAIN**: If strategic, you MUST categorize it into ONE of the following allowed domains: {allowed_domains}\n\n=== PROPOSED UPDATE ===\nUpdate: {update_text}\nRationale: {rationale}\nInitial Confidence: {initial_confidence:.2f}\n\n{all_rules_context}\n\n=== YOUR ANALYSIS ===\nRespond in JSON format:\n{{\n    \"is_duplicate\": true/false,\n    \"scope\": \"strategic\" or \"tactical\",\n    \"confidence\": 0.0-1.0,\n    \"domain\": \"domain_name\" (only if scope is strategic, otherwise \"\"),\n    \"reason\": \"Brief explanation of your classification\"\n}}\n\nThink step by step:\n1. Check if the proposed update is already covered by existing rules (exact match or semantic similarity)\n2. Determine if it's a general best practice (strategic) or task-specific (tactical)\n3. Assess the confidence based on clarity, actionability, and usefulness\n4. If strategic, assign appropriate domain\n\nJSON Response:",
+   "RULE_ANALYSIS_PROMPT": "You are a rule optimization analyzer. Analyze these {num_rules} rules and identify optimization opportunities.\n\n{rules_text}\n\nYour task is to identify three types of optimization opportunities:\n\n1. **CONFLICTS**: Pairs of rules that give contradictory guidance.\n   - Example: \"Minimize tool calls\" vs \"Call verification after each step\"\n   - PRIORITY: Highest - conflicts must be resolved first\n\n2. **SUBSUMPTION**: Pairs where a specific rule is entirely covered by a more general rule.\n   - Example: If \"Check all file paths\" exists, then \"Check image file paths\" is redundant\n   - Format: [general_rule_index, specific_rule_index]\n   - PRIORITY: High - clear redundancy should be removed\n\n3. **CONSOLIDATION**: Groups of rules that express similar concepts and can be merged into a single, more comprehensive rule.\n   - Example: \"Validate file paths\" + \"Check file existence\" → can merge\n   - PRIORITY: Medium - merge rules that address the same concern from different angles\n\n**IMPORTANT PRIORITY RULES** (to avoid overlaps):\n1. If two rules CONFLICT, do NOT also mark them for consolidation or subsumption\n2. If one rule SUBSUMES another, do NOT also mark them for consolidation\n3. A rule pair should appear in AT MOST ONE category\n4. When in doubt between categories, prefer: Conflicts > Subsumption > Consolidation\n\nGuidelines:\n- Only flag conflicts if there's a REAL contradiction (not just different aspects)\n- For subsumption, the specific rule must be COMPLETELY covered by the general one\n- Only group rules for consolidation if they truly address the same concern AND don't conflict\n- Return empty arrays if no opportunities found\n- Be conservative - only suggest optimizations you're confident about\n\nYou MUST respond with ONLY valid JSON in this exact format (no extra text before or after):\n{{\n  \"consolidation\": [[idx1, idx2], [idx3, idx4]],\n  \"subsumption\": [[general_idx, specific_idx]],\n  \"conflicts\": [[idx1, idx2]]\n}}\n\nExample valid response:\n{{\n  \"consolidation\": [[0, 1, 2], [5, 6]],\n  \"subsumption\": [[3, 7]],\n  \"conflicts\": [[4, 8]]\n}}\n\nIf no opportunities found, return:\n{{\n  \"consolidation\": [],\n  \"subsumption\": [],\n  \"conflicts\": []\n}}\n\nJSON Response:",
+   "RULE_MERGE_PROMPT": "You are merging similar rules into one comprehensive rule.\n\nOriginal rules to merge:\n{rules_text}\n\nCreate a single, comprehensive rule that:\n1. Captures all the key guidance from the original rules\n2. Is clear and actionable\n3. Eliminates redundancy\n4. Maintains the original intent\n\nAlso provide a brief rationale explaining what the merged rule accomplishes.\n\nReturn JSON:\n{{\n  \"rule\": \"The merged rule text\",\n  \"rationale\": \"Brief explanation of what this rule accomplishes\"\n}}\n\nJSON Response:",
+   "SUBSUMPTION_VERIFY_PROMPT": "Verify if the general rule subsumes the specific rule.\n\nGeneral Rule: {general_rule}\nSpecific Rule: {specific_rule}\n\nA rule is subsumed if:\n- Following the general rule AUTOMATICALLY means you follow the specific rule\n- The specific rule adds NO additional constraints or guidance\n- The specific rule is merely a special case or example of the general rule\n\nDoes the general rule completely subsume the specific rule? Answer with JSON:\n{{\n  \"subsumed\": true or false,\n  \"reasoning\": \"Brief explanation\"\n}}\n\nJSON Response:",
+   "CONFLICT_RESOLVE_PROMPT": "You are resolving a conflict between two rules.\n\nRule {idx1}:\n  Text: {rule1_text}\n  Rationale: {rule1_rationale}\n\nRule {idx2}:\n  Text: {rule2_text}\n  Rationale: {rule2_rationale}\n\nThese rules appear to conflict. Your task is to:\n1. Verify the conflict is real\n2. Synthesize a single rule that reconciles both OR pick the better rule with justification\n\nReturn JSON:\n{{\n  \"rule\": \"The resolved rule text\",\n  \"rationale\": \"Explanation of how this resolves the conflict\"\n}}\n\nJSON Response:"
+  },
+  "synthesizer": {
+   "results": {
+    "error": {
+     "__type__": "Guideline",
+     "update_text": "Check the sign of each value before tagging.",
+     "rationale": "The agent confused losses with gains.",
+     "scope": "session",
+     "confidence": "high"
+    },
+    "error_no_rules": {
+     "__type__": "Guideline",
+     "update_text": "Check the sign of each value before tagging.",
+     "rationale": "The agent confused losses with gains.",
+     "scope": "session",
+     "confidence": "high"
+    },
+    "quality_thoroughness": {
+     "__type__": "Guideline",
+     "update_text": "Check the sign of each value before tagging.",
+     "rationale": "The agent confused losses with gains.",
+     "scope": "session",
+     "confidence": "high"
+    },
+    "quality_efficiency": {
+     "__type__": "Guideline",
+     "update_text": "Check the sign of each value before tagging.",
+     "rationale": "The agent confused losses with gains.",
+     "scope": "session",
+     "confidence": "high"
+    },
+    "best_of_n_error": {
+     "__type__": "Guideline",
+     "update_text": "Validate the XBRL tag against the entity type.",
+     "rationale": "The agent confused losses with gains.",
+     "scope": "session",
+     "confidence": "high"
+    }
+   },
+   "primary_calls": [
+    {
+     "messages": [
+      {
+       "role": "user",
+       "content": "You are a prompt engineering expert analyzing agent execution errors.\n\nYour task: Generate a SHORT, TARGETED system prompt addition (1-3 lines) that will help prevent this error in the future.\n\nContext:\n- Agent Name: finer_agent\n- Agent Role: Expert tagging financial entities with US GAAP XBRL tags\n- Task: Assign the best US GAAP tag to each numeric entity\n- Error Type: Exception\n- Error Message: Incorrect answer. Model answered 'Revenues', expected 'Loss'.\n\nPrevious actions taken:\nModel output: The tag is Revenues.\nObservations: Answer incorrect\n\nCurrent system prompt (for reference, to avoid duplication):\nYou are a financial tagging assistant. End with FINAL ANSWER: <tag>.\n\nAlready applied rules (DO NOT duplicate these):\n- Always read the full sentence.\n\nGuidelines:\n1. Be SPECIFIC and ACTIONABLE - target the exact error cause\n2. Be BRIEF - max 1-3 lines\n3. Use imperative language (\"Always...\", \"Never...\", \"When X, do Y...\")\n4. Don't repeat what's already in the current system prompt\n5. Focus on formatting, structure, or procedure constraints\n\nOutput ONLY valid JSON with this exact format:\n{\n  \"update_text\": \"The actual prompt addition text here\",\n  \"rationale\": \"Brief 1-sentence why this helps\",\n  \"confidence\": \"low|medium|high\"\n}"
+      }
+     ],
+     "prompt": null,
+     "hash": "4daab63f8571eb83",
+     "matched": "rule:1",
+     "response": "```json\n{\"update_text\": \"Check the sign of each value before tagging.\", \"rationale\": \"The agent confused losses with gains.\", \"confidence\": \"high\"}\n```"
+    },
+    {
+     "messages": [
+      {
+       "role": "user",
+       "content": "You are a prompt engineering expert analyzing agent execution errors.\n\nYour task: Generate a SHORT, TARGETED system prompt addition (1-3 lines) that will help prevent this error in the future.\n\nContext:\n- Agent Name: finer_agent\n- Agent Role: Expert tagging financial entities with US GAAP XBRL tags\n- Task: Assign the best US GAAP tag to each numeric entity\n- Error Type: Exception\n- Error Message: Incorrect answer. Model answered 'Revenues', expected 'Loss'.\n\nPrevious actions taken:\nModel output: The tag is Revenues.\nObservations: Answer incorrect\n\nCurrent system prompt (for reference, to avoid duplication):\nYou are a financial tagging assistant. End with FINAL ANSWER: <tag>.\n\nAlready applied rules (DO NOT duplicate these):\n(none)\n\nGuidelines:\n1. Be SPECIFIC and ACTIONABLE - target the exact error cause\n2. Be BRIEF - max 1-3 lines\n3. Use imperative language (\"Always...\", \"Never...\", \"When X, do Y...\")\n4. Don't repeat what's already in the current system prompt\n5. Focus on formatting, structure, or procedure constraints\n\nOutput ONLY valid JSON with this exact format:\n{\n  \"update_text\": \"The actual prompt addition text here\",\n  \"rationale\": \"Brief 1-sentence why this helps\",\n  \"confidence\": \"low|medium|high\"\n}"
+      }
+     ],
+     "prompt": null,
+     "hash": "5925252b551f0228",
+     "matched": "rule:1",
+     "response": "```json\n{\"update_text\": \"Check the sign of each value before tagging.\", \"rationale\": \"The agent confused losses with gains.\", \"confidence\": \"high\"}\n```"
+    },
+    {
+     "messages": [
+      {
+       "role": "user",
+       "content": "You are a prompt engineering expert analyzing agent execution quality.\n\nYour task: Analyze this successful step and determine if there are inefficiencies or areas for improvement. If found, generate a SHORT, TARGETED system prompt addition (1-3 lines).\n\nContext:\n- Agent Name: finer_agent\n- Agent Role: Expert tagging financial entities with US GAAP XBRL tags\n- Task: Assign the best US GAAP tag to each numeric entity\n\nStep details:\nModel output: The tag is Revenues.\nObservations: Answer incorrect\n\nCurrent system prompt (for reference):\nYou are a financial tagging assistant. End with FINAL ANSWER: <tag>.\n\nAlready applied rules (DO NOT duplicate these):\n- Always read the full sentence.\n\nAnalyze for improvements in these dimensions:\n\n1. **Correctness & Logic**:\n   - Are there incorrect assumptions or flawed reasoning?\n   - Are edge cases or special conditions being missed?\n   - Is the approach fundamentally sound for this problem type?\n   - Are validation/sanity checks missing?\n   Examples: \"Check if 1 ∈ S before computing\", \"Verify units match\", \"Confirm UTF-8 encoding\"\n\n2. **Domain-Specific Strategies**:\n   - What terminology variants, synonyms, or phrasings should be searched?\n     Examples: \"ASEP/TASEP/exclusion process\", \"Émile/Emile\", \"Cafi/Caffi/Cafí\"\n   - Which authoritative sources, databases, or experts are most reliable?\n     Examples: \"arXiv for math\", \"uboat.net for naval\", \"cite Mumford/Milne\"\n   - What heuristics or shortcuts apply in this domain?\n     Examples: \"Check order-of-magnitude for physics\", \"Use closed-form when n<10\"\n   - What validation methods are domain-appropriate?\n     Examples: \"Verify stereochemistry\", \"Check orbital symmetry\", \"Confirm timestamp format\"\n   - Are there problem-type recognition patterns?\n     Examples: \"Sparse results → try variants\"\n\n3. **Strategic Planning & Approach**:\n   - Is there a better problem decomposition or sequencing?\n   - Should simpler methods be tried first? (trivial cases, closed forms, local computation)\n   - Are batch operations being used where possible?\n   - Is there missing lookahead or early termination logic?\n   Examples: \"Handle trivial case locally first\", \"Batch preprocessing before analysis\"\n\n4. **Tool Usage Efficiency**:\n   - Multiple tool calls when one comprehensive call would suffice?\n   - Missing consolidation opportunities?\n   - Redundant fetches of the same information?\n   - Could local computation replace a tool call?\n   Examples: \"Combine search + extraction\", \"Cache plan state\", \"Count locally\"\n\n5. **Information Preservation**:\n   - Is critical context being lost between steps?\n   - Are sources/citations/evidence being properly tracked?\n   - Are intermediate results preserved for verification?\n   Examples: \"Attach artifact_refs\", \"Log clicked URLs\", \"Preserve evidence chain\"\n\n6. **Robustness & Error Recovery**:\n   - Are there missing fallback strategies?\n   - Is retry logic appropriate?\n   - Are error conditions anticipated?\n   Examples: \"If search fails, try broader query\", \"Rate limit → exponential backoff\"\n\n7. **Output Quality**:\n   - Is reasoning unnecessarily verbose?\n   - Are outputs well-structured and parseable?\n   - Is the answer format user-friendly?\n   Examples: \"Limit to ≤200 chars\", \"Return structured JSON\", \"Include confidence score\"\n\nGuidelines:\n- PRIORITIZE correctness over efficiency\n- Only suggest if there's a CLEAR, ACTIONABLE, GENERALIZABLE improvement\n- For domain rules: Include SPECIFIC terms/sources/values, not placeholders\n  Good: \"Search 'Bean model' OR 'critical state' OR 'Brandt' on arXiv\"\n  Bad: \"Use relevant search terms on appropriate databases\"\n- Be BRIEF - max 1-3 lines\n- Use imperative language (\"Always...\", \"Prefer...\", \"When X, do Y...\")\n- Don't repeat what's already in the current system prompt\n- Look for PATTERNS that generalize beyond this single instance\n\nOutput ONLY valid JSON with this exact format:\n{\n  \"update_text\": \"The actual prompt addition text here (or empty string if no improvement needed)\",\n  \"rationale\": \"Brief 1-sentence why this helps (or 'No improvement needed')\",\n  \"confidence\": \"low|medium|high\"\n}"
+      }
+     ],
+     "prompt": null,
+     "hash": "1fda994c9046bcd9",
+     "matched": "rule:2",
+     "response": "```json\n{\"update_text\": \"Check the sign of each value before tagging.\", \"rationale\": \"The agent confused losses with gains.\", \"confidence\": \"high\"}\n```"
+    },
+    {
+     "messages": [
+      {
+       "role": "user",
+       "content": "You are a prompt engineering expert analyzing agent execution quality.\n\nYour task: Analyze this successful step and determine if there are inefficiencies or areas for improvement. If found, generate a SHORT, TARGETED system prompt addition (1-3 lines).\n\nContext:\n- Agent Name: finer_agent\n- Agent Role: Expert tagging financial entities with US GAAP XBRL tags\n- Task: Assign the best US GAAP tag to each numeric entity\n\nStep details:\nModel output: The tag is Revenues.\nObservations: Answer incorrect\n\nCurrent system prompt (for reference):\nYou are a financial tagging assistant. End with FINAL ANSWER: <tag>.\n\nAlready applied rules (DO NOT duplicate these):\n(none)\n\nAnalyze for:\n1. **Inefficient tool usage**: Multiple calls when one would suffice, redundant operations\n2. **Verbose outputs**: Unnecessarily long reasoning or outputs\n3. **Missing best practices**: Not following domain-specific best practices\n4. **Suboptimal approaches**: Using less efficient methods when better ones exist\n\nGuidelines:\n- Only suggest an update if there's a CLEAR, ACTIONABLE improvement\n- Be SPECIFIC about what to improve\n- Be BRIEF - max 1-3 lines\n- Use imperative language (\"Always...\", \"Prefer...\", \"When X, use Y instead of Z...\")\n- Don't repeat what's already in the current system prompt\n\nOutput ONLY valid JSON with this exact format:\n{\n  \"update_text\": \"The actual prompt addition text here (or empty string if no improvement needed)\",\n  \"rationale\": \"Brief 1-sentence why this helps (or 'No improvement needed')\",\n  \"confidence\": \"low|medium|high\"\n}"
+      }
+     ],
+     "prompt": null,
+     "hash": "1eed29e192cb0997",
+     "matched": "rule:2",
+     "response": "```json\n{\"update_text\": \"Check the sign of each value before tagging.\", \"rationale\": \"The agent confused losses with gains.\", \"confidence\": \"high\"}\n```"
+    },
+    {
+     "messages": [
+      {
+       "role": "user",
+       "content": "You are a prompt engineering expert analyzing agent execution errors.\n\nYour task: Generate a SHORT, TARGETED system prompt addition (1-3 lines) that will help prevent this error in the future.\n\nContext:\n- Agent Name: finer_agent\n- Agent Role: Expert tagging financial entities with US GAAP XBRL tags\n- Task: Assign the best US GAAP tag to each numeric entity\n- Error Type: Exception\n- Error Message: Incorrect answer. Model answered 'Revenues', expected 'Loss'.\n\nPrevious actions taken:\nModel output: The tag is Revenues.\nObservations: Answer incorrect\n\nCurrent system prompt (for reference, to avoid duplication):\nYou are a financial tagging assistant. End with FINAL ANSWER: <tag>.\n\nAlready applied rules (DO NOT duplicate these):\n- Always read the full sentence.\n\nGuidelines:\n1. Be SPECIFIC and ACTIONABLE - target the exact error cause\n2. Be BRIEF - max 1-3 lines\n3. Use imperative language (\"Always...\", \"Never...\", \"When X, do Y...\")\n4. Don't repeat what's already in the current system prompt\n5. Focus on formatting, structure, or procedure constraints\n\nOutput ONLY valid JSON with this exact format:\n{\n  \"update_text\": \"The actual prompt addition text here\",\n  \"rationale\": \"Brief 1-sentence why this helps\",\n  \"confidence\": \"low|medium|high\"\n}"
+      }
+     ],
+     "prompt": null,
+     "hash": "4daab63f8571eb83",
+     "matched": "rule:1",
+     "response": "```json\n{\"update_text\": \"Check the sign of each value before tagging.\", \"rationale\": \"The agent confused losses with gains.\", \"confidence\": \"high\"}\n```"
+    },
+    {
+     "messages": [
+      {
+       "role": "user",
+       "content": "You are a prompt engineering expert evaluating multiple candidate prompt updates.\n\nYour task: Select the BEST candidate update from the options below.\n\nContext:\n- Agent Name: finer_agent\n- Agent Role: Expert tagging financial entities with US GAAP XBRL tags\n- Task: Assign the best US GAAP tag to each numeric entity\n- Issue Type: error\n\nIssue Details:\nError Type: Exception\nError Message: Incorrect answer. Model answered 'Revenues', expected 'Loss'.\n\nLast Step:\nModel output: The tag is Revenues.\nObservations: Answer incorrect\n\nCurrent system prompt (for reference):\nYou are a financial tagging assistant. End with FINAL ANSWER: <tag>.\n\nCandidate Updates:\n\n[Candidate 0]\nUpdate: Check the sign of each value before tagging.\nRationale: The agent confused losses with gains.\nConfidence: high\n\n[Candidate 1]\nUpdate: Validate the XBRL tag against the entity type.\nRationale: The agent confused losses with gains.\nConfidence: high\n\n\nEvaluation Criteria (in priority order):\n1. **Specificity & Relevance**: Most directly addresses the actual issue/error\n2. **Actionability**: Clear, implementable instructions that the agent can follow\n3. **Generalizability**: Useful beyond just this instance, but not too vague\n4. **Brevity**: Concise and clear without unnecessary words\n5. **Non-duplication**: Doesn't repeat what's already in the system prompt\n\nSelect the candidate that best balances these criteria for the current situation.\n\nOutput ONLY valid JSON with this exact format:\n{\n  \"selected_index\": 0,\n  \"rationale\": \"Brief 1-2 sentence explanation of why this candidate is best\"\n}"
+      }
+     ],
+     "prompt": null,
+     "hash": "b90796f7dcd4eece",
+     "matched": "rule:0",
+     "response": "```json\n{\"selected_index\": 1, \"rationale\": \"more general\"}\n```"
+    }
+   ],
+   "candidate_calls": [
+    {
+     "messages": [
+      {
+       "role": "user",
+       "content": "You are a prompt engineering expert analyzing agent execution errors.\n\nYour task: Generate a SHORT, TARGETED system prompt addition (1-3 lines) that will help prevent this error in the future.\n\nContext:\n- Agent Name: finer_agent\n- Agent Role: Expert tagging financial entities with US GAAP XBRL tags\n- Task: Assign the best US GAAP tag to each numeric entity\n- Error Type: Exception\n- Error Message: Incorrect answer. Model answered 'Revenues', expected 'Loss'.\n\nPrevious actions taken:\nModel output: The tag is Revenues.\nObservations: Answer incorrect\n\nCurrent system prompt (for reference, to avoid duplication):\nYou are a financial tagging assistant. End with FINAL ANSWER: <tag>.\n\nAlready applied rules (DO NOT duplicate these):\n- Always read the full sentence.\n\nGuidelines:\n1. Be SPECIFIC and ACTIONABLE - target the exact error cause\n2. Be BRIEF - max 1-3 lines\n3. Use imperative language (\"Always...\", \"Never...\", \"When X, do Y...\")\n4. Don't repeat what's already in the current system prompt\n5. Focus on formatting, structure, or procedure constraints\n\nOutput ONLY valid JSON with this exact format:\n{\n  \"update_text\": \"The actual prompt addition text here\",\n  \"rationale\": \"Brief 1-sentence why this helps\",\n  \"confidence\": \"low|medium|high\"\n}"
+      }
+     ],
+     "prompt": null,
+     "hash": "4daab63f8571eb83",
+     "matched": "rule:0",
+     "response": "```json\n{\"update_text\": \"Validate the XBRL tag against the entity type.\", \"rationale\": \"The agent confused losses with gains.\", \"confidence\": \"high\"}\n```"
+    }
+   ]
+  },
+  "classification": {
+   "result": {
+    "is_duplicate": false,
+    "scope": "strategic",
+    "confidence": 0.9,
+    "domain": "data_validation",
+    "reason": "general"
+   },
+   "result_empty": {
+    "is_duplicate": false,
+    "scope": "strategic",
+    "confidence": 0.9,
+    "domain": "data_validation",
+    "reason": "general"
+   },
+   "calls": [
+    {
+     "messages": [
+      {
+       "role": "user",
+       "content": "You are a rule classifier. Analyze the proposed update and determine:\n\n1. **Is it a DUPLICATE/REDUNDANT?** Check if it's already covered by existing strategic or tactical rules.\n2. **What is its SCOPE?** \n   - STRATEGIC: General best practice that applies across different tasks (e.g., \"Always validate inputs\", \"Use batch operations when possible\")\n   - TACTICAL: Task-specific constraint for current task only (e.g., \"This dataset has missing values in column X\", \"API rate limit is 100/min\")\n3. **Refined CONFIDENCE**: Assess confidence (0.0-1.0) based on how actionable and useful this rule is.\n4. **DOMAIN**: If strategic, you MUST categorize it into ONE of the following allowed domains: tool_usage, data_validation, error_handling, efficiency, analysis_methodology, safety, general\n\n=== PROPOSED UPDATE ===\nUpdate: Check signs.\nRationale: Losses confused.\nInitial Confidence: 0.90\n\n\n=== STRATEGIC RULES (Cross-task, persistent): ===\n\n## Strategic Guidelines (Learned Best Practices):\nThese are high-confidence rules learned from previous tasks:\n\n### General:\n- Always read the full sentence.\n\n=== TACTICAL RULES (Current task only): ===\n1. Tactical one.\n2. Bare string rule.\n\n\n=== YOUR ANALYSIS ===\nRespond in JSON format:\n{\n    \"is_duplicate\": true/false,\n    \"scope\": \"strategic\" or \"tactical\",\n    \"confidence\": 0.0-1.0,\n    \"domain\": \"domain_name\" (only if scope is strategic, otherwise \"\"),\n    \"reason\": \"Brief explanation of your classification\"\n}\n\nThink step by step:\n1. Check if the proposed update is already covered by existing rules (exact match or semantic similarity)\n2. Determine if it's a general best practice (strategic) or task-specific (tactical)\n3. Assess the confidence based on clarity, actionability, and usefulness\n4. If strategic, assign appropriate domain\n\nJSON Response:"
+      }
+     ],
+     "prompt": null,
+     "hash": "476b1e07bd1b72c9",
+     "matched": "rule:0",
+     "response": "```json\n{\"is_duplicate\": false, \"scope\": \"strategic\", \"confidence\": 0.9, \"domain\": \"data_validation\", \"reason\": \"general\"}\n```"
+    },
+    {
+     "messages": [
+      {
+       "role": "user",
+       "content": "You are a rule classifier. Analyze the proposed update and determine:\n\n1. **Is it a DUPLICATE/REDUNDANT?** Check if it's already covered by existing strategic or tactical rules.\n2. **What is its SCOPE?** \n   - STRATEGIC: General best practice that applies across different tasks (e.g., \"Always validate inputs\", \"Use batch operations when possible\")\n   - TACTICAL: Task-specific constraint for current task only (e.g., \"This dataset has missing values in column X\", \"API rate limit is 100/min\")\n3. **Refined CONFIDENCE**: Assess confidence (0.0-1.0) based on how actionable and useful this rule is.\n4. **DOMAIN**: If strategic, you MUST categorize it into ONE of the following allowed domains: tool_usage, data_validation, error_handling, efficiency, analysis_methodology, safety, general\n\n=== PROPOSED UPDATE ===\nUpdate: Check signs.\nRationale: Losses confused.\nInitial Confidence: 0.60\n\n\n=== STRATEGIC RULES (Cross-task, persistent): ===\nNo strategic rules yet.\n\n=== TACTICAL RULES (Current task only): ===\nNo tactical rules yet.\n\n\n=== YOUR ANALYSIS ===\nRespond in JSON format:\n{\n    \"is_duplicate\": true/false,\n    \"scope\": \"strategic\" or \"tactical\",\n    \"confidence\": 0.0-1.0,\n    \"domain\": \"domain_name\" (only if scope is strategic, otherwise \"\"),\n    \"reason\": \"Brief explanation of your classification\"\n}\n\nThink step by step:\n1. Check if the proposed update is already covered by existing rules (exact match or semantic similarity)\n2. Determine if it's a general best practice (strategic) or task-specific (tactical)\n3. Assess the confidence based on clarity, actionability, and usefulness\n4. If strategic, assign appropriate domain\n\nJSON Response:"
+      }
+     ],
+     "prompt": null,
+     "hash": "3f6eba2df6b9abac",
+     "matched": "rule:0",
+     "response": "```json\n{\"is_duplicate\": false, \"scope\": \"strategic\", \"confidence\": 0.9, \"domain\": \"data_validation\", \"reason\": \"general\"}\n```"
+    }
+   ]
+  },
+  "memory_optimizer": {
+   "result": [
+    {
+     "rule": "Rule text 0.",
+     "rationale": "why 0",
+     "confidence": 0.85
+    },
+    {
+     "rule": "Resolved rule 4/5.",
+     "rationale": "resolved",
+     "confidence": 0.9,
+     "added_timestamp": "",
+     "source_task_id": ""
+    },
+    {
+     "rule": "Merged rule 2+3.",
+     "rationale": "merged",
+     "confidence": 0.88,
+     "added_timestamp": "",
+     "source_task_id": ""
+    }
+   ],
+   "calls": [
+    {
+     "messages": [
+      {
+       "role": "user",
+       "content": "You are a rule optimization analyzer. Analyze these 6 rules and identify optimization opportunities.\n\nRule 0: Rule text 0.\nRule 1: Rule text 1.\nRule 2: Rule text 2.\nRule 3: Rule text 3.\nRule 4: Rule text 4.\nRule 5: Rule text 5.\n\n\nYour task is to identify three types of optimization opportunities:\n\n1. **CONFLICTS**: Pairs of rules that give contradictory guidance.\n   - Example: \"Minimize tool calls\" vs \"Call verification after each step\"\n   - PRIORITY: Highest - conflicts must be resolved first\n\n2. **SUBSUMPTION**: Pairs where a specific rule is entirely covered by a more general rule.\n   - Example: If \"Check all file paths\" exists, then \"Check image file paths\" is redundant\n   - Format: [general_rule_index, specific_rule_index]\n   - PRIORITY: High - clear redundancy should be removed\n\n3. **CONSOLIDATION**: Groups of rules that express similar concepts and can be merged into a single, more comprehensive rule.\n   - Example: \"Validate file paths\" + \"Check file existence\" → can merge\n   - PRIORITY: Medium - merge rules that address the same concern from different angles\n\n**IMPORTANT PRIORITY RULES** (to avoid overlaps):\n1. If two rules CONFLICT, do NOT also mark them for consolidation or subsumption\n2. If one rule SUBSUMES another, do NOT also mark them for consolidation\n3. A rule pair should appear in AT MOST ONE category\n4. When in doubt between categories, prefer: Conflicts > Subsumption > Consolidation\n\nGuidelines:\n- Only flag conflicts if there's a REAL contradiction (not just different aspects)\n- For subsumption, the specific rule must be COMPLETELY covered by the general one\n- Only group rules for consolidation if they truly address the same concern AND don't conflict\n- Return empty arrays if no opportunities found\n- Be conservative - only suggest optimizations you're confident about\n\nYou MUST respond with ONLY valid JSON in this exact format (no extra text before or after):\n{\n  \"consolidation\": [[idx1, idx2], [idx3, idx4]],\n  \"subsumption\": [[general_idx, specific_idx]],\n  \"conflicts\": [[idx1, idx2]]\n}\n\nExample valid response:\n{\n  \"consolidation\": [[0, 1, 2], [5, 6]],\n  \"subsumption\": [[3, 7]],\n  \"conflicts\": [[4, 8]]\n}\n\nIf no opportunities found, return:\n{\n  \"consolidation\": [],\n  \"subsumption\": [],\n  \"conflicts\": []\n}\n\nJSON Response:"
+      }
+     ],
+     "prompt": null,
+     "hash": "161ece3c793b6e69",
+     "matched": "rule:0",
+     "response": "```json\n{\"consolidation\": [[2, 3]], \"subsumption\": [[0, 1]], \"conflicts\": [[4, 5]]}\n```"
+    },
+    {
+     "messages": [
+      {
+       "role": "user",
+       "content": "You are resolving a conflict between two rules.\n\nRule 4:\n  Text: Rule text 4.\n  Rationale: why 4\n\nRule 5:\n  Text: Rule text 5.\n  Rationale: why 5\n\nThese rules appear to conflict. Your task is to:\n1. Verify the conflict is real\n2. Synthesize a single rule that reconciles both OR pick the better rule with justification\n\nReturn JSON:\n{\n  \"rule\": \"The resolved rule text\",\n  \"rationale\": \"Explanation of how this resolves the conflict\"\n}\n\nJSON Response:"
+      }
+     ],
+     "prompt": null,
+     "hash": "d34da358df4ccc9e",
+     "matched": "rule:3",
+     "response": "```json\n{\"rule\": \"Resolved rule 4/5.\", \"rationale\": \"resolved\"}\n```"
+    },
+    {
+     "messages": [
+      {
+       "role": "user",
+       "content": "Verify if the general rule subsumes the specific rule.\n\nGeneral Rule: Rule text 0.\nSpecific Rule: Rule text 1.\n\nA rule is subsumed if:\n- Following the general rule AUTOMATICALLY means you follow the specific rule\n- The specific rule adds NO additional constraints or guidance\n- The specific rule is merely a special case or example of the general rule\n\nDoes the general rule completely subsume the specific rule? Answer with JSON:\n{\n  \"subsumed\": true or false,\n  \"reasoning\": \"Brief explanation\"\n}\n\nJSON Response:"
+      }
+     ],
+     "prompt": null,
+     "hash": "2c4859b012d6bd4a",
+     "matched": "rule:2",
+     "response": "```json\n{\"subsumed\": true, \"reason\": \"covered\"}\n```"
+    },
+    {
+     "messages": [
+      {
+       "role": "user",
+       "content": "You are merging similar rules into one comprehensive rule.\n\nOriginal rules to merge:\n\nRule 2:\n  Text: Rule text 2.\n  Rationale: why 2\n\nRule 3:\n  Text: Rule text 3.\n  Rationale: why 3\n\n\nCreate a single, comprehensive rule that:\n1. Captures all the key guidance from the original rules\n2. Is clear and actionable\n3. Eliminates redundancy\n4. Maintains the original intent\n\nAlso provide a brief rationale explaining what the merged rule accomplishes.\n\nReturn JSON:\n{\n  \"rule\": \"The merged rule text\",\n  \"rationale\": \"Brief explanation of what this rule accomplishes\"\n}\n\nJSON Response:"
+      }
+     ],
+     "prompt": null,
+     "hash": "ad5bd9131aee9d25",
+     "matched": "rule:1",
+     "response": "```json\n{\"rule\": \"Merged rule 2+3.\", \"rationale\": \"merged\"}\n```"
+    }
+   ]
+  },
+  "openai_adapter_request": [
+   {
+    "messages": [
+     {
+      "role": "user",
+      "content": [
+       {
+        "type": "text",
+        "text": "You are a prompt engineering expert analyzing agent execution errors.\n\nYour task: Generate a SHORT, TARGETED system prompt addition (1-3 lines) that will help prevent this error in the future.\n\nContext:\n- Agent Name: finer_agent\n- Agent Role: Expert tagging financial entities with US GAAP XBRL tags\n- Task: Assign the best US GAAP tag to each numeric entity\n- Error Type: Exception\n- Error Message: Incorrect answer. Model answered 'Revenues', expected 'Loss'.\n\nPrevious actions taken:\nModel output: The tag is Revenues.\nObservations: Answer incorrect\n\nCurrent system prompt (for reference, to avoid duplication):\nYou are a financial tagging assistant. End with FINAL ANSWER: <tag>.\n\nAlready applied rules (DO NOT duplicate these):\n(none)\n\nGuidelines:\n1. Be SPECIFIC and ACTIONABLE - target the exact error cause\n2. Be BRIEF - max 1-3 lines\n3. Use imperative language (\"Always...\", \"Never...\", \"When X, do Y...\")\n4. Don't repeat what's already in the current system prompt\n5. Focus on formatting, structure, or procedure constraints\n\nOutput ONLY valid JSON with this exact format:\n{\n  \"update_text\": \"The actual prompt addition text here\",\n  \"rationale\": \"Brief 1-sentence why this helps\",\n  \"confidence\": \"low|medium|high\"\n}"
+       }
+      ]
+     }
+    ],
+    "prompt": null,
+    "hash": "5925252b551f0228",
+    "matched": "rule:0",
+    "response": "```json\n{\"update_text\": \"Check the sign of each value before tagging.\", \"rationale\": \"The agent confused losses with gains.\", \"confidence\": \"high\"}\n```",
+    "model": "ornith15-9b",
+    "temperature": 0
+   }
+  ],
+  "step_summary": {
+   "truncate": "Model output: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx...\nTool calls: yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy...\nObservations: zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz...",
+   "full_short": "Model output: out\nObservations: obs",
+   "no_truncate": "Model output: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+   "empty": "(no step details)"
+  },
+  "strategic_rules_text": "\n## Strategic Guidelines (Learned Best Practices):\nThese are high-confidence rules learned from previous tasks:\n\n### General:\n- Always read the full sentence."
+ }
+}

@@ -1,0 +1,320 @@
+{
+ "header": {
+  "repo": "EvoLib",
+  "path": "/Users/user/Projects/upstreams/EvoLib",
+  "commit": "98266b2d22e146c19c651b1126ae81ff072f65e0",
+  "functions": {
+   "extract_subtasks": "EvoLib/utils.py:32",
+   "extract_fenced_blocks": "EvoLib/utils.py:48",
+   "extract_first_fenced_block": "EvoLib/utils.py:57",
+   "extract_if_condition": "EvoLib/utils.py:65",
+   "extract_functions": "EvoLib/utils.py:7",
+   "extract_function_name": "EvoLib/utils.py:44",
+   "generate_insight": "EvoLib/evolib_agent.py:109",
+   "consolidate_insights": "EvoLib/evolib_agent.py:127",
+   "is_better_solution": "EvoLib/evolib_agent.py:138"
+  },
+  "command": "$UPSTREAMS/.venvs/light/bin/python bridge/capture_evolib.py",
+  "python": "3.11.11"
+ },
+ "data": {
+  "extract_subtasks": {
+   "one": {
+    "ok": [
+     [
+      "<subtask>\n<description>\nAdd a and b.\n</description>\n<solution>\nwork\n</solution>\n<result>5</result>\n</subtask>",
+      "<description>\nAdd a and b.\n</description>"
+     ]
+    ]
+   },
+   "two": {
+    "ok": [
+     [
+      "<subtask>\n<description>\nAdd a and b.\n</description>\n<solution>\nwork\n</solution>\n<result>5</result>\n</subtask>",
+      "<description>\nAdd a and b.\n</description>"
+     ],
+     [
+      "<subtask>\n<description>\nMultiply a and b.\n</description>\n<solution>\nwork\n</solution>\n<result>6</result>\n</subtask>",
+      "<description>\nMultiply a and b.\n</description>"
+     ]
+    ]
+   },
+   "no_close": {
+    "ok": []
+   },
+   "no_description": {
+    "ok": []
+   },
+   "one_without_description_among_two": {
+    "ok": []
+   },
+   "two_descriptions": {
+    "ok": [
+     [
+      "<subtask><description> a </description><description>b</description></subtask>",
+      "<description> a </description>"
+     ]
+    ]
+   },
+   "upper_case": {
+    "ok": []
+   },
+   "nested": {
+    "ok": [
+     [
+      "<subtask><subtask><description>in</description></subtask>",
+      "<description>in</description>"
+     ]
+    ]
+   },
+   "empty": {
+    "ok": []
+   }
+  },
+  "extract_fenced_blocks": {
+   "one": {
+    "ok": "\nIf a, then b.\n\n"
+   },
+   "two": {
+    "ok": "\nIf a, then b.\n\n\nIf c, then d.\n\n"
+   },
+   "no_close": {
+    "ok": ""
+   },
+   "upper_case": {
+    "ok": ""
+   },
+   "other_tag_between": {
+    "ok": "\nIf a, then b.\n\n"
+   },
+   "tag_prefix": {
+    "ok": "x\nIf a, then b.\n\n"
+   },
+   "inner_fence": {
+    "ok": "\nIf a, then use \n"
+   },
+   "empty": {
+    "ok": ""
+   }
+  },
+  "extract_first_fenced_block": {
+   "one": {
+    "ok": "If a, then b."
+   },
+   "two": {
+    "ok": "If a, then b."
+   },
+   "no_close": {
+    "ok": ""
+   },
+   "upper_case": {
+    "ok": ""
+   },
+   "other_tag_between": {
+    "ok": "If a, then b."
+   },
+   "tag_prefix": {
+    "ok": "x\nIf a, then b."
+   },
+   "inner_fence": {
+    "ok": "If a, then use"
+   },
+   "empty": {
+    "ok": ""
+   },
+   "judgment": {
+    "ok": "Solution 2 is better."
+   }
+  },
+  "extract_if_condition": {
+   "normal": {
+    "ok": "the sum is odd"
+   },
+   "two_then": {
+    "ok": "a"
+   },
+   "no_then": {
+    "ok": "a and b."
+   },
+   "lower_if": {
+    "ok": "if a"
+   },
+   "if_inside": {
+    "ok": "x"
+   },
+   "then_without_comma": {
+    "ok": "a then b."
+   },
+   "empty": {
+    "ok": ""
+   }
+  },
+  "extract_functions": {
+   "normal": {
+    "ok": [
+     [
+      "def add(a, b):\n    \"\"\"Add two numbers.\"\"\"\n    return a + b",
+      "Add two numbers."
+     ]
+    ]
+   },
+   "no_exclude": {
+    "ok": [
+     [
+      "def add(a, b):\n    \"\"\"Add two numbers.\"\"\"\n    return a + b",
+      "Add two numbers."
+     ],
+     [
+      "def main():\n    \"\"\"Entry.\"\"\"\n    print(add(1, 2))",
+      "Entry."
+     ]
+    ]
+   },
+   "one_without_docstring": {
+    "ok": []
+   },
+   "nested_def": {
+    "ok": [
+     [
+      "def outer():\n    \"\"\"Outer.\"\"\"\n    def inner():\n        return 1\n    return inner()",
+      "Outer."
+     ]
+    ]
+   },
+   "async": {
+    "ok": [
+     [
+      "async def f():\n    \"\"\"Async.\"\"\"\n    return 1",
+      "Async."
+     ]
+    ]
+   },
+   "class_method": {
+    "ok": []
+   },
+   "empty_docstring": {
+    "ok": [
+     [
+      "def f():\n    \"\"\"   \"\"\"\n    return 1",
+      "A function named f."
+     ]
+    ]
+   },
+   "syntax_error": {
+    "ok": []
+   },
+   "empty": {
+    "ok": []
+   }
+  },
+  "extract_function_name": {
+   "def": {
+    "ok": "add"
+   },
+   "async": {
+    "ok": "f"
+   },
+   "no_paren": {
+    "ok": "1"
+   }
+  },
+  "HMMT_SOLUTION_EXTRACTOR": {
+   "ok": "<subtask>\n<description>\nAdd a and b.\n</description>\n<solution>\nwork\n</solution>\n<result>5</result>\n</subtask>\n<answer>5</answer>"
+  },
+  "BIGCODE_SOLUTION_EXTRACTOR": {
+   "fenced": {
+    "ok": "import os\nx=1"
+   },
+   "none": {
+    "ok": ""
+   }
+  },
+  "CODE_SKILL_EXTRACTOR": {
+   "ok": [
+    [
+     "def add(a, b):\n    \"\"\"Add two numbers.\"\"\"\n    return a + b",
+     "Add two numbers."
+    ]
+   ]
+  },
+  "EvoLibAgent.generate_insight": {
+   "fenced": {
+    "ok": "If a, then b."
+   },
+   "tag": {
+    "ok": "If a, then b."
+   },
+   "tag_and_fenced": {
+    "ok": "If fenced, then f."
+   },
+   "two_tags": {
+    "ok": "If one, then 1."
+   },
+   "na": {
+    "ok": ""
+   },
+   "na_with_text": {
+    "ok": "N/A, I agree"
+   },
+   "upper_tag": {
+    "ok": ""
+   },
+   "no_close": {
+    "ok": ""
+   },
+   "empty_fenced_then_tag": {
+    "ok": "If a, then b."
+   }
+  },
+  "EvoLibAgent.consolidate_insights": {
+   "two_lines": {
+    "ok": [
+     "If a, then b.",
+     "If c, then d."
+    ]
+   },
+   "numbered": {
+    "ok": []
+   },
+   "indented": {
+    "ok": [
+     "If a, then b."
+    ]
+   },
+   "lower_if": {
+    "ok": []
+   },
+   "multiline_insight": {
+    "ok": [
+     "If a,"
+    ]
+   },
+   "no_fence": {
+    "ok": []
+   },
+   "two_fences": {
+    "ok": [
+     "If a, then b.",
+     "If c, then d."
+    ]
+   }
+  },
+  "EvoLibAgent.is_better_solution": {
+   "sol2": {
+    "ok": true
+   },
+   "sol1": {
+    "ok": false
+   },
+   "sol2_lower": {
+    "ok": true
+   },
+   "no_fence": {
+    "ok": false
+   },
+   "sol1_mentions_sol2": {
+    "ok": true
+   }
+  }
+ }
+}

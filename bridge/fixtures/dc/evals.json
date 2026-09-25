@@ -1,0 +1,297 @@
+{
+ "header": {
+  "repo": "dynamic-cheatsheet",
+  "path": "/Users/user/Projects/upstreams/dynamic-cheatsheet",
+  "commit": "5cfe3c37e8e52b1d858d0f3df46e7f17c50991b9",
+  "functions": {
+   "eval_equation_balancer": "dynamic_cheatsheet/utils/evaluation.py:151",
+   "eval_for_multiple_choice": "dynamic_cheatsheet/utils/evaluation.py:173",
+   "eval_for_exact_matching_with_no_punctuation": "dynamic_cheatsheet/utils/evaluation.py:102"
+  },
+  "command": "$UPSTREAMS/.venvs/light/bin/python bridge/capture_dc.py",
+  "python": "3.11.11"
+ },
+ "data": {
+  "eval_equation_balancer": [
+   {
+    "name": "same",
+    "output": "1 + 2 + 3 = 6",
+    "target": "1 + 2 + 3 = 6",
+    "ok": true
+   },
+   {
+    "name": "other_ops_same_value",
+    "output": "2 * 2 = 4",
+    "target": "2 + 2 = 4",
+    "ok": true
+   },
+   {
+    "name": "no_rhs",
+    "output": "1 + 2 + 3",
+    "target": "1 + 2 + 3 = 6",
+    "ok": true
+   },
+   {
+    "name": "wrong_value",
+    "output": "1 * 2 + 3 = 6",
+    "target": "1 + 2 + 3 = 6",
+    "ok": false
+   },
+   {
+    "name": "other_numbers",
+    "output": "1 + 2 + 4 = 6",
+    "target": "1 + 2 + 3 = 6",
+    "ok": false
+   },
+   {
+    "name": "unicode_times",
+    "output": "2 × 3 = 6",
+    "target": "2 * 3 = 6",
+    "ok": false
+   },
+   {
+    "name": "unicode_div",
+    "output": "8 ÷ 4 = 2",
+    "target": "8 / 4 = 2",
+    "ok": false
+   },
+   {
+    "name": "dataset_example",
+    "output": "14 - 16 / 20 * 15 + 23 = 25",
+    "target": "14 - 16 / 20 * 15 + 23 = 25",
+    "ok": true
+   },
+   {
+    "name": "float_rounding",
+    "output": "1 / 3 * 3 = 1",
+    "target": "1 * 3 / 3 = 1",
+    "ok": true
+   },
+   {
+    "name": "float_target",
+    "output": "7 / 2 = 3.5",
+    "target": "7 / 2 = 3.5",
+    "ok": true
+   },
+   {
+    "name": "no_spaces",
+    "output": "1+2+3=6",
+    "target": "1 + 2 + 3 = 6",
+    "ok": true
+   },
+   {
+    "name": "leading_minus",
+    "output": "-1 + 2 = 1",
+    "target": "-1 + 2 = 1",
+    "ok": true
+   },
+   {
+    "name": "prose",
+    "output": "The answer is 1 + 2 + 3 = 6",
+    "target": "1 + 2 + 3 = 6",
+    "ok": false
+   },
+   {
+    "name": "empty",
+    "output": "",
+    "target": "1 + 2 + 3 = 6",
+    "ok": false
+   },
+   {
+    "name": "zero_division",
+    "output": "1 / 0 = 1",
+    "target": "1 - 0 = 1",
+    "ok": false
+   },
+   {
+    "name": "no_answer_marker",
+    "output": "No final answer found",
+    "target": "1 + 2 + 3 = 6",
+    "ok": false
+   }
+  ],
+  "eval_for_multiple_choice": [
+   {
+    "name": "exact",
+    "input": "Question #1:\nWhich particle is a lepton?\nOptions:\n(A) proton\n(B) muon\n(C) neutron\n(D) pion",
+    "final_answer": "(B)",
+    "target": "(B)",
+    "ok": true
+   },
+   {
+    "name": "letter",
+    "input": "Question #1:\nWhich particle is a lepton?\nOptions:\n(A) proton\n(B) muon\n(C) neutron\n(D) pion",
+    "final_answer": "B",
+    "target": "(B)",
+    "ok": true
+   },
+   {
+    "name": "lower_letter",
+    "input": "Question #1:\nWhich particle is a lepton?\nOptions:\n(A) proton\n(B) muon\n(C) neutron\n(D) pion",
+    "final_answer": "b",
+    "target": "(B)",
+    "ok": true
+   },
+   {
+    "name": "letter_dot",
+    "input": "Question #1:\nWhich particle is a lepton?\nOptions:\n(A) proton\n(B) muon\n(C) neutron\n(D) pion",
+    "final_answer": "B.",
+    "target": "(B)",
+    "ok": true
+   },
+   {
+    "name": "option_word",
+    "input": "Question #1:\nWhich particle is a lepton?\nOptions:\n(A) proton\n(B) muon\n(C) neutron\n(D) pion",
+    "final_answer": "Option B",
+    "target": "(B)",
+    "ok": true
+   },
+   {
+    "name": "answer_is",
+    "input": "Question #1:\nWhich particle is a lepton?\nOptions:\n(A) proton\n(B) muon\n(C) neutron\n(D) pion",
+    "final_answer": "The answer is B.",
+    "target": "(B)",
+    "ok": false
+   },
+   {
+    "name": "paren_close",
+    "input": "Question #1:\nWhich particle is a lepton?\nOptions:\n(A) proton\n(B) muon\n(C) neutron\n(D) pion",
+    "final_answer": "B) muon",
+    "target": "(B)",
+    "ok": true
+   },
+   {
+    "name": "option_text",
+    "input": "Question #1:\nWhich particle is a lepton?\nOptions:\n(A) proton\n(B) muon\n(C) neutron\n(D) pion",
+    "final_answer": "muon",
+    "target": "(B)",
+    "ok": true
+   },
+   {
+    "name": "option_text_in_sentence",
+    "input": "Question #1:\nWhich particle is a lepton?\nOptions:\n(A) proton\n(B) muon\n(C) neutron\n(D) pion",
+    "final_answer": "It is the muon.",
+    "target": "(B)",
+    "ok": true
+   },
+   {
+    "name": "wrong_letter",
+    "input": "Question #1:\nWhich particle is a lepton?\nOptions:\n(A) proton\n(B) muon\n(C) neutron\n(D) pion",
+    "final_answer": "(A)",
+    "target": "(B)",
+    "ok": false
+   },
+   {
+    "name": "two_letters",
+    "input": "Question #1:\nWhich particle is a lepton?\nOptions:\n(A) proton\n(B) muon\n(C) neutron\n(D) pion",
+    "final_answer": "(A) or (B)",
+    "target": "(B)",
+    "ok": true
+   },
+   {
+    "name": "empty",
+    "input": "Question #1:\nWhich particle is a lepton?\nOptions:\n(A) proton\n(B) muon\n(C) neutron\n(D) pion",
+    "final_answer": "",
+    "target": "(B)",
+    "ok": false
+   },
+   {
+    "name": "target_plain_letter",
+    "input": "Question #1:\nWhich particle is a lepton?\nOptions:\n(A) proton\n(B) muon\n(C) neutron\n(D) pion",
+    "final_answer": "(B)",
+    "target": "B",
+    "ok": true
+   },
+   {
+    "name": "dot_options",
+    "input": "Which particle is a lepton?\nA. proton\nB. muon\nC. neutron\nD. pion",
+    "final_answer": "muon",
+    "target": "(B)",
+    "ok": false
+   },
+   {
+    "name": "no_final_answer",
+    "input": "Question #1:\nWhich particle is a lepton?\nOptions:\n(A) proton\n(B) muon\n(C) neutron\n(D) pion",
+    "final_answer": "No final answer found",
+    "target": "(B)",
+    "ok": false
+   },
+   {
+    "name": "starts_with_letter_word",
+    "input": "Question #1:\nWhich particle is a lepton?\nOptions:\n(A) proton\n(B) muon\n(C) neutron\n(D) pion",
+    "final_answer": "Because",
+    "target": "(B)",
+    "ok": false
+   },
+   {
+    "name": "backticks",
+    "input": "Question #1:\nWhich particle is a lepton?\nOptions:\n(A) proton\n(B) muon\n(C) neutron\n(D) pion",
+    "final_answer": "`(B)`",
+    "target": "(B)",
+    "ok": true
+   }
+  ],
+  "eval_for_exact_matching_with_no_punctuation": [
+   {
+    "name": "same",
+    "output": "42",
+    "target": "42",
+    "ok": true
+   },
+   {
+    "name": "trailing_dot",
+    "output": "42.",
+    "target": "42",
+    "ok": true
+   },
+   {
+    "name": "thousands_comma",
+    "output": "4,200",
+    "target": "4200",
+    "ok": true
+   },
+   {
+    "name": "leading_zero",
+    "output": "042",
+    "target": "42",
+    "ok": false
+   },
+   {
+    "name": "dollar",
+    "output": "$42",
+    "target": "42",
+    "ok": false
+   },
+   {
+    "name": "latex_dollars",
+    "output": "$42$",
+    "target": "42",
+    "ok": false
+   },
+   {
+    "name": "space",
+    "output": " 42",
+    "target": "42",
+    "ok": false
+   },
+   {
+    "name": "newline",
+    "output": "4\n2",
+    "target": "4 2",
+    "ok": true
+   },
+   {
+    "name": "float",
+    "output": "42.0",
+    "target": "42",
+    "ok": false
+   },
+   {
+    "name": "upper",
+    "output": "abc",
+    "target": "ABC",
+    "ok": false
+   }
+  ]
+ }
+}

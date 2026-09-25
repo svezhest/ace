@@ -1,0 +1,130 @@
+{
+ "header": {
+  "repo": "meta-context-engineering",
+  "path": "/Users/user/Projects/upstreams/meta-context-engineering",
+  "commit": "c4b7a7c2ce3ffc4bf4a74c52d2dd8a9a8fb14c30",
+  "functions": {
+   "build_meta_agent_prompt": "mce/prompts/meta_agent.py:16",
+   "build_base_agent_prompt": "mce/prompts/base_agent.py:13",
+   "_find_best_iteration": "mce/utils.py:417",
+   "aggregate_iteration_results": "mce/utils.py:134",
+   "setup_base_agent_workspace": "mce/utils.py:299",
+   "run_iteration": "mce/main.py:34",
+   "main": "mce/main.py:361",
+   "batch_evaluate": "mce/eval.py:59"
+  },
+  "command": "$UPSTREAMS/.venvs/mce/bin/python bridge/capture_mce.py",
+  "python": "3.11.11"
+ },
+ "data": {
+  "find_best_iteration": {
+   "iter0_current": null,
+   "iter1_with_iter0": {
+    "iteration": 0,
+    "primary_metric_value": 0.0,
+    "last_sub_folder": "iter0"
+   },
+   "iter1_no_iter0": null,
+   "iter2_no_file": null,
+   "iter2_only_iter1": {
+    "iteration": 1,
+    "primary_metric_value": 0.4,
+    "last_sub_folder": "iter1_sub1"
+   },
+   "iter3_all_worse_than_iter0_in_file": {
+    "iteration": 0,
+    "primary_metric_value": 0.9,
+    "last_sub_folder": "iter0"
+   },
+   "iter3_all_worse_iter0_absent": {
+    "iteration": 1,
+    "primary_metric_value": 0.4,
+    "last_sub_folder": "iter1_sub1"
+   },
+   "iter3_tie_first_wins": {
+    "iteration": 1,
+    "primary_metric_value": 0.5,
+    "last_sub_folder": "iter1_sub1"
+   },
+   "iter4_gap_and_missing_metric": {
+    "iteration": 3,
+    "primary_metric_value": 0.2,
+    "last_sub_folder": "iter3_sub1"
+   },
+   "iter3_no_last_sub_folder": {
+    "iteration": 2,
+    "primary_metric_value": 0.7,
+    "last_sub_folder": "iter2"
+   },
+   "iter3_all_zero": {
+    "iteration": 1,
+    "primary_metric_value": 0.0,
+    "last_sub_folder": "iter1_sub0"
+   },
+   "iter3_future_iter_ignored": {
+    "iteration": 1,
+    "primary_metric_value": 0.1,
+    "last_sub_folder": "iter1_sub0"
+   },
+   "iter3_other_metric": {
+    "iteration": 1,
+    "primary_metric_value": 0.2,
+    "last_sub_folder": "iter1"
+   }
+  },
+  "aggregate_iteration_results": {
+   "after_iter1": {
+    "evaluations.json": "{\n  \"iter1\": {\n    \"train_accuracy\": 0.5,\n    \"train_metrics\": {\n      \"accuracy\": 0.5,\n      \"f1\": 0.375\n    },\n    \"val_accuracy\": 0.5,\n    \"val_metrics\": {\n      \"accuracy\": 0.5\n    },\n    \"val_total\": 4,\n    \"total_rollouts\": 4,\n    \"num_sub_iters\": 2,\n    \"last_sub_folder\": \"iter1_sub1\"\n  }\n}",
+    "skills/iter1/SKILL.md": "## Skill Overview\nskill of iter1_sub1\n"
+   },
+   "after_iter2_and_rewrite_iter1": {
+    "evaluations.json": "{\n  \"iter1\": {\n    \"train_accuracy\": 0.3333333333333333,\n    \"train_metrics\": {\n      \"accuracy\": 0.3333333333333333,\n      \"f1\": 0.5\n    },\n    \"val_accuracy\": 0.75,\n    \"val_metrics\": {\n      \"accuracy\": 0.75\n    },\n    \"val_total\": 4,\n    \"total_rollouts\": 3,\n    \"num_sub_iters\": 1,\n    \"last_sub_folder\": \"iter9_sub0\"\n  },\n  \"iter2\": {\n    \"train_accuracy\": 0.0,\n    \"train_metrics\": {},\n    \"val_accuracy\": 0.25,\n    \"val_metrics\": {\n      \"accuracy\": 0.25,\n      \"f1\": 0.1\n    },\n    \"val_total\": 4,\n    \"total_rollouts\": 0,\n    \"num_sub_iters\": 1,\n    \"last_sub_folder\": \"iter2_sub0\"\n  }\n}",
+    "skills/iter1/SKILL.md": "## Skill Overview\nskill of iter1_sub1\n",
+    "skills/iter2/SKILL.md": "## Skill Overview\nskill of iter2_sub0\n"
+   }
+  },
+  "setup_base_agent_workspace": {
+   "iter1": {
+    "context/f.txt": "context from seed",
+    "interfaces/f.txt": "interfaces from seed"
+   },
+   "iter3_best": {
+    "context/f.txt": "context from iter1 best",
+    "interfaces/f.txt": "interfaces from iter1 best"
+   },
+   "iter3_sub1_from_prev": {
+    "context/f.txt": "context from iter2 worse",
+    "interfaces/f.txt": "interfaces from iter2 worse"
+   },
+   "iter2_no_evals": "ValueError: No previous iterations found for iteration 2"
+  },
+  "cleanup_irrelevant_files": {
+   "meta": [
+    ".claude/skills/x/SKILL.md",
+    ".hidden",
+    "context/a.md",
+    "data/train.json",
+    "interfaces/__init__.py",
+    "utils/llm.py"
+   ],
+   "base": [
+    ".claude/skills/x/SKILL.md",
+    ".hidden",
+    "context/a.md",
+    "data/train.json",
+    "interfaces/__init__.py",
+    "utils/llm.py"
+   ]
+  },
+  "create_iteration_workspace": {
+   "iter0": [
+    "<empty>"
+   ],
+   "iter1_sub0_dirs": [
+    "iter1_sub0/.claude",
+    "iter1_sub0/.claude/skills",
+    "iter1_sub0/.claude/skills/learning-context"
+   ]
+  }
+ }
+}

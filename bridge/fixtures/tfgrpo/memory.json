@@ -1,0 +1,385 @@
+{
+ "header": {
+  "repo": "youtu-agent",
+  "path": "/Users/user/Projects/upstreams/youtu-agent",
+  "commit": "c2caa539f4c95ae1c39ed24dc8a99cb3651e1d5d",
+  "functions": {
+   "ExperienceUpdater.run": "utu/practice/experience_updater.py:30",
+   "ExperienceUpdater._single_rollout_summary": "utu/practice/experience_updater.py:74",
+   "ExperienceUpdater._group_advantage": "utu/practice/experience_updater.py:141",
+   "ExperienceUpdater._group_update": "utu/practice/experience_updater.py:210",
+   "ExperienceUpdater._batch_update": "utu/practice/experience_updater.py:266",
+   "ExperienceUpdater._format_exp_and_ops": "utu/practice/experience_updater.py:329",
+   "prompts": "utu/prompts/practice/experience.yaml"
+  },
+  "command": "$UPSTREAMS/.venvs/youtu/bin/python bridge/capture_tfgrpo.py",
+  "python": "3.12.8",
+  "note": "шим utu из repro/tfgrpo_run.py:58-140; FileUtils как utu/utils/path.py:75,108; asyncio.as_completed заменён на порядок создания; model_params из config.json ({})"
+ },
+ "data": {
+  "batch_update": {
+   "add_update_delete": {
+    "before": {
+     "G0": "Units: check units.",
+     "G1": "Verify: recompute."
+    },
+    "plan": [
+     {
+      "operation": "ADD",
+      "id": null,
+      "content": "New: a."
+     },
+     {
+      "operation": "UPDATE",
+      "id": "G1",
+      "content": "Verify: recompute twice."
+     },
+     {
+      "operation": "DELETE",
+      "id": "G0",
+      "content": "Units: check units."
+     }
+    ],
+    "after": {
+     "G1": "Verify: recompute twice.",
+     "2": "New: a."
+    }
+   },
+   "update_unknown_id_adds": {
+    "before": {
+     "G0": "Units: check units.",
+     "G1": "Verify: recompute."
+    },
+    "plan": [
+     {
+      "operation": "UPDATE",
+      "id": "G9",
+      "content": "Orphan: b."
+     }
+    ],
+    "after": {
+     "G0": "Units: check units.",
+     "G1": "Verify: recompute.",
+     "2": "Orphan: b."
+    }
+   },
+   "delete_unknown_id": {
+    "before": {
+     "G0": "Units: check units.",
+     "G1": "Verify: recompute."
+    },
+    "plan": [
+     {
+      "operation": "DELETE",
+      "id": "G9",
+      "content": "x"
+     }
+    ],
+    "after": {
+     "G0": "Units: check units.",
+     "G1": "Verify: recompute."
+    }
+   },
+   "empty_content_skipped": {
+    "before": {
+     "G0": "Units: check units.",
+     "G1": "Verify: recompute."
+    },
+    "plan": [
+     {
+      "operation": "ADD",
+      "content": ""
+     },
+     {
+      "operation": "DELETE",
+      "id": "G0",
+      "content": ""
+     }
+    ],
+    "after": {
+     "G0": "Units: check units.",
+     "G1": "Verify: recompute."
+    }
+   },
+   "missing_operation_is_add": {
+    "before": {
+     "G0": "Units: check units.",
+     "G1": "Verify: recompute."
+    },
+    "plan": [
+     {
+      "content": "Default: c."
+     }
+    ],
+    "after": {
+     "G0": "Units: check units.",
+     "G1": "Verify: recompute.",
+     "2": "Default: c."
+    }
+   },
+   "none_operation_ignored": {
+    "before": {
+     "G0": "Units: check units.",
+     "G1": "Verify: recompute."
+    },
+    "plan": [
+     {
+      "operation": "NONE",
+      "id": null,
+      "content": "Same: d."
+     }
+    ],
+    "after": {
+     "G0": "Units: check units.",
+     "G1": "Verify: recompute."
+    }
+   },
+   "lowercase_operation_ignored": {
+    "before": {
+     "G0": "Units: check units.",
+     "G1": "Verify: recompute."
+    },
+    "plan": [
+     {
+      "operation": "add",
+      "content": "lower"
+     }
+    ],
+    "after": {
+     "G0": "Units: check units.",
+     "G1": "Verify: recompute."
+    }
+   },
+   "int_id_not_matched": {
+    "before": {
+     "G0": "Units: check units.",
+     "G1": "Verify: recompute."
+    },
+    "plan": [
+     {
+      "operation": "UPDATE",
+      "id": 0,
+      "content": "int id"
+     }
+    ],
+    "after": {
+     "G0": "Units: check units.",
+     "G1": "Verify: recompute.",
+     "2": "int id"
+    }
+   },
+   "delete_then_add_key": {
+    "before": {
+     "G0": "Units: check units.",
+     "G1": "Verify: recompute."
+    },
+    "plan": [
+     {
+      "operation": "DELETE",
+      "id": "G0",
+      "content": "x"
+     },
+     {
+      "operation": "ADD",
+      "content": "A1"
+     },
+     {
+      "operation": "ADD",
+      "content": "A2"
+     }
+    ],
+    "after": {
+     "G1": "Verify: recompute.",
+     "2": "A1",
+     "3": "A2"
+    }
+   },
+   "empty_plan": {
+    "before": {
+     "G0": "Units: check units.",
+     "G1": "Verify: recompute."
+    },
+    "plan": [],
+    "after": {
+     "G0": "Units: check units.",
+     "G1": "Verify: recompute."
+    }
+   }
+  },
+  "format_exp_and_ops": {
+   "no_ops": {
+    "experiences": {
+     "G0": "a"
+    },
+    "operations": [],
+    "text": "No batch operations."
+   },
+   "related_and_free": {
+    "experiences": {
+     "G0": "a",
+     "G1": "b"
+    },
+    "operations": [
+     {
+      "operation": "UPDATE",
+      "id": "G0",
+      "content": "a2"
+     },
+     {
+      "operation": "ADD",
+      "id": null,
+      "content": "c"
+     },
+     {
+      "operation": "NONE",
+      "content": "d"
+     }
+    ],
+    "text": "Experience G0:\nContent: a\nRelated Operations:\n{\n  \"operation\": \"UPDATE\",\n  \"id\": \"G0\",\n  \"content\": \"a2\"\n}\n\nExperience G1:\nContent: b\nNo related operations.\n\nOperations without specific Experience ID:\n{\n  \"operation\": \"ADD\",\n  \"id\": null,\n  \"content\": \"c\"\n}\n{\n  \"operation\": \"NONE\",\n  \"content\": \"d\"\n}"
+   },
+   "unknown_id_dropped": {
+    "experiences": {
+     "G0": "a"
+    },
+    "operations": [
+     {
+      "operation": "UPDATE",
+      "id": "G7",
+      "content": "x"
+     }
+    ],
+    "text": "Experience G0:\nContent: a\nNo related operations."
+   },
+   "empty_library": {
+    "experiences": {},
+    "operations": [
+     {
+      "operation": "ADD",
+      "id": null,
+      "content": "c"
+     }
+    ],
+    "text": "Operations without specific Experience ID:\n{\n  \"operation\": \"ADD\",\n  \"id\": null,\n  \"content\": \"c\"\n}"
+   },
+   "unicode": {
+    "experiences": {
+     "G0": "π ≈ 3.14"
+    },
+    "operations": [
+     {
+      "operation": "UPDATE",
+      "id": "G0",
+      "content": "π — число"
+     }
+    ],
+    "text": "Experience G0:\nContent: π ≈ 3.14\nRelated Operations:\n{\n  \"operation\": \"UPDATE\",\n  \"id\": \"G0\",\n  \"content\": \"π — число\"\n}"
+   }
+  },
+  "partial_filter": {
+   "given_ground_truth=True": {
+    "rewards": {
+     "mixed": [
+      1,
+      0,
+      1,
+      0
+     ],
+     "all_one": [
+      1,
+      1,
+      1,
+      1
+     ],
+     "all_zero": [
+      0,
+      0,
+      0,
+      0
+     ],
+     "one_of_four": [
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    "summarized": {
+     "Problem mixed": [
+      1.0,
+      0.0,
+      1.0,
+      0.0
+     ],
+     "Problem one_of_four": [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ],
+     "Problem notraj": [
+      1.0,
+      0.0
+     ]
+    }
+   },
+   "given_ground_truth=False": {
+    "rewards": {
+     "mixed": [
+      1,
+      0,
+      1,
+      0
+     ],
+     "all_one": [
+      1,
+      1,
+      1,
+      1
+     ],
+     "all_zero": [
+      0,
+      0,
+      0,
+      0
+     ],
+     "one_of_four": [
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    "summarized": {
+     "Problem mixed": [
+      1.0,
+      0.0,
+      1.0,
+      0.0
+     ],
+     "Problem all_one": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+     ],
+     "Problem all_zero": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "Problem one_of_four": [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ],
+     "Problem notraj": [
+      1.0,
+      0.0
+     ]
+    }
+   }
+  }
+ }
+}

@@ -1,0 +1,145 @@
+{
+ "header": {
+  "repo": "dynamic-cheatsheet",
+  "path": "/Users/user/Projects/upstreams/dynamic-cheatsheet",
+  "commit": "5cfe3c37e8e52b1d858d0f3df46e7f17c50991b9",
+  "functions": {
+   "advanced_generate": "dynamic_cheatsheet/language_model.py:290"
+  },
+  "command": "$UPSTREAMS/.venvs/light/bin/python bridge/capture_dc.py",
+  "python": "3.11.11"
+ },
+ "data": {
+  "Dynamic_Retrieval_top3": [
+   {
+    "top_k_original_inputs": [],
+    "shown_cheatsheet": "(empty)"
+   },
+   {
+    "top_k_original_inputs": [
+     "Two quantum states with energies E1 and E2 have a lifetime of 10^-9 sec and 10^-8 sec, respectively. Which energy difference lets them be clearly resolved?\nOptions:\n(A) 10^-9 eV\n(B) 10^-8 eV\n(C) 10^-4 eV\n(D) 10^-11 eV"
+    ],
+    "shown_cheatsheet": "### PREVIOUS SOLUTIONS (START)\n\nNote: The input-output pairs listed below are taken from previous test cases and are meant to assist you in understanding potential solution strategies or tool usages. While they can offer insight and inspiration, they should not be blindly copied, as they may contain errors or may not fit your specific use case. Approach them with a critical mindset—analyze their logic, verify their correctness, and adapt them as needed. Your goal should be to develop a well-reasoned solution that best addresses the problem at hand.\n\n#### Previous Input #1 (Similarity: 0.00):\n\nTwo quantum states with energies E1 and E2 have a lifetime of 10^-9 sec and 10^-8 sec, respectively. Which energy difference lets them be clearly resolved?\nOptions:\n(A) 10^-9 eV\n(B) 10^-8 eV\n(C) 10^-4 eV\n(D) 10^-11 eV\n\n#### Model Solution to Previous Input  #1:\n\nResolve by energy-time uncertainty.\nFINAL ANSWER:\n<answer>\n(C)\n</answer>\n---\n---\n\n#### PREVIOUS SOLUTIONS (END)"
+   },
+   {
+    "top_k_original_inputs": [
+     "Two quantum states with energies E1 and E2 have a lifetime of 10^-9 sec and 10^-8 sec, respectively. Which energy difference lets them be clearly resolved?\nOptions:\n(A) 10^-9 eV\n(B) 10^-8 eV\n(C) 10^-4 eV\n(D) 10^-11 eV",
+     "14 ? 16 ? 20 ? 15 ? 23 = 25"
+    ],
+    "shown_cheatsheet": "### PREVIOUS SOLUTIONS (START)\n\nNote: The input-output pairs listed below are taken from previous test cases and are meant to assist you in understanding potential solution strategies or tool usages. While they can offer insight and inspiration, they should not be blindly copied, as they may contain errors or may not fit your specific use case. Approach them with a critical mindset—analyze their logic, verify their correctness, and adapt them as needed. Your goal should be to develop a well-reasoned solution that best addresses the problem at hand.\n\n#### Previous Input #1 (Similarity: 0.11):\n\n14 ? 16 ? 20 ? 15 ? 23 = 25\n\n#### Model Solution to Previous Input  #1:\n\nTry * and / first.\nFINAL ANSWER:\n<answer>\n14 - 16 / 20 * 15 + 23 = 25\n</answer>\n---\n---\n\n#### Previous Input #2 (Similarity: 0.99):\n\nTwo quantum states with energies E1 and E2 have a lifetime of 10^-9 sec and 10^-8 sec, respectively. Which energy difference lets them be clearly resolved?\nOptions:\n(A) 10^-9 eV\n(B) 10^-8 eV\n(C) 10^-4 eV\n(D) 10^-11 eV\n\n#### Model Solution to Previous Input  #2:\n\nResolve by energy-time uncertainty.\nFINAL ANSWER:\n<answer>\n(C)\n</answer>\n---\n---\n\n#### PREVIOUS SOLUTIONS (END)"
+   },
+   {
+    "top_k_original_inputs": [
+     "14 ? 16 ? 20 ? 15 ? 23 = 25",
+     "1 ? 2 ? 3 = 6",
+     "Two quantum states with energies E1 and E2 have a lifetime of 10^-9 sec and 10^-8 sec, respectively. Which energy difference lets them be clearly resolved?\nOptions:\n(A) 10^-9 eV\n(B) 10^-8 eV\n(C) 10^-4 eV\n(D) 10^-11 eV"
+    ],
+    "shown_cheatsheet": "### PREVIOUS SOLUTIONS (START)\n\nNote: The input-output pairs listed below are taken from previous test cases and are meant to assist you in understanding potential solution strategies or tool usages. While they can offer insight and inspiration, they should not be blindly copied, as they may contain errors or may not fit your specific use case. Approach them with a critical mindset—analyze their logic, verify their correctness, and adapt them as needed. Your goal should be to develop a well-reasoned solution that best addresses the problem at hand.\n\n#### Previous Input #1 (Similarity: 0.60):\n\nTwo quantum states with energies E1 and E2 have a lifetime of 10^-9 sec and 10^-8 sec, respectively. Which energy difference lets them be clearly resolved?\nOptions:\n(A) 10^-9 eV\n(B) 10^-8 eV\n(C) 10^-4 eV\n(D) 10^-11 eV\n\n#### Model Solution to Previous Input  #1:\n\nResolve by energy-time uncertainty.\nFINAL ANSWER:\n<answer>\n(C)\n</answer>\n---\n---\n\n#### Previous Input #2 (Similarity: 0.68):\n\n1 ? 2 ? 3 = 6\n\n#### Model Solution to Previous Input  #2:\n\nBalance with + only.\nFINAL ANSWER:\n<answer>\n1 + 2 + 3 = 6\n</answer>\n---\n---\n\n#### Previous Input #3 (Similarity: 0.80):\n\n14 ? 16 ? 20 ? 15 ? 23 = 25\n\n#### Model Solution to Previous Input  #3:\n\nTry * and / first.\nFINAL ANSWER:\n<answer>\n14 - 16 / 20 * 15 + 23 = 25\n</answer>\n---\n---\n\n#### PREVIOUS SOLUTIONS (END)"
+   },
+   {
+    "top_k_original_inputs": [
+     "14 ? 16 ? 20 ? 15 ? 23 = 25",
+     "Which particle is a lepton?\nOptions:\n(A) proton\n(B) muon\n(C) neutron\n(D) pion",
+     "1 ? 2 ? 3 = 6"
+    ],
+    "shown_cheatsheet": "### PREVIOUS SOLUTIONS (START)\n\nNote: The input-output pairs listed below are taken from previous test cases and are meant to assist you in understanding potential solution strategies or tool usages. While they can offer insight and inspiration, they should not be blindly copied, as they may contain errors or may not fit your specific use case. Approach them with a critical mindset—analyze their logic, verify their correctness, and adapt them as needed. Your goal should be to develop a well-reasoned solution that best addresses the problem at hand.\n\n#### Previous Input #1 (Similarity: 0.02):\n\n1 ? 2 ? 3 = 6\n\n#### Model Solution to Previous Input  #1:\n\nBalance with + only.\nFINAL ANSWER:\n<answer>\n1 + 2 + 3 = 6\n</answer>\n---\n---\n\n#### Previous Input #2 (Similarity: 0.16):\n\nWhich particle is a lepton?\nOptions:\n(A) proton\n(B) muon\n(C) neutron\n(D) pion\n\n#### Model Solution to Previous Input  #2:\n\nEstimate first.\nFINAL ANSWER:\n<answer>\nB\n</answer>\n---\n---\n\n#### Previous Input #3 (Similarity: 0.20):\n\n14 ? 16 ? 20 ? 15 ? 23 = 25\n\n#### Model Solution to Previous Input  #3:\n\nTry * and / first.\nFINAL ANSWER:\n<answer>\n14 - 16 / 20 * 15 + 23 = 25\n</answer>\n---\n---\n\n#### PREVIOUS SOLUTIONS (END)"
+   }
+  ],
+  "Dynamic_Retrieval_top2": [
+   {
+    "top_k_original_inputs": [],
+    "shown_cheatsheet": "(empty)"
+   },
+   {
+    "top_k_original_inputs": [
+     "Two quantum states with energies E1 and E2 have a lifetime of 10^-9 sec and 10^-8 sec, respectively. Which energy difference lets them be clearly resolved?\nOptions:\n(A) 10^-9 eV\n(B) 10^-8 eV\n(C) 10^-4 eV\n(D) 10^-11 eV"
+    ],
+    "shown_cheatsheet": "### PREVIOUS SOLUTIONS (START)\n\nNote: The input-output pairs listed below are taken from previous test cases and are meant to assist you in understanding potential solution strategies or tool usages. While they can offer insight and inspiration, they should not be blindly copied, as they may contain errors or may not fit your specific use case. Approach them with a critical mindset—analyze their logic, verify their correctness, and adapt them as needed. Your goal should be to develop a well-reasoned solution that best addresses the problem at hand.\n\n#### Previous Input #1 (Similarity: 0.00):\n\nTwo quantum states with energies E1 and E2 have a lifetime of 10^-9 sec and 10^-8 sec, respectively. Which energy difference lets them be clearly resolved?\nOptions:\n(A) 10^-9 eV\n(B) 10^-8 eV\n(C) 10^-4 eV\n(D) 10^-11 eV\n\n#### Model Solution to Previous Input  #1:\n\nResolve by energy-time uncertainty.\nFINAL ANSWER:\n<answer>\n(C)\n</answer>\n---\n---\n\n#### PREVIOUS SOLUTIONS (END)"
+   },
+   {
+    "top_k_original_inputs": [
+     "Two quantum states with energies E1 and E2 have a lifetime of 10^-9 sec and 10^-8 sec, respectively. Which energy difference lets them be clearly resolved?\nOptions:\n(A) 10^-9 eV\n(B) 10^-8 eV\n(C) 10^-4 eV\n(D) 10^-11 eV",
+     "14 ? 16 ? 20 ? 15 ? 23 = 25"
+    ],
+    "shown_cheatsheet": "### PREVIOUS SOLUTIONS (START)\n\nNote: The input-output pairs listed below are taken from previous test cases and are meant to assist you in understanding potential solution strategies or tool usages. While they can offer insight and inspiration, they should not be blindly copied, as they may contain errors or may not fit your specific use case. Approach them with a critical mindset—analyze their logic, verify their correctness, and adapt them as needed. Your goal should be to develop a well-reasoned solution that best addresses the problem at hand.\n\n#### Previous Input #1 (Similarity: 0.11):\n\n14 ? 16 ? 20 ? 15 ? 23 = 25\n\n#### Model Solution to Previous Input  #1:\n\nTry * and / first.\nFINAL ANSWER:\n<answer>\n14 - 16 / 20 * 15 + 23 = 25\n</answer>\n---\n---\n\n#### Previous Input #2 (Similarity: 0.99):\n\nTwo quantum states with energies E1 and E2 have a lifetime of 10^-9 sec and 10^-8 sec, respectively. Which energy difference lets them be clearly resolved?\nOptions:\n(A) 10^-9 eV\n(B) 10^-8 eV\n(C) 10^-4 eV\n(D) 10^-11 eV\n\n#### Model Solution to Previous Input  #2:\n\nResolve by energy-time uncertainty.\nFINAL ANSWER:\n<answer>\n(C)\n</answer>\n---\n---\n\n#### PREVIOUS SOLUTIONS (END)"
+   },
+   {
+    "top_k_original_inputs": [
+     "14 ? 16 ? 20 ? 15 ? 23 = 25",
+     "1 ? 2 ? 3 = 6"
+    ],
+    "shown_cheatsheet": "### PREVIOUS SOLUTIONS (START)\n\nNote: The input-output pairs listed below are taken from previous test cases and are meant to assist you in understanding potential solution strategies or tool usages. While they can offer insight and inspiration, they should not be blindly copied, as they may contain errors or may not fit your specific use case. Approach them with a critical mindset—analyze their logic, verify their correctness, and adapt them as needed. Your goal should be to develop a well-reasoned solution that best addresses the problem at hand.\n\n#### Previous Input #1 (Similarity: 0.68):\n\n1 ? 2 ? 3 = 6\n\n#### Model Solution to Previous Input  #1:\n\nBalance with + only.\nFINAL ANSWER:\n<answer>\n1 + 2 + 3 = 6\n</answer>\n---\n---\n\n#### Previous Input #2 (Similarity: 0.80):\n\n14 ? 16 ? 20 ? 15 ? 23 = 25\n\n#### Model Solution to Previous Input  #2:\n\nTry * and / first.\nFINAL ANSWER:\n<answer>\n14 - 16 / 20 * 15 + 23 = 25\n</answer>\n---\n---\n\n#### PREVIOUS SOLUTIONS (END)"
+   },
+   {
+    "top_k_original_inputs": [
+     "14 ? 16 ? 20 ? 15 ? 23 = 25",
+     "Which particle is a lepton?\nOptions:\n(A) proton\n(B) muon\n(C) neutron\n(D) pion"
+    ],
+    "shown_cheatsheet": "### PREVIOUS SOLUTIONS (START)\n\nNote: The input-output pairs listed below are taken from previous test cases and are meant to assist you in understanding potential solution strategies or tool usages. While they can offer insight and inspiration, they should not be blindly copied, as they may contain errors or may not fit your specific use case. Approach them with a critical mindset—analyze their logic, verify their correctness, and adapt them as needed. Your goal should be to develop a well-reasoned solution that best addresses the problem at hand.\n\n#### Previous Input #1 (Similarity: 0.16):\n\nWhich particle is a lepton?\nOptions:\n(A) proton\n(B) muon\n(C) neutron\n(D) pion\n\n#### Model Solution to Previous Input  #1:\n\nEstimate first.\nFINAL ANSWER:\n<answer>\nB\n</answer>\n---\n---\n\n#### Previous Input #2 (Similarity: 0.20):\n\n14 ? 16 ? 20 ? 15 ? 23 = 25\n\n#### Model Solution to Previous Input  #2:\n\nTry * and / first.\nFINAL ANSWER:\n<answer>\n14 - 16 / 20 * 15 + 23 = 25\n</answer>\n---\n---\n\n#### PREVIOUS SOLUTIONS (END)"
+   }
+  ],
+  "FullHistoryAppending": [
+   {
+    "top_k_original_inputs": [],
+    "shown_cheatsheet": "(empty)"
+   },
+   {
+    "top_k_original_inputs": [
+     "Two quantum states with energies E1 and E2 have a lifetime of 10^-9 sec and 10^-8 sec, respectively. Which energy difference lets them be clearly resolved?\nOptions:\n(A) 10^-9 eV\n(B) 10^-8 eV\n(C) 10^-4 eV\n(D) 10^-11 eV"
+    ],
+    "shown_cheatsheet": "### PREVIOUS SOLUTIONS (START)\n\n#### Previous Input #1:\n\nTwo quantum states with energies E1 and E2 have a lifetime of 10^-9 sec and 10^-8 sec, respectively. Which energy difference lets them be clearly resolved?\nOptions:\n(A) 10^-9 eV\n(B) 10^-8 eV\n(C) 10^-4 eV\n(D) 10^-11 eV\n\n#### Model Solution to Previous Input #1:\n\nResolve by energy-time uncertainty.\nFINAL ANSWER:\n<answer>\n(C)\n</answer>\n---\n---\n\n#### PREVIOUS SOLUTIONS (END)"
+   },
+   {
+    "top_k_original_inputs": [
+     "Two quantum states with energies E1 and E2 have a lifetime of 10^-9 sec and 10^-8 sec, respectively. Which energy difference lets them be clearly resolved?\nOptions:\n(A) 10^-9 eV\n(B) 10^-8 eV\n(C) 10^-4 eV\n(D) 10^-11 eV",
+     "14 ? 16 ? 20 ? 15 ? 23 = 25"
+    ],
+    "shown_cheatsheet": "### PREVIOUS SOLUTIONS (START)\n\n#### Previous Input #1:\n\nTwo quantum states with energies E1 and E2 have a lifetime of 10^-9 sec and 10^-8 sec, respectively. Which energy difference lets them be clearly resolved?\nOptions:\n(A) 10^-9 eV\n(B) 10^-8 eV\n(C) 10^-4 eV\n(D) 10^-11 eV\n\n#### Model Solution to Previous Input #1:\n\nResolve by energy-time uncertainty.\nFINAL ANSWER:\n<answer>\n(C)\n</answer>\n---\n---\n\n#### Previous Input #2:\n\n14 ? 16 ? 20 ? 15 ? 23 = 25\n\n#### Model Solution to Previous Input #2:\n\nTry * and / first.\nFINAL ANSWER:\n<answer>\n14 - 16 / 20 * 15 + 23 = 25\n</answer>\n---\n---\n\n#### PREVIOUS SOLUTIONS (END)"
+   },
+   {
+    "top_k_original_inputs": [
+     "Two quantum states with energies E1 and E2 have a lifetime of 10^-9 sec and 10^-8 sec, respectively. Which energy difference lets them be clearly resolved?\nOptions:\n(A) 10^-9 eV\n(B) 10^-8 eV\n(C) 10^-4 eV\n(D) 10^-11 eV",
+     "14 ? 16 ? 20 ? 15 ? 23 = 25",
+     "1 ? 2 ? 3 = 6"
+    ],
+    "shown_cheatsheet": "### PREVIOUS SOLUTIONS (START)\n\n#### Previous Input #1:\n\nTwo quantum states with energies E1 and E2 have a lifetime of 10^-9 sec and 10^-8 sec, respectively. Which energy difference lets them be clearly resolved?\nOptions:\n(A) 10^-9 eV\n(B) 10^-8 eV\n(C) 10^-4 eV\n(D) 10^-11 eV\n\n#### Model Solution to Previous Input #1:\n\nResolve by energy-time uncertainty.\nFINAL ANSWER:\n<answer>\n(C)\n</answer>\n---\n---\n\n#### Previous Input #2:\n\n14 ? 16 ? 20 ? 15 ? 23 = 25\n\n#### Model Solution to Previous Input #2:\n\nTry * and / first.\nFINAL ANSWER:\n<answer>\n14 - 16 / 20 * 15 + 23 = 25\n</answer>\n---\n---\n\n#### Previous Input #3:\n\n1 ? 2 ? 3 = 6\n\n#### Model Solution to Previous Input #3:\n\nBalance with + only.\nFINAL ANSWER:\n<answer>\n1 + 2 + 3 = 6\n</answer>\n---\n---\n\n#### PREVIOUS SOLUTIONS (END)"
+   },
+   {
+    "top_k_original_inputs": [
+     "Two quantum states with energies E1 and E2 have a lifetime of 10^-9 sec and 10^-8 sec, respectively. Which energy difference lets them be clearly resolved?\nOptions:\n(A) 10^-9 eV\n(B) 10^-8 eV\n(C) 10^-4 eV\n(D) 10^-11 eV",
+     "14 ? 16 ? 20 ? 15 ? 23 = 25",
+     "1 ? 2 ? 3 = 6",
+     "Which particle is a lepton?\nOptions:\n(A) proton\n(B) muon\n(C) neutron\n(D) pion"
+    ],
+    "shown_cheatsheet": "### PREVIOUS SOLUTIONS (START)\n\n#### Previous Input #1:\n\nTwo quantum states with energies E1 and E2 have a lifetime of 10^-9 sec and 10^-8 sec, respectively. Which energy difference lets them be clearly resolved?\nOptions:\n(A) 10^-9 eV\n(B) 10^-8 eV\n(C) 10^-4 eV\n(D) 10^-11 eV\n\n#### Model Solution to Previous Input #1:\n\nResolve by energy-time uncertainty.\nFINAL ANSWER:\n<answer>\n(C)\n</answer>\n---\n---\n\n#### Previous Input #2:\n\n14 ? 16 ? 20 ? 15 ? 23 = 25\n\n#### Model Solution to Previous Input #2:\n\nTry * and / first.\nFINAL ANSWER:\n<answer>\n14 - 16 / 20 * 15 + 23 = 25\n</answer>\n---\n---\n\n#### Previous Input #3:\n\n1 ? 2 ? 3 = 6\n\n#### Model Solution to Previous Input #3:\n\nBalance with + only.\nFINAL ANSWER:\n<answer>\n1 + 2 + 3 = 6\n</answer>\n---\n---\n\n#### Previous Input #4:\n\nWhich particle is a lepton?\nOptions:\n(A) proton\n(B) muon\n(C) neutron\n(D) pion\n\n#### Model Solution to Previous Input #4:\n\nEstimate first.\nFINAL ANSWER:\n<answer>\nB\n</answer>\n---\n---\n\n#### PREVIOUS SOLUTIONS (END)"
+   }
+  ],
+  "embeddings": [
+   [
+    1.0,
+    0.0,
+    0.0
+   ],
+   [
+    0.0,
+    1.0,
+    0.0
+   ],
+   [
+    0.9,
+    0.1,
+    0.0
+   ],
+   [
+    0.6,
+    0.8,
+    0.0
+   ],
+   [
+    0.0,
+    0.2,
+    1.0
+   ]
+  ]
+ }
+}

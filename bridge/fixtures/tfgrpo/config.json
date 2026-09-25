@@ -1,0 +1,85 @@
+{
+ "header": {
+  "repo": "youtu-agent",
+  "path": "/Users/user/Projects/upstreams/youtu-agent",
+  "commit": "c2caa539f4c95ae1c39ed24dc8a99cb3651e1d5d",
+  "functions": {
+   "TrainingFreeGRPO.build": "utu/practice/training_free_grpo.py:63",
+   "TrainingFreeGRPO._create_agent_config_with_experiences": "utu/practice/training_free_grpo.py:233",
+   "ConfigLoader.load_training_free_grpo_config": "utu/config/loader.py:64"
+  },
+  "command": "$UPSTREAMS/.venvs/youtu/bin/python bridge/capture_tfgrpo.py  (подпроцесс: capture_tfgrpo.py config)",
+  "python": "3.12.8",
+  "note": "do_eval принудительно True; TrainingFreeGRPODataManager и RolloutManager заменены заглушками (без БД), DIR_ROOT для итогового yaml — tmp"
+ },
+ "data": {
+  "math_reasoning": {
+   "practice": {
+    "epochs": 1,
+    "batch_size": 50,
+    "grpo_n": 5,
+    "rollout_concurrency": 128,
+    "rollout_temperature": 0.7,
+    "rollout_data_truncate": 100,
+    "task_timeout": 1800,
+    "shuffle_data": true,
+    "agent_objective": "input: A math question that could falls into any areas of mathematics\noutput: A step-by-step reasoning process that leads to the final answer\n",
+    "learning_objective": "Help the agent to improve the solving capability on math questions by extracting general and concise guidelines.\n",
+    "given_ground_truth": true,
+    "num_experiences_per_query": 1,
+    "do_eval": true,
+    "eval_strategy": "epoch",
+    "eval_steps": 1
+   },
+   "evaluation_pass_k": 32,
+   "loaded": {
+    "agent_temperature": 0.3,
+    "agent_top_p": 0.95
+   },
+   "after_build": {
+    "original_temperature": 0.3,
+    "practice_rollout_temperature": 0.7,
+    "eval_rollout_temperature": 0.7,
+    "practice_and_eval_share_agent": true,
+    "practice_pass_k": 5,
+    "eval_pass_k": 32
+   },
+   "updater_query_params": {},
+   "final_agent_yaml": "# @package _global_\ndefaults:\n  - _self_\n\ntype: simple\nmodel:\n  model_provider:\n    type: chat.completions\n    model: fake\n  model_settings:\n    temperature: 0.3\n    top_p: 0.95\n    include_usage: true\n    extra_args:\n      timeout: 3000\n  model_params: {}\nagent:\n  name: math_agent\n  instructions: \"Solve the following problem step by step. You now have the ability\\\n    \\ to selectively write executable Python code to enhance your reasoning process,\\\n    \\ e.g., calulating numbers and verifying math computations. Never directly just\\\n    \\ printing your textual reasoning in Python. The Python code will be executed\\\n    \\ by an external sandbox, and the output (returned as a dict with the message\\\n    \\ in the \\\"message\\\" field) can be returned to aid your reasoning and help you\\\n    \\ arrive at the final answer. The Python code should be complete scripts, including\\\n    \\ necessary imports. \\nEach code snippet is wrapped with \\n```python\\ncode snippet\\n\\\n    ```.\\n\\nThe last part of your final response should be in the following format:\\n\\\n    <answer>\\n\\\\\\\\boxed{{'The final answer goes here.'}}\\n</answer>\\n\\nWhen solving\\\n    \\ problems, you MUST first carefully read and understand the helpful instructions\\\n    \\ and experiences:\\n[G0]. Units: check units.\\n[G1]. Verify: recompute.\"\ntoolkits:\n  python_executor:\n    mode: builtin\n    env_mode: local\n    name: python_executor\n    config: {}\n    mcp_transport: stdio\n    mcp_client_session_timeout_seconds: 20\n"
+  },
+  "web_search": {
+   "practice": {
+    "epochs": 3,
+    "batch_size": 50,
+    "grpo_n": 3,
+    "rollout_concurrency": 128,
+    "rollout_temperature": 0.7,
+    "rollout_data_truncate": 100,
+    "task_timeout": 1800,
+    "shuffle_data": true,
+    "agent_objective": "input: A question or task that requires web search and information gathering\noutput: A comprehensive answer based on searched web content and reliable sources\n",
+    "learning_objective": "Help the agent to improve web search strategies and information synthesis capabilities by extracting general and concise guidelines.\n",
+    "given_ground_truth": true,
+    "num_experiences_per_query": 2,
+    "do_eval": true,
+    "eval_strategy": "epoch",
+    "eval_steps": 1
+   },
+   "evaluation_pass_k": 1,
+   "loaded": {
+    "agent_temperature": 0.3,
+    "agent_top_p": 0.95
+   },
+   "after_build": {
+    "original_temperature": 0.3,
+    "practice_rollout_temperature": 0.7,
+    "eval_rollout_temperature": 0.7,
+    "practice_and_eval_share_agent": true,
+    "practice_pass_k": 3,
+    "eval_pass_k": 1
+   },
+   "updater_query_params": {},
+   "final_agent_yaml": "# @package _global_\ndefaults:\n  - _self_\n\ntype: simple\nmodel:\n  model_provider:\n    type: chat.completions\n    model: fake\n  model_settings:\n    temperature: 0.3\n    top_p: 0.95\n    include_usage: true\n    extra_args:\n      timeout: 3000\n  model_params: {}\nagent:\n  name: utu-base\n  instructions: 'You are a helpful assistant.\n\n\n    When solving problems, you MUST first carefully read and understand the helpful\n    instructions and experiences:\n\n    [G0]. Units: check units.\n\n    [G1]. Verify: recompute.'\ntoolkits:\n  search:\n    mode: builtin\n    env_mode: local\n    name: search\n    config:\n      search_engine: google\n      search_params: {}\n      search_banned_sites: []\n      crawl_engine: jina\n      crawl_params: {}\n      crawl_jina_params: {}\n      summary_token_limit: 10000\n    config_llm:\n      model_provider:\n        type: chat.completions\n        model: fake\n      model_settings: {}\n      model_params: {}\n    mcp_transport: stdio\n    mcp_client_session_timeout_seconds: 20\n"
+  }
+ }
+}

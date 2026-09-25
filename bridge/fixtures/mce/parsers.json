@@ -1,0 +1,464 @@
+{
+ "header": {
+  "repo": "meta-context-engineering",
+  "path": "/Users/user/Projects/upstreams/meta-context-engineering",
+  "commit": "c4b7a7c2ce3ffc4bf4a74c52d2dd8a9a8fb14c30",
+  "functions": {
+   "build_meta_agent_prompt": "mce/prompts/meta_agent.py:16",
+   "build_base_agent_prompt": "mce/prompts/base_agent.py:13",
+   "_find_best_iteration": "mce/utils.py:417",
+   "aggregate_iteration_results": "mce/utils.py:134",
+   "setup_base_agent_workspace": "mce/utils.py:299",
+   "run_iteration": "mce/main.py:34",
+   "main": "mce/main.py:361",
+   "batch_evaluate": "mce/eval.py:59"
+  },
+  "command": "$UPSTREAMS/.venvs/mce/bin/python bridge/capture_mce.py",
+  "python": "3.11.11"
+ },
+ "data": {
+  "symptom_diagnosis": {
+   "responses": [
+    {
+     "input": "[DIAGNOSIS]Fungal Infection[/DIAGNOSIS]",
+     "diagnosis": {
+      "ok": "Fungal Infection"
+     },
+     "normalized": {
+      "ok": "fungal infection"
+     }
+    },
+    {
+     "input": "[diagnosis] common cold. [/diagnosis]",
+     "diagnosis": {
+      "ok": "common cold."
+     },
+     "normalized": {
+      "ok": "common cold"
+     }
+    },
+    {
+     "input": "[DIAGNOSIS]allergy[/DIAGNOSIS] then [DIAGNOSIS]malaria[/DIAGNOSIS]",
+     "diagnosis": {
+      "ok": "allergy"
+     },
+     "normalized": {
+      "ok": "allergy"
+     }
+    },
+    {
+     "input": "[DIAGNOSIS]no close tag",
+     "diagnosis": {
+      "ok": "[DIAGNOSIS]no close tag"
+     },
+     "normalized": {
+      "ok": "[diagnosis]no close tag"
+     }
+    },
+    {
+     "input": "Final diagnosis: Typhoid\nmore text",
+     "diagnosis": {
+      "ok": "Typhoid"
+     },
+     "normalized": {
+      "ok": "typhoid"
+     }
+    },
+    {
+     "input": "Conclusion：dengue",
+     "diagnosis": {
+      "ok": "dengue"
+     },
+     "normalized": {
+      "ok": "dengue"
+     }
+    },
+    {
+     "input": "I think\n\nit is  Jaundice!\n\n",
+     "diagnosis": {
+      "ok": "it is  Jaundice!"
+     },
+     "normalized": {
+      "ok": "it is jaundice"
+     }
+    },
+    {
+     "input": "",
+     "diagnosis": {
+      "ok": ""
+     },
+     "normalized": {
+      "ok": ""
+     }
+    },
+    {
+     "input": "1. malaria\n2. dengue, typhoid\n3. flu",
+     "diagnosis": {
+      "ok": "3. flu"
+     },
+     "normalized": {
+      "ok": "3. flu"
+     }
+    },
+    {
+     "input": "[CANDIDATES]flu, cold ,  malaria[/CANDIDATES]",
+     "diagnosis": {
+      "ok": "[CANDIDATES]flu, cold ,  malaria[/CANDIDATES]"
+     },
+     "normalized": {
+      "ok": "[candidates]flu, cold , malaria[/candidates]"
+     }
+    }
+   ],
+   "format_result_for_training": {
+    "ok": {
+     "id": 3,
+     "symptoms": "q",
+     "ground_truth": "flu",
+     "llm_prediction": "flu",
+     "is_correct": true
+    }
+   },
+   "format_partial_metric": {
+    "ok": {
+     "id": 3,
+     "symptoms": "q",
+     "ground_truth": "flu",
+     "llm_prediction": "",
+     "is_correct": false
+    }
+   }
+  },
+  "symptom_diagnosis_twostep": {
+   "responses": [
+    {
+     "input": "[DIAGNOSIS]Fungal Infection[/DIAGNOSIS]",
+     "diagnosis": {
+      "ok": "Fungal Infection"
+     },
+     "normalized": {
+      "ok": "fungal infection"
+     },
+     "candidates": {
+      "ok": [
+       "drug reaction",
+       "allergy",
+       "chicken pox"
+      ]
+     }
+    },
+    {
+     "input": "[diagnosis] common cold. [/diagnosis]",
+     "diagnosis": {
+      "ok": "common cold."
+     },
+     "normalized": {
+      "ok": "common cold"
+     },
+     "candidates": {
+      "ok": [
+       "drug reaction",
+       "allergy",
+       "chicken pox"
+      ]
+     }
+    },
+    {
+     "input": "[DIAGNOSIS]allergy[/DIAGNOSIS] then [DIAGNOSIS]malaria[/DIAGNOSIS]",
+     "diagnosis": {
+      "ok": "allergy"
+     },
+     "normalized": {
+      "ok": "allergy"
+     },
+     "candidates": {
+      "ok": [
+       "drug reaction",
+       "allergy",
+       "chicken pox"
+      ]
+     }
+    },
+    {
+     "input": "[DIAGNOSIS]no close tag",
+     "diagnosis": {
+      "ok": "[DIAGNOSIS]no close tag"
+     },
+     "normalized": {
+      "ok": "[diagnosis]no close tag"
+     },
+     "candidates": {
+      "ok": [
+       "drug reaction",
+       "allergy",
+       "chicken pox"
+      ]
+     }
+    },
+    {
+     "input": "Final diagnosis: Typhoid\nmore text",
+     "diagnosis": {
+      "ok": "Typhoid"
+     },
+     "normalized": {
+      "ok": "typhoid"
+     },
+     "candidates": {
+      "ok": [
+       "drug reaction",
+       "allergy",
+       "chicken pox"
+      ]
+     }
+    },
+    {
+     "input": "Conclusion：dengue",
+     "diagnosis": {
+      "ok": "dengue"
+     },
+     "normalized": {
+      "ok": "dengue"
+     },
+     "candidates": {
+      "ok": [
+       "drug reaction",
+       "allergy",
+       "chicken pox"
+      ]
+     }
+    },
+    {
+     "input": "I think\n\nit is  Jaundice!\n\n",
+     "diagnosis": {
+      "ok": "it is  Jaundice!"
+     },
+     "normalized": {
+      "ok": "it is jaundice"
+     },
+     "candidates": {
+      "ok": [
+       "drug reaction",
+       "allergy",
+       "chicken pox"
+      ]
+     }
+    },
+    {
+     "input": "",
+     "diagnosis": {
+      "ok": ""
+     },
+     "normalized": {
+      "ok": ""
+     },
+     "candidates": {
+      "ok": [
+       "drug reaction",
+       "allergy",
+       "chicken pox"
+      ]
+     }
+    },
+    {
+     "input": "1. malaria\n2. dengue, typhoid\n3. flu",
+     "diagnosis": {
+      "ok": "3. flu"
+     },
+     "normalized": {
+      "ok": "3. flu"
+     },
+     "candidates": {
+      "ok": [
+       "malaria",
+       "dengue",
+       "flu"
+      ]
+     }
+    },
+    {
+     "input": "[CANDIDATES]flu, cold ,  malaria[/CANDIDATES]",
+     "diagnosis": {
+      "ok": "[CANDIDATES]flu, cold ,  malaria[/CANDIDATES]"
+     },
+     "normalized": {
+      "ok": "[candidates]flu, cold , malaria[/candidates]"
+     },
+     "candidates": {
+      "ok": [
+       "flu",
+       "cold",
+       "malaria"
+      ]
+     }
+    }
+   ],
+   "format_result_for_training": {
+    "ok": {
+     "id": 3,
+     "symptoms": "q",
+     "ground_truth": "flu",
+     "candidates": [
+      "flu",
+      "cold"
+     ],
+     "llm_prediction": "flu",
+     "is_correct": true
+    }
+   },
+   "format_partial_metric": {
+    "ok": {
+     "id": 3,
+     "symptoms": "q",
+     "ground_truth": "flu",
+     "candidates": [],
+     "llm_prediction": "",
+     "is_correct": false
+    }
+   }
+  },
+  "symptom_diagnosis_agent": {
+   "responses": [
+    {
+     "input": "[DIAGNOSIS]Fungal Infection[/DIAGNOSIS]",
+     "diagnosis": {
+      "ok": "Fungal Infection"
+     },
+     "normalized": {
+      "ok": "fungal infection"
+     }
+    },
+    {
+     "input": "[diagnosis] common cold. [/diagnosis]",
+     "diagnosis": {
+      "ok": "common cold."
+     },
+     "normalized": {
+      "ok": "common cold"
+     }
+    },
+    {
+     "input": "[DIAGNOSIS]allergy[/DIAGNOSIS] then [DIAGNOSIS]malaria[/DIAGNOSIS]",
+     "diagnosis": {
+      "ok": "allergy"
+     },
+     "normalized": {
+      "ok": "allergy"
+     }
+    },
+    {
+     "input": "[DIAGNOSIS]no close tag",
+     "diagnosis": {
+      "ok": "[DIAGNOSIS]no close tag"
+     },
+     "normalized": {
+      "ok": "[diagnosis]no close tag"
+     }
+    },
+    {
+     "input": "Final diagnosis: Typhoid\nmore text",
+     "diagnosis": {
+      "ok": "Typhoid"
+     },
+     "normalized": {
+      "ok": "typhoid"
+     }
+    },
+    {
+     "input": "Conclusion：dengue",
+     "diagnosis": {
+      "ok": "dengue"
+     },
+     "normalized": {
+      "ok": "dengue"
+     }
+    },
+    {
+     "input": "I think\n\nit is  Jaundice!\n\n",
+     "diagnosis": {
+      "ok": "it is  Jaundice!"
+     },
+     "normalized": {
+      "ok": "it is jaundice"
+     }
+    },
+    {
+     "input": "",
+     "diagnosis": {
+      "ok": "unknown"
+     },
+     "normalized": {
+      "ok": "unknown"
+     }
+    },
+    {
+     "input": "1. malaria\n2. dengue, typhoid\n3. flu",
+     "diagnosis": {
+      "ok": "3. flu"
+     },
+     "normalized": {
+      "ok": "3. flu"
+     }
+    },
+    {
+     "input": "[CANDIDATES]flu, cold ,  malaria[/CANDIDATES]",
+     "diagnosis": {
+      "ok": "[CANDIDATES]flu, cold ,  malaria[/CANDIDATES]"
+     },
+     "normalized": {
+      "ok": "[candidates]flu, cold , malaria[/candidates]"
+     }
+    }
+   ],
+   "format_result_for_training": {
+    "ok": {
+     "id": 3,
+     "symptoms": "q",
+     "ground_truth": "flu",
+     "prediction": "",
+     "is_correct": true,
+     "trajectory": [
+      {
+       "stage": "agent_reasoning",
+       "turns": 0,
+       "diagnosis": ""
+      }
+     ]
+    }
+   },
+   "format_partial_metric": {
+    "ok": {
+     "id": 3,
+     "symptoms": "q",
+     "ground_truth": "flu",
+     "prediction": "",
+     "is_correct": false,
+     "trajectory": [
+      {
+       "stage": "agent_reasoning",
+       "turns": 0,
+       "diagnosis": ""
+      }
+     ]
+    }
+   }
+  },
+  "extract_skill_overview": {
+   "ok": "  Read train.json, group mistakes.\n\n    Add rules.",
+   "last": "  Only section, no next heading.",
+   "sub": "  Text\n  ### Sub heading stays\n  more",
+   "none": "  (no '## Skill Overview' section found)",
+   "empty": "  (Skill Overview section is empty)",
+   "missing": "  (SKILL.md not found)"
+  },
+  "compute_avg_metrics": {
+   "accuracy": 0.5,
+   "f1": 0.75
+  },
+  "folder_names": [
+   "iter0",
+   "iter1",
+   "iter1_sub0",
+   "iter2_sub3"
+  ]
+ }
+}

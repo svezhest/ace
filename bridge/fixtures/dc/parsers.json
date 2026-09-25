@@ -1,0 +1,168 @@
+{
+ "header": {
+  "repo": "dynamic-cheatsheet",
+  "path": "/Users/user/Projects/upstreams/dynamic-cheatsheet",
+  "commit": "5cfe3c37e8e52b1d858d0f3df46e7f17c50991b9",
+  "functions": {
+   "extract_cheatsheet": "dynamic_cheatsheet/utils/extractor.py:62",
+   "extract_answer": "dynamic_cheatsheet/utils/extractor.py:12"
+  },
+  "command": "$UPSTREAMS/.venvs/light/bin/python bridge/capture_dc.py",
+  "python": "3.11.11"
+ },
+ "data": {
+  "extract_cheatsheet": {
+   "normal": {
+    "input": "Some analysis.\n<cheatsheet>\nVersion: 2\nkeep this\n</cheatsheet>\ntrailing text",
+    "old": "OLD CHEATSHEET",
+    "ok": "Version: 2\nkeep this"
+   },
+   "two_blocks": {
+    "input": "<cheatsheet>A</cheatsheet> middle <cheatsheet>B</cheatsheet>",
+    "old": "OLD CHEATSHEET",
+    "ok": "A"
+   },
+   "two_open_one_close": {
+    "input": "<cheatsheet>A\n<cheatsheet>B</cheatsheet>",
+    "old": "OLD CHEATSHEET",
+    "ok": "A"
+   },
+   "tag_mentioned_in_prose": {
+    "input": "I will write the <cheatsheet> block below.\n<cheatsheet>REAL</cheatsheet>",
+    "old": "OLD CHEATSHEET",
+    "ok": "block below."
+   },
+   "no_closing": {
+    "input": "<cheatsheet>\nVersion: 3\nunterminated",
+    "old": "OLD CHEATSHEET",
+    "ok": "Version: 3\nunterminated"
+   },
+   "closing_only": {
+    "input": "text </cheatsheet>",
+    "old": "OLD CHEATSHEET",
+    "ok": "OLD CHEATSHEET"
+   },
+   "upper_case": {
+    "input": "<CHEATSHEET>X</CHEATSHEET>",
+    "old": "OLD CHEATSHEET",
+    "ok": "OLD CHEATSHEET"
+   },
+   "mixed_case": {
+    "input": "<Cheatsheet>X</Cheatsheet>",
+    "old": "OLD CHEATSHEET",
+    "ok": "OLD CHEATSHEET"
+   },
+   "empty_block": {
+    "input": "<cheatsheet></cheatsheet>",
+    "old": "OLD CHEATSHEET",
+    "ok": ""
+   },
+   "blank_block": {
+    "input": "<cheatsheet>\n   \n</cheatsheet>",
+    "old": "OLD CHEATSHEET",
+    "ok": ""
+   },
+   "empty_response": {
+    "input": "",
+    "old": "OLD CHEATSHEET",
+    "ok": "OLD CHEATSHEET"
+   },
+   "no_tag": {
+    "input": "No changes needed.",
+    "old": "OLD CHEATSHEET",
+    "ok": "OLD CHEATSHEET"
+   },
+   "inside_code_fence": {
+    "input": "NEW CHEATSHEET:\n```\n<cheatsheet>\nVersion: 2\nfenced\n</cheatsheet>\n```",
+    "old": "OLD CHEATSHEET",
+    "ok": "Version: 2\nfenced"
+   },
+   "template_echo": {
+    "input": "<cheatsheet>\nVersion: [Version Number]\n\nSOLUTIONS, IMPLEMENTATION PATTERNS, AND CODE SNIPPETS\n<memory_item>\n[...]\n</memory_item>\n</cheatsheet>",
+    "old": "OLD CHEATSHEET",
+    "ok": "Version: [Version Number]\n\nSOLUTIONS, IMPLEMENTATION PATTERNS, AND CODE SNIPPETS\n<memory_item>\n[...]\n</memory_item>"
+   },
+   "short_real": {
+    "input": "<cheatsheet>\nVersion: 1\nUse * before +.\n</cheatsheet>",
+    "old": "OLD CHEATSHEET",
+    "ok": "Version: 1\nUse * before +."
+   },
+   "long_real": {
+    "input": "<cheatsheet>\nVersion: 5\n\nSOLUTIONS, IMPLEMENTATION PATTERNS, AND CODE SNIPPETS\n<memory_item>\n<description>\nEquation balancing: try multiplication and division first, then fix the remainder with + and -.\n</description>\n<example>\n14 ? 16 ? 20 ? 15 ? 23 = 25 -> 14 - 16 / 20 * 15 + 23 = 25\n</example>\n</memory_item>\n** Count: 5\n\nGENERAL META-REASONING STRATEGIES\n<memory_item>\n<description>\nFor multiple-choice physics, estimate orders of magnitude before computing (question #5).\n</description>\n</memory_item>\n** Count: 1\n</cheatsheet>",
+    "old": "OLD CHEATSHEET",
+    "ok": "Version: 5\n\nSOLUTIONS, IMPLEMENTATION PATTERNS, AND CODE SNIPPETS\n<memory_item>\n<description>\nEquation balancing: try multiplication and division first, then fix the remainder with + and -.\n</description>\n<example>\n14 ? 16 ? 20 ? 15 ? 23 = 25 -> 14 - 16 / 20 * 15 + 23 = 25\n</example>\n</memory_item>\n** Count: 5\n\nGENERAL META-REASONING STRATEGIES\n<memory_item>\n<description>\nFor multiple-choice physics, estimate orders of magnitude before computing (question #5).\n</description>\n</memory_item>\n** Count: 1"
+   },
+   "leading_whitespace": {
+    "input": "\n\n  <cheatsheet>  padded  </cheatsheet>  \n",
+    "old": "OLD CHEATSHEET",
+    "ok": "padded"
+   }
+  },
+  "extract_answer": {
+   "answer_tag": {
+    "input": "<answer>(A)</answer>",
+    "ok": "(A)"
+   },
+   "final_answer_block": {
+    "input": "FINAL ANSWER:\n<answer>\n42\n</answer>",
+    "ok": "42"
+   },
+   "two_answer_tags": {
+    "input": "<answer>1</answer> then reconsider <answer>2</answer>",
+    "ok": "2"
+   },
+   "no_closing": {
+    "input": "<answer> 7 and more",
+    "ok": "7 and more"
+   },
+   "upper_case": {
+    "input": "<ANSWER>5</ANSWER>",
+    "ok": "No final answer found"
+   },
+   "empty_answer": {
+    "input": "<answer></answer>",
+    "ok": ""
+   },
+   "final_answer_backticks": {
+    "input": "FINAL ANSWER: ```\n12\n```",
+    "ok": "12"
+   },
+   "final_answer_quotes": {
+    "input": "FINAL ANSWER: '''13'''",
+    "ok": "13"
+   },
+   "final_answer_both_fences": {
+    "input": "FINAL ANSWER: '''a''' then ```b```",
+    "ok": "a"
+   },
+   "final_answer_plain": {
+    "input": "FINAL ANSWER: 14",
+    "ok": "No final answer found"
+   },
+   "final_answer_python": {
+    "input": "FINAL ANSWER:\n```python\ndef f():\n    return 1\n```",
+    "ok": "def f():\n    return 1"
+   },
+   "final_answer_lower": {
+    "input": "final answer: 15",
+    "ok": "No final answer found"
+   },
+   "empty": {
+    "input": "",
+    "ok": "No final answer found"
+   },
+   "no_marker": {
+    "input": "The answer is (B).",
+    "ok": "No final answer found"
+   },
+   "equation": {
+    "input": "FINAL ANSWER:\n<answer>\n1 + 2 * 3 = 7\n</answer>",
+    "ok": "1 + 2 * 3 = 7"
+   },
+   "answer_in_code_then_final": {
+    "input": "```\n<answer>x</answer>\n```\nFINAL ANSWER:\n<answer>\ny\n</answer>",
+    "ok": "y"
+   }
+  }
+ }
+}

@@ -1,0 +1,407 @@
+{
+ "header": {
+  "repo": "ace",
+  "path": "/Users/user/Projects/upstreams/ace",
+  "commit": "82709de050e1db6e6ef2f07bcb0393560b94992a",
+  "functions": {
+   "DataProcessor.answer_is_correct": "eval/finance/data_processor.py:165",
+   "DataProcessor._formula_answer_is_correct": "eval/finance/data_processor.py:154",
+   "DataProcessor._finer_answer_is_correct": "eval/finance/data_processor.py:126",
+   "DataProcessor.evaluate_accuracy": "eval/finance/data_processor.py:223",
+   "parse_context_and_question_formula": "eval/finance/data_processor.py:49",
+   "parse_instruction_and_input": "eval/finance/data_processor.py:31"
+  },
+  "command": "$UPSTREAMS/.venvs/ace/bin/python bridge/capture_ace.py",
+  "python": "3.11.11"
+ },
+ "data": {
+  "formula_answer_is_correct": [
+   {
+    "pred": "15.00",
+    "target": "15.0",
+    "out": {
+     "ok": true
+    }
+   },
+   {
+    "pred": "15",
+    "target": "15.0",
+    "out": {
+     "ok": true
+    }
+   },
+   {
+    "pred": "$15.00",
+    "target": "15.0",
+    "out": {
+     "ok": false
+    }
+   },
+   {
+    "pred": "15.0",
+    "target": "$15.0",
+    "out": {
+     "ok": false
+    }
+   },
+   {
+    "pred": "$15.0",
+    "target": "$15.0",
+    "out": {
+     "ok": true
+    }
+   },
+   {
+    "pred": "1,200.00",
+    "target": "1200.0",
+    "out": {
+     "ok": true
+    }
+   },
+   {
+    "pred": "1200",
+    "target": "1,200.0",
+    "out": {
+     "ok": true
+    }
+   },
+   {
+    "pred": "15%",
+    "target": "15.0",
+    "out": {
+     "ok": false
+    }
+   },
+   {
+    "pred": "15.004",
+    "target": "15.0",
+    "out": {
+     "ok": false
+    }
+   },
+   {
+    "pred": "1.5e1",
+    "target": "15.0",
+    "out": {
+     "ok": true
+    }
+   },
+   {
+    "pred": " 15.0 ",
+    "target": "15.0",
+    "out": {
+     "ok": true
+    }
+   },
+   {
+    "pred": "No final answer found",
+    "target": "15.0",
+    "out": {
+     "ok": false
+    }
+   },
+   {
+    "pred": "abc",
+    "target": "abc",
+    "out": {
+     "ok": true
+    }
+   },
+   {
+    "pred": "-3.5",
+    "target": "-3.50",
+    "out": {
+     "ok": true
+    }
+   },
+   {
+    "pred": "5 million",
+    "target": "5000000.0",
+    "out": {
+     "ok": false
+    }
+   },
+   {
+    "pred": "5000000.0",
+    "target": "5000000.0",
+    "out": {
+     "ok": true
+    }
+   },
+   {
+    "pred": "nan",
+    "target": "nan",
+    "out": {
+     "ok": false
+    }
+   },
+   {
+    "pred": "inf",
+    "target": "inf",
+    "out": {
+     "ok": true
+    }
+   }
+  ],
+  "finer_answer_is_correct": [
+   {
+    "pred": "Revenues,InterestExpense",
+    "target": "Revenues,InterestExpense",
+    "out": {
+     "ok": true
+    }
+   },
+   {
+    "pred": "revenues , interestexpense",
+    "target": "Revenues,InterestExpense",
+    "out": {
+     "ok": true
+    }
+   },
+   {
+    "pred": "Revenues",
+    "target": "Revenues,InterestExpense",
+    "out": {
+     "ok": false
+    }
+   },
+   {
+    "pred": "Revenues,InterestExpense,Goodwill",
+    "target": "Revenues,InterestExpense",
+    "out": {
+     "ok": true
+    }
+   },
+   {
+    "pred": "$1,200",
+    "target": "1200",
+    "out": {
+     "ok": false
+    }
+   },
+   {
+    "pred": "1200.0",
+    "target": "1200",
+    "out": {
+     "ok": true
+    }
+   },
+   {
+    "pred": "1+1",
+    "target": "2",
+    "out": {
+     "ok": true
+    }
+   },
+   {
+    "pred": "2",
+    "target": "1+1",
+    "out": {
+     "ok": true
+    }
+   },
+   {
+    "pred": "$5",
+    "target": "5",
+    "out": {
+     "ok": true
+    }
+   },
+   {
+    "pred": "5%",
+    "target": "5",
+    "out": {
+     "ok": false
+    }
+   },
+   {
+    "pred": "0.5",
+    "target": "1/2",
+    "out": {
+     "ok": true
+    }
+   },
+   {
+    "pred": "True",
+    "target": "1",
+    "out": {
+     "ok": false
+    }
+   },
+   {
+    "pred": "",
+    "target": "",
+    "out": {
+     "ok": true
+    }
+   },
+   {
+    "pred": "Goodwill,",
+    "target": "Goodwill",
+    "out": {
+     "ok": true
+    }
+   }
+  ],
+  "finer_counts": [
+   {
+    "pred": "Revenues,InterestExpense",
+    "target": "Revenues,InterestExpense",
+    "out": {
+     "ok": [
+      2,
+      2
+     ]
+    }
+   },
+   {
+    "pred": "revenues , interestexpense",
+    "target": "Revenues,InterestExpense",
+    "out": {
+     "ok": [
+      2,
+      2
+     ]
+    }
+   },
+   {
+    "pred": "Revenues",
+    "target": "Revenues,InterestExpense",
+    "out": {
+     "ok": [
+      1,
+      2
+     ]
+    }
+   },
+   {
+    "pred": "Revenues,InterestExpense,Goodwill",
+    "target": "Revenues,InterestExpense",
+    "out": {
+     "ok": [
+      2,
+      2
+     ]
+    }
+   },
+   {
+    "pred": "$1,200",
+    "target": "1200",
+    "out": {
+     "ok": [
+      0,
+      1
+     ]
+    }
+   },
+   {
+    "pred": "1200.0",
+    "target": "1200",
+    "out": {
+     "ok": [
+      1,
+      1
+     ]
+    }
+   },
+   {
+    "pred": "1+1",
+    "target": "2",
+    "out": {
+     "ok": [
+      1,
+      1
+     ]
+    }
+   },
+   {
+    "pred": "2",
+    "target": "1+1",
+    "out": {
+     "ok": [
+      1,
+      1
+     ]
+    }
+   },
+   {
+    "pred": "$5",
+    "target": "5",
+    "out": {
+     "ok": [
+      1,
+      1
+     ]
+    }
+   },
+   {
+    "pred": "5%",
+    "target": "5",
+    "out": {
+     "ok": [
+      0,
+      1
+     ]
+    }
+   },
+   {
+    "pred": "0.5",
+    "target": "1/2",
+    "out": {
+     "ok": [
+      1,
+      1
+     ]
+    }
+   },
+   {
+    "pred": "True",
+    "target": "1",
+    "out": {
+     "ok": [
+      0,
+      1
+     ]
+    }
+   },
+   {
+    "pred": "",
+    "target": "",
+    "out": {
+     "ok": [
+      1,
+      1
+     ]
+    }
+   },
+   {
+    "pred": "Goodwill,",
+    "target": "Goodwill",
+    "out": {
+     "ok": [
+      1,
+      1
+     ]
+    }
+   }
+  ],
+  "finer_evaluate_accuracy": {
+   "ok": 0.7777777777777778
+  },
+  "formula_evaluate_accuracy": {
+   "ok": 0.6111111111111112
+  },
+  "parse_context_and_question_formula": {
+   "ok": [
+    "",
+    "Alpha: revenue $300,000, operating income $45,000; find the operating margin. Your answer should be a plain floating point number, round to the nearest hundredth if necessary. Do the necessary conversions, for example 5 million should be 5000000.0. "
+   ]
+  },
+  "parse_instruction_and_input": {
+   "ok": [
+    "Revenue was $5 million.",
+    "Tag the numbers."
+   ]
+  }
+ }
+}

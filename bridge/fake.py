@@ -16,6 +16,8 @@ from types import SimpleNamespace
 BRIDGE = os.path.dirname(os.path.abspath(__file__))
 FIXTURES = os.path.join(BRIDGE, "fixtures")
 UPSTREAMS = os.environ.get("UPSTREAMS", "/Users/user/Projects/upstreams")
+# до offline(): он меняет cwd на tmp
+SCRIPT = os.path.abspath(sys.argv[0]) if sys.argv and sys.argv[0] else ""
 
 
 def digest(text):
@@ -157,8 +159,9 @@ def header(repo, funcs, command=None):
         "path": root,
         "commit": git_head(root),
         "functions": {name: where(f, root) if not isinstance(f, str) else f for name, f in funcs.items()},
-        "command": command or " ".join([os.path.relpath(sys.executable, UPSTREAMS)] +
-                                       [os.path.relpath(sys.argv[0], os.path.dirname(BRIDGE))]),
+        # запуск из корня стенда
+        "command": command or "$UPSTREAMS/{} {}".format(
+            os.path.relpath(sys.executable, UPSTREAMS), os.path.relpath(SCRIPT, os.path.dirname(BRIDGE))),
         "python": sys.version.split()[0],
     }
 

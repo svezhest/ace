@@ -1,0 +1,647 @@
+{
+ "header": {
+  "repo": "ace",
+  "path": "/Users/user/Projects/upstreams/ace",
+  "commit": "82709de050e1db6e6ef2f07bcb0393560b94992a",
+  "functions": {
+   "Generator._extract_bullet_ids": "ace/core/generator.py:79",
+   "Generator._extract_bullet_ids_regex": "ace/core/generator.py:104",
+   "Reflector._extract_bullet_tags": "ace/core/reflector.py:100",
+   "extract_json_from_text": "playbook_utils.py:256",
+   "Curator._extract_and_validate_operations": "ace/core/curator.py:344",
+   "extract_answer": "utils.py:100"
+  },
+  "command": "$UPSTREAMS/.venvs/ace/bin/python bridge/capture_ace.py",
+  "python": "3.11.11"
+ },
+ "data": {
+  "_extract_bullet_ids_regex": [
+   {
+    "in": "Used [calc-00001] and [fin-00002].",
+    "out": {
+     "ok": [
+      "calc-00001",
+      "fin-00002"
+     ]
+    }
+   },
+   {
+    "in": "Used [ph-00003] and [sai-00004].",
+    "out": {
+     "ok": [
+      "sai-00004"
+     ]
+    }
+   },
+   {
+    "in": "{\"bullet_ids\": [\"calc-00001\", \"ph-00003\"], \"final_answer\": \"1\"}",
+    "out": {
+     "ok": []
+    }
+   },
+   {
+    "in": "{\"bullet_ids\": \"[\\\"ph-00001\\\"]\", \"final_answer\": \"1\"}",
+    "out": {
+     "ok": []
+    }
+   },
+   {
+    "in": "{\"bullet_ids\": [\"calc-1\"], \"final_answer\": \"1\"}",
+    "out": {
+     "ok": []
+    }
+   },
+   {
+    "in": "Used [CALC-00001] and [Calc-00002] and [calc-0001] and [calc-000001].",
+    "out": {
+     "ok": []
+    }
+   },
+   {
+    "in": "bullet_ids: [\"calc-00001\", \"misc-00007\"]",
+    "out": {
+     "ok": []
+    }
+   },
+   {
+    "in": "```json\n{\"bullet_ids\": [\"calc-00001\"], \"final_answer\": \"1\"}\n```",
+    "out": {
+     "ok": []
+    }
+   },
+   {
+    "in": "no ids here",
+    "out": {
+     "ok": []
+    }
+   },
+   {
+    "in": "[code-00012][err-00013] [ctx-00014]",
+    "out": {
+     "ok": [
+      "code-00012",
+      "err-00013",
+      "ctx-00014"
+     ]
+    }
+   }
+  ],
+  "_extract_bullet_ids": [
+   {
+    "in": "Used [calc-00001] and [fin-00002].",
+    "json_mode": false,
+    "out": {
+     "ok": [
+      "calc-00001",
+      "fin-00002"
+     ]
+    }
+   },
+   {
+    "in": "Used [calc-00001] and [fin-00002].",
+    "json_mode": true,
+    "out": {
+     "ok": [
+      "calc-00001",
+      "fin-00002"
+     ]
+    }
+   },
+   {
+    "in": "Used [ph-00003] and [sai-00004].",
+    "json_mode": false,
+    "out": {
+     "ok": [
+      "sai-00004"
+     ]
+    }
+   },
+   {
+    "in": "Used [ph-00003] and [sai-00004].",
+    "json_mode": true,
+    "out": {
+     "ok": [
+      "sai-00004"
+     ]
+    }
+   },
+   {
+    "in": "{\"bullet_ids\": [\"calc-00001\", \"ph-00003\"], \"final_answer\": \"1\"}",
+    "json_mode": false,
+    "out": {
+     "ok": []
+    }
+   },
+   {
+    "in": "{\"bullet_ids\": [\"calc-00001\", \"ph-00003\"], \"final_answer\": \"1\"}",
+    "json_mode": true,
+    "out": {
+     "ok": [
+      "calc-00001",
+      "ph-00003"
+     ]
+    }
+   },
+   {
+    "in": "{\"bullet_ids\": \"[\\\"ph-00001\\\"]\", \"final_answer\": \"1\"}",
+    "json_mode": false,
+    "out": {
+     "ok": []
+    }
+   },
+   {
+    "in": "{\"bullet_ids\": \"[\\\"ph-00001\\\"]\", \"final_answer\": \"1\"}",
+    "json_mode": true,
+    "out": {
+     "ok": "[\"ph-00001\"]"
+    }
+   },
+   {
+    "in": "{\"bullet_ids\": [\"calc-1\"], \"final_answer\": \"1\"}",
+    "json_mode": false,
+    "out": {
+     "ok": []
+    }
+   },
+   {
+    "in": "{\"bullet_ids\": [\"calc-1\"], \"final_answer\": \"1\"}",
+    "json_mode": true,
+    "out": {
+     "ok": [
+      "calc-1"
+     ]
+    }
+   },
+   {
+    "in": "Used [CALC-00001] and [Calc-00002] and [calc-0001] and [calc-000001].",
+    "json_mode": false,
+    "out": {
+     "ok": []
+    }
+   },
+   {
+    "in": "Used [CALC-00001] and [Calc-00002] and [calc-0001] and [calc-000001].",
+    "json_mode": true,
+    "out": {
+     "ok": []
+    }
+   },
+   {
+    "in": "bullet_ids: [\"calc-00001\", \"misc-00007\"]",
+    "json_mode": false,
+    "out": {
+     "ok": []
+    }
+   },
+   {
+    "in": "bullet_ids: [\"calc-00001\", \"misc-00007\"]",
+    "json_mode": true,
+    "out": {
+     "ok": []
+    }
+   },
+   {
+    "in": "```json\n{\"bullet_ids\": [\"calc-00001\"], \"final_answer\": \"1\"}\n```",
+    "json_mode": false,
+    "out": {
+     "ok": []
+    }
+   },
+   {
+    "in": "```json\n{\"bullet_ids\": [\"calc-00001\"], \"final_answer\": \"1\"}\n```",
+    "json_mode": true,
+    "out": {
+     "ok": []
+    }
+   },
+   {
+    "in": "no ids here",
+    "json_mode": false,
+    "out": {
+     "ok": []
+    }
+   },
+   {
+    "in": "no ids here",
+    "json_mode": true,
+    "out": {
+     "ok": []
+    }
+   },
+   {
+    "in": "[code-00012][err-00013] [ctx-00014]",
+    "json_mode": false,
+    "out": {
+     "ok": [
+      "code-00012",
+      "err-00013",
+      "ctx-00014"
+     ]
+    }
+   },
+   {
+    "in": "[code-00012][err-00013] [ctx-00014]",
+    "json_mode": true,
+    "out": {
+     "ok": [
+      "code-00012",
+      "err-00013",
+      "ctx-00014"
+     ]
+    }
+   }
+  ],
+  "_extract_bullet_tags": [
+   {
+    "in": "{\"reasoning\": \"r\", \"bullet_tags\": [{\"id\": \"calc-00001\", \"tag\": \"helpful\"}]}",
+    "json_mode": false,
+    "out": {
+     "ok": [
+      {
+       "id": "calc-00001",
+       "tag": "helpful"
+      }
+     ]
+    }
+   },
+   {
+    "in": "{\"reasoning\": \"r\", \"bullet_tags\": [{\"id\": \"calc-00001\", \"tag\": \"helpful\"}]}",
+    "json_mode": true,
+    "out": {
+     "ok": [
+      {
+       "id": "calc-00001",
+       "tag": "helpful"
+      }
+     ]
+    }
+   },
+   {
+    "in": "prose then \"bullet_tags\": [{\"id\": \"ph-00003\", \"tag\": \"harmful\"}, {\"id\": \"x\", \"tag\": \"neutral\"}] tail",
+    "json_mode": false,
+    "out": {
+     "ok": [
+      {
+       "id": "ph-00003",
+       "tag": "harmful"
+      },
+      {
+       "id": "x",
+       "tag": "neutral"
+      }
+     ]
+    }
+   },
+   {
+    "in": "prose then \"bullet_tags\": [{\"id\": \"ph-00003\", \"tag\": \"harmful\"}, {\"id\": \"x\", \"tag\": \"neutral\"}] tail",
+    "json_mode": true,
+    "out": {
+     "ok": []
+    }
+   },
+   {
+    "in": "\"bullet_tags\": [{\"id\": \"a\", \"tag\": \"helpful\"}",
+    "json_mode": false,
+    "out": {
+     "ok": []
+    }
+   },
+   {
+    "in": "\"bullet_tags\": [{\"id\": \"a\", \"tag\": \"helpful\"}",
+    "json_mode": true,
+    "out": {
+     "ok": []
+    }
+   },
+   {
+    "in": "\"bullet_tags\": []",
+    "json_mode": false,
+    "out": {
+     "ok": []
+    }
+   },
+   {
+    "in": "\"bullet_tags\": []",
+    "json_mode": true,
+    "out": {
+     "ok": []
+    }
+   },
+   {
+    "in": "no tags",
+    "json_mode": false,
+    "out": {
+     "ok": []
+    }
+   },
+   {
+    "in": "no tags",
+    "json_mode": true,
+    "out": {
+     "ok": []
+    }
+   },
+   {
+    "in": "```json\n{\"bullet_tags\": [{\"bullet\": \"calc-00001\", \"tag\": \"helpful\"}]}\n```",
+    "json_mode": false,
+    "out": {
+     "ok": [
+      {
+       "bullet": "calc-00001",
+       "tag": "helpful"
+      }
+     ]
+    }
+   },
+   {
+    "in": "```json\n{\"bullet_tags\": [{\"bullet\": \"calc-00001\", \"tag\": \"helpful\"}]}\n```",
+    "json_mode": true,
+    "out": {
+     "ok": []
+    }
+   }
+  ],
+  "extract_json_from_text": [
+   {
+    "in": "{\"a\": 1}",
+    "out": {
+     "ok": {
+      "a": 1
+     }
+    }
+   },
+   {
+    "in": "  {\"a\": 1}\n",
+    "out": {
+     "ok": {
+      "a": 1
+     }
+    }
+   },
+   {
+    "in": "text before ```json\n{\"a\": 1}\n``` after",
+    "out": {
+     "ok": {
+      "a": 1
+     }
+    }
+   },
+   {
+    "in": "```JSON\n{\"a\": 2}\n```",
+    "out": {
+     "ok": {
+      "a": 2
+     }
+    }
+   },
+   {
+    "in": "```json\n{\"a\": 1,}\n```\n```json\n{\"b\": 2}\n```",
+    "out": {
+     "ok": {
+      "b": 2
+     }
+    }
+   },
+   {
+    "in": "{\"a\": 1} and then {\"b\": 2}",
+    "out": {
+     "ok": {
+      "a": 1
+     }
+    }
+   },
+   {
+    "in": "broken {\"a\": 1 and more",
+    "out": {
+     "ok": null
+    }
+   },
+   {
+    "in": "nested {\"a\": {\"b\": [1, 2, {\"c\": \"}\"}]}} tail",
+    "out": {
+     "ok": {
+      "a": {
+       "b": [
+        1,
+        2,
+        {
+         "c": "}"
+        }
+       ]
+      }
+     }
+    }
+   },
+   {
+    "in": "{\"a\": \"brace } in string\"}",
+    "out": {
+     "ok": {
+      "a": "brace } in string"
+     }
+    }
+   },
+   {
+    "in": "[1, 2, 3]",
+    "out": {
+     "ok": [
+      1,
+      2,
+      3
+     ]
+    }
+   },
+   {
+    "in": "```\n{\"a\": 1}\n```",
+    "out": {
+     "ok": {
+      "a": 1
+     }
+    }
+   },
+   {
+    "in": "{'a': 1}",
+    "out": {
+     "ok": null
+    }
+   },
+   {
+    "in": "",
+    "out": {
+     "ok": null
+    }
+   }
+  ],
+  "_extract_and_validate_operations": [
+   {
+    "in": "{\"reasoning\": \"r\", \"operations\": [{\"type\": \"ADD\", \"section\": \"s\", \"content\": \"c\"}]}",
+    "out": {
+     "ok": {
+      "reasoning": "r",
+      "operations": [
+       {
+        "type": "ADD",
+        "section": "s",
+        "content": "c"
+       }
+      ]
+     }
+    }
+   },
+   {
+    "in": "{\"reasoning\": \"r\", \"operations\": []}",
+    "out": {
+     "ok": {
+      "reasoning": "r",
+      "operations": []
+     }
+    }
+   },
+   {
+    "in": "{\"operations\": []}",
+    "out": {
+     "error": "ValueError: JSON missing required 'reasoning' field"
+    }
+   },
+   {
+    "in": "{\"reasoning\": \"r\", \"operations\": [{\"type\": \"ADD\", \"section\": \"s\"}]}",
+    "out": {
+     "error": "ValueError: ADD operation 0 missing fields: ['content']"
+    }
+   },
+   {
+    "in": "{\"reasoning\": \"r\", \"operations\": [{\"type\": \"DELETE\", \"bullet_id\": \"calc-00001\"}]}",
+    "out": {
+     "ok": {
+      "reasoning": "r",
+      "operations": [
+       {
+        "type": "DELETE",
+        "bullet_id": "calc-00001"
+       }
+      ]
+     }
+    }
+   },
+   {
+    "in": "{\"reasoning\": \"r\", \"operations\": [{\"type\": \"FOO\"}]}",
+    "out": {
+     "ok": {
+      "reasoning": "r",
+      "operations": [
+       {
+        "type": "FOO"
+       }
+      ]
+     }
+    }
+   },
+   {
+    "in": "{\"reasoning\": \"r\", \"operations\": \"ADD\"}",
+    "out": {
+     "error": "ValueError: 'operations' field must be a list"
+    }
+   },
+   {
+    "in": "```json\n{\"reasoning\": \"r\", \"operations\": [{\"type\": \"ADD\", \"section\": \"s\", \"content\": \"c\"}]}\n```",
+    "out": {
+     "ok": {
+      "reasoning": "r",
+      "operations": [
+       {
+        "type": "ADD",
+        "section": "s",
+        "content": "c"
+       }
+      ]
+     }
+    }
+   },
+   {
+    "in": "nothing",
+    "out": {
+     "error": "ValueError: Failed to extract valid JSON from curator response"
+    }
+   }
+  ],
+  "extract_answer": [
+   {
+    "in": "{\"reasoning\": \"r\", \"final_answer\": \"15.00\"}",
+    "out": {
+     "ok": "15.00"
+    }
+   },
+   {
+    "in": "{\"reasoning\": \"r\", \"final_answer\": 15}",
+    "out": {
+     "ok": "15"
+    }
+   },
+   {
+    "in": "{\"reasoning\": \"r\", \"final_answer\": \"$1,200.50\"}",
+    "out": {
+     "ok": "$1,200.50"
+    }
+   },
+   {
+    "in": "Some text \"final_answer\": \"42\" more",
+    "out": {
+     "ok": "42"
+    }
+   },
+   {
+    "in": "Some text 'final_answer': '42' more",
+    "out": {
+     "ok": "42"
+    }
+   },
+   {
+    "in": "\"final_answer\": 3.14}",
+    "out": {
+     "ok": "3.14"
+    }
+   },
+   {
+    "in": "Finish[7] then Finish[8]",
+    "out": {
+     "ok": "8"
+    }
+   },
+   {
+    "in": "The final answer is: $\\boxed{12.5}$",
+    "out": {
+     "ok": "12.5"
+    }
+   },
+   {
+    "in": "The final answer is 99.",
+    "out": {
+     "ok": "99"
+    }
+   },
+   {
+    "in": "The final answer is $5$",
+    "out": {
+     "ok": "5"
+    }
+   },
+   {
+    "in": "{\"final_answer\": \"a\"} {\"final_answer\": \"b\"}",
+    "out": {
+     "ok": "b"
+    }
+   },
+   {
+    "in": "[\"x\"]",
+    "out": {
+     "ok": "No final answer found"
+    }
+   },
+   {
+    "in": "nothing",
+    "out": {
+     "ok": "No final answer found"
+    }
+   }
+  ]
+ }
+}

@@ -1,0 +1,266 @@
+{
+ "header": {
+  "repo": "dynamic-cheatsheet",
+  "path": "/Users/user/Projects/upstreams/dynamic-cheatsheet",
+  "commit": "5cfe3c37e8e52b1d858d0f3df46e7f17c50991b9",
+  "functions": {
+   "extract_cheatsheet": "dynamic_cheatsheet/utils/extractor.py:62"
+  },
+  "command": "$UPSTREAMS/.venvs/light/bin/python bridge/capture_dc.py",
+  "python": "3.11.11"
+ },
+ "data": {
+  "sources": {
+   "patched": {
+    "path": "/Users/user/Projects/itmo/cs-masters/thesis/repro/dynamic-cheatsheet/dynamic_cheatsheet/utils/extractor.py",
+    "sha256": "0ce0eff6b8493a08"
+   },
+   "ours": {
+    "path": "/Users/user/Projects/ace/ace/parse.py",
+    "sha256": "e65e1b0b37de688d",
+    "ace_commit": "e5d361999f6377b8be7916a6613fbf1c4c4bcb59",
+    "function": "opened('cheatsheet')"
+   }
+  },
+  "rows": {
+   "normal": {
+    "input": "Some analysis.\n<cheatsheet>\nVersion: 2\nkeep this\n</cheatsheet>\ntrailing text",
+    "head": {
+     "ok": "Version: 2\nkeep this"
+    },
+    "patched": {
+     "ok": "OLD CHEATSHEET"
+    },
+    "ours": {
+     "ok": "Version: 2\nkeep this"
+    },
+    "patched_differs": true,
+    "ours_differs": false
+   },
+   "two_blocks": {
+    "input": "<cheatsheet>A</cheatsheet> middle <cheatsheet>B</cheatsheet>",
+    "head": {
+     "ok": "A"
+    },
+    "patched": {
+     "ok": "OLD CHEATSHEET"
+    },
+    "ours": {
+     "ok": "A"
+    },
+    "patched_differs": true,
+    "ours_differs": false
+   },
+   "two_open_one_close": {
+    "input": "<cheatsheet>A\n<cheatsheet>B</cheatsheet>",
+    "head": {
+     "ok": "A"
+    },
+    "patched": {
+     "ok": "OLD CHEATSHEET"
+    },
+    "ours": {
+     "ok": "A\n<cheatsheet>B"
+    },
+    "patched_differs": true,
+    "ours_differs": true
+   },
+   "tag_mentioned_in_prose": {
+    "input": "I will write the <cheatsheet> block below.\n<cheatsheet>REAL</cheatsheet>",
+    "head": {
+     "ok": "block below."
+    },
+    "patched": {
+     "ok": "OLD CHEATSHEET"
+    },
+    "ours": {
+     "ok": "block below.\n<cheatsheet>REAL"
+    },
+    "patched_differs": true,
+    "ours_differs": true
+   },
+   "no_closing": {
+    "input": "<cheatsheet>\nVersion: 3\nunterminated",
+    "head": {
+     "ok": "Version: 3\nunterminated"
+    },
+    "patched": {
+     "ok": "OLD CHEATSHEET"
+    },
+    "ours": {
+     "ok": "Version: 3\nunterminated"
+    },
+    "patched_differs": true,
+    "ours_differs": false
+   },
+   "closing_only": {
+    "input": "text </cheatsheet>",
+    "head": {
+     "ok": "OLD CHEATSHEET"
+    },
+    "patched": {
+     "ok": "OLD CHEATSHEET"
+    },
+    "ours": {
+     "ok": "OLD CHEATSHEET"
+    },
+    "patched_differs": false,
+    "ours_differs": false
+   },
+   "upper_case": {
+    "input": "<CHEATSHEET>X</CHEATSHEET>",
+    "head": {
+     "ok": "OLD CHEATSHEET"
+    },
+    "patched": {
+     "ok": "OLD CHEATSHEET"
+    },
+    "ours": {
+     "ok": "OLD CHEATSHEET"
+    },
+    "patched_differs": false,
+    "ours_differs": false
+   },
+   "mixed_case": {
+    "input": "<Cheatsheet>X</Cheatsheet>",
+    "head": {
+     "ok": "OLD CHEATSHEET"
+    },
+    "patched": {
+     "ok": "OLD CHEATSHEET"
+    },
+    "ours": {
+     "ok": "OLD CHEATSHEET"
+    },
+    "patched_differs": false,
+    "ours_differs": false
+   },
+   "empty_block": {
+    "input": "<cheatsheet></cheatsheet>",
+    "head": {
+     "ok": ""
+    },
+    "patched": {
+     "ok": "OLD CHEATSHEET"
+    },
+    "ours": {
+     "ok": ""
+    },
+    "patched_differs": true,
+    "ours_differs": false
+   },
+   "blank_block": {
+    "input": "<cheatsheet>\n   \n</cheatsheet>",
+    "head": {
+     "ok": ""
+    },
+    "patched": {
+     "ok": "OLD CHEATSHEET"
+    },
+    "ours": {
+     "ok": ""
+    },
+    "patched_differs": true,
+    "ours_differs": false
+   },
+   "empty_response": {
+    "input": "",
+    "head": {
+     "ok": "OLD CHEATSHEET"
+    },
+    "patched": {
+     "ok": "OLD CHEATSHEET"
+    },
+    "ours": {
+     "ok": "OLD CHEATSHEET"
+    },
+    "patched_differs": false,
+    "ours_differs": false
+   },
+   "no_tag": {
+    "input": "No changes needed.",
+    "head": {
+     "ok": "OLD CHEATSHEET"
+    },
+    "patched": {
+     "ok": "OLD CHEATSHEET"
+    },
+    "ours": {
+     "ok": "OLD CHEATSHEET"
+    },
+    "patched_differs": false,
+    "ours_differs": false
+   },
+   "inside_code_fence": {
+    "input": "NEW CHEATSHEET:\n```\n<cheatsheet>\nVersion: 2\nfenced\n</cheatsheet>\n```",
+    "head": {
+     "ok": "Version: 2\nfenced"
+    },
+    "patched": {
+     "ok": "OLD CHEATSHEET"
+    },
+    "ours": {
+     "ok": "Version: 2\nfenced"
+    },
+    "patched_differs": true,
+    "ours_differs": false
+   },
+   "template_echo": {
+    "input": "<cheatsheet>\nVersion: [Version Number]\n\nSOLUTIONS, IMPLEMENTATION PATTERNS, AND CODE SNIPPETS\n<memory_item>\n[...]\n</memory_item>\n</cheatsheet>",
+    "head": {
+     "ok": "Version: [Version Number]\n\nSOLUTIONS, IMPLEMENTATION PATTERNS, AND CODE SNIPPETS\n<memory_item>\n[...]\n</memory_item>"
+    },
+    "patched": {
+     "ok": "OLD CHEATSHEET"
+    },
+    "ours": {
+     "ok": "Version: [Version Number]\n\nSOLUTIONS, IMPLEMENTATION PATTERNS, AND CODE SNIPPETS\n<memory_item>\n[...]\n</memory_item>"
+    },
+    "patched_differs": true,
+    "ours_differs": false
+   },
+   "short_real": {
+    "input": "<cheatsheet>\nVersion: 1\nUse * before +.\n</cheatsheet>",
+    "head": {
+     "ok": "Version: 1\nUse * before +."
+    },
+    "patched": {
+     "ok": "OLD CHEATSHEET"
+    },
+    "ours": {
+     "ok": "Version: 1\nUse * before +."
+    },
+    "patched_differs": true,
+    "ours_differs": false
+   },
+   "long_real": {
+    "input": "<cheatsheet>\nVersion: 5\n\nSOLUTIONS, IMPLEMENTATION PATTERNS, AND CODE SNIPPETS\n<memory_item>\n<description>\nEquation balancing: try multiplication and division first, then fix the remainder with + and -.\n</description>\n<example>\n14 ? 16 ? 20 ? 15 ? 23 = 25 -> 14 - 16 / 20 * 15 + 23 = 25\n</example>\n</memory_item>\n** Count: 5\n\nGENERAL META-REASONING STRATEGIES\n<memory_item>\n<description>\nFor multiple-choice physics, estimate orders of magnitude before computing (question #5).\n</description>\n</memory_item>\n** Count: 1\n</cheatsheet>",
+    "head": {
+     "ok": "Version: 5\n\nSOLUTIONS, IMPLEMENTATION PATTERNS, AND CODE SNIPPETS\n<memory_item>\n<description>\nEquation balancing: try multiplication and division first, then fix the remainder with + and -.\n</description>\n<example>\n14 ? 16 ? 20 ? 15 ? 23 = 25 -> 14 - 16 / 20 * 15 + 23 = 25\n</example>\n</memory_item>\n** Count: 5\n\nGENERAL META-REASONING STRATEGIES\n<memory_item>\n<description>\nFor multiple-choice physics, estimate orders of magnitude before computing (question #5).\n</description>\n</memory_item>\n** Count: 1"
+    },
+    "patched": {
+     "ok": "Version: 5\n\nSOLUTIONS, IMPLEMENTATION PATTERNS, AND CODE SNIPPETS\n<memory_item>\n<description>\nEquation balancing: try multiplication and division first, then fix the remainder with + and -.\n</description>\n<example>\n14 ? 16 ? 20 ? 15 ? 23 = 25 -> 14 - 16 / 20 * 15 + 23 = 25\n</example>\n</memory_item>\n** Count: 5\n\nGENERAL META-REASONING STRATEGIES\n<memory_item>\n<description>\nFor multiple-choice physics, estimate orders of magnitude before computing (question #5).\n</description>\n</memory_item>\n** Count: 1"
+    },
+    "ours": {
+     "ok": "Version: 5\n\nSOLUTIONS, IMPLEMENTATION PATTERNS, AND CODE SNIPPETS\n<memory_item>\n<description>\nEquation balancing: try multiplication and division first, then fix the remainder with + and -.\n</description>\n<example>\n14 ? 16 ? 20 ? 15 ? 23 = 25 -> 14 - 16 / 20 * 15 + 23 = 25\n</example>\n</memory_item>\n** Count: 5\n\nGENERAL META-REASONING STRATEGIES\n<memory_item>\n<description>\nFor multiple-choice physics, estimate orders of magnitude before computing (question #5).\n</description>\n</memory_item>\n** Count: 1"
+    },
+    "patched_differs": false,
+    "ours_differs": false
+   },
+   "leading_whitespace": {
+    "input": "\n\n  <cheatsheet>  padded  </cheatsheet>  \n",
+    "head": {
+     "ok": "padded"
+    },
+    "patched": {
+     "ok": "OLD CHEATSHEET"
+    },
+    "ours": {
+     "ok": "padded"
+    },
+    "patched_differs": true,
+    "ours_differs": false
+   }
+  }
+ }
+}

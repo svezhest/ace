@@ -1,0 +1,2644 @@
+{
+ "header": {
+  "repo": "EvoLib",
+  "path": "/Users/user/Projects/upstreams/EvoLib",
+  "commit": "98266b2d22e146c19c651b1126ae81ff072f65e0",
+  "functions": {
+   "compute_IG": "EvoLib/evolib_agent.py:219",
+   "update_future_IG_for_insights": "EvoLib/evolib_agent.py:222",
+   "update_future_IG_for_skills": "EvoLib/evolib_agent.py:235",
+   "_sample_from_library": "EvoLib/evolib_agent.py:73",
+   "add_new_insight": "EvoLib/evolib_agent.py:144",
+   "add_new_skills": "EvoLib/evolib_agent.py:178",
+   "run_iteration": "EvoLib/evolib_agent.py:248",
+   "eval_function": "bridge/capture_evolib.py:eval_function (наш чекер вместо matharena)"
+  },
+  "command": "$UPSTREAMS/.venvs/light/bin/python bridge/capture_evolib.py",
+  "python": "3.11.11"
+ },
+ "data": {
+  "compute_IG": {
+   "majority_2_of_3": {
+    "best": 1.0,
+    "scores": [
+     1.0,
+     1.0,
+     0.0
+    ],
+    "IG": 0.40546510810816444
+   },
+   "all_right": {
+    "best": 1.0,
+    "scores": [
+     1.0,
+     1.0,
+     1.0
+    ],
+    "IG": 0.0
+   },
+   "all_wrong": {
+    "best": 0.0,
+    "scores": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "IG": 0.0
+   },
+   "one_of_3": {
+    "best": 1.0,
+    "scores": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "IG": 1.0986122886681098
+   },
+   "halved": {
+    "best": 0.5,
+    "scores": [
+     0.5,
+     0.5,
+     0.0
+    ],
+    "IG": 0.4054651081081645
+   },
+   "tiny_mean": {
+    "best": 1.0,
+    "scores": [
+     0.01,
+     0.0,
+     0.0
+    ],
+    "IG": 4.605170185988091
+   },
+   "single": {
+    "best": 1.0,
+    "scores": [
+     1.0
+    ],
+    "IG": 0.0
+   }
+  },
+  "update_future_IG": {
+   "in_best_and_one_other": {
+    "best": 1.0,
+    "best_sample": [
+     "s1",
+     "i1"
+    ],
+    "scores": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "samples": [
+     [
+      "s1",
+      "i1"
+     ],
+     [
+      "s1",
+      "i1"
+     ],
+     []
+    ],
+    "after": {
+     "s1": [
+      4.605170185988091
+     ],
+     "s2": [
+      0.3
+     ],
+     "i1": [
+      4.605170185988091
+     ],
+     "i2": [
+      0.2
+     ]
+    }
+   },
+   "in_all_samples": {
+    "best": 1.0,
+    "best_sample": [
+     "s1",
+     "i1"
+    ],
+    "scores": [
+     1.0,
+     1.0
+    ],
+    "samples": [
+     [
+      "s1",
+      "i1"
+     ],
+     [
+      "s1",
+      "i1"
+     ]
+    ],
+    "after": {
+     "s1": [
+      4.605170185988091
+     ],
+     "s2": [
+      0.3
+     ],
+     "i1": [
+      4.605170185988091
+     ],
+     "i2": [
+      0.2
+     ]
+    }
+   },
+   "missing_from_lib": {
+    "best": 1.0,
+    "best_sample": [
+     "gone"
+    ],
+    "scores": [
+     1.0,
+     0.0
+    ],
+    "samples": [
+     [
+      "gone"
+     ],
+     []
+    ],
+    "after": {
+     "s1": [
+      4.605170185988091
+     ],
+     "s2": [
+      0.3
+     ],
+     "i1": [
+      4.605170185988091
+     ],
+     "i2": [
+      0.2
+     ]
+    }
+   },
+   "baseline_zero_eps": {
+    "best": 0.5,
+    "best_sample": [
+     "s2",
+     "i2"
+    ],
+    "scores": [
+     0.5,
+     0.0,
+     0.0
+    ],
+    "samples": [
+     [
+      "s2",
+      "i2"
+     ],
+     [],
+     []
+    ],
+    "after": {
+     "s1": [
+      4.605170185988091
+     ],
+     "s2": [
+      0.3,
+      3.9120230054281455
+     ],
+     "i1": [
+      4.605170185988091
+     ],
+     "i2": [
+      0.2,
+      3.9120230054281455
+     ]
+    }
+   },
+   "duplicates_in_best": {
+    "best": 1.0,
+    "best_sample": [
+     "s1",
+     "s1",
+     "i1",
+     "i1"
+    ],
+    "scores": [
+     1.0,
+     0.0
+    ],
+    "samples": [
+     [
+      "s1",
+      "i1"
+     ],
+     []
+    ],
+    "after": {
+     "s1": [
+      4.605170185988091,
+      4.605170185988091,
+      4.605170185988091
+     ],
+     "s2": [
+      0.3,
+      3.9120230054281455
+     ],
+     "i1": [
+      4.605170185988091,
+      4.605170185988091,
+      4.605170185988091
+     ],
+     "i2": [
+      0.2,
+      3.9120230054281455
+     ]
+    }
+   }
+  },
+  "sample_from_library": {
+   "both": [
+    {
+     "seed": 0,
+     "p_choice": 0.8444218515250481,
+     "skills": [],
+     "insights": [],
+     "choices": []
+    },
+    {
+     "seed": 1,
+     "p_choice": 0.13436424411240122,
+     "skills": [
+      "skill_negative_ig",
+      "skill_negative_ig",
+      "skill_high"
+     ],
+     "insights": [],
+     "choices": [
+      {
+       "population": [
+        "skill_high",
+        "skill_negative_ig",
+        "skill_zero"
+       ],
+       "weights": [
+        1.0,
+        0.51,
+        0.01
+       ],
+       "k": 3,
+       "chosen": [
+        "skill_negative_ig",
+        "skill_negative_ig",
+        "skill_high"
+       ]
+      }
+     ]
+    },
+    {
+     "seed": 2,
+     "p_choice": 0.9560342718892494,
+     "skills": [],
+     "insights": [],
+     "choices": []
+    },
+    {
+     "seed": 3,
+     "p_choice": 0.23796462709189137,
+     "skills": [
+      "skill_high",
+      "skill_high",
+      "skill_high"
+     ],
+     "insights": [],
+     "choices": [
+      {
+       "population": [
+        "skill_high",
+        "skill_negative_ig",
+        "skill_zero"
+       ],
+       "weights": [
+        1.0,
+        0.51,
+        0.01
+       ],
+       "k": 3,
+       "chosen": [
+        "skill_high",
+        "skill_high",
+        "skill_high"
+       ]
+      }
+     ]
+    },
+    {
+     "seed": 4,
+     "p_choice": 0.23604808973743452,
+     "skills": [
+      "skill_high",
+      "skill_high",
+      "skill_high"
+     ],
+     "insights": [],
+     "choices": [
+      {
+       "population": [
+        "skill_high",
+        "skill_negative_ig",
+        "skill_zero"
+       ],
+       "weights": [
+        1.0,
+        0.51,
+        0.01
+       ],
+       "k": 3,
+       "chosen": [
+        "skill_high",
+        "skill_high",
+        "skill_high"
+       ]
+      }
+     ]
+    },
+    {
+     "seed": 5,
+     "p_choice": 0.6229016948897019,
+     "skills": [],
+     "insights": [
+      "If c, then d.",
+      "If c, then d.",
+      "If c, then d."
+     ],
+     "choices": [
+      {
+       "population": [
+        "If a, then b.",
+        "If c, then d.",
+        "If e, then f."
+       ],
+       "weights": [
+        0.3,
+        0.5,
+        0.01
+       ],
+       "k": 3,
+       "chosen": [
+        "If c, then d.",
+        "If c, then d.",
+        "If c, then d."
+       ]
+      }
+     ]
+    },
+    {
+     "seed": 6,
+     "p_choice": 0.793340083761663,
+     "skills": [],
+     "insights": [],
+     "choices": []
+    },
+    {
+     "seed": 7,
+     "p_choice": 0.32383276483316237,
+     "skills": [
+      "skill_high",
+      "skill_high",
+      "skill_high"
+     ],
+     "insights": [],
+     "choices": [
+      {
+       "population": [
+        "skill_high",
+        "skill_negative_ig",
+        "skill_zero"
+       ],
+       "weights": [
+        1.0,
+        0.51,
+        0.01
+       ],
+       "k": 3,
+       "chosen": [
+        "skill_high",
+        "skill_high",
+        "skill_high"
+       ]
+      }
+     ]
+    },
+    {
+     "seed": 8,
+     "p_choice": 0.2267058593810488,
+     "skills": [
+      "skill_negative_ig",
+      "skill_high",
+      "skill_negative_ig"
+     ],
+     "insights": [],
+     "choices": [
+      {
+       "population": [
+        "skill_high",
+        "skill_negative_ig",
+        "skill_zero"
+       ],
+       "weights": [
+        1.0,
+        0.51,
+        0.01
+       ],
+       "k": 3,
+       "chosen": [
+        "skill_negative_ig",
+        "skill_high",
+        "skill_negative_ig"
+       ]
+      }
+     ]
+    },
+    {
+     "seed": 9,
+     "p_choice": 0.46300735781502145,
+     "skills": [],
+     "insights": [
+      "If c, then d.",
+      "If a, then b.",
+      "If c, then d."
+     ],
+     "choices": [
+      {
+       "population": [
+        "If a, then b.",
+        "If c, then d.",
+        "If e, then f."
+       ],
+       "weights": [
+        0.3,
+        0.5,
+        0.01
+       ],
+       "k": 3,
+       "chosen": [
+        "If c, then d.",
+        "If a, then b.",
+        "If c, then d."
+       ]
+      }
+     ]
+    }
+   ],
+   "skills_only": [
+    {
+     "seed": 0,
+     "p_choice": 0.8444218515250481,
+     "skills": [],
+     "insights": [],
+     "choices": []
+    },
+    {
+     "seed": 1,
+     "p_choice": 0.13436424411240122,
+     "skills": [
+      "skill_negative_ig",
+      "skill_negative_ig",
+      "skill_high"
+     ],
+     "insights": [],
+     "choices": [
+      {
+       "population": [
+        "skill_high",
+        "skill_negative_ig",
+        "skill_zero"
+       ],
+       "weights": [
+        1.0,
+        0.51,
+        0.01
+       ],
+       "k": 3,
+       "chosen": [
+        "skill_negative_ig",
+        "skill_negative_ig",
+        "skill_high"
+       ]
+      }
+     ]
+    },
+    {
+     "seed": 2,
+     "p_choice": 0.9560342718892494,
+     "skills": [],
+     "insights": [],
+     "choices": []
+    },
+    {
+     "seed": 3,
+     "p_choice": 0.23796462709189137,
+     "skills": [
+      "skill_high",
+      "skill_high",
+      "skill_high"
+     ],
+     "insights": [],
+     "choices": [
+      {
+       "population": [
+        "skill_high",
+        "skill_negative_ig",
+        "skill_zero"
+       ],
+       "weights": [
+        1.0,
+        0.51,
+        0.01
+       ],
+       "k": 3,
+       "chosen": [
+        "skill_high",
+        "skill_high",
+        "skill_high"
+       ]
+      }
+     ]
+    },
+    {
+     "seed": 4,
+     "p_choice": 0.23604808973743452,
+     "skills": [
+      "skill_high",
+      "skill_high",
+      "skill_high"
+     ],
+     "insights": [],
+     "choices": [
+      {
+       "population": [
+        "skill_high",
+        "skill_negative_ig",
+        "skill_zero"
+       ],
+       "weights": [
+        1.0,
+        0.51,
+        0.01
+       ],
+       "k": 3,
+       "chosen": [
+        "skill_high",
+        "skill_high",
+        "skill_high"
+       ]
+      }
+     ]
+    },
+    {
+     "seed": 5,
+     "p_choice": 0.6229016948897019,
+     "skills": [],
+     "insights": [],
+     "choices": []
+    },
+    {
+     "seed": 6,
+     "p_choice": 0.793340083761663,
+     "skills": [],
+     "insights": [],
+     "choices": []
+    },
+    {
+     "seed": 7,
+     "p_choice": 0.32383276483316237,
+     "skills": [
+      "skill_high",
+      "skill_high",
+      "skill_high"
+     ],
+     "insights": [],
+     "choices": [
+      {
+       "population": [
+        "skill_high",
+        "skill_negative_ig",
+        "skill_zero"
+       ],
+       "weights": [
+        1.0,
+        0.51,
+        0.01
+       ],
+       "k": 3,
+       "chosen": [
+        "skill_high",
+        "skill_high",
+        "skill_high"
+       ]
+      }
+     ]
+    },
+    {
+     "seed": 8,
+     "p_choice": 0.2267058593810488,
+     "skills": [
+      "skill_negative_ig",
+      "skill_high",
+      "skill_negative_ig"
+     ],
+     "insights": [],
+     "choices": [
+      {
+       "population": [
+        "skill_high",
+        "skill_negative_ig",
+        "skill_zero"
+       ],
+       "weights": [
+        1.0,
+        0.51,
+        0.01
+       ],
+       "k": 3,
+       "chosen": [
+        "skill_negative_ig",
+        "skill_high",
+        "skill_negative_ig"
+       ]
+      }
+     ]
+    },
+    {
+     "seed": 9,
+     "p_choice": 0.46300735781502145,
+     "skills": [],
+     "insights": [],
+     "choices": []
+    }
+   ],
+   "insights_only": [
+    {
+     "seed": 0,
+     "p_choice": 0.8444218515250481,
+     "skills": [],
+     "insights": [],
+     "choices": []
+    },
+    {
+     "seed": 1,
+     "p_choice": 0.13436424411240122,
+     "skills": [],
+     "insights": [
+      "If c, then d.",
+      "If c, then d.",
+      "If a, then b."
+     ],
+     "choices": [
+      {
+       "population": [
+        "If a, then b.",
+        "If c, then d.",
+        "If e, then f."
+       ],
+       "weights": [
+        0.3,
+        0.5,
+        0.01
+       ],
+       "k": 3,
+       "chosen": [
+        "If c, then d.",
+        "If c, then d.",
+        "If a, then b."
+       ]
+      }
+     ]
+    },
+    {
+     "seed": 2,
+     "p_choice": 0.9560342718892494,
+     "skills": [],
+     "insights": [],
+     "choices": []
+    },
+    {
+     "seed": 3,
+     "p_choice": 0.23796462709189137,
+     "skills": [],
+     "insights": [
+      "If c, then d.",
+      "If a, then b.",
+      "If c, then d."
+     ],
+     "choices": [
+      {
+       "population": [
+        "If a, then b.",
+        "If c, then d.",
+        "If e, then f."
+       ],
+       "weights": [
+        0.3,
+        0.5,
+        0.01
+       ],
+       "k": 3,
+       "chosen": [
+        "If c, then d.",
+        "If a, then b.",
+        "If c, then d."
+       ]
+      }
+     ]
+    },
+    {
+     "seed": 4,
+     "p_choice": 0.23604808973743452,
+     "skills": [],
+     "insights": [
+      "If a, then b.",
+      "If c, then d.",
+      "If a, then b."
+     ],
+     "choices": [
+      {
+       "population": [
+        "If a, then b.",
+        "If c, then d.",
+        "If e, then f."
+       ],
+       "weights": [
+        0.3,
+        0.5,
+        0.01
+       ],
+       "k": 3,
+       "chosen": [
+        "If a, then b.",
+        "If c, then d.",
+        "If a, then b."
+       ]
+      }
+     ]
+    },
+    {
+     "seed": 5,
+     "p_choice": 0.6229016948897019,
+     "skills": [],
+     "insights": [
+      "If c, then d.",
+      "If c, then d.",
+      "If c, then d."
+     ],
+     "choices": [
+      {
+       "population": [
+        "If a, then b.",
+        "If c, then d.",
+        "If e, then f."
+       ],
+       "weights": [
+        0.3,
+        0.5,
+        0.01
+       ],
+       "k": 3,
+       "chosen": [
+        "If c, then d.",
+        "If c, then d.",
+        "If c, then d."
+       ]
+      }
+     ]
+    },
+    {
+     "seed": 6,
+     "p_choice": 0.793340083761663,
+     "skills": [],
+     "insights": [],
+     "choices": []
+    },
+    {
+     "seed": 7,
+     "p_choice": 0.32383276483316237,
+     "skills": [],
+     "insights": [
+      "If a, then b.",
+      "If c, then d.",
+      "If a, then b."
+     ],
+     "choices": [
+      {
+       "population": [
+        "If a, then b.",
+        "If c, then d.",
+        "If e, then f."
+       ],
+       "weights": [
+        0.3,
+        0.5,
+        0.01
+       ],
+       "k": 3,
+       "chosen": [
+        "If a, then b.",
+        "If c, then d.",
+        "If a, then b."
+       ]
+      }
+     ]
+    },
+    {
+     "seed": 8,
+     "p_choice": 0.2267058593810488,
+     "skills": [],
+     "insights": [
+      "If c, then d.",
+      "If a, then b.",
+      "If c, then d."
+     ],
+     "choices": [
+      {
+       "population": [
+        "If a, then b.",
+        "If c, then d.",
+        "If e, then f."
+       ],
+       "weights": [
+        0.3,
+        0.5,
+        0.01
+       ],
+       "k": 3,
+       "chosen": [
+        "If c, then d.",
+        "If a, then b.",
+        "If c, then d."
+       ]
+      }
+     ]
+    },
+    {
+     "seed": 9,
+     "p_choice": 0.46300735781502145,
+     "skills": [],
+     "insights": [
+      "If c, then d.",
+      "If a, then b.",
+      "If c, then d."
+     ],
+     "choices": [
+      {
+       "population": [
+        "If a, then b.",
+        "If c, then d.",
+        "If e, then f."
+       ],
+       "weights": [
+        0.3,
+        0.5,
+        0.01
+       ],
+       "k": 3,
+       "chosen": [
+        "If c, then d.",
+        "If a, then b.",
+        "If c, then d."
+       ]
+      }
+     ]
+    }
+   ],
+   "empty": [
+    {
+     "seed": 0,
+     "p_choice": 0.8444218515250481,
+     "skills": [],
+     "insights": [],
+     "choices": []
+    },
+    {
+     "seed": 1,
+     "p_choice": 0.13436424411240122,
+     "skills": [],
+     "insights": [],
+     "choices": []
+    },
+    {
+     "seed": 2,
+     "p_choice": 0.9560342718892494,
+     "skills": [],
+     "insights": [],
+     "choices": []
+    },
+    {
+     "seed": 3,
+     "p_choice": 0.23796462709189137,
+     "skills": [],
+     "insights": [],
+     "choices": []
+    },
+    {
+     "seed": 4,
+     "p_choice": 0.23604808973743452,
+     "skills": [],
+     "insights": [],
+     "choices": []
+    },
+    {
+     "seed": 5,
+     "p_choice": 0.6229016948897019,
+     "skills": [],
+     "insights": [],
+     "choices": []
+    },
+    {
+     "seed": 6,
+     "p_choice": 0.793340083761663,
+     "skills": [],
+     "insights": [],
+     "choices": []
+    },
+    {
+     "seed": 7,
+     "p_choice": 0.32383276483316237,
+     "skills": [],
+     "insights": [],
+     "choices": []
+    },
+    {
+     "seed": 8,
+     "p_choice": 0.2267058593810488,
+     "skills": [],
+     "insights": [],
+     "choices": []
+    },
+    {
+     "seed": 9,
+     "p_choice": 0.46300735781502145,
+     "skills": [],
+     "insights": [],
+     "choices": []
+    }
+   ],
+   "w_IG_100": [
+    {
+     "seed": 0,
+     "p_choice": 0.8444218515250481,
+     "skills": [],
+     "insights": [],
+     "choices": []
+    },
+    {
+     "seed": 1,
+     "p_choice": 0.13436424411240122,
+     "skills": [
+      "skill_high",
+      "skill_high",
+      "skill_high"
+     ],
+     "insights": [],
+     "choices": [
+      {
+       "population": [
+        "skill_high",
+        "skill_negative_ig",
+        "skill_zero"
+       ],
+       "weights": [
+        70.0,
+        1.0,
+        1.0
+       ],
+       "k": 3,
+       "chosen": [
+        "skill_high",
+        "skill_high",
+        "skill_high"
+       ]
+      }
+     ]
+    },
+    {
+     "seed": 2,
+     "p_choice": 0.9560342718892494,
+     "skills": [],
+     "insights": [],
+     "choices": []
+    },
+    {
+     "seed": 3,
+     "p_choice": 0.23796462709189137,
+     "skills": [
+      "skill_high",
+      "skill_high",
+      "skill_high"
+     ],
+     "insights": [],
+     "choices": [
+      {
+       "population": [
+        "skill_high",
+        "skill_negative_ig",
+        "skill_zero"
+       ],
+       "weights": [
+        70.0,
+        1.0,
+        1.0
+       ],
+       "k": 3,
+       "chosen": [
+        "skill_high",
+        "skill_high",
+        "skill_high"
+       ]
+      }
+     ]
+    },
+    {
+     "seed": 4,
+     "p_choice": 0.23604808973743452,
+     "skills": [
+      "skill_high",
+      "skill_high",
+      "skill_high"
+     ],
+     "insights": [],
+     "choices": [
+      {
+       "population": [
+        "skill_high",
+        "skill_negative_ig",
+        "skill_zero"
+       ],
+       "weights": [
+        70.0,
+        1.0,
+        1.0
+       ],
+       "k": 3,
+       "chosen": [
+        "skill_high",
+        "skill_high",
+        "skill_high"
+       ]
+      }
+     ]
+    },
+    {
+     "seed": 5,
+     "p_choice": 0.6229016948897019,
+     "skills": [],
+     "insights": [
+      "If c, then d.",
+      "If c, then d.",
+      "If c, then d."
+     ],
+     "choices": [
+      {
+       "population": [
+        "If a, then b.",
+        "If c, then d.",
+        "If e, then f."
+       ],
+       "weights": [
+        0.3,
+        0.5,
+        0.01
+       ],
+       "k": 3,
+       "chosen": [
+        "If c, then d.",
+        "If c, then d.",
+        "If c, then d."
+       ]
+      }
+     ]
+    },
+    {
+     "seed": 6,
+     "p_choice": 0.793340083761663,
+     "skills": [],
+     "insights": [],
+     "choices": []
+    },
+    {
+     "seed": 7,
+     "p_choice": 0.32383276483316237,
+     "skills": [
+      "skill_high",
+      "skill_high",
+      "skill_high"
+     ],
+     "insights": [],
+     "choices": [
+      {
+       "population": [
+        "skill_high",
+        "skill_negative_ig",
+        "skill_zero"
+       ],
+       "weights": [
+        70.0,
+        1.0,
+        1.0
+       ],
+       "k": 3,
+       "chosen": [
+        "skill_high",
+        "skill_high",
+        "skill_high"
+       ]
+      }
+     ]
+    },
+    {
+     "seed": 8,
+     "p_choice": 0.2267058593810488,
+     "skills": [
+      "skill_high",
+      "skill_high",
+      "skill_high"
+     ],
+     "insights": [],
+     "choices": [
+      {
+       "population": [
+        "skill_high",
+        "skill_negative_ig",
+        "skill_zero"
+       ],
+       "weights": [
+        70.0,
+        1.0,
+        1.0
+       ],
+       "k": 3,
+       "chosen": [
+        "skill_high",
+        "skill_high",
+        "skill_high"
+       ]
+      }
+     ]
+    },
+    {
+     "seed": 9,
+     "p_choice": 0.46300735781502145,
+     "skills": [],
+     "insights": [
+      "If c, then d.",
+      "If a, then b.",
+      "If c, then d."
+     ],
+     "choices": [
+      {
+       "population": [
+        "If a, then b.",
+        "If c, then d.",
+        "If e, then f."
+       ],
+       "weights": [
+        0.3,
+        0.5,
+        0.01
+       ],
+       "k": 3,
+       "chosen": [
+        "If c, then d.",
+        "If a, then b.",
+        "If c, then d."
+       ]
+      }
+     ]
+    }
+   ],
+   "k_sample_2": [
+    {
+     "seed": 0,
+     "p_choice": 0.8444218515250481,
+     "skills": [],
+     "insights": [],
+     "choices": []
+    },
+    {
+     "seed": 1,
+     "p_choice": 0.13436424411240122,
+     "skills": [
+      "skill_negative_ig",
+      "skill_negative_ig"
+     ],
+     "insights": [],
+     "choices": [
+      {
+       "population": [
+        "skill_high",
+        "skill_negative_ig",
+        "skill_zero"
+       ],
+       "weights": [
+        1.0,
+        0.51,
+        0.01
+       ],
+       "k": 2,
+       "chosen": [
+        "skill_negative_ig",
+        "skill_negative_ig"
+       ]
+      }
+     ]
+    },
+    {
+     "seed": 2,
+     "p_choice": 0.9560342718892494,
+     "skills": [],
+     "insights": [],
+     "choices": []
+    },
+    {
+     "seed": 3,
+     "p_choice": 0.23796462709189137,
+     "skills": [
+      "skill_high",
+      "skill_high"
+     ],
+     "insights": [],
+     "choices": [
+      {
+       "population": [
+        "skill_high",
+        "skill_negative_ig",
+        "skill_zero"
+       ],
+       "weights": [
+        1.0,
+        0.51,
+        0.01
+       ],
+       "k": 2,
+       "chosen": [
+        "skill_high",
+        "skill_high"
+       ]
+      }
+     ]
+    },
+    {
+     "seed": 4,
+     "p_choice": 0.23604808973743452,
+     "skills": [
+      "skill_high",
+      "skill_high"
+     ],
+     "insights": [],
+     "choices": [
+      {
+       "population": [
+        "skill_high",
+        "skill_negative_ig",
+        "skill_zero"
+       ],
+       "weights": [
+        1.0,
+        0.51,
+        0.01
+       ],
+       "k": 2,
+       "chosen": [
+        "skill_high",
+        "skill_high"
+       ]
+      }
+     ]
+    },
+    {
+     "seed": 5,
+     "p_choice": 0.6229016948897019,
+     "skills": [],
+     "insights": [
+      "If c, then d.",
+      "If c, then d."
+     ],
+     "choices": [
+      {
+       "population": [
+        "If a, then b.",
+        "If c, then d.",
+        "If e, then f."
+       ],
+       "weights": [
+        0.3,
+        0.5,
+        0.01
+       ],
+       "k": 2,
+       "chosen": [
+        "If c, then d.",
+        "If c, then d."
+       ]
+      }
+     ]
+    },
+    {
+     "seed": 6,
+     "p_choice": 0.793340083761663,
+     "skills": [],
+     "insights": [],
+     "choices": []
+    },
+    {
+     "seed": 7,
+     "p_choice": 0.32383276483316237,
+     "skills": [
+      "skill_high",
+      "skill_high"
+     ],
+     "insights": [],
+     "choices": [
+      {
+       "population": [
+        "skill_high",
+        "skill_negative_ig",
+        "skill_zero"
+       ],
+       "weights": [
+        1.0,
+        0.51,
+        0.01
+       ],
+       "k": 2,
+       "chosen": [
+        "skill_high",
+        "skill_high"
+       ]
+      }
+     ]
+    },
+    {
+     "seed": 8,
+     "p_choice": 0.2267058593810488,
+     "skills": [
+      "skill_negative_ig",
+      "skill_high"
+     ],
+     "insights": [],
+     "choices": [
+      {
+       "population": [
+        "skill_high",
+        "skill_negative_ig",
+        "skill_zero"
+       ],
+       "weights": [
+        1.0,
+        0.51,
+        0.01
+       ],
+       "k": 2,
+       "chosen": [
+        "skill_negative_ig",
+        "skill_high"
+       ]
+      }
+     ]
+    },
+    {
+     "seed": 9,
+     "p_choice": 0.46300735781502145,
+     "skills": [],
+     "insights": [
+      "If c, then d.",
+      "If a, then b."
+     ],
+     "choices": [
+      {
+       "population": [
+        "If a, then b.",
+        "If c, then d.",
+        "If e, then f."
+       ],
+       "weights": [
+        0.3,
+        0.5,
+        0.01
+       ],
+       "k": 2,
+       "chosen": [
+        "If c, then d.",
+        "If a, then b."
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  "add_new_insight": {
+   "into_empty": {
+    "new": null,
+    "before": {
+     "If base cond, then do x.": [
+      0.4,
+      0.2
+     ]
+    },
+    "after": {
+     "If base cond, then do x.": [
+      [
+       0.4,
+       0.2
+      ],
+      [
+       1.0,
+       0.0,
+       0.0
+      ]
+     ]
+    },
+    "embedded": [
+     [
+      "base cond"
+     ]
+    ],
+    "llm_prompts": []
+   },
+   "below_079": {
+    "new": "If far cond, then do y.",
+    "before": {
+     "If base cond, then do x.": [
+      0.4,
+      0.2
+     ]
+    },
+    "after": {
+     "If base cond, then do x.": [
+      [
+       0.4,
+       0.2
+      ],
+      [
+       1.0,
+       0.0,
+       0.0
+      ]
+     ],
+     "If far cond, then do y.": [
+      [],
+      [
+       0.79,
+       0.6131068422387732,
+       0.0
+      ]
+     ]
+    },
+    "embedded": [
+     [
+      "base cond"
+     ],
+     [
+      "far cond"
+     ]
+    ],
+    "llm_prompts": []
+   },
+   "exactly_080": {
+    "new": "If edge cond, then do y.",
+    "before": {
+     "If base cond, then do x.": [
+      0.4,
+      0.2
+     ]
+    },
+    "after": {
+     "If base cond, then do x.": [
+      [
+       0.4,
+       0.2
+      ],
+      [
+       1.0,
+       0.0,
+       0.0
+      ]
+     ],
+     "If edge cond, then do y.": [
+      [],
+      [
+       0.8,
+       0.5999999999999999,
+       0.0
+      ]
+     ]
+    },
+    "embedded": [
+     [
+      "base cond"
+     ],
+     [
+      "edge cond"
+     ]
+    ],
+    "llm_prompts": []
+   },
+   "above_081_merge_to_one": {
+    "new": "If near cond, then do y.",
+    "before": {
+     "If base cond, then do x.": [
+      0.4,
+      0.2
+     ]
+    },
+    "after": {
+     "If merged cond, then do both.": [
+      [
+       0.4,
+       0.2
+      ],
+      [
+       0.95,
+       0.31224989991991997,
+       0.0
+      ]
+     ]
+    },
+    "embedded": [
+     [
+      "base cond"
+     ],
+     [
+      "near cond"
+     ],
+     [
+      "merged cond"
+     ]
+    ],
+    "llm_prompts": [
+     "You are a math expert that helps consolidate insights for better math problem solving.\nHere are some insights generated from previous math problems:\n```insights\nIf base cond, then do x.\nIf near cond, then do y.\n```\nPlease consolidate these insights by merging the ones with similar conditioning situations into a single insight.\nIf there are insights with distinct conditioning situations, please do not merge them together.\nIf there are insights with similar conditioning situations, merge them into a single insight by keeping the common conditioning situation and adding the different action parts together.\nNOTE: Please preserve the original meaning of the insights, and do not change any existing insight logic.\nThe consolidated insights should follow the pseudo-code format of \"If (certain situation), then do (what to do)\" or \"If (certain situation), then do not (what to avoid)\" or \"If (certain situation), then consider the case (the cases to consider)\".\nPut the consolidated insights within ```insights and ```.\n"
+    ]
+   },
+   "above_081_merge_to_two": {
+    "new": "If near cond, then do y.",
+    "before": {
+     "If base cond, then do x.": [
+      0.4,
+      0.2
+     ]
+    },
+    "after": {
+     "If base cond, then do x.": [
+      [
+       0.4,
+       0.2
+      ],
+      [
+       1.0,
+       0.0,
+       0.0
+      ]
+     ],
+     "If merged cond, then do one.": [
+      [],
+      [
+       0.95,
+       0.31224989991991997,
+       0.0
+      ]
+     ],
+     "If other merged, then do two.": [
+      [],
+      [
+       0.0,
+       1.0,
+       0.0
+      ]
+     ]
+    },
+    "embedded": [
+     [
+      "base cond"
+     ],
+     [
+      "near cond"
+     ],
+     [
+      "merged cond"
+     ],
+     [
+      "other merged"
+     ]
+    ],
+    "llm_prompts": [
+     "You are a math expert that helps consolidate insights for better math problem solving.\nHere are some insights generated from previous math problems:\n```insights\nIf base cond, then do x.\nIf near cond, then do y.\n```\nPlease consolidate these insights by merging the ones with similar conditioning situations into a single insight.\nIf there are insights with distinct conditioning situations, please do not merge them together.\nIf there are insights with similar conditioning situations, merge them into a single insight by keeping the common conditioning situation and adding the different action parts together.\nNOTE: Please preserve the original meaning of the insights, and do not change any existing insight logic.\nThe consolidated insights should follow the pseudo-code format of \"If (certain situation), then do (what to do)\" or \"If (certain situation), then do not (what to avoid)\" or \"If (certain situation), then consider the case (the cases to consider)\".\nPut the consolidated insights within ```insights and ```.\n"
+    ]
+   },
+   "above_081_merge_to_zero": {
+    "new": "If near cond, then do y.",
+    "before": {
+     "If base cond, then do x.": [
+      0.4,
+      0.2
+     ]
+    },
+    "after": {
+     "If base cond, then do x.": [
+      [
+       0.4,
+       0.2
+      ],
+      [
+       1.0,
+       0.0,
+       0.0
+      ]
+     ]
+    },
+    "embedded": [
+     [
+      "base cond"
+     ],
+     [
+      "near cond"
+     ]
+    ],
+    "llm_prompts": [
+     "You are a math expert that helps consolidate insights for better math problem solving.\nHere are some insights generated from previous math problems:\n```insights\nIf base cond, then do x.\nIf near cond, then do y.\n```\nPlease consolidate these insights by merging the ones with similar conditioning situations into a single insight.\nIf there are insights with distinct conditioning situations, please do not merge them together.\nIf there are insights with similar conditioning situations, merge them into a single insight by keeping the common conditioning situation and adding the different action parts together.\nNOTE: Please preserve the original meaning of the insights, and do not change any existing insight logic.\nThe consolidated insights should follow the pseudo-code format of \"If (certain situation), then do (what to do)\" or \"If (certain situation), then do not (what to avoid)\" or \"If (certain situation), then consider the case (the cases to consider)\".\nPut the consolidated insights within ```insights and ```.\n"
+    ]
+   },
+   "above_081_merge_keeps_old": {
+    "new": "If near cond, then do y.",
+    "before": {
+     "If base cond, then do x.": [
+      0.4,
+      0.2
+     ]
+    },
+    "after": {
+     "If base cond, then do x.": [
+      [
+       0.4,
+       0.2
+      ],
+      [
+       1.0,
+       0.0,
+       0.0
+      ]
+     ],
+     "If near cond, then do y.": [
+      [],
+      [
+       0.81,
+       0.5864298764558299,
+       0.0
+      ]
+     ]
+    },
+    "embedded": [
+     [
+      "base cond"
+     ],
+     [
+      "near cond"
+     ],
+     [
+      "near cond"
+     ]
+    ],
+    "llm_prompts": [
+     "You are a math expert that helps consolidate insights for better math problem solving.\nHere are some insights generated from previous math problems:\n```insights\nIf base cond, then do x.\nIf near cond, then do y.\n```\nPlease consolidate these insights by merging the ones with similar conditioning situations into a single insight.\nIf there are insights with distinct conditioning situations, please do not merge them together.\nIf there are insights with similar conditioning situations, merge them into a single insight by keeping the common conditioning situation and adding the different action parts together.\nNOTE: Please preserve the original meaning of the insights, and do not change any existing insight logic.\nThe consolidated insights should follow the pseudo-code format of \"If (certain situation), then do (what to do)\" or \"If (certain situation), then do not (what to avoid)\" or \"If (certain situation), then consider the case (the cases to consider)\".\nPut the consolidated insights within ```insights and ```.\n"
+    ]
+   },
+   "empty_insight": {
+    "new": "",
+    "before": {
+     "If base cond, then do x.": [
+      0.4,
+      0.2
+     ]
+    },
+    "after": {
+     "If base cond, then do x.": [
+      [
+       0.4,
+       0.2
+      ],
+      [
+       1.0,
+       0.0,
+       0.0
+      ]
+     ]
+    },
+    "embedded": [
+     [
+      "base cond"
+     ]
+    ],
+    "llm_prompts": []
+   },
+   "same_text_again": {
+    "new": "If base cond, then do x.",
+    "before": {
+     "If base cond, then do x.": [
+      0.4,
+      0.2
+     ]
+    },
+    "after": {
+     "If merged cond, then do both.": [
+      [
+       0.4,
+       0.2
+      ],
+      [
+       0.95,
+       0.31224989991991997,
+       0.0
+      ]
+     ]
+    },
+    "embedded": [
+     [
+      "base cond"
+     ],
+     [
+      "base cond"
+     ],
+     [
+      "merged cond"
+     ]
+    ],
+    "llm_prompts": [
+     "You are a math expert that helps consolidate insights for better math problem solving.\nHere are some insights generated from previous math problems:\n```insights\nIf base cond, then do x.\nIf base cond, then do x.\n```\nPlease consolidate these insights by merging the ones with similar conditioning situations into a single insight.\nIf there are insights with distinct conditioning situations, please do not merge them together.\nIf there are insights with similar conditioning situations, merge them into a single insight by keeping the common conditioning situation and adding the different action parts together.\nNOTE: Please preserve the original meaning of the insights, and do not change any existing insight logic.\nThe consolidated insights should follow the pseudo-code format of \"If (certain situation), then do (what to do)\" or \"If (certain situation), then do not (what to avoid)\" or \"If (certain situation), then consider the case (the cases to consider)\".\nPut the consolidated insights within ```insights and ```.\n"
+    ]
+   }
+  },
+  "add_new_skills": {
+   "into_empty": {
+    "new": [],
+    "IG_score": 0.0,
+    "before": {
+     "<subtask>\n<description>\nBase desc.\n</description>\n<solution>\nwork\n</solution>\n<result>1</result>\n</subtask>": [
+      0.9,
+      [
+       0.5
+      ]
+     ]
+    },
+    "after": {
+     "<subtask>\n<description>\nBase desc.\n</description>\n<solution>\nwork\n</solution>\n<result>1</result>\n</subtask>": [
+      0.9,
+      [
+       0.5
+      ],
+      "<description>\nBase desc.\n</description>",
+      [
+       1.0,
+       0.0,
+       0.0
+      ]
+     ]
+    },
+    "embedded": [
+     [
+      "<description>\nBase desc.\n</description>"
+     ]
+    ],
+    "llm_calls": 0
+   },
+   "below_079": {
+    "new": [
+     [
+      "<subtask>\n<description>\nFar desc.\n</description>\n<solution>\nwork\n</solution>\n<result>3</result>\n</subtask>",
+      "<description>\nFar desc.\n</description>"
+     ]
+    ],
+    "IG_score": 0.3,
+    "before": {
+     "<subtask>\n<description>\nBase desc.\n</description>\n<solution>\nwork\n</solution>\n<result>1</result>\n</subtask>": [
+      0.9,
+      [
+       0.5
+      ]
+     ]
+    },
+    "after": {
+     "<subtask>\n<description>\nBase desc.\n</description>\n<solution>\nwork\n</solution>\n<result>1</result>\n</subtask>": [
+      0.9,
+      [
+       0.5
+      ],
+      "<description>\nBase desc.\n</description>",
+      [
+       1.0,
+       0.0,
+       0.0
+      ]
+     ],
+     "<subtask>\n<description>\nFar desc.\n</description>\n<solution>\nwork\n</solution>\n<result>3</result>\n</subtask>": [
+      0.3,
+      [],
+      "<description>\nFar desc.\n</description>",
+      [
+       0.79,
+       0.6131068422387732,
+       0.0
+      ]
+     ]
+    },
+    "embedded": [
+     [
+      "<description>\nBase desc.\n</description>"
+     ],
+     [
+      "<description>\nFar desc.\n</description>"
+     ]
+    ],
+    "llm_calls": 0
+   },
+   "above_081_merge_to_one": {
+    "new": [
+     [
+      "<subtask>\n<description>\nNear desc.\n</description>\n<solution>\nwork\n</solution>\n<result>2</result>\n</subtask>",
+      "<description>\nNear desc.\n</description>"
+     ]
+    ],
+    "IG_score": 0.3,
+    "before": {
+     "<subtask>\n<description>\nBase desc.\n</description>\n<solution>\nwork\n</solution>\n<result>1</result>\n</subtask>": [
+      0.9,
+      [
+       0.5
+      ]
+     ]
+    },
+    "after": {
+     "<subtask>\n<description>\nMerged desc.\n</description>\n<solution>\nwork\n</solution>\n<result>4</result>\n</subtask>": [
+      0.6,
+      [
+       0.5
+      ],
+      "<description>\nMerged desc.\n</description>",
+      [
+       0.97,
+       0.24310491562286443,
+       0.0
+      ]
+     ]
+    },
+    "embedded": [
+     [
+      "<description>\nBase desc.\n</description>"
+     ],
+     [
+      "<description>\nNear desc.\n</description>"
+     ],
+     [
+      "<description>\nMerged desc.\n</description>"
+     ]
+    ],
+    "llm_calls": 1
+   },
+   "above_081_merge_to_two": {
+    "new": [
+     [
+      "<subtask>\n<description>\nNear desc.\n</description>\n<solution>\nwork\n</solution>\n<result>2</result>\n</subtask>",
+      "<description>\nNear desc.\n</description>"
+     ]
+    ],
+    "IG_score": 0.3,
+    "before": {
+     "<subtask>\n<description>\nBase desc.\n</description>\n<solution>\nwork\n</solution>\n<result>1</result>\n</subtask>": [
+      0.9,
+      [
+       0.5
+      ]
+     ]
+    },
+    "after": {
+     "<subtask>\n<description>\nBase desc.\n</description>\n<solution>\nwork\n</solution>\n<result>1</result>\n</subtask>": [
+      0.9,
+      [
+       0.5
+      ],
+      "<description>\nBase desc.\n</description>",
+      [
+       1.0,
+       0.0,
+       0.0
+      ]
+     ],
+     "<subtask>\n<description>\nMerged desc.\n</description>\n<solution>\nwork\n</solution>\n<result>4</result>\n</subtask>": [
+      0.3,
+      [],
+      "<description>\nMerged desc.\n</description>",
+      [
+       0.97,
+       0.24310491562286443,
+       0.0
+      ]
+     ],
+     "<subtask>\n<description>\nSplit desc.\n</description>\n<solution>\nwork\n</solution>\n<result>5</result>\n</subtask>": [
+      0.3,
+      [],
+      "<description>\nSplit desc.\n</description>",
+      [
+       0.0,
+       1.0,
+       0.0
+      ]
+     ]
+    },
+    "embedded": [
+     [
+      "<description>\nBase desc.\n</description>"
+     ],
+     [
+      "<description>\nNear desc.\n</description>"
+     ],
+     [
+      "<description>\nMerged desc.\n</description>"
+     ],
+     [
+      "<description>\nSplit desc.\n</description>"
+     ]
+    ],
+    "llm_calls": 1
+   },
+   "above_081_merge_to_zero": {
+    "new": [
+     [
+      "<subtask>\n<description>\nNear desc.\n</description>\n<solution>\nwork\n</solution>\n<result>2</result>\n</subtask>",
+      "<description>\nNear desc.\n</description>"
+     ]
+    ],
+    "IG_score": 0.3,
+    "before": {
+     "<subtask>\n<description>\nBase desc.\n</description>\n<solution>\nwork\n</solution>\n<result>1</result>\n</subtask>": [
+      0.9,
+      [
+       0.5
+      ]
+     ]
+    },
+    "after": {
+     "<subtask>\n<description>\nBase desc.\n</description>\n<solution>\nwork\n</solution>\n<result>1</result>\n</subtask>": [
+      0.9,
+      [
+       0.5
+      ],
+      "<description>\nBase desc.\n</description>",
+      [
+       1.0,
+       0.0,
+       0.0
+      ]
+     ]
+    },
+    "embedded": [
+     [
+      "<description>\nBase desc.\n</description>"
+     ],
+     [
+      "<description>\nNear desc.\n</description>"
+     ]
+    ],
+    "llm_calls": 1
+   },
+   "batch_near_and_far": {
+    "new": [
+     [
+      "<subtask>\n<description>\nNear desc.\n</description>\n<solution>\nwork\n</solution>\n<result>2</result>\n</subtask>",
+      "<description>\nNear desc.\n</description>"
+     ],
+     [
+      "<subtask>\n<description>\nFar desc.\n</description>\n<solution>\nwork\n</solution>\n<result>3</result>\n</subtask>",
+      "<description>\nFar desc.\n</description>"
+     ]
+    ],
+    "IG_score": 0.3,
+    "before": {
+     "<subtask>\n<description>\nBase desc.\n</description>\n<solution>\nwork\n</solution>\n<result>1</result>\n</subtask>": [
+      0.9,
+      [
+       0.5
+      ]
+     ]
+    },
+    "after": {
+     "<subtask>\n<description>\nMerged desc.\n</description>\n<solution>\nwork\n</solution>\n<result>4</result>\n</subtask>": [
+      0.44999999999999996,
+      [
+       0.5
+      ],
+      "<description>\nMerged desc.\n</description>",
+      [
+       0.97,
+       0.24310491562286443,
+       0.0
+      ]
+     ]
+    },
+    "embedded": [
+     [
+      "<description>\nBase desc.\n</description>"
+     ],
+     [
+      "<description>\nNear desc.\n</description>",
+      "<description>\nFar desc.\n</description>"
+     ],
+     [
+      "<description>\nMerged desc.\n</description>"
+     ],
+     [
+      "<description>\nMerged desc.\n</description>"
+     ]
+    ],
+    "llm_calls": 2
+   },
+   "two_similar_in_one_batch": {
+    "new": [
+     [
+      "<subtask>\n<description>\nNear desc.\n</description>\n<solution>\nwork\n</solution>\n<result>2</result>\n</subtask>",
+      "<description>\nNear desc.\n</description>"
+     ],
+     [
+      "<subtask>\n<description>\nNear desc again.\n</description>\n<solution>\nwork\n</solution>\n<result>6</result>\n</subtask>",
+      "<description>\nNear desc again.\n</description>"
+     ]
+    ],
+    "IG_score": 0.3,
+    "before": {
+     "<subtask>\n<description>\nBase desc.\n</description>\n<solution>\nwork\n</solution>\n<result>1</result>\n</subtask>": [
+      0.9,
+      [
+       0.5
+      ]
+     ]
+    },
+    "after": {
+     "<subtask>\n<description>\nMerged desc.\n</description>\n<solution>\nwork\n</solution>\n<result>4</result>\n</subtask>": [
+      0.44999999999999996,
+      [
+       0.5
+      ],
+      "<description>\nMerged desc.\n</description>",
+      [
+       0.97,
+       0.24310491562286443,
+       0.0
+      ]
+     ]
+    },
+    "embedded": [
+     [
+      "<description>\nBase desc.\n</description>"
+     ],
+     [
+      "<description>\nNear desc.\n</description>",
+      "<description>\nNear desc again.\n</description>"
+     ],
+     [
+      "<description>\nMerged desc.\n</description>"
+     ],
+     [
+      "<description>\nMerged desc.\n</description>"
+     ]
+    ],
+    "llm_calls": 2
+   }
+  },
+  "run_iteration_majority_and_penalty": {
+   "2_of_3_insight": {
+    "answers": [
+     "5",
+     "5",
+     "6"
+    ],
+    "result": {
+     "best_score": 0.5,
+     "best_solution": "<subtask>\n<description>\nAdd numbers variant 0.\n</description>\n<solution>\nwork\n</solution>\n<result>5</result>\n</subtask>\n<answer>5</answer>",
+     "best_skills": [
+      "<subtask>\n<description>\nAdd numbers variant 0.\n</description>\n<solution>\nwork\n</solution>\n<result>5</result>\n</subtask>"
+     ],
+     "best_insights": [
+      "If sums are small, then do add digits."
+     ],
+     "is_improving": true,
+     "IG_score": 0.40546510810816444,
+     "eval_score": null
+    },
+    "lib": {
+     "skill_lib": {
+      "<subtask>\n<description>\nAdd numbers variant 0.\n</description>\n<solution>\nwork\n</solution>\n<result>5</result>\n</subtask>": [
+       0.40546510810816444,
+       [],
+       "<description>\nAdd numbers variant 0.\n</description>",
+       [
+        1.0,
+        0.0,
+        0.0
+       ]
+      ]
+     },
+     "insight_lib": {
+      "If sums are small, then do add digits.": [
+       [],
+       [
+        0.0,
+        0.0,
+        1.0
+       ]
+      ]
+     }
+    },
+    "calls": [
+     "rule:3",
+     "rule:3",
+     "rule:3",
+     "rule:0"
+    ]
+   },
+   "2_of_3_insight_na": {
+    "answers": [
+     "5",
+     "5",
+     "6"
+    ],
+    "result": {
+     "best_score": 1.0,
+     "best_solution": "<subtask>\n<description>\nAdd numbers variant 0.\n</description>\n<solution>\nwork\n</solution>\n<result>5</result>\n</subtask>\n<answer>5</answer>",
+     "best_skills": [
+      "<subtask>\n<description>\nAdd numbers variant 0.\n</description>\n<solution>\nwork\n</solution>\n<result>5</result>\n</subtask>"
+     ],
+     "best_insights": [],
+     "is_improving": true,
+     "IG_score": 0.40546510810816444,
+     "eval_score": null
+    },
+    "lib": {
+     "skill_lib": {
+      "<subtask>\n<description>\nAdd numbers variant 0.\n</description>\n<solution>\nwork\n</solution>\n<result>5</result>\n</subtask>": [
+       0.40546510810816444,
+       [],
+       "<description>\nAdd numbers variant 0.\n</description>",
+       [
+        1.0,
+        0.0,
+        0.0
+       ]
+      ]
+     },
+     "insight_lib": {}
+    },
+    "calls": [
+     "rule:3",
+     "rule:3",
+     "rule:3",
+     "rule:0"
+    ]
+   },
+   "all_differ": {
+    "answers": [
+     "4",
+     "5",
+     "6"
+    ],
+    "result": {
+     "best_score": 0.5,
+     "best_solution": "<subtask>\n<description>\nAdd numbers variant 0.\n</description>\n<solution>\nwork\n</solution>\n<result>4</result>\n</subtask>\n<answer>4</answer>",
+     "best_skills": [
+      "<subtask>\n<description>\nAdd numbers variant 0.\n</description>\n<solution>\nwork\n</solution>\n<result>4</result>\n</subtask>"
+     ],
+     "best_insights": [
+      "If sums are small, then do add digits."
+     ],
+     "is_improving": true,
+     "IG_score": 1.0986122886681098,
+     "eval_score": null
+    },
+    "lib": {
+     "skill_lib": {
+      "<subtask>\n<description>\nAdd numbers variant 0.\n</description>\n<solution>\nwork\n</solution>\n<result>4</result>\n</subtask>": [
+       1.0986122886681098,
+       [],
+       "<description>\nAdd numbers variant 0.\n</description>",
+       [
+        1.0,
+        0.0,
+        0.0
+       ]
+      ]
+     },
+     "insight_lib": {
+      "If sums are small, then do add digits.": [
+       [],
+       [
+        0.0,
+        0.0,
+        1.0
+       ]
+      ]
+     }
+    },
+    "calls": [
+     "rule:3",
+     "rule:3",
+     "rule:3",
+     "rule:0"
+    ]
+   },
+   "dollar_stripped": {
+    "answers": [
+     "$5$",
+     "5",
+     "6"
+    ],
+    "result": {
+     "best_score": 0.5,
+     "best_solution": "<subtask>\n<description>\nAdd numbers variant 0.\n</description>\n<solution>\nwork\n</solution>\n<result>$5$</result>\n</subtask>\n<answer>$5$</answer>",
+     "best_skills": [
+      "<subtask>\n<description>\nAdd numbers variant 0.\n</description>\n<solution>\nwork\n</solution>\n<result>$5$</result>\n</subtask>"
+     ],
+     "best_insights": [
+      "If sums are small, then do add digits."
+     ],
+     "is_improving": true,
+     "IG_score": 0.40546510810816444,
+     "eval_score": null
+    },
+    "lib": {
+     "skill_lib": {
+      "<subtask>\n<description>\nAdd numbers variant 0.\n</description>\n<solution>\nwork\n</solution>\n<result>$5$</result>\n</subtask>": [
+       0.40546510810816444,
+       [],
+       "<description>\nAdd numbers variant 0.\n</description>",
+       [
+        1.0,
+        0.0,
+        0.0
+       ]
+      ]
+     },
+     "insight_lib": {
+      "If sums are small, then do add digits.": [
+       [],
+       [
+        0.0,
+        0.0,
+        1.0
+       ]
+      ]
+     }
+    },
+    "calls": [
+     "rule:3",
+     "rule:3",
+     "rule:3",
+     "rule:0"
+    ]
+   },
+   "whitespace_differs": {
+    "answers": [
+     "5",
+     " 5 ",
+     "5.0"
+    ],
+    "result": {
+     "best_score": 0.5,
+     "best_solution": "<subtask>\n<description>\nAdd numbers variant 0.\n</description>\n<solution>\nwork\n</solution>\n<result>5</result>\n</subtask>\n<answer>5</answer>",
+     "best_skills": [
+      "<subtask>\n<description>\nAdd numbers variant 0.\n</description>\n<solution>\nwork\n</solution>\n<result>5</result>\n</subtask>"
+     ],
+     "best_insights": [
+      "If sums are small, then do add digits."
+     ],
+     "is_improving": true,
+     "IG_score": 0.40546510810816444,
+     "eval_score": null
+    },
+    "lib": {
+     "skill_lib": {
+      "<subtask>\n<description>\nAdd numbers variant 0.\n</description>\n<solution>\nwork\n</solution>\n<result>5</result>\n</subtask>": [
+       0.40546510810816444,
+       [],
+       "<description>\nAdd numbers variant 0.\n</description>",
+       [
+        1.0,
+        0.0,
+        0.0
+       ]
+      ]
+     },
+     "insight_lib": {
+      "If sums are small, then do add digits.": [
+       [],
+       [
+        0.0,
+        0.0,
+        1.0
+       ]
+      ]
+     }
+    },
+    "calls": [
+     "rule:3",
+     "rule:3",
+     "rule:3",
+     "rule:0"
+    ]
+   },
+   "no_answer_tags": {
+    "answers": [
+     null,
+     null,
+     null
+    ],
+    "result": {
+     "best_score": 0.0,
+     "best_solution": "<subtask><description>Add numbers variant 0.</description></subtask> no tags",
+     "best_skills": [
+      "<subtask><description>Add numbers variant 0.</description></subtask>"
+     ],
+     "best_insights": [
+      "If sums are small, then do add digits."
+     ],
+     "is_improving": true,
+     "IG_score": 0.0,
+     "eval_score": null
+    },
+    "lib": {
+     "skill_lib": {
+      "<subtask><description>Add numbers variant 0.</description></subtask>": [
+       0.0,
+       [],
+       "<description>Add numbers variant 0.</description>",
+       [
+        1.0,
+        0.0,
+        0.0
+       ]
+      ]
+     },
+     "insight_lib": {
+      "If sums are small, then do add digits.": [
+       [],
+       [
+        0.0,
+        0.0,
+        1.0
+       ]
+      ]
+     }
+    },
+    "calls": [
+     "rule:3",
+     "rule:3",
+     "rule:3",
+     "rule:0"
+    ]
+   },
+   "one_answer_only": {
+    "answers": [
+     "5",
+     null,
+     null
+    ],
+    "result": {
+     "best_score": 0.5,
+     "best_solution": "<subtask>\n<description>\nAdd numbers variant 0.\n</description>\n<solution>\nwork\n</solution>\n<result>5</result>\n</subtask>\n<answer>5</answer>",
+     "best_skills": [
+      "<subtask>\n<description>\nAdd numbers variant 0.\n</description>\n<solution>\nwork\n</solution>\n<result>5</result>\n</subtask>"
+     ],
+     "best_insights": [
+      "If sums are small, then do add digits."
+     ],
+     "is_improving": true,
+     "IG_score": 1.0986122886681098,
+     "eval_score": null
+    },
+    "lib": {
+     "skill_lib": {
+      "<subtask>\n<description>\nAdd numbers variant 0.\n</description>\n<solution>\nwork\n</solution>\n<result>5</result>\n</subtask>": [
+       1.0986122886681098,
+       [],
+       "<description>\nAdd numbers variant 0.\n</description>",
+       [
+        1.0,
+        0.0,
+        0.0
+       ]
+      ]
+     },
+     "insight_lib": {
+      "If sums are small, then do add digits.": [
+       [],
+       [
+        0.0,
+        0.0,
+        1.0
+       ]
+      ]
+     }
+    },
+    "calls": [
+     "rule:3",
+     "rule:3",
+     "rule:3",
+     "rule:0"
+    ]
+   },
+   "prev_best_not_improving_judge_2": {
+    "answers": [
+     "5",
+     "5",
+     "6"
+    ],
+    "result": {
+     "best_score": 1.0,
+     "best_solution": "<subtask>\n<description>\nAdd numbers variant 0.\n</description>\n<solution>\nwork\n</solution>\n<result>5</result>\n</subtask>\n<answer>5</answer>",
+     "best_skills": [
+      "<subtask>\n<description>\nAdd numbers variant 0.\n</description>\n<solution>\nwork\n</solution>\n<result>5</result>\n</subtask>"
+     ],
+     "best_insights": [],
+     "is_improving": true,
+     "IG_score": 0.40546510810816444,
+     "eval_score": 1
+    },
+    "lib": {
+     "skill_lib": {
+      "<subtask>\n<description>\nAdd numbers variant 0.\n</description>\n<solution>\nwork\n</solution>\n<result>5</result>\n</subtask>": [
+       0.40546510810816444,
+       [],
+       "<description>\nAdd numbers variant 0.\n</description>",
+       [
+        1.0,
+        0.0,
+        0.0
+       ]
+      ]
+     },
+     "insight_lib": {}
+    },
+    "calls": [
+     "rule:3",
+     "rule:3",
+     "rule:3",
+     "rule:0",
+     "rule:1"
+    ]
+   },
+   "prev_best_not_improving_judge_1": {
+    "answers": [
+     "5",
+     "5",
+     "6"
+    ],
+    "result": {
+     "best_score": 1.0,
+     "best_solution": "<subtask>\n<description>\nAdd numbers variant 0.\n</description>\n<solution>\nwork\n</solution>\n<result>5</result>\n</subtask>\n<answer>5</answer>",
+     "best_skills": [
+      "<subtask>\n<description>\nAdd numbers variant 0.\n</description>\n<solution>\nwork\n</solution>\n<result>5</result>\n</subtask>"
+     ],
+     "best_insights": [],
+     "is_improving": false,
+     "IG_score": 0.40546510810816444,
+     "eval_score": null
+    },
+    "lib": {
+     "skill_lib": {},
+     "insight_lib": {}
+    },
+    "calls": [
+     "rule:3",
+     "rule:3",
+     "rule:3",
+     "rule:0",
+     "rule:1"
+    ]
+   },
+   "prev_best_agrees_with_majority": {
+    "answers": [
+     "5",
+     "5",
+     "6"
+    ],
+    "result": {
+     "best_score": 1.0,
+     "best_solution": "<subtask>\n<description>\nAdd numbers variant 0.\n</description>\n<solution>\nwork\n</solution>\n<result>5</result>\n</subtask>\n<answer>5</answer>",
+     "best_skills": [
+      "<subtask>\n<description>\nAdd numbers variant 0.\n</description>\n<solution>\nwork\n</solution>\n<result>5</result>\n</subtask>"
+     ],
+     "best_insights": [],
+     "is_improving": false,
+     "IG_score": 0.40546510810816444,
+     "eval_score": null
+    },
+    "lib": {
+     "skill_lib": {},
+     "insight_lib": {}
+    },
+    "calls": [
+     "rule:3",
+     "rule:3",
+     "rule:3",
+     "rule:0"
+    ]
+   },
+   "gold_best_below_1": {
+    "answers": [
+     "6",
+     "7",
+     "8"
+    ],
+    "result": {
+     "best_score": 0,
+     "best_solution": "<subtask>\n<description>\nAdd numbers variant 0.\n</description>\n<solution>\nwork\n</solution>\n<result>6</result>\n</subtask>\n<answer>6</answer>",
+     "best_skills": [
+      "<subtask>\n<description>\nAdd numbers variant 0.\n</description>\n<solution>\nwork\n</solution>\n<result>6</result>\n</subtask>"
+     ],
+     "best_insights": [
+      "If sums are small, then do add digits."
+     ],
+     "is_improving": true,
+     "IG_score": 0.0,
+     "eval_score": 0
+    },
+    "lib": {
+     "skill_lib": {
+      "<subtask>\n<description>\nAdd numbers variant 0.\n</description>\n<solution>\nwork\n</solution>\n<result>6</result>\n</subtask>": [
+       0.0,
+       [],
+       "<description>\nAdd numbers variant 0.\n</description>",
+       [
+        1.0,
+        0.0,
+        0.0
+       ]
+      ]
+     },
+     "insight_lib": {
+      "If sums are small, then do add digits.": [
+       [],
+       [
+        0.0,
+        0.0,
+        1.0
+       ]
+      ]
+     }
+    },
+    "calls": [
+     "rule:1",
+     "rule:1",
+     "rule:1",
+     "rule:0"
+    ]
+   },
+   "gold_best_1": {
+    "answers": [
+     "5",
+     "6",
+     "6"
+    ],
+    "result": {
+     "best_score": 1,
+     "best_solution": "<subtask>\n<description>\nAdd numbers variant 0.\n</description>\n<solution>\nwork\n</solution>\n<result>5</result>\n</subtask>\n<answer>5</answer>",
+     "best_skills": [
+      "<subtask>\n<description>\nAdd numbers variant 0.\n</description>\n<solution>\nwork\n</solution>\n<result>5</result>\n</subtask>"
+     ],
+     "best_insights": [],
+     "is_improving": true,
+     "IG_score": 1.0986122886681098,
+     "eval_score": 1
+    },
+    "lib": {
+     "skill_lib": {
+      "<subtask>\n<description>\nAdd numbers variant 0.\n</description>\n<solution>\nwork\n</solution>\n<result>5</result>\n</subtask>": [
+       1.0986122886681098,
+       [],
+       "<description>\nAdd numbers variant 0.\n</description>",
+       [
+        1.0,
+        0.0,
+        0.0
+       ]
+      ]
+     },
+     "insight_lib": {}
+    },
+    "calls": [
+     "rule:1",
+     "rule:1",
+     "rule:1"
+    ]
+   }
+  }
+ }
+}
