@@ -198,3 +198,20 @@ def test_embeddings_server(monkeypatch):
     listed = c.embeddings.create(model="text-embedding-3-small", input="ab", encoding_format="float").data[0].embedding
     srv.shutdown()
     assert got == [[2.0, np.float32(0.1).item()], [1.0, np.float32(0.1).item()]] and listed == got[0]
+
+
+def test_record_cache(fake, tmp_path):
+    """--cache: запрос, совпавший с прошлой записью после normalize, получает её ответ без апстрима."""
+    rec, c = record(fake, tmp_path)
+    chat(c, "a 1")
+    chat(c, "a 1")
+    rec.shutdown()
+    first = tmp_path / "rec.jsonl"
+    again = start(Recorder(("127.0.0.1", 0), tmp_path / "again.jsonl", f"http://127.0.0.1:{fake.server_address[1]}",
+                           None, False, first, lambda s: s.replace("2", "1")))
+    c = client(again)
+    assert [chat(c, "a 2"), chat(c, "a 2"), chat(c, "a 2")] == ["call 1 seed None", "call 2 seed None", "call 3 seed None"]
+    again.shutdown()
+    r = lines(tmp_path / "again.jsonl")
+    assert [x.get("cached", False) for x in r] == [True, True, False] and len(fake.got) == 3
+    assert json.loads(r[0]["request"])["messages"][0]["content"] == "a 2" and [x["n"] for x in r] == [0, 1, 2]

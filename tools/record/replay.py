@@ -15,12 +15,16 @@ from tools.record import wire
 
 
 class Replayer(wire.Server):
-    def __init__(self, addr, rec: Path):
+    """normalize(канонический запрос) -> строка сравнения, и у записанных, и у пришедших; по умолчанию — как есть.
+    Нужна только там, где запрос несёт окружение, которое не воспроизвести (MCE: дата и время файлов в выводе
+    инструментов CLI Claude, DEVIATIONS MCE7)."""
+    def __init__(self, addr, rec: Path, normalize=None):
         super().__init__(addr, ReplayHandler)
+        self.normalize = normalize or (lambda c: c)
         self.rec = defaultdict(list)       # ключ -> ответы по номеру повтора
         for line in rec.read_text().splitlines():
             r = json.loads(line)
-            got = self.rec[wire.key(r["path"], r["request"])]
+            got = self.rec[wire.key(r["path"], self.normalize(r["request"]))]
             assert r["n"] == len(got), f"запись {r['path']} n={r['n']} не по порядку"
             got.append((r["status"], r["response"]))
         self.used = Counter()
@@ -28,7 +32,7 @@ class Replayer(wire.Server):
         self.lock = threading.Lock()
 
     def handle(self, path: str, body: dict, headers):
-        c = wire.canon(body)
+        c = self.normalize(wire.canon(body))
         k = wire.key(path, c)
         with self.lock:
             got = self.rec.get(k)
