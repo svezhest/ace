@@ -3,7 +3,7 @@ utu/prompts/practice/experience.yaml дословно в ace/prompts/tfgrpo_*.j2
 configs/practice/math_reasoning.yaml и configs/agents/practice/math_agent.yaml.
 
     попытки     в зачёт итоговый агент апстрима: T = 0.3, top_p 0.95; группа для обучения — G = 5 попыток
-                при T = 0.7 (rollout_temperature)
+                при T = 0.7 (rollout_temperature), top_p тот же 0.95
     вердикт     верный ответ, награда 0/1
     извлечение  контраст (extract/tfgrpo.py): сводки -> групповое преимущество -> не больше 1 опыта -> сверка
                 с библиотекой -> операции
@@ -53,7 +53,8 @@ def temperature(k):
 
 
 def top_p(k):
-    return TOP_P if k == 0 else None
+    """Rollout меняет у агента только температуру (training_free_grpo.py:84): top_p 0.95 у всех попыток."""
+    return TOP_P
 
 
 EXPERIENCES = Whole(layout=lambda recs, memory: render.experiences(recs), head="",
