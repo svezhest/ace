@@ -1,0 +1,40 @@
+{"context": "The number 24 can be made by multiplying together four prime numbers: 2, 2, 2 and 3. How many primes must be multiplied to make 2400?", "target": "8", "index": 8}
+{"context": "Determine the number of solutions in $x$ of the congruence $64x\\equiv 2\\pmod {66}$ such that $0< x\\le 100$.", "target": "3", "index": 16}
+{"context": "Given that $x$ is an integer such that $x\\sqrt{x}-5x-9\\sqrt{x}=35$, find $x$.", "target": "49", "index": 19}
+{"context": "How many positive integers not exceeding 2001 are multiples of 3 or 4 but not 5? Provide your answer as an integer.", "target": "801", "index": 24}
+{"context": "Given that $$(m+n+p)(mn+mp+np)=25$$ and that $$m^2(n+p)+n^2(m+p)+p^2(m+n)=4$$ for real numbers $m$, $n$, and $p$, what is the value of $mnp$?", "target": "7", "index": 39}
+{"context": "Determine the sum of all possible positive integers $n$, such that the product of its digits equals $n^2 - 15n - 27$.", "target": "17", "index": 40}
+{"context": "Find the number of vertical asymptotes in the graph of\n\\[y = \\frac{(x + 8) (x + 5)^2 (x + 1)^3 x^5 (x - 3)^2}{(x + 7) (x + 5)^2 (x + 1) x (x - 3)^3 (x - 4)}.\\]", "target": "3", "index": 41}
+{"context": "Find the number of ordered triples of positive integers \\((a, b, c)\\) such that \\(abc\\) divides \\((ab + 1)(bc + 1)(ca + 1)\\).", "target": "16", "index": 43}
+{"context": "Let $M$ be the set of those positive integers which are not divisible by $3$. The sum of $2n$ consecutive elements of $M$ is $300$. Determine $n$.", "target": "10", "index": 45}
+{"context": "Given that $-1 - 4\\sqrt{2}$ is a root of the equation \\[x^3 + ax^2 + bx + 31 = 0\\]and that $a$ and $b$ are rational numbers, compute $a.$", "target": "1", "index": 50}
+{"context": "What is the sum of all the solutions of $x = \\left|2x-|60-2x|\\right|$?", "target": "92", "index": 52}
+{"context": "For how many positive integers $n$ less than $2018$ does $n^2$ have the same remainder when divided by $7$, $11$, and $13$?", "target": "36", "index": 56}
+{"context": "Find the integer that divides $3^{3n+1} + 5^{3n+2} + 7^{3n+3}$ for every positive integer $n$.", "target": "7", "index": 60}
+{"context": "How many ordered pairs of integers $(x,y)$ are there such that $2011y^2 = 2010x + 3$?", "target": "0", "index": 62}
+{"context": "Find the smallest prime number that does not divide \\(9 + 9^2 + 9^3 + \\cdots + 9^{2010}\\).", "target": "17", "index": 79}
+{"context": "Two rectangles have integer dimensions, and both have a perimeter of 144 cm. What is the greatest possible difference between the areas of two such rectangles?", "target": "1225", "index": 84}
+{"context": "For any positive integer $n$, let $r_n$ denote the greatest odd divisor of $n$. Compute the sum:\n\\[ T = r_{100} + r_{101} + r_{102} + \\cdots + r_{200} \\]", "target": "10025", "index": 96}
+{"context": "The sum of the two $5$-digit numbers $AMC10$ and $AMC12$ is $123422$. What is the value of $A+M+C$?", "target": "14", "index": 99}
+{"context": "For how many integers $x \\in [0, 2007]$ is $\\frac{6x^3+53x^2+61x+7}{2x^2+17x+15}$ reducible?", "target": "286", "index": 105}
+{"context": "In the row of Pascal's triangle that starts 1, 11, what is the ninth number?", "target": "165", "index": 108}
+{"context": "What digit must be placed in the blank to make the four-digit integer $20\\_7$ a multiple of 11?", "target": "5", "index": 112}
+{"context": "How many positive integers have a square less than $10^7$?", "target": "3162", "index": 119}
+{"context": "The function $f(n)$ is defined on the positive integers such that $f(f(n)) = 2n$ and $f(4n + 1) = 4n + 3$ for all positive integers $n.$  Find $f(1000).$", "target": "1016", "index": 120}
+{"context": "Let $x$ be the answer to this problem. For what real number $a$ is the answer to this problem also $a-x$?", "target": "0", "index": 128}
+{"context": "How many ways are there to insert $+$'s between the digits of $111111111111111$ (fifteen $1$'s) so that the result will be a multiple of $30$?", "target": "2002", "index": 131}
+{"context": "Let $f(x) = x^3-7x^2+16x-10$. As $x$ ranges over all integers, find the sum of distinct prime values taken on by $f(x)$.", "target": "2", "index": 133}
+{"context": "How many sequences of zeros and ones of length 20 have all the zeros consecutive, or all the ones consecutive, or both?", "target": "382", "index": 139}
+{"context": "Is there a number whose square begins with the digits $123456789$ and ends with the digits $987654321$?", "target": "111111111", "index": 146}
+{"context": "How many integer values of $k$, with $1 \\leq k \\leq 70$, are such that $x^{k}-1 \\equiv 0 \\pmod{71}$ has at least $\\sqrt{k}$ solutions?", "target": "21", "index": 150}
+{"context": "Find all real numbers $a$ such that the roots of the polynomial\n$$x^3 - 6x^2 + 21x + a$$form an arithmetic progression and are not all real.", "target": "-26", "index": 152}
+{"context": "Find the area of the region enclosed by the graph of $|x-60|+|y|=\\left|\\frac{x}{4}\\right|.$", "target": "480", "index": 158}
+{"context": "For a real number $x,$ let\n\\[f(x) = \\max \\{|x + 15|, |x + 12|, |x + 8|, |x - 1|, |x - 3|, |x - 19|\\}.\\]Find the minimum value of $f(x).$", "target": "17", "index": 163}
+{"context": "If $\\cos \\theta = \\frac{1}{3},$ find $\\cos 5 \\theta.$The answer is in the form \frac{m}{n}, where gcd(m, n) = 1. Please provide the value of m + n.", "target": "484", "index": 175}
+{"context": "Find the smallest positive integer solution to $\\tan{19x^{\\circ}}=\\dfrac{\\cos{96^{\\circ}}+\\sin{96^{\\circ}}}{\\cos{96^{\\circ}}-\\sin{96^{\\circ}}}$.", "target": "159", "index": 181}
+{"context": "Find the sum of all even positive integers less than $233$ not divisible by $10$.", "target": "10812", "index": 182}
+{"context": "Find\n$$\n\\lim _{n \\rightarrow \\infty}\\left[\\frac{1}{n^{5}} \\sum_{h=1}^{n} \\sum_{k=1}^{n}\\left(5 h^{4}-18 h^{2} k^{2}+5 k^{4}\\right)\\right].\n$$", "target": "-1", "index": 184}
+{"context": "How many positive three-digit integers with a $5$ in the units place are divisible by $15$?", "target": "30", "index": 185}
+{"context": "Find the smallest integer $k > 1$ for which $n^k - n$ is a multiple of $2010$ for every positive integer $n$.", "target": "133", "index": 194}
+{"context": "Find the value of $x$ where the graph of \\( y = \\log_3(\\sqrt{x^2+729}+x) - 2\\log_3(\\sqrt{x^2+729}-x) \\) crosses the $x$-axis.", "target": "36", "index": 201}
+{"context": "How many solutions does the equation \\[\\frac{(x-1)(x-2)(x-3)\\dotsm(x-100)}{(x-1^2)(x-2^2)(x-3^2)\\dotsm(x-100^2)} = 0\\]have for $x$?", "target": "90", "index": 207}

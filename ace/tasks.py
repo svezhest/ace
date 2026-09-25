@@ -1,7 +1,14 @@
 """Задачи: данные, инструкция решателю и проверка ответа. Проверки finer и formula — как в ACE, meb — как в DC
-(сверка с эталонами: tests/bridge/test_bridge_tasks.py), gpqa — наша."""
+(сверка с эталонами: tests/bridge/test_bridge_tasks.py), dapo — как в TF-GRPO, gpqa — наша.
+
+dapo — DAPO-Math-17k в порядке апстрима TF-GRPO (scripts/data/process_training_free_GRPO_data.py: без дублей,
+shuffle Random(42)), задачи на английском с условием короче 160 символов: train — первые 40, val — следующие 10,
+тест — ещё 40."""
 import json
 from dataclasses import dataclass, field
+
+from math_verify.metric import math_metric
+from math_verify.parser import ExprExtractionConfig, LatexExtractionConfig
 
 from . import config, prompts
 
@@ -88,15 +95,24 @@ def meb_ok(pred, tgt):
     return abs(arithmetic_eval(out) - arithmetic_eval(want)) < MEB_EPS
 
 
+def dapo_ok(pred, tgt):
+    """verify_func апстрима TF-GRPO (utu/practice/verify/math.py): эталон в \\boxed{}, math_verify по всему ответу,
+    верно — награда 1.0."""
+    verify = math_metric(gold_extraction_target=(LatexExtractionConfig(),),
+                         pred_extraction_target=(ExprExtractionConfig(), LatexExtractionConfig()))
+    score, _ = verify(["\\boxed{" + str(tgt) + "}"], [pred])
+    return float(score) == 1.0
+
+
 def gpqa_ok(pred, tgt):
     """Наша: буква варианта в начале ответа. Не eval_for_multiple_choice DC (тот принимает и текст варианта из
     вопроса): GPQA в стенде — наша задача, не из статей методов."""
     return pred.strip("()`*. ").upper()[:1] == tgt.strip("()").upper()[:1]
 
 
-CHECK = {"finer": finer_ok, "formula": formula_ok, "meb": meb_ok, "gpqa": gpqa_ok}
+CHECK = {"finer": finer_ok, "formula": formula_ok, "meb": meb_ok, "gpqa": gpqa_ok, "dapo": dapo_ok}
 
-TASKS = {name: Task(name) for name in ("finer", "formula", "meb", "gpqa")}
+TASKS = {name: Task(name) for name in ("finer", "formula", "meb", "gpqa", "dapo")}
 
 
 def accuracy(task, answers, targets):

@@ -1,0 +1,10 @@
+{"context": "The coefficients of the polynomial $P(x)$ are nonnegative integers, each less than 100. Given that $P(10) = 331633$ and $P(-10) = 273373$, compute $P(1)$.", "target": "100", "index": 209}
+{"context": "There are $n$ integers $a$ such that $0 \\leq a < 91$ and $a$ is a solution to the congruence $x^3 + 8x^2 - x + 83 \\equiv 0 \\pmod{91}$. What is $n$?", "target": "6", "index": 216}
+{"context": "What is the smallest possible value of $|12^m - 5^n|$, where $m$ and $n$ are positive integers?", "target": "7", "index": 218}
+{"context": "For which $n$ is $n^4 + 6n^3 + 11n^2 + 3n + 31$ a perfect square?", "target": "10", "index": 226}
+{"context": "The digit-sum of $998$ is $9+9+8=26$. Find the number of $3$-digit whole numbers, whose digit-sum is $26$, that are even.", "target": "1", "index": 234}
+{"context": "What is the smallest positive integer that can be written in the form $2002m + 44444n$, where $m$ and $n$ are integers?", "target": "2", "index": 242}
+{"context": "Simplify $\\dfrac{111}{9999} \\cdot 33.$The answer is in the form \frac{m}{n}, where gcd(m, n) = 1. Please provide the value of m + n.", "target": "138", "index": 245}
+{"context": "Find the number of integer solutions to $||x| - 2020| < 5$.", "target": "18", "index": 254}
+{"context": "What value of $x$ will give the maximum value for $-x^2- 6x + 12$?", "target": "-3", "index": 259}
+{"context": "Let $a, b, c$ be the roots of the polynomial $x^3 - 9x^2 + 11x - 1 = 0$. Define $s = \\sqrt{a} + \\sqrt{b} + \\sqrt{c}$. Find the value of $s^4 - 18s^2 - 8s$.", "target": "-37", "index": 264}
