@@ -1,4 +1,4 @@
-"""Настройки стенда: сервер модели, бюджет генерации, seed, размеры выборок и пути.
+"""Настройки стенда: сервер модели, бюджет генерации, эмбеддинги, seed, размеры выборок и пути.
 Всё берётся из окружения."""
 import os
 from pathlib import Path
@@ -8,6 +8,8 @@ API_KEY = os.getenv("OPENAI_API_KEY", "local")
 MODEL = os.getenv("MODEL", "ornith15-9b")
 BACKEND = os.getenv("BACKEND", "pydantic-ai")     # доступ к модели: pydantic-ai | wire (ace/model)
 MAX_TOKENS = int(os.getenv("MAX_TOKENS", 4096))
+# устройство BGE-M3 (mps, cuda, cpu); не задано — выбирает sentence-transformers
+EMBED_DEVICE = os.getenv("EMBED_DEVICE")
 SEED = int(os.getenv("SEED", 0))    # сид random стенда (выборки, порядок); вызовы модели при T > 0 идут без seed
 
 # размер выборки входит в имя файла данных: formula40.jsonl, formula_train40.jsonl, formula_val10.jsonl

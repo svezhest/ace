@@ -1,7 +1,8 @@
 """Записывающий прокси OpenAI-совместимого API (chat/completions, embeddings):
-    uv run python -m tools.record.record OUT.jsonl [--port 8090] [--upstream http://localhost:8080]
+    uv run python -m tools.record.record OUT.jsonl [--port 8090] [--upstream URL]
         [--embeddings-upstream URL] [--seed] [--cache REC.jsonl --normalize mce]
-Клиенту — base_url http://127.0.0.1:PORT/v1. Каждая пара пишется строкой JSONL:
+--upstream — сервер модели, по умолчанию OPENAI_BASE_URL стенда без /v1. Клиенту — base_url
+http://127.0.0.1:PORT/v1. Каждая пара пишется строкой JSONL:
 {"path", "request": канонический JSON, "n": номер повтора такого же запроса, "seed", "status", "response"}.
 --seed: если в запросе chat/completions нет seed, подставить seed_for(запрос, n) (--seed-salt S — другая серия).
 Клиенту, просившему stream, заголовки ответа идут сразу, наверх — тоже stream; в запись — ответ, собранный из
@@ -146,10 +147,11 @@ class RecordHandler(wire.Handler):
 
 
 def main():
+    from ace import config      # не при импорте: контейнеры записи (bridge/live) монтируют только tools/
     ap = argparse.ArgumentParser()
     ap.add_argument("out", type=Path)
     ap.add_argument("--port", type=int, default=8090)
-    ap.add_argument("--upstream", default="http://localhost:8080")
+    ap.add_argument("--upstream", default=config.OPENAI_BASE_URL.removesuffix("/v1"))
     ap.add_argument("--embeddings-upstream")
     ap.add_argument("--seed", action="store_true")
     ap.add_argument("--cache", type=Path)

@@ -16,7 +16,7 @@ def embed(texts):
     global _model
     if _model is None:
         from sentence_transformers import SentenceTransformer
-        _model = SentenceTransformer(MODEL, device="mps")
+        _model = SentenceTransformer(MODEL, device=config.EMBED_DEVICE)
     return _model.encode(list(texts), normalize_embeddings=True, convert_to_numpy=True)
 
 

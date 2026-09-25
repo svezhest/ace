@@ -1,9 +1,7 @@
 """Бэкенд pydantic-ai: один агент на вызов, инструменты и схема ответа передаются явно.
 С on_step прогон идёт по одному запросу к модели: после шага с инструментами on_step(новые шаги) может
 вернуть Patch, и он применяется к истории до следующего запроса."""
-import os
-os.environ.setdefault("PYDANTIC_AI_NO_BANNER", "1")
-
+import pydantic_ai
 from pydantic_ai import Agent, Tool, UsageLimits, capture_run_messages
 from pydantic_ai.exceptions import UnexpectedModelBehavior, UsageLimitExceeded
 from pydantic_ai.messages import (ModelRequest, ModelResponse, RetryPromptPart, SystemPromptPart, TextPart, ToolCallPart,
@@ -17,6 +15,8 @@ from . import Outcome, Reply, Step, content
 # запросов сверх раундов инструментов: ответ и одна попытка исправить вывод, не прошедший схему
 EXTRA_REQUESTS = 2
 RETRIES = 3                 # попыток модели исправить вывод, не прошедший схему (не сетевые повторы)
+
+pydantic_ai.BANNER_ENABLED = False     # что печатать, решает стенд
 
 
 def apply(messages, patch):
