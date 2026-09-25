@@ -144,7 +144,7 @@ def test_weights_and_show():
 
 
 def test_judge_after_each_attempt():
-    """Судья ставит вердикт сразу после попытки (DEVIATIONS п. 7), в зачёт — ответ большинства."""
+    """Судья ставит вердикт сразу после попытки (DEVIATIONS D7), в зачёт — ответ большинства."""
     model = Stub(lambda call: "VERDICT: correct" if call["system"] == "You are a strict grader." else "N/A")
     run(TASK, evolib_judge, model, 1)
     kinds = ["judge" if c["system"] == "You are a strict grader." else "solver" if c["system"].startswith(TASK.system)
