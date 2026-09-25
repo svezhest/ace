@@ -379,3 +379,13 @@ def test_finish_by_outcome():
     assert finish(ep) == "rounds"
     ep.outcome, ep.truncated = Outcome.broken, True
     assert finish(ep) == "length"
+
+
+def test_show_reads_memory():
+    """Показ или решатель читает у памяти то, что объявил: нет этого у памяти — ошибка сборки, а не падение на
+    первой попытке."""
+    from ace.methods import METHODS
+    from ace.solver.ace import GENERATOR
+    with pytest.raises(ValueError, match="sections"):
+        swap(METHODS["ace_stand"], solver=GENERATOR)
+    swap(METHODS["ace"], solver=None)           # общий решатель с playbook апстрима — можно

@@ -13,6 +13,7 @@
 
 class OwnSolver:
     random = False              # показ внутри решателя случаен (выборка EvoLib): val такой памяти не кэшируется
+    reads = ()                  # что решатель читает у памяти сверх records(): сборка проверяет, что это есть
 
     def prompt(self, ex, memory, item, k):
         raise NotImplementedError

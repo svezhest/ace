@@ -13,7 +13,8 @@
                 (Patch(append)); исходы показа и сами хуки — у обёртки Hooks
 Переписать системный промпт посреди попытки (SCOPE) — Patch(system) из on_step показа.
 
-random — показ случаен (выборка EvoLib): val такой памяти не кэшируется. watches_steps — показу нужны шаги попытки."""
+random — показ случаен: val такой памяти не кэшируется. watches_steps — показу нужны шаги попытки. reads — что
+показ читает у памяти сверх records() (устройство памяти метода): сборка проверяет, что у памяти это есть."""
 from .. import embed, fs, prompts, render
 from ..loop import Prompt
 from ..model import Patch
@@ -26,6 +27,7 @@ CATALOG_ROUNDS = 3          # лишних шагов решателю на чт
 class Show:
     random = False
     watches_steps = False
+    reads = ()
 
     def prompt(self, ex, memory, item, k):
         return Prompt()
@@ -37,9 +39,10 @@ class Show:
 class Whole(Show):
     """Все записи памяти (после pick) в системном промпте: строки line через sep или layout(записи, память).
     Пустой показ — empty, если он задан, иначе ничего."""
-    def __init__(self, line=render.numbered, sep="\n", layout=None, head=HEAD, before="", after="", empty=None):
+    def __init__(self, line=render.numbered, sep="\n", layout=None, head=HEAD, before="", after="", empty=None, reads=()):
         self.line, self.sep, self.layout = line, sep, layout
         self.head, self.before, self.after, self.empty = head, before, after, empty
+        self.reads = reads      # что раскладка layout читает у памяти
 
     def pick(self, records, item):
         return records

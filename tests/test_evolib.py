@@ -150,7 +150,7 @@ def test_weights_and_show():
     p = SAMPLER.prompt(Ex(Stub()), m, {"context": "q"}, 0)
     user = p.solver.call("").messages[0]["content"]
     assert "Problem: q\n\nHere are some insights that may help you solve the problem:\nIf a, then b.\n" in user
-    assert p.shown == ["r1"] and SAMPLER.random and Learner("x", solver=SAMPLER).key() is None
+    assert p.shown == ["r1"] and SAMPLER.random and Learner("x", memory=m, solver=SAMPLER).key() is None
     random.seed(0)                  # первое число 0.84: выше обоих порогов — ничего
     assert SAMPLER.prompt(Ex(Stub()), m, {"context": "q"}, 0).shown == []
 

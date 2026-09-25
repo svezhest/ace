@@ -52,9 +52,18 @@ class Learner:
     def __post_init__(self):
         self.protocol.check(self.name)
         self.check_solver()
+        self.check_reads()
         lack = missing(self.memory, self.extract)
         if lack:
             raise Contract(f"{self.name}: память требует от извлечения {', '.join(sorted(lack))}, а оно этого не даёт")
+
+    def check_reads(self):
+        """Показ (или свой решатель) читает у памяти то, что объявил (reads): иначе он упадёт на первой попытке."""
+        viewer = self.solver or self.viewer()
+        lack = [a for a in viewer.reads if not hasattr(self.memory, a)]
+        if lack:
+            raise Contract(f"{self.name}: {'решатель' if self.solver else 'показ'} читает у памяти {', '.join(lack)}, "
+                           "а у неё этого нет")
 
     def check_solver(self):
         """Свой решатель сам показывает память и ставит параметры вызова: уровни, которые при нём не действуют, —

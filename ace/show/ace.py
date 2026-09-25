@@ -5,4 +5,4 @@ from .. import prompts
 from ..memory.ace import layout
 from . import Whole
 
-PLAYBOOK = Whole(layout=lambda records, memory: layout(memory), after="\n\n" + prompts.text("solver_used"))
+PLAYBOOK = Whole(layout=lambda records, memory: layout(memory), after="\n\n" + prompts.text("solver_used"), reads=("sections",))

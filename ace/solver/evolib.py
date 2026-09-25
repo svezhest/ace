@@ -59,6 +59,7 @@ def solver_texts(task):
 class Sampler(OwnSolver):
     """k записей ветки, вес skill с w_ig; temperature(k) — температура попытки k (ступень абляции), None — нет."""
     random = True
+    reads = ("skills", "insights")
 
     def __init__(self, k=K, w_ig=W_IG, temperature=None):
         self.k, self.w_ig, self.temperature = k, w_ig, temperature

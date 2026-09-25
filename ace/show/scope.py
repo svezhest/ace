@@ -11,6 +11,7 @@ from . import Show
 
 class StrategicRules(Show):
     watches_steps = True
+    reads = ("book",)
 
     def __init__(self, patch="system"):
         self.patch = patch

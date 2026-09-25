@@ -46,6 +46,7 @@ class Generator(OwnSolver):
     """Решатель DC апстрима; sheet(ex, память, item, вход) -> (текст для [[CHEATSHEET]], показанные записи)."""
     def __init__(self, sheet, code=False):
         self.sheet, self.code = sheet, code
+        self.reads = READS.get(sheet, ())
 
     def prompt(self, ex, memory, item, k):
         question = dc_input(ex.task.name, ex.i, item["context"])
@@ -131,3 +132,6 @@ def synthesis(ex, memory, item, question):
     prompt = SYNTH.fill(PREVIOUS_INPUT_OUTPUT_PAIRS=pairs, NEXT_INPUT=question, PREVIOUS_CHEATSHEET=memory.sheet.current())
     out = ex.model.ask(Call(messages(prompt), dc_params(TOKENS * MAX_TOKENS), CHEATSHEET)).output
     return (pairs if out is None else out), recs
+
+
+READS = {cumulative: ("current",), synthesis: ("sheet",)}     # что показ cheatsheet читает у памяти

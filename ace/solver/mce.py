@@ -16,6 +16,8 @@ PARAMS = {"temperature": 0.0}       # LLMClient апстрима: temperature=0.
 
 
 class Environment(OwnSolver):
+    reads = ("interfaces",)
+
     def __init__(self):
         self.files = Whole(line=render.plain, sep="\n\n")
 

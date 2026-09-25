@@ -13,6 +13,8 @@ NO_REFLECTION = "(empty)"
 
 
 class Generator(OwnSolver):
+    reads = ("sections",)
+
     def prompt(self, ex, memory, item, k):
         context, question = ace_input(ex.task.name, item["context"])
         playbook = layout(memory)
