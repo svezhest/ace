@@ -17,7 +17,7 @@ from ace.learner import Learner
 from ace.loop import Attempts, Experiment, best, first, run, vote
 from ace.memory import Lessons
 from ace.model import Model, Patch
-from ace.show import Sample, Show, Whole
+from ace.show import Show, Whole
 
 
 class Journal(list):
@@ -143,10 +143,14 @@ def test_offline_best_by_val_and_training(tmp_path):
     assert json.load(open(tmp_path / "memory.json"))[0]["text"] == "version 0"
 
 
+class Random(Whole):
+    random = True
+
+
 def test_val_cache():
     """Та же память — val не пересчитывается; при случайном показе ключа нет и кэша тоже."""
     val = len(TASK.load("val"))
-    for show, solves in ((Whole(), 2 + val), (Sample(1, weight=lambda r: 1), 2 + 2 * val)):
+    for show, solves in ((Whole(), 2 + val), (Random(), 2 + 2 * val)):
         model = Stub()
         run(TASK, Learner("x", show=show), model, 1, epochs=2, offline=True)
         assert len(model.solver_calls()) == solves + 1

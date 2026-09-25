@@ -1,22 +1,29 @@
-"""Память EvoLib (EvoLib/EvoLib/evolib_agent.py; промпты слияния evolib_merge_*.j2): библиотека skills и insights.
+"""Память EvoLib (EvoLib/EvoLib/evolib_agent.py, embed.py; промпты слияния evolib_merge_*.j2): библиотека skills и
+insights.
 
     skills      подзадачи целиком (<subtask> с description, solution, result) из лучшего решения, если оно улучшает
     insights    «If ..., then ...»
     solutions   лучшее решение каждого вопроса — скрыто от решателя; меняется, только если новое улучшает
 
-Журнал исходов записи — Future IG (fig), оценка при рождении — IG вопроса (ig, у skill). Похожие (косинус
-строго больше 0.8 по условию insight или description skill) сливает модель; одна слитая запись наследует журнал
-старой, а skill и IG — скользящим средним с долей 0.5. Вес записи для показа задаёт показ (show/evolib.py)."""
+Журнал исходов записи — Future IG (fig), оценка при рождении — IG вопроса (ig, у skill). Эмбеддинг ключа (условие
+insight, description skill) считается один раз, когда запись входит в библиотеку, и хранится при ней, как в
+апстриме: запросы эмбеддингов (text-embedding-3-small на проводе) идут в его порядке — новый insight, все
+description лучшего решения одним запросом, каждая слитая запись отдельно. Похожие (косинус строго больше 0.8) сливает
+модель; одна слитая запись наследует журнал старой, а skill и IG — скользящим средним с долей 0.5. Вес записи для
+показа задаёт показ (show/evolib.py)."""
 from dataclasses import dataclass, field
 
-from .. import embed, parse, prompts
-from ..model import Call, Reader, messages, params
+import numpy as np
+
+from .. import parse, prompts
 from ..extract import ATTRIBUTION, BEST_ANSWER, IG
-from ..extract.evolib import future_gains, second_better
+from ..extract.evolib import domain, future_gains, generate, llm_params, second_better
+from ..model import Call, Reader, messages
 from . import Container, Ids, Lessons, Operation, Record
 
 P = {n: prompts.load(f"evolib_{n}") for n in ("merge_skills", "merge_insights", "compare")}
 SIM, RATE = 0.8, 0.5        # порог слияния похожих, доля нового IG у слитого skill
+EMBEDDING = "text-embedding-3-small"    # EmbeddingModel апстрима
 
 
 @dataclass(frozen=True, eq=False)
@@ -43,7 +50,16 @@ def merged_insights(text):
     return [l.strip() for l in parse.fenced(text, "insights").split("\n") if l.strip().startswith("If ")]
 
 
-INSIGHTS, SKILLS = Reader(text=merged_insights), Reader(text=parse.subtasks)
+def similarity(a, b):
+    """embedding_similarity апстрима."""
+    a, b = np.array(a), np.array(b)
+    return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b) + 1e-8)
+
+
+def graded(task, best):
+    """Что проверка задачи видит как решение (eval_function апстрима): у hmmt — весь текст решения, у задач стенда —
+    ответ FINAL ANSWER."""
+    return best.output if task.name == "hmmt" else best.answer
 
 
 class Library(Container):
@@ -55,6 +71,8 @@ class Library(Container):
         self.skills = Lessons("skill", Skill, ops, ids)
         self.insights = Lessons("insight", Insight, ops, ids)
         self.ids, self.solutions = ids, {}
+        self.vecs = {}          # id -> эмбеддинг ключа записи
+        self.born = {}          # id -> (контейнер, текст) всех записей, и ушедших: Future IG ищет запись по тексту
 
     def records(self):
         return sorted(self.skills.records() + self.insights.records(), key=lambda r: self.ids.order(r.id))
@@ -70,11 +88,13 @@ class Library(Container):
             best = x.extras[BEST_ANSWER]
             if best is not None and self.improves(ex, x.group, best):
                 self.solutions[x.group.question] = best
-                for block, doc in parse.subtasks(best.output):
-                    self.add_skill(ex, block, doc, x.extras[IG])
+                self.add_skills(ex, parse.subtasks(best.output), x.extras[IG])
+            # запись ищется по тексту, как в апстриме: слияние могло вернуть тот же текст новой записью
             for rid, gain in future_gains(x.extras[ATTRIBUTION], x.scores):
-                if self.get(rid):
-                    self.get(rid).outcomes.append(gain)
+                container, text = self.born[rid]
+                rec = next((r for r in container.records() if r.text == text), None)
+                if rec is not None:
+                    rec.outcomes.append(gain)
 
     def improves(self, ex, group, best):
         """is_improving апстрима: лучшего решения вопроса ещё нет или новое строго лучше по баллу; не лучше, но есть
@@ -82,47 +102,69 @@ class Library(Container):
         before = self.best(group.question)
         if before is None or best.score > before.score:
             return True
-        if not group.vote or ex.task.check(before.answer, group.vote):
+        if not group.vote or ex.task.check(graded(ex.task, before), group.vote):
             return False
-        prompt = P["compare"].fill(question=group.question, a=before.output, b=best.output)
-        return ex.model.ask(Call(messages(prompt), params(), Reader(text=second_better))).output
+        prompt = P["compare"].fill(question=group.question, a=before.output, b=best.output, **domain(ex.task))
+        return generate(ex.model, Call(messages(prompt), llm_params(ex.task), Reader(text=second_better))).output
+
+    def embed(self, ex, texts):
+        """embed_strings апстрима: пустая строка — "text"."""
+        return ex.model.embed([t if t.strip() else "text" for t in texts], EMBEDDING) if texts else []
+
+    def near(self, container, vec):
+        """Записи контейнера с косинусом строго больше SIM, от самой похожей (при равенстве — в порядке библиотеки)."""
+        sims = [(r, similarity(vec, self.vecs[r.id])) for r in container.records()]
+        return [r for r, s in sorted([(r, s) for r, s in sims if s > SIM], key=lambda x: x[1], reverse=True)]
+
+    def add(self, container, text, vec, **born):
+        rec = container.add(text, **born)
+        self.vecs[rec.id], self.born[rec.id] = vec, (container, text)
+
+    def remove(self, container, rec):
+        container.delete(rec.id)
+        del self.vecs[rec.id]
+
+    def ask(self, ex, name, reader, **fields):
+        prompt = P[name].fill(**fields, **domain(ex.task))
+        return generate(ex.model, Call(messages(prompt), llm_params(ex.task), reader)).output
 
     def add_insight(self, ex, text):
-        def merge(old):
-            prompt = P["merge_insights"].fill(insights=f"{old.text}\n{text}")
-            fig = []
-            return [(t, dict(outcomes=fig)) for t in ex.model.ask(Call(messages(prompt), params(), INSIGHTS)).output]
-        self.consolidate(self.insights, text, condition(text), lambda r: condition(r.text), dict(outcomes=[]), merge,
-                         lambda old, born: dict(outcomes=old.outcomes))
-
-    def add_skill(self, ex, block, doc, ig):
-        def merge(old):
-            prompt = P["merge_skills"].fill(skills=f"{old.text}\n{block}")
-            fig = []
-            return [(b, dict(doc=d, ig=ig, outcomes=fig)) for b, d in ex.model.ask(Call(messages(prompt), params(), SKILLS)).output]
-        self.consolidate(self.skills, block, doc, lambda r: r.doc, dict(doc=doc, ig=ig, outcomes=[]), merge,
-                         lambda old, born: dict(born, ig=RATE * born["ig"] + (1 - RATE) * old.ig, outcomes=old.outcomes))
-
-    def consolidate(self, container, text, key, key_of, born, merge, inherit):
-        """Похожих (косинус ключей строго больше SIM) нет — запись добавляется. Есть — ближайшую сливает с новой
-        модель: одна слитая запись наследует от старой (inherit), старая уходит; несколько — старая остаётся.
-        Тексты, уже лежащие в контейнере, не добавляются."""
-        same = container.records()
-        near = []
-        if same:
-            sims = embed.embed([key_of(r) for r in same]) @ embed.embed([key])[0]
-            near = [same[i] for i in sims.argsort()[::-1] if sims[i] > SIM]
+        """add_new_insight: похожего нет — запись добавляется; есть — ближайший сливает с новым модель: одна слитая
+        запись наследует журнал старого, старый уходит; несколько — старый остаётся, новые делят один журнал.
+        Тексты, уже лежащие в библиотеке, не добавляются."""
+        vec = self.embed(ex, [condition(text)])[0]
+        near = self.near(self.insights, vec)
         if not near:
-            container.add(text, **born)
+            self.add(self.insights, text, vec, outcomes=[])
             return
         old = near[0]
-        merged = merge(old)
+        merged = self.ask(ex, "merge_insights", Reader(text=merged_insights), insights=f"{old.text}\n{text}")
+        fig = []
         if len(merged) == 1:
-            merged = [(t, inherit(old, b)) for t, b in merged]
-            container.delete(old.id)
-        for t, b in merged:
-            if t not in {r.text for r in container.records()}:
-                container.add(t, **b)
+            fig = old.outcomes
+            self.remove(self.insights, old)
+        for t in merged:
+            if t not in {r.text for r in self.insights.records()}:
+                self.add(self.insights, t, self.embed(ex, [condition(t)])[0], outcomes=fig)
+
+    def add_skills(self, ex, blocks, ig):
+        """add_new_skills: description всех подзадач — одним запросом эмбеддингов; каждая подзадача по очереди,
+        как add_insight; у одной слитой — IG скользящим средним и журнал старой."""
+        vecs = self.embed(ex, [doc for _, doc in blocks])
+        for (block, doc), vec in zip(blocks, vecs):
+            near = self.near(self.skills, vec)
+            if not near:
+                self.add(self.skills, block, vec, doc=doc, ig=ig, outcomes=[])
+                continue
+            old = near[0]
+            merged = self.ask(ex, "merge_skills", Reader(text=parse.subtasks), skills=f"{old.text}\n{block}")
+            new_ig, fig = ig, []
+            if len(merged) == 1:
+                new_ig, fig = RATE * ig + (1 - RATE) * old.ig, old.outcomes
+                self.remove(self.skills, old)
+            for b, d in merged:
+                if b not in {r.text for r in self.skills.records()}:
+                    self.add(self.skills, b, self.embed(ex, [d])[0], doc=d, ig=new_ig, outcomes=fig)
 
     def dump(self):
         solutions = [dict(kind="best", id=f"b{i}", question=q, text=s.output, answer=s.answer, score=s.score)

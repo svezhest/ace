@@ -7,19 +7,13 @@
 Варианты:
     Whole       весь текст: строки записей (line) или раскладка всей памяти (layout)
     TopK        k ближайших к вопросу по эмбеддингу
-    Sample      k записей с возвращением, с вероятностью по весу (weight — у метода)
-    Choose      одно случайное число выбирает ветку показа (EvoLib: skills, insights или ничего)
     Catalog     в промпте строки каталога (id и head()), тела — инструментом read, только чтение;
                 прочитанное цикл пишет в episode.used
     AfterError  после шага с ошибкой — записи, чей триггер есть в тексте ошибки, сообщением в конец истории
                 (Patch(append)); исходы показа и сами хуки — у обёртки Hooks
-    Part        показ над частью памяти
-    Hint        добавка к системному промпту перед показом
 Переписать системный промпт посреди попытки (SCOPE) — Patch(system) из on_step показа.
 
-random — показ случаен (выборка): val такой памяти не кэшируется. watches_steps — показу нужны шаги попытки."""
-import random
-
+random — показ случаен (выборка EvoLib): val такой памяти не кэшируется. watches_steps — показу нужны шаги попытки."""
 from .. import embed, fs, prompts, render
 from ..loop import Prompt
 from ..model import Patch
@@ -90,36 +84,6 @@ class TopK(Whole):
         return [Scored(records[i], float(sims[i])) for i in sims.argsort()[::-1][:self.k]]
 
 
-class Sample(Whole):
-    """k записей с возвращением, с вероятностью по weight(запись)."""
-    random = True
-
-    def __init__(self, k, weight, **whole):
-        super().__init__(**whole)
-        self.k, self.weight = k, weight
-
-    def pick(self, records, item):
-        return random.choices(records, [self.weight(r) for r in records], k=min(len(records), self.k))
-
-
-class Choose(Show):
-    """branches: (накопленная вероятность, показ). Первая ветка, чей порог выше случайного числа и чей показ
-    не пуст; иначе ничего (EvoLib: пустая библиотека skills отдаёт ход insights)."""
-    random = True
-
-    def __init__(self, *branches):
-        self.branches = branches
-
-    def prompt(self, ex, memory, item, k):
-        p = random.random()
-        for bound, branch in self.branches:
-            if p < bound:
-                out = branch.prompt(ex, memory, item, k)
-                if out.shown:
-                    return out
-        return Prompt()
-
-
 class Catalog(Show):
     """Записи listed(память) строками каталога в промпте, тела по read(path) из skills/ только на чтение."""
     def __init__(self, listed=lambda memory: memory.records(), rounds=CATALOG_ROUNDS, head=HEAD):
@@ -154,23 +118,3 @@ class AfterError(Show):
             return patch
         mine = Patch(append=self.intro + render.lines(hit, self.line))
         return mine if patch is None else patch.merge(mine)
-
-
-class Part(Show):
-    """Показ над частью памяти part(память)."""
-    def __init__(self, part, show):
-        self.part, self.show, self.random = part, show, show.random
-
-    def prompt(self, ex, memory, item, k):
-        return self.show.prompt(ex, self.part(memory), item, k)
-
-
-class Hint(Show):
-    """Добавка к системному промпту решателя перед показом."""
-    def __init__(self, hint, show):
-        self.hint, self.show, self.random = hint, show, show.random
-
-    def prompt(self, ex, memory, item, k):
-        p = self.show.prompt(ex, memory, item, k)
-        p.system = self.hint + p.system
-        return p

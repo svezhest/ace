@@ -11,7 +11,7 @@ c4b7a7c (MCE). Тесты — `uv run pytest tests/bridge`.
 
 ## Общее
 
-S1. **Решатель общий для всех методов, кроме ace_exact, DC и TF-GRPO.** Методы сравниваются по памяти при одном решателе:
+S1. **Решатель общий для всех методов, кроме ace_exact, DC, TF-GRPO и EvoLib.** Методы сравниваются по памяти при одном решателе:
     системный промпт задачи, память — в нём же (после «What you learned so far:» или раздел метода), вопрос — весь
     вход задачи, ответ — строка FINAL ANSWER (`tasks.final_answer`), код — инструмент `run_python`, траектория для
     обучения — наш транскрипт (`render.transcript`). ace_exact идёт генератором апстрима целиком (`show/ace.py`:
@@ -19,17 +19,16 @@ S1. **Решатель общий для всех методов, кроме ace
     варианты DC — генератором апстрима (`show/dc.py`: Generator — `generator_prompt.txt`, вход задачи как в
     `run_benchmark.py`, ответ `extract_answer`, у dc_code код по «EXECUTE CODE!»); TF-GRPO — агентом апстрима
     (`show/tfgrpo.py`: инструкции `math_agent.yaml`, инструмент execute_python_code, траектория — repr списка
-    сообщений). Решатели апстримов:
-    EvoLib — `HMMT_SOLVER_PROMPT` (ответ — первый `<answer>` без `$`; у нас просьба решать подзадачами в формате
-    `HMMT_FORMAT_PROMPT` — в системном промпте, раздел памяти с теми же вступлениями — в его конце, решение
-    попытки — вся траектория). Мостик подставляет в эталон нашу траекторию и разбор ответа и сверяет, что решатель
-    видит тот же текст памяти.
+    сообщений); EvoLib — решателем апстрима (`show/evolib.py`: `HMMT_SOLVER_PROMPT` с выборкой из библиотеки, ответ
+    у hmmt — первый `<answer>` без `$`, у задач стенда — роль и инструкция задачи и строка FINAL ANSWER (S2)).
 S2. **Задачи стенда, а не бенчмарки апстримов.** Тексты апстримов, привязанные к домену их бенчмарка, заменены
     текстами наших задач, форма та же: цели агента и обучения TF-GRPO (`tfgrpo_objective_*.j2`,
     `tfgrpo_learning.j2` вместо math; input / output и перевод строки в конце, как у yaml-блока; у dapo — math
     дословно), инструкции агента TF-GRPO (у dapo — `math_agent.yaml` дословно, у остальных — системный промпт
-    задачи, тот же текст про код и инструкция задачи вместо формата `<answer>\boxed{}`); промпты EvoLib
-    без «math» («You are an expert», «the following problem», «better problem solving»); поля агента для
+    задачи, тот же текст про код и инструкция задачи вместо формата `<answer>\boxed{}`); промпты EvoLib у задач
+    стенда (у hmmt — дословно) без «math» («You are an expert», «the following problem», «better problem
+    solving»), в инструкции решателя — роль задачи и её инструкция, в формате — строка FINAL ANSWER вместо
+    `<answer>\boxed{}`; поля агента для
     синтезатора SCOPE — agent_name «<задача>_agent», agent_role — системный промпт задачи, task — вопрос,
     current_system_prompt — системный промпт решателя сейчас (роль, подсказка среды, strategic при запуске,
     tactical этой попытки); в data/train.json MCE поле вопроса — `question` (у symptom_diagnosis — `symptoms`),
@@ -52,9 +51,9 @@ S4. **Модель одна, параметры запросов — стенд�
     top_p 0.95 без предела генерации, обновление без параметров, как у апстрима; ace_exact: T = 0.0 и `max_completion_tokens` 4096, как
     `timed_llm_call` при api_provider openai; DC: T = 0.0 и `max_completion_tokens` 2048, у куратора и синтеза
     4096, как `_generate_openai`; вызовы SCOPE — без параметров, сообщение частями, как `create_openai_model` без
-    temperature). У апстримов модели и параметры свои: EvoLib HMMT — o4-mini
-    через reasoning API (`max_completion_tokens` 50000, `reasoning_effort` high; T = 0 и top_p 0.5 — только без
-    reasoning API); scope_bo2 — основная модель и `candidate_models` по разу, у нас `candidate_models` — та же
+    temperature; EvoLib у hmmt — как у апстрима на модели задачи o4-mini: reasoning API, `max_completion_tokens`
+    50000, `reasoning_effort` high, без температуры). У апстримов модели и параметры свои: EvoLib у задач стенда
+    идёт с параметрами стенда (T = 0 и top_p 0.5 у апстрима — только без reasoning API); scope_bo2 — основная модель и `candidate_models` по разу, у нас `candidate_models` — та же
     модель при T = 0.7 (селектор, отсев пустых и «no improvement needed», первый кандидат при сбое выбора —
     как у апстрима). Мостик сверяет параметры там, где эталон их пишет.
 
@@ -63,7 +62,11 @@ S4. **Модель одна, параметры запросов — стенд�
 finer и formula — чекеры ACE (`eval/finance/data_processor.py`), meb — `eval_equation_balancer` DC; на эталонах
 совпадают все строки (`tests/bridge/test_bridge_tasks.py`). Отчётная точность `accuracy` в summary — как
 `evaluate_accuracy` ACE: у finer доля верных сущностей, у остальных доля вопросов; `correct` — число верных
-вопросов целиком, как `answer_is_correct`, которым ACE судит попытки при обучении.
+вопросов целиком, как `answer_is_correct`, которым ACE судит попытки при обучении. hmmt — `extract_and_grade`
+MathArena (`ace/matharena`: parser.py и parse_manual.py дословно, e927660 — последний коммит до коммита EvoLib;
+конфиг соревнования HMMT — strict_parsing false). EvoLib зовёт его как `(решение, ответ)`, а у MathArena ни в одной
+версии такого вызова нет — `(сообщения, число токенов, ответ, конфиг)`; запись `bridge/live/evolib` снята с
+переходником в раннере (решение — одно сообщение assistant), проверка стенда — то же по тексту решения.
 
 CHK1. **eval апстримов — только над арифметикой.** ACE (finer) и DC (meb) отдают ответ модели в `eval` целиком;
     мы вычисляем только строку из цифр, точки, `+ - * /`, скобок, `e`, `_` и пробелов, без `**` и без

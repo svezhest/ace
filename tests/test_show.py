@@ -1,15 +1,12 @@
-"""Показ: весь текст, top-k, выборка по весу, выбор ветки, синтез, каталог с чтением, урок после ошибки."""
-import random
-
+"""Показ: весь текст, top-k, синтез, каталог с чтением, урок после ошибки."""
 import numpy as np
 from stub import Stub
 
 from ace import fs
-from ace.learner import Learner
 from ace.loop import Attempt, Prompt
 from ace.memory import Lessons
 from ace.model import Patch, Step
-from ace.show import HEAD, AfterError, Catalog, Choose, Sample, Show, TopK, Whole
+from ace.show import HEAD, AfterError, Catalog, TopK, Whole
 
 ITEM = {"context": "What is 2 / 4?", "target": "0.5"}
 
@@ -38,23 +35,6 @@ def test_topk(monkeypatch):
     monkeypatch.setattr("ace.embed.embed", lambda texts: np.array([vecs[t] for t in texts], dtype=float))
     p = TopK(2).prompt(Ex, memory("far", "near", "mid"), ITEM, 0)
     assert p.shown == ["r2", "r3"]
-
-
-def test_sample_is_random():
-    random.seed(0)
-    show = Sample(3, weight=lambda r: 1.0 if r.text == "x" else 0.0)
-    assert show.random and Learner("x", show=show).key() is None
-    assert show.prompt(Ex, memory("x", "y"), ITEM, 0).shown == ["r1", "r1"]
-    assert Learner("x").key() == ()
-
-
-def test_choose():
-    """Пустая ветка отдаёт ход следующей; число выше всех порогов — ничего."""
-    full = Whole(head="")
-    random.seed(0)                          # первое число 0.84
-    assert Choose((0.9, Show()), (1.0, full)).prompt(Ex, memory("a"), ITEM, 0).shown == ["r1"]
-    random.seed(0)
-    assert Choose((0.5, full)).prompt(Ex, memory("a"), ITEM, 0) == Prompt()
 
 
 def test_catalog():

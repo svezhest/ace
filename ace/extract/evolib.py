@@ -8,17 +8,45 @@
 
 Даёт: ig (до деления баллов), best_answer (лучшее решение попытки с баллом после деления: улучшает ли оно
 лучшее решение вопроса, решает память — после слияния insight, как в апстриме), attribution (записи в промпте
-каждой попытки и номер лучшей — для Future IG)."""
+каждой попытки и номер лучшей — для Future IG).
+
+Все вызовы EvoLib идут через generate (LLMAgent.generate апстрима) с параметрами llm_params задачи."""
 import math
 from dataclasses import dataclass
 
+import numpy as np
+
 from .. import parse, prompts, render
-from ..model import Call, Reader, messages, params
+from ..model import TEXT, Call, Reader, Reply, messages, params
 from . import ATTRIBUTION, BEST_ANSWER, IG, Extraction, Extractor
 
 EPS = 0.01                  # пол логарифма в IG
 UNEVALUATED = 0.5           # множитель баллов без внешней оценки, когда insight есть
 INSIGHT = prompts.load("evolib_insight")
+# LLMAgent апстрима с reasoning API (модель задачи HMMT — o4-mini): без температуры
+REASONING = {"max_completion_tokens": 50000, "reasoning_effort": "high"}
+TRIES = 20                  # пустой ответ — тот же запрос заново; у апстрима без предела
+
+
+def llm_params(task):
+    """Параметры всех вызовов EvoLib: у hmmt — как у апстрима (reasoning API), у задач стенда — стенда (S4)."""
+    return dict(REASONING) if task.name == "hmmt" else params()
+
+
+def domain(task):
+    """Поля промптов EvoLib: у hmmt — тексты апстрима (math), у задач стенда — без math (S2)."""
+    return dict(expert="a math expert", math="math ") if task.name == "hmmt" else dict(expert="an expert", math="")
+
+
+def generate(model, call):
+    """LLMAgent.generate апстрима: пустой ответ — тот же запрос заново; ответ без пробелов по краям разбирает
+    reader вызова."""
+    for _ in range(TRIES):
+        reply = model.ask(Call(call.messages, call.params, TEXT))
+        text = (reply.output or "").strip()
+        if text:
+            break
+    return Reply(call.reader.read(text), text, reply.truncated, raw=text)
 
 
 @dataclass
@@ -37,7 +65,7 @@ class Attribution:
 
 def log_gain(best, scores, eps=EPS):
     """log(best) - log(mean(scores)), оба снизу ограничены eps."""
-    return math.log(max(best, eps)) - math.log(max(sum(scores) / len(scores), eps))
+    return math.log(max(best, eps)) - math.log(max(np.mean(scores), eps))
 
 
 def future_gains(attribution, scores, eps=EPS):
@@ -70,8 +98,8 @@ class Gains(Extractor):
         self.evaluated = evaluated
 
     def insight(self, ex, group, best, evaluation):
-        prompt = INSIGHT.fill(question=group.question, solution=best.output, evaluation=evaluation)
-        return ex.model.ask(Call(messages(prompt), params(), Reader(text=insight_of))).output
+        prompt = INSIGHT.fill(question=group.question, solution=best.output, evaluation=evaluation, **domain(ex.task))
+        return generate(ex.model, Call(messages(prompt), llm_params(ex.task), Reader(text=insight_of))).output
 
     def __call__(self, ex, group, memory):
         eps = group.episodes

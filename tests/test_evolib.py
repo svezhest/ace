@@ -6,9 +6,10 @@ import random
 import numpy as np
 from stub import TASK, Stub, episode
 
-from ace import prompts, verdict
+from ace import verdict
 from ace.extract import ATTRIBUTION, BEST_ANSWER, IG, Extraction
 from ace.extract.evolib import Attribution, Best, Gains, future_gains, log_gain
+from ace.learner import Learner
 from ace.loop import Group, run
 from ace.memory.evolib import Library, Skill
 from ace.methods.evolib import evolib_judge
@@ -113,9 +114,9 @@ def test_library_learn(monkeypatch):
 def test_merge_insight(monkeypatch):
     """Похожий insight (косинус условий > 0.8) сливает модель: одна слитая запись наследует журнал, старая уходит;
     несколько — старая остаётся, новые делят один журнал."""
-    fake_embed(monkeypatch, {"a": [1, 0], "a2": [0.9, 0.436]})
+    fake_embed(monkeypatch, {"a": [1, 0], "a2": [0.9, 0.436], "a or a2": [1, 0]})
     m = Library()
-    m.insights.add("If a, then b.", outcomes=[0.3])
+    m.add(m.insights, "If a, then b.", [1, 0], outcomes=[0.3])
     one = Stub(lambda call: "```insights\nIf a or a2, then b.\n```")
     m.add_insight(Ex(one), "If a2, then c.")
     assert "If a, then b.\nIf a2, then c." in one.calls[0]["user"]
@@ -132,8 +133,8 @@ def test_merge_skill(monkeypatch):
     """Слитый skill: IG — скользящее среднее с долей 0.5, журнал старого."""
     fake_embed(monkeypatch, {"d1": [1, 0], "d1b": [1, 0], "<description>d</description>": [1, 0]})
     m = Library()
-    m.skills.add(SKILL.format("d1"), doc="d1", ig=1.0, outcomes=[0.2])
-    m.add_skill(Ex(Stub(lambda call: SKILL.format("d"))), SKILL.format("d1b"), "d1b", 0.0)
+    m.add(m.skills, SKILL.format("d1"), [1, 0], doc="d1", ig=1.0, outcomes=[0.2])
+    m.add_skills(Ex(Stub(lambda call: SKILL.format("d"))), [(SKILL.format("d1b"), "d1b")], 0.0)
     [r] = m.records()
     assert (r.doc, r.ig, r.outcomes) == ("<description>d</description>", 0.5, [0.2])
 
@@ -146,14 +147,17 @@ def test_weights_and_show():
     m.insights.add("If a, then b.")
     random.seed(1)                  # первое число 0.13: ветка skills пуста, ход переходит к insights
     p = SHOW.prompt(Ex(Stub()), m, {"context": "q"}, 0)
-    assert p.system.startswith(prompts.text("evolib_subtasks") + "\n\n" + prompts.text("evolib_insights_intro"))
-    assert p.shown == ["r1"] and SHOW.random
+    user = p.solver.call("").messages[0]["content"]
+    assert "Problem: q\n\nHere are some insights that may help you solve the problem:\nIf a, then b.\n" in user
+    assert p.shown == ["r1"] and SHOW.random and Learner("x", show=SHOW).key() is None
+    random.seed(0)                  # первое число 0.84: выше обоих порогов — ничего
+    assert SHOW.prompt(Ex(Stub()), m, {"context": "q"}, 0).shown == []
 
 
 def test_judge_after_each_attempt():
     """Судья ставит вердикт сразу после попытки (масштабы не смешиваются), в зачёт — ответ большинства."""
     model = Stub(lambda call: "VERDICT: correct" if call["system"] == "You are a strict grader." else "N/A")
     run(TASK, evolib_judge, model, 1)
-    kinds = ["judge" if c["system"] == "You are a strict grader." else "solver" if c["system"].startswith(TASK.system)
+    kinds = ["judge" if c["system"] == "You are a strict grader." else "solver" if "plan ahead how to break down" in c["user"]
              else "other" for c in model.calls]
     assert kinds == ["solver", "judge"] * 3

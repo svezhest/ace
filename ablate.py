@@ -8,10 +8,10 @@ from ace.env import Sandbox
 from ace.learner import swap
 from ace.loop import Attempts, run, vote
 from ace.methods import METHODS
-from ace.methods.evolib import ATTEMPTS
 from ace.methods.mce import ITERATIONS
 from ace.model import Model
 from ace.show import Catalog, Whole
+from ace.show.evolib import Sampler
 from ace.show.scope import StrategicRules
 from ace.tasks import TASKS
 from ace.wrap.hooks import Hooks
@@ -69,7 +69,7 @@ CHAIN = {
     "evolib_golden": swap(m["evolib_judge"], "evolib_golden", verdict=verdict.golden),   # от evolib_judge: верный ответ
     # попытки (от evolib)
     "evolib_n5": swap(evolib, "evolib_n5", attempts=Attempts(5, pick=vote)),                  # число: 5 вместо 3
-    "evolib_t07": swap(evolib, "evolib_t07", attempts=Attempts(ATTEMPTS, spread, pick=vote)),  # различие: ещё и температура
+    "evolib_t07": swap(evolib, "evolib_t07", show=Sampler(temperature=spread)),                # различие: ещё и температура
 
     # показ посреди попытки (SCOPE; правило на шаге бывает только у решателя с инструментами)
     "scope_code": scope_code,       # от scope: исполнение python

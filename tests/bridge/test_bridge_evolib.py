@@ -1,8 +1,8 @@
 """Мостик к EvoLib (98266b2, эталоны bridge/fixtures/evolib, снятые bridge/capture_evolib.py): промпты, разборщики,
 операции над библиотекой, run_iteration и цикл на 4 задачах в два прохода. Входы разборщиков и памяти — те же,
-что в скрипте снятия. Разборщики кода (extract_functions, CODE_*, BIGCODE_*) не сравниваются: у нас вариант HMMT.
-Эмбеддинги — та же таблица «подстрока -> вектор»; библиотека у нас не хранит векторы, а считает их заново —
-при одной и той же таблице это одно и то же, поэтому список эмбеддингов апстрима не сравнивается."""
+что в скрипте снятия; задача — hmmt (тексты и параметры апстрима), проверка — строковая, как eval_function скрипта
+снятия. Разборщики кода (extract_functions, CODE_*, BIGCODE_*) не сравниваются: у нас вариант HMMT.
+Эмбеддинги — та же таблица «подстрока -> вектор»."""
 import importlib
 import math
 import random
@@ -17,13 +17,16 @@ from ace.extract.evolib import Attribution, Best, Gains, future_gains, insight_o
 from ace.learner import swap
 from ace.loop import Episode, Group, Prompt, run
 from ace.model import roles, text_reply
+from ace.tasks import TASKS
 
+extract_evolib = importlib.import_module("ace.extract.evolib")
 E = importlib.import_module("ace.methods.evolib")      # модуль: имя в пакете занято самим методом
 MEM = importlib.import_module("ace.memory.evolib")
 SHOW = importlib.import_module("ace.show.evolib")
 
 PROMPTS, PARSERS, MEMORY, LOOP = (fixture("evolib", n) for n in ("prompts", "parsers", "memory", "loop"))
-HINT = prompts.text("evolib_subtasks")
+REASONING = {"max_completion_tokens": 50000, "reasoning_effort": "high"}
+SOLVER_HEAD = "You are a math expert. For the following math problem"
 
 
 def solution(desc, result, answer):
@@ -33,7 +36,7 @@ def solution(desc, result, answer):
 
 
 def no_math(text):
-    """Промпты апстрима без «math»: наши задачи не только математические."""
+    """Промпты апстрима без «math» — у задач стенда: они не только математические."""
     deviation("S2")
     return text.replace("a math expert", "an expert").replace("math ", "")
 
@@ -47,10 +50,7 @@ def no_evaluation(text):
     return head + tail.split("\n", 1)[1]
 
 
-def upstream_answer(text):
-    """Ответ попытки, как run_iteration: первый <answer>...</answer> без $; у нас — FINAL ANSWER стенда."""
-    deviation("S1")
-    return parse.between(text or "", "<answer>", "</answer>").replace("<answer>", "").replace("$", "").strip()
+upstream_answer = SHOW.upstream_answer
 
 
 def table_embed(monkeypatch, table, default=(0.0, 0.0, 1.0)):
@@ -74,6 +74,9 @@ class Fake:
         self.calls.append(dict(name=name, system=system, user=user, params=call.params))
         return text_reply(call, text)
 
+    def embed(self, texts, name):
+        return np.asarray(importlib.import_module("ace.embed").embed(texts)).tolist()
+
     def usage(self):
         return dict(calls=len(self.calls), prompt_tokens=0, completion_tokens=0)
 
@@ -88,8 +91,9 @@ def cycle(replies):
 
 
 class Task:
-    """Задачи эталона; проверка — строковое сравнение ответа, как eval_function скрипта снятия (вместо matharena)."""
-    name, system, instr = "formula", "You solve problems.", "Solve the problem."
+    """Задачи эталона под именем hmmt; проверка — как eval_function скрипта снятия (вместо matharena): последний
+    <answer> решения против строки-цели; ответ без тегов сравнивается как есть."""
+    name, system, instr = "hmmt", "You solve problems.", "Solve the problem."
 
     def __init__(self, problems):
         self.items = [dict(context=p, target=a) for p, a in problems]
@@ -98,6 +102,8 @@ class Task:
         return self.items
 
     def check(self, answer, target):
+        if "<answer>" in (answer or ""):
+            answer = answer.rsplit("<answer>", 1)[1].split("</answer>", 1)[0].replace("$", "").strip()
         return bool(answer) and answer == str(target)
 
 
@@ -125,26 +131,22 @@ def figs(insight_lib):
 # промпты
 
 
-def test_prompts_filled():
+@pytest.mark.parametrize("task", ["hmmt", "formula"])
+def test_prompts_filled(task):
+    """У hmmt — тексты апстрима дословно, у задач стенда — без «math»."""
     f, sol1, sol2 = PROMPTS["filled"], solution("Add 2 and 3.", "5", "5"), solution("Add 2 and 3.", "6", "6")
+    same = (lambda t: t) if task == "hmmt" else no_math
+    d = extract_evolib.domain(TASKS[task])
     insights = ["If adding integers, then do check the carry.", "If adding decimals, then do align the point."]
-    insight = prompts.load("evolib_insight").fill(question="Compute 2+3.", solution=sol1, evaluation="")
-    assert insight == no_math(f["insight_generation"]) == no_math(f["insight_generation_with_test_result"])
-    assert prompts.load("evolib_merge_skills").fill(skills="\n".join([sol1, sol2])) == no_math(f["skill_consolidation"])
-    assert prompts.load("evolib_merge_insights").fill(insights="\n".join(insights)) == no_math(f["insight_consolidation"])
-    assert prompts.load("evolib_compare").fill(question="Compute 2+3.", a=sol1, b=sol2) == no_math(f["solution_comparison"])
+    insight = prompts.load("evolib_insight").fill(question="Compute 2+3.", solution=sol1, evaluation="", **d)
+    assert insight == same(f["insight_generation"]) == same(f["insight_generation_with_test_result"])
+    assert prompts.load("evolib_merge_skills").fill(skills="\n".join([sol1, sol2]), **d) == same(f["skill_consolidation"])
+    assert prompts.load("evolib_merge_insights").fill(insights="\n".join(insights), **d) == same(f["insight_consolidation"])
+    assert prompts.load("evolib_compare").fill(question="Compute 2+3.", a=sol1, b=sol2, **d) == same(f["solution_comparison"])
 
 
-def section(user, problem):
-    """Раздел памяти в промпте решателя апстрима: между задачей и форматом ответа."""
-    return user.split(f"Problem: {problem}\n\n", 1)[1].split("\nAfter reasoning and planning", 1)[0]
-
-
-def shown(system):
-    """Раздел памяти в нашем системном промпте: после просьбы решать подзадачами."""
-    deviation("S1")
-    tail = system.split(HINT, 1)[1]
-    return tail.removeprefix("\n\n")
+def solver_call(p):
+    return p.solver.call("")
 
 
 @pytest.mark.parametrize("name,skills,insights", [("solver_empty", 0, 0), ("solver_skills", 1, 0),
@@ -156,8 +158,8 @@ def test_solver_section(monkeypatch, name, skills, insights):
     if insights:
         m.insights.add("If adding integers, then do check the carry.")
     monkeypatch.setattr(random, "random", lambda: 0.1 if skills else 0.5)
-    p = SHOW.SHOW.prompt(None, m, {"context": "Compute 2+3."}, 0)
-    assert shown(p.system) == section(PROMPTS["filled"][name], "Compute 2+3.")
+    call = solver_call(SHOW.SHOW.prompt(Ex(None), m, {"context": "Compute 2+3."}, 0))
+    assert call.messages == [{"role": "user", "content": PROMPTS["filled"][name]}] and call.params == REASONING
 
 # разборщики
 
@@ -264,12 +266,12 @@ def test_sample_from_library(monkeypatch, case):
         m.skills.add(text, ig=ig, outcomes=list(fig), doc="d")
     for text, fig in SAMPLE_LIB[1] if insights else []:
         m.insights.add(text, outcomes=list(fig))
-    show, choices, log = SHOW.show(**kw), random.choices, []
+    show, choices, log = SHOW.Sampler(**kw), random.choices, []
     monkeypatch.setattr(random, "choices", lambda pop, weights, k: log.append((pop, weights, k)) or choices(pop, weights, k=k))
     for run_ in MEMORY["sample_from_library"][case]:
         random.seed(run_["seed"])
         log.clear()
-        p = show.prompt(None, m, {"context": "q"}, 0)
+        p = show.prompt(Ex(None), m, {"context": "q"}, 0)
         texts = [m.get(i).text for i in p.shown]
         assert (texts if m.skills.get(p.shown[0] if p.shown else "") else []) == run_["skills"]
         assert (texts if m.insights.get(p.shown[0] if p.shown else "") else []) == run_["insights"]
@@ -301,7 +303,7 @@ def test_add_new_insight(monkeypatch, case):
     if want["new"]:                 # пустой insight извлечение в память не отдаёт (add_new_insight апстрима: return)
         m.add_insight(Ex(model), want["new"])
     assert state(m)[1] == upstream_state({}, figs(want["after"]))[1]
-    assert [c["user"] for c in model.calls] == [no_math(p) for p in want["llm_prompts"]]
+    assert [c["user"] for c in model.calls] == want["llm_prompts"]
 
 
 def unit(cos):
@@ -322,11 +324,9 @@ def test_add_new_skills(monkeypatch, case):
     table_embed(monkeypatch, SKILL_TABLE)
     model = Fake([("merge", "consolidate these example problems", SKILL_REPLY.get(case, ""))], default="")
     m = MEM.Library()
-    for block, doc in parse.subtasks(solution("Base desc.", "1", "1")):
-        m.add_skill(Ex(model), block, doc, 0.9)
+    m.add_skills(Ex(model), parse.subtasks(solution("Base desc.", "1", "1")), 0.9)
     m.skills.records()[0].outcomes.append(0.5)
-    for block, doc in want["new"]:
-        m.add_skill(Ex(model), block, doc, want["IG_score"])
+    m.add_skills(Ex(model), [tuple(x) for x in want["new"]], want["IG_score"])
     got = [(t, [pytest.approx(ig), fig, doc]) for t, (ig, fig, doc) in state(m)[0]]
     assert got == upstream_state(want["after"], {})[0] and len(model.calls) == want["llm_calls"]
 
@@ -421,15 +421,8 @@ def loop_model():
         ("merge", "consolidate these example problems", solution("Add two-digit numbers a and b.", "a+b", "a+b")),
         ("compare", "and two solutions", "```judgment\nSolution 1 is better.\n```"),
     ]
-    rules += [("solver", lambda s, u, p=p: s.startswith(Task.system) and p in u, cycle(sols)) for p, _, sols in PROBLEMS]
+    rules += [("solver", lambda s, u, p=p: u.startswith(SOLVER_HEAD) and p in u, cycle(sols)) for p, _, sols in PROBLEMS]
     return Fake(rules)
-
-
-def calls_of(model, calls):
-    """Вызовы итерации: у решателя — раздел памяти, у остальных — промпт."""
-    solver = [shown(c["system"]) for c in calls if c["name"] == "solver"]
-    rest = [c["user"] for c in calls if c["name"] != "solver"]
-    return solver, rest
 
 
 @pytest.mark.parametrize("mode", ["nogold", "gold"])
@@ -437,7 +430,6 @@ def test_loop(monkeypatch, mode):
     """Два прохода по 4 задачам, как main() в eval_main.py: те же выборки из библиотеки (тот же поток random), та же
     библиотека, лучшие баллы и вызовы модели после каждой итерации."""
     table_embed(monkeypatch, LOOP_TABLE)
-    monkeypatch.setattr("ace.loop.final_answer", upstream_answer)
     task, model, snaps = Task([(p, a) for p, a, _ in PROBLEMS]), loop_model(), []
     learn = MEM.Library.learn
 
@@ -453,11 +445,7 @@ def test_loop(monkeypatch, mode):
     for (lib, best, end), it in zip(snaps, want):
         assert lib == upstream_state(it["lib"]["skills"], it["lib"]["insights"]), it["kiter"]
         assert best == [s for s, _ in it["best_scores"]], it["kiter"]
-        problem = PROBLEMS[it["problem"]][0]
-        up = [c["messages"][0]["content"] for c in it["calls"]]
-        up_solver = [section(u, problem) for u in up if u.startswith("You are a math expert. For the following math problem")]
-        up_rest = [no_math(u) for u in up if not u.startswith("You are a math expert. For the following math problem")]
-        solver, rest = calls_of(model, model.calls[start:end])
-        rest = [no_evaluation(u) for u in rest]
-        assert solver == up_solver and rest == up_rest, it["kiter"]
+        up = [(c["messages"][0]["content"], {k: c[k] for k in REASONING}) for c in it["calls"]]
+        ours = [(no_evaluation(c["user"]), c["params"]) for c in model.calls[start:end]]
+        assert ours == up, it["kiter"]
         start = end

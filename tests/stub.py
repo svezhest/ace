@@ -1,5 +1,8 @@
 """Модель-заглушка для тестов цикла и уровней: ответ решателя — функция от промпта, ответ по схеме — из словаря
 по имени схемы. Запоминает все вызовы."""
+import numpy as np
+
+from ace import embed
 from ace.loop import Episode, Prompt
 from ace.model import Reply, roles, text_reply
 from ace.tasks import TASKS
@@ -38,6 +41,10 @@ class Stub:
                     n=len(self.calls))
         self.calls.append(call)
         return {"role": "assistant", "content": self.answer(call)}, "stop"
+
+    def embed(self, texts, name):
+        """Эмбеддинги — ace.embed (тесты подменяют его таблицей)."""
+        return np.asarray(embed.embed(texts)).tolist()
 
     def usage(self):
         return dict(calls=len(self.calls), prompt_tokens=0, completion_tokens=0)

@@ -158,7 +158,7 @@ $U/mce/bin/python   bridge/capture_mce.py
 | `test_bridge_ace.py` | ACE | 113 | шаблоны и запросы генератора, рефлектора и куратора, параметры, разборщики (и bullet_ids, extract_answer), вход задачи, операции над playbook, цикл online на 4 задачах с окном 2 (все запросы по порядку, итоговый playbook) |
 | `test_bridge_dc.py` | DC | 32 | шаблоны генератора, куратора и синтеза, их запросы, `extract_cheatsheet`, вход задачи, показ пар, цикл DC-Cu и DC-RS на 5 задачах (все запросы по порядку) |
 | `test_bridge_scope.py` | SCOPE | 63 | шаблоны и запросы, все разборщики (текстом, как у апстрима), память (0.85, лимит 20), цикл на 7 задачах |
-| `test_bridge_evolib.py` | EvoLib | 44 | промпты, разборщики, IG и Future IG, выборка из библиотеки, слияния, цикл nogold и gold |
+| `test_bridge_evolib.py` | EvoLib | 45 | промпты (hmmt дословно, задачи стенда без math), решатель HMMT целиком, параметры, разборщики, IG и Future IG, выборка из библиотеки, слияния, цикл nogold и gold (все запросы по порядку) |
 | `test_bridge_tfgrpo.py` | TF-GRPO | 60 | шаблоны и запросы стадий, разборщики, план батча, фильтр групп, два батча `ExperienceUpdater.run`, настройки |
 | `test_bridge_mce.py` | MCE | 10 | промпты мета-агента и базового агента, разбор Skill Overview, выбор итерации, evaluations, цикл |
 | `test_bridge_tasks.py` | ACE, DC | 66 | чекеры finer и formula (ACE), meb (DC), отчётная точность; gpqa — наша (CHK2) |
@@ -168,5 +168,5 @@ bullet_ids ACE — регулярка апстрима как есть (тест
 пропускаются (тест); SCOPE 0.85 и лимит 20 — как у апстрима (тест); DC extract_cheatsheet — как HEAD (тест); MCE
 выбор итерации — как у апстрима, без iter0 (тест); TF-GRPO температуры — как у апстрима (тест, S3).
 
-Не сравниваются: решатели EvoLib и TF-GRPO — решатель общий (S1); разборщики кодовых задач EvoLib и ответы symptom_diagnosis MCE — у нас таких задач
+Не сравниваются: разборщики кодовых задач EvoLib и ответы symptom_diagnosis MCE — у нас таких задач
 нет; журнал SCOPE (history_store) — лог, а не память.
