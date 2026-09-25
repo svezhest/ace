@@ -30,13 +30,14 @@
 Новый метод — новая сборка; если блока не хватает, существующий делится на два.
 
 ```
-uv venv .venv && uv pip install -p .venv/bin/python "pydantic-ai-slim[openai]"
-python ace/env/sandbox.py --build        # образ docker для исполнения кода
-python run.py formula ace 40             # результаты в results/formula40/ace/
-EPOCHS=3 OFFLINE=1 python run.py formula mce 40   # офлайн: обучение на train, тест с лучшей по val памятью
-python ablate.py formula 40              # вся цепочка абляций, или список ступеней после N
-python report.py                         # таблица по results/
-python ace/tasks.py meb results/meb40/ace/log.json   # переоценить лог
+uv sync                                   # окружение с зависимостями для разработки (pytest)
+docker build -t cestand-sandbox ace/env   # образ docker для исполнения кода
+uv run python run.py formula ace 40       # результаты в results/formula40/ace/
+EPOCHS=3 OFFLINE=1 uv run python run.py formula mce 40   # офлайн: обучение на train, тест с лучшей по val памятью
+uv run python ablate.py formula 40        # вся цепочка абляций, или список ступеней после N
+uv run python report.py                   # таблица по results/
+uv run pytest -q                          # тесты; старые логи results/ переигрываются проверками задач
+uv run python tools/trace.py /tmp/t.json && uv run python tools/compare.py /tmp/t.json   # трасса промптов против эталона pre-rewrite
 ```
 
 Методы (`ace/methods/`): baseline; dc, dc_rs и контроли dc_retrieval, dc_history, dc_code; ace (вариант стенда),

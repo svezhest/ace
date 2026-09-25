@@ -1,4 +1,5 @@
-"""Задачи: данные, инструкция решателю и проверка ответа. Чекеры повторяют ACE, чтобы числа были сравнимы."""
+"""Задачи: данные, инструкция решателю и проверка ответа. Проверки finer и formula — как в ACE, meb — как в DC
+(плюс ×÷−–), gpqa — наша."""
 import json
 from dataclasses import dataclass, field
 
@@ -46,14 +47,26 @@ def number(s):
 
 
 def formula_ok(pred, tgt):
-    return number(pred) == number(tgt) != None
+    want = number(tgt)
+    return want is not None and number(pred) == want
+
+
+MEB_CHARS = set("0123456789.+-*/ ")
+MEB_EPS = 1e-6
+
+
+def arithmetic(s):
+    """Только цифры, точка, + - * / и пробелы, без **: такое выражение можно отдать eval (9**9**9 повесил бы процесс)."""
+    return set(s) <= MEB_CHARS and "**" not in s
 
 
 def meb_ok(pred, tgt):
     pred = pred.translate(str.maketrans("×÷−–", "*/--"))
     lhs, want, ref = pred.split("=")[0], tgt.split("=")[1], tgt.split("=")[0]
+    if not (arithmetic(lhs) and arithmetic(want)):
+        return False
     digits = lambda s: "".join(c for c in s if c not in "+-*/ ")
-    return digits(lhs) == digits(ref) and abs(eval(lhs) - eval(want)) < 1e-6
+    return digits(lhs) == digits(ref) and abs(eval(lhs) - eval(want)) < MEB_EPS
 
 
 def gpqa_ok(pred, tgt):
@@ -71,10 +84,6 @@ def final_answer(text):
     return tail.strip().split("\n")[0].strip("`*. ")
 
 
-if __name__ == "__main__":
-    # переигрываем старый log.json и сверяем оценку
-    import sys
-    task, log = TASKS[sys.argv[1]], json.load(open(sys.argv[2]))
-    bad = [r["i"] for r in log if task.check(r["answer"], r["target"]) != r["correct"]]
-    print(len(log), "records,", len(bad), "mismatches", bad[:10])
-    sys.exit(bool(bad))
+def replay(task, log):
+    """Номера записей старого log.json, где проверка сейчас судит иначе, чем при прогоне."""
+    return [r["i"] for r in log if task.check(r["answer"], r["target"]) != r["correct"]]
