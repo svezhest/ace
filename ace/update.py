@@ -24,7 +24,7 @@ from dataclasses import dataclass, field
 
 from pydantic import BaseModel
 
-from . import prompts
+from . import prompts, render
 from .memory import needs
 
 
@@ -92,7 +92,7 @@ class Delta(BaseModel):
     info: dict = {}             # что ещё нужно куратору: вопрос, баллы, лучшее решение
 
     def shown(self):
-        return "\n".join(f"- {l}" for l in self.lessons)
+        return render.lessons(self.lessons)
 
 
 def ask(prompt, fields, output=str, then=None, system="", temperature=0, tokens=1, parse=None):

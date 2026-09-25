@@ -36,7 +36,7 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-from . import parse, prompts
+from . import parse, prompts, render
 from .feedback import failed
 from .inject import counted, text_of
 from .memory import needs, perspective_kind
@@ -159,7 +159,7 @@ class Lesson(BaseModel):
     text: str
 
     def __str__(self):
-        return f"{self.kind}, when {self.when}: {self.text}"
+        return render.typed_lesson(self.kind, self.when, self.text)
 
 
 class TypedReflection(BaseModel):
@@ -171,9 +171,9 @@ class TypedReflection(BaseModel):
 def lesson_fields(form, sees="memory"):
     def fields(ctx, ep, memory, **extra):
         if sees == "used":
-            seen = dict(used="\n".join(f"[{i}] {memory.get(i).text}" for i in ep.used if memory.get(i)) or "(none)")
+            seen = dict(used=render.used([memory.get(i) for i in ep.used if memory.get(i)]))
         else:
-            seen = dict(memory=memory.text() or "(empty)")
+            seen = dict(memory=memory.text() or render.EMPTY)
         return dict(question=ep.question, output=ep.output, verdict=ep.verdict(), form=form, **seen)
     return fields
 
@@ -247,49 +247,38 @@ class Selection(BaseModel):
     selected_index: int = 0
 
 
-def step_summary(output="", tools="", observations=""):
-    """Сводка шага, обрезанная как в апстриме по умолчанию (truncate_context=True)."""
-    cut = lambda s, n: s[:n] + "..." if len(s) > n else s
-    parts = [f"Model output: {cut(output, 200)}" if output else "", f"Tool calls: {cut(tools, 150)}" if tools else "",
-             f"Observations: {cut(observations, 150)}" if observations else ""]
-    return "\n".join(p for p in parts if p) or "(no step details)"
-
-
 def tool_step(step):
     """Шаг с инструментом -> сводка и ошибка (тип, сообщение) или None."""
     name, args, result = step
-    return step_summary(tools=f"{name} {args}", observations=result), ("ToolError", result[-500:]) if failed(result) else None
+    return render.step_summary(tools=render.tool_call(name, args), observations=result), render.tool_error(result) if failed(result) else None
 
 
 def answer_step(ep):
     """Итоговый шаг -> сводка ответа и ошибка: неверный ответ (с верным, если он есть) или обрыв."""
     error = None
     if ep.ok is False:
-        error = ("IncorrectAnswer", f"Incorrect answer. Model answered '{ep.answer}'" + (f", expected '{ep.target}'." if ep.target else "."))
+        error = render.incorrect_answer(ep.answer, ep.target)
     elif ep.truncated:
-        error = ("Truncated", "The output was cut at the token limit before the final answer.")
-    seen = "" if ep.ok is None else f"Answer {'correct' if ep.ok else 'incorrect'}"
-    return step_summary(ep.output, observations=seen), error
+        error = render.truncated_answer()
+    return render.step_summary(ep.output, observations=render.answer_seen(ep.ok)), error
 
 
 def agent_context(ctx, ep):
     return dict(agent_name=f"{ctx.task.name}_agent", agent_role=ctx.task.system, task=ep.question,
-                current_system_prompt=f"{ctx.task.system}\n\n{ep.context}".strip())
+                current_system_prompt=render.system_prompt(ctx.task.system, ep.context))
 
 
 @needs(kinds=("tactical",))
 def rule_fields(ctx, ep, memory, step, error, **extra):
     """Уже действующие правила: tactical перспективы, то есть принятые в этой задаче."""
     rules = [r.text for r in memory.of(perspective_kind("tactical", ep.perspective))]
-    fields = dict(agent_context(ctx, ep), last_step_summary=step, applied_rules="\n".join(f"- {r}" for r in rules) or "(none)")
+    fields = dict(agent_context(ctx, ep), last_step_summary=step, applied_rules=render.rules(rules))
     return dict(fields, error_type=error[0], error_message=error[1]) if error else fields
 
 
 def selector_fields(ctx, ep, memory, step, error, candidates, **extra):
-    text = "".join(f"\n[Candidate {i}]\nUpdate: {c.update_text}\nRationale: {c.rationale}\nConfidence: {c.confidence}\n"
-                   for i, c in enumerate(candidates))
-    details = f"Error Type: {error[0]}\nError Message: {error[1]}\n\nLast Step:\n{step}" if error else f"Step Details:\n{step}"
-    return dict(agent_context(ctx, ep), issue_type="error" if error else "quality", issue_details=details, candidates=text)
+    return dict(agent_context(ctx, ep), issue_type="error" if error else "quality", issue_details=render.issue(step, error),
+                candidates=render.candidates(candidates))
 
 
 def selected_index(s):
@@ -330,11 +319,11 @@ def partial_group(ctx, ep, memory, **extra):
 
 
 def answer_or_redacted(ep):
-    return ep.target or "[REDACTED]"
+    return ep.target or render.REDACTED
 
 
 def rollout_fields(ctx, g, memory, **extra):
-    return dict(question=g.question, trajectory=g.output, answer=answer_or_redacted(g), critique="[No critique provided]")
+    return dict(question=g.question, trajectory=g.output, answer=answer_or_redacted(g), critique=render.NO_CRITIQUE)
 
 
 def summarized(ctx, ep, memory, prev, **extra):
@@ -344,12 +333,11 @@ def summarized(ctx, ep, memory, prev, **extra):
 
 
 def advantage_fields(ctx, ep, memory, prev, **extra):
-    return dict(question=ep.question, answer=answer_or_redacted(ep), trajectories="\n\n".join(
-        f"Attempt {i + 1} (Reward {float(bool(g.ok)) if ep.target else '[REDACTED]'}):\n{s}" for i, (g, s) in enumerate(prev)))
+    return dict(question=ep.question, answer=answer_or_redacted(ep), trajectories=render.attempts(prev, bool(ep.target)))
 
 
 def library_fields(ctx, ep, memory, prev, **extra):
-    return dict(existing_experiences="\n".join(f"[{r.id}]. {r.text}" for r in memory.of()) or "None", new_experiences=prev)
+    return dict(existing_experiences=render.experiences(memory.of()), new_experiences=prev)
 
 
 def nonempty_ops(text):
@@ -380,7 +368,7 @@ def insight_needed(evaluated):
 def insight_fields(evaluated):
     def fields(ctx, ep, memory, prev, **extra):
         best = prev["attempts"][prev["b"]]
-        return dict(question=ep.question, solution=best.output, evaluation=f"\nEvaluation: {best.verdict()}\n" if evaluated else "")
+        return dict(question=ep.question, solution=best.output, evaluation=render.evaluation(best.verdict()) if evaluated else "")
     return fields
 
 
@@ -490,10 +478,9 @@ def has_failures(ctx, ep, memory, **extra):
 
 def failure_fields(ctx, ep, memory, **extra):
     """Ошибки эпизода и хуки, которые в нём показывались, но ошибка повторилась: их можно переписать."""
-    errors = "\n\n".join(f"{i}. {name} {args[:300]}\n{result[-500:]}" for i, (name, args, result) in enumerate(failures(ep), 1))
     missed = [memory.get(i) for i in dict.fromkeys(i for i, ok in ep.fired if not ok) if memory.get(i)]
-    return dict(question=ep.question, errors=errors, output=ep.output, verdict=ep.verdict(),
-                missed="\n".join(f"- trigger: {r.trigger}\n  lesson: {r.text}" for r in missed) or "(none)")
+    return dict(question=ep.question, errors=render.failures(failures(ep)), output=ep.output, verdict=ep.verdict(),
+                missed=render.hooks(missed))
 
 
 class HookLesson(BaseModel):
@@ -532,5 +519,5 @@ def raw_hooks(ctx, ep, memory, **extra):
     out = []
     for (name, args, result), nxt in zip(ep.steps, ep.steps[1:]):
         if failed(result) and not failed(nxt[2]):
-            out.append(dict(trigger=error_kind(result), text=prompts.text("hook_raw", name=nxt[0], args=nxt[1][:500])))
+            out.append(dict(trigger=error_kind(result), text=render.raw_hook(nxt[0], nxt[1])))
     return out or None

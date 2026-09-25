@@ -24,6 +24,8 @@ import copy
 import json
 from dataclasses import asdict, dataclass, field, fields
 
+from . import render
+
 ALL = ("add", "edit", "narrow", "delete")
 
 
@@ -236,7 +238,7 @@ class Memory:
         return [r for r in self.visible() if not self.spec(r.kind).apart]
 
     def text(self, *kinds):
-        return "\n".join(f"[{r.id}] {r.text}" for r in self.of(*kinds))
+        return render.lines(self.of(*kinds))
 
     def chars(self):
         return sum(len(r.text) for r in self.visible())

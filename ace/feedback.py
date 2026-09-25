@@ -13,7 +13,7 @@
 from collections import Counter
 from dataclasses import dataclass, field
 
-from . import prompts
+from . import prompts, render
 
 JUDGE = prompts.load("judge")
 
@@ -35,11 +35,7 @@ class Episode:
     fired: list = field(default_factory=list)   # (id хука, помог ли): ошибка с его trigger не повторилась
 
     def verdict(self):
-        if self.ok is None:
-            return "unknown"
-        if self.ok:
-            return "correct"
-        return f"wrong, correct answer: {self.target}" if self.target else "wrong"
+        return render.verdict(self.ok, self.target)
 
 
 @dataclass

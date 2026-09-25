@@ -1,5 +1,5 @@
 """Среда задачи: инструменты решателя, не связанные с памятью. Чтение памяти даёт инжект."""
-from .. import prompts
+from .. import prompts, render
 from . import sandbox
 
 
@@ -13,7 +13,7 @@ class Env:
 def run_python(code: str) -> str:
     """Run Python code in a sandbox and return its stdout and stderr."""
     r = sandbox.run(code)
-    return f"[stdout]\n{r['stdout']}\n[stderr]\n{r['stderr']}".strip()
+    return render.python_output(r["stdout"], r["stderr"])
 
 
 class Sandbox(Env):

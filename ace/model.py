@@ -7,12 +7,11 @@ from dataclasses import dataclass
 
 from pydantic_ai import Agent, UsageLimits, capture_run_messages
 from pydantic_ai.exceptions import UnexpectedModelBehavior, UsageLimitExceeded
-from pydantic_ai.messages import (ModelRequest, ModelResponse, RetryPromptPart, SystemPromptPart, TextPart, ToolCallPart,
-                                  ToolReturnPart)
+from pydantic_ai.messages import ModelRequest, ModelResponse, RetryPromptPart, SystemPromptPart, ToolCallPart, ToolReturnPart
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
 
-from . import config
+from . import config, render
 
 
 @dataclass
@@ -50,7 +49,7 @@ class Model:
                         if isinstance(p, SystemPromptPart):
                             p.content = system + extra
         responses = [m for m in messages if isinstance(m, ModelResponse)]
-        return Reply(result, transcript(messages), any(m.finish_reason == "length" for m in responses), steps(messages))
+        return Reply(result, render.transcript(messages), any(m.finish_reason == "length" for m in responses), steps(messages))
 
     def request(self, system, user, history, output, tools, deps, limit, settings):
         """До limit запросов; -> (ответ или None, все сообщения, закончен ли прогон). Сообщения сохраняются
@@ -79,19 +78,6 @@ class Model:
         return dict(calls=self.calls, prompt_tokens=self.prompt_tokens, completion_tokens=self.completion_tokens)
 
 
-def transcript(messages):
-    lines = []
-    for m in messages:
-        for p in m.parts:
-            if isinstance(p, TextPart) and p.content:
-                lines.append(p.content)
-            elif isinstance(p, ToolCallPart):
-                lines.append(f"[call {p.tool_name}] {p.args_as_json_str()}")
-            elif isinstance(p, ToolReturnPart):
-                lines.append(f"[{p.tool_name}] {p.content}")
-    return "\n\n".join(lines)
-
-
 def steps(messages):
     """Вызовы инструментов: (имя, аргументы, результат); отбивка ModelRetry — результат «Error: ...»."""
     calls, out = {}, []
@@ -102,5 +88,5 @@ def steps(messages):
             elif isinstance(p, ToolReturnPart) and p.tool_call_id in calls:
                 out.append((*calls[p.tool_call_id], str(p.content)))
             elif isinstance(p, RetryPromptPart) and p.tool_call_id in calls:
-                out.append((*calls[p.tool_call_id], f"Error: {p.content if isinstance(p.content, str) else p.content[0]['msg']}"))
+                out.append((*calls[p.tool_call_id], render.retry_error(p.content)))
     return out

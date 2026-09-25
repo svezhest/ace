@@ -29,14 +29,13 @@
 Итерации MCE: meta_fields, new_skill, iteration (история — скрытый вид iterations), skill_fields, context_and_results
 Прототип: TYPED_TOOLS, TypedOps, apply_typed, Entries, replace_entries, add_episode
 Хуки по ошибкам: add_hooks (новые хуки, переписанные, исходы показов в счётчики)"""
-import json
 from dataclasses import asdict
 from typing import Literal
 
 from pydantic import BaseModel
 from pydantic_ai import RunContext
 
-from . import bound, embed, fs, parse, prompts, update
+from . import bound, embed, fs, parse, prompts, render, update
 from .memory import Forbidden, Kind, Memory, needs, perspective_kind, slug
 from .reflect import Lesson, Typed, best_solution
 
@@ -229,17 +228,16 @@ def lessons_fields(view):
 
 
 def files_view(memory):
-    return "\n".join(f"memory/{r.id}: {r.text}" for r in memory.of()) or "(empty)"
+    return render.files(memory.of())
 
 
 def text_view(memory):
-    return memory.text() or "(empty)"
+    return memory.text() or render.EMPTY
 
 
 @needs("when", kinds=("constraint", "procedure", "insight"))
 def entries_view(memory):
-    shown = "\n".join(f"[{r.id}] ({r.kind}; when: {r.when}) {r.text}" for r in memory.of("constraint", "procedure", "insight"))
-    return shown or "(empty)"
+    return render.entries(memory.of("constraint", "procedure", "insight"))
 
 # плейбук ACE
 
@@ -278,7 +276,7 @@ def playbook_fields(sections, token_budget, layout):
     @needs("section", "helpful", "harmful", kinds="*")
     def fields(ctx, memory, d, **extra):
         return dict(token_budget=token_budget, current_step=ctx.step, total_samples=ctx.total,
-                    playbook_stats=json.dumps(playbook_stats(memory, sections), indent=2), recent_reflection=d.lessons[-1],
+                    playbook_stats=render.stats(playbook_stats(memory, sections)), recent_reflection=d.lessons[-1],
                     current_playbook=layout(memory.of()), question_context=d.info["question"])
     return fields
 
@@ -307,8 +305,8 @@ def classify_fields(domains, intro, layout):
     def fields(ctx, memory, g, **extra):
         strategic = memory.of(perspective_kind("strategic", g["perspective"]))
         tactical = memory.of(perspective_kind("tactical", g["perspective"]))
-        strategic_text = "\n" + intro + layout(strategic) if strategic else ""
-        rules = prompts.text("scope_rules_context", strategic=strategic_text, tactical=[r.text for r in tactical])
+        rules = prompts.text("scope_rules_context", strategic=render.strategic(intro, layout(strategic) if strategic else ""),
+                             tactical=[r.text for r in tactical])
         return dict(allowed_domains=", ".join(domains), update_text=g["text"], rationale=g["rationale"],
                     initial_confidence=g["confidence"], all_rules_context=rules)
     return fields
@@ -361,16 +359,9 @@ def promote(cap, target, optimizer):
 # план батча TF-GRPO
 
 
-def batch_table(memory, ops):
-    """Опыты с относящимися к ним операциями, затем операции без id."""
-    dump = lambda op: json.dumps(op, ensure_ascii=False, indent=2)
-    experiences = [dict(id=r.id, text=r.text, related=[dump(op) for op in ops if op.get("id") == r.id]) for r in memory.of()]
-    return prompts.text("tfgrpo_batch_table", ops=bool(ops), experiences=experiences,
-                        loose=[dump(op) for op in ops if not op.get("id")])
-
-
 def plan_fields(ctx, memory, deltas, **extra):
-    return dict(experiences_and_operations=batch_table(memory, [op for d in deltas for op in d.ops if isinstance(op, dict)]))
+    ops = [op for d in deltas for op in d.ops if isinstance(op, dict)]
+    return dict(experiences_and_operations=render.batch_table(memory.of(), ops))
 
 
 def op_list(plan):
@@ -430,33 +421,10 @@ def gains(add_insight, add_skill):
 # итерации MCE; история — скрытый вид iterations, её же читает bound.best_by_val
 
 
-def overview(skill):
-    """Раздел «## Skill Overview» навыка."""
-    lines, out, inside = skill.splitlines(), [], False
-    for l in lines:
-        if l.strip().lower().replace(" ", "") == "##skilloverview":
-            inside = True
-            continue
-        if inside and l.startswith("## "):
-            break
-        if inside:
-            out.append(l)
-    text = "\n".join(out).strip()
-    return "\n".join(f"  {l}" if l.strip() else "" for l in text.splitlines()) if text else "  (no '## Skill Overview' section found)"
-
-
 def meta_fields(ctx, memory, deltas, history, **extra):
     done = history[1:]
-    if not done:
-        database = prompts.text("mce_no_iterations")
-    else:
-        database = "\n\n".join(f"### Iteration {i}\n- **Train**: {h.train:.2%} | **Val**: {h.val:.2%}\n"
-                               f"- **Skill Overview**:\n{overview(h.text)}" for i, h in enumerate(done, 1))
-    evaluations = json.dumps({f"iter{i}": dict(val_accuracy=h.val, train_accuracy=h.train)
-                              for i, h in enumerate(history)}, indent=2)
-    skills = "\n\n".join(f"### iter{i}/SKILL.md\n{h.text}" for i, h in enumerate(done, 1)) or "(none)"
-    return dict(task_instruction=f"{ctx.task.system} {ctx.task.instr}", skill_database=database,
-                evaluations=evaluations, skills=skills)
+    return dict(task_instruction=render.task_instruction(ctx.task), skill_database=render.skill_database(done),
+                evaluations=render.evaluations(history), skills=render.skills(done))
 
 
 def new_skill(out, ctx, memory, deltas, history, **extra):
@@ -480,14 +448,14 @@ def iteration(meta, kind="iterations"):
 
 @needs(kinds=("iterations",))
 def skill_fields(ctx, memory, deltas, **extra):
-    return dict(task_instruction=f"{ctx.task.system} {ctx.task.instr}", skill=memory.of("iterations")[-1].text,
-                summary=f"train_accuracy {sum(bool(ep.ok) for ep in deltas)}/{len(deltas)}")
+    return dict(task_instruction=render.task_instruction(ctx.task), skill=memory.of("iterations")[-1].text,
+                summary=render.train_summary(sum(bool(ep.ok) for ep in deltas), len(deltas)))
 
 
 def results(deltas):
     data = Memory({"result": Kind(ops=("add",))})
     for ep in deltas:
-        data.add(f"is_correct: {bool(ep.ok)}\nllm_answer: {ep.answer}\ntarget: {ep.target}\nquestion:\n{ep.question}")
+        data.add(render.result(ep.ok, ep.answer, ep.target, ep.question))
     return data
 
 

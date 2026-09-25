@@ -18,7 +18,7 @@ from collections import Counter
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 
-from . import config, prompts
+from . import config, prompts, render
 from . import inject as injects
 from .env import Env
 from .feedback import Episode, Feedback, failed
@@ -92,7 +92,7 @@ def solve(model, task, method, memory, item, temperature=0, note="", ctx=None):
         system += "\n\n" + view.head + view.text
     if self_report and memory.of():
         system += "\n\n" + prompts.text("solver_used")
-    user = f"{task.instr}\n\n{item['context']}" + (f"\n\nReflection:\n{note}" if note else "")
+    user = render.user_message(task.instr, item["context"], note)
     learn = ctx is not None and method.update.step
     events = Steps(ctx, method, memory, item, view) if env.tools + view.tools and (learn or view.hook) else None
     r = model.run(system, user, tools=env.tools + view.tools, deps=view.fs,

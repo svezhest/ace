@@ -14,8 +14,7 @@ from dataclasses import asdict, fields
 
 from pydantic import BaseModel
 
-from . import embed, parse
-from .inject import counted
+from . import embed, parse, render
 from .memory import needs, requirements
 
 
@@ -102,7 +101,7 @@ def merge_counted(prompt, temperature=0.3):
     def merge(ctx, group):
         first = group[0]
         helpful, harmful = sum(r.helpful for r in group), sum(r.harmful for r in group)
-        out = ctx.model.one("", prompt.fill(dict(bullets="\n".join(f"{k + 1}. {counted(r)}" for k, r in enumerate(group)),
+        out = ctx.model.one("", prompt.fill(dict(bullets=render.merge_group(group),
                                                  id=first.id, helpful=helpful, harmful=harmful)), temperature=temperature).output
         return parse.counted_line(first.id)(out)
     return merge
@@ -181,8 +180,7 @@ def rule_optimizer(prompts, passes=2):
             if len(group) < 2 or not parts:
                 out += parts
                 continue
-            text = "".join(f"\nRule {x['id']}:\n  Text: {x['rule']}\n  Rationale: {x['rationale']}\n" for x in parts)
-            r = llm(model, "merge", dict(rules_text=text), Rule)
+            r = llm(model, "merge", dict(rules_text=render.rule_group(parts)), Rule)
             if r:
                 out.append(dict(rule=r.rule, rationale=r.rationale, id=parts[0]["id"],
                                 confidence=max(x.get("confidence", 0.85) for x in parts)))
@@ -196,7 +194,7 @@ def rule_optimizer(prompts, passes=2):
         for _ in range(passes):
             if len(rules) <= target:
                 break
-            a = llm(model, "analyze", dict(num_rules=len(rules), rules_text="".join(f"Rule {x['id']}: {x['rule']}\n" for x in rules)),
+            a = llm(model, "analyze", dict(num_rules=len(rules), rules_text=render.rule_list(rules)),
                     Analysis) or Analysis()
             if not (a.conflicts or a.subsumption or a.consolidation):
                 break

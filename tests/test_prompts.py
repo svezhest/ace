@@ -8,7 +8,7 @@ import jinja2.meta
 import pytest
 import yaml
 
-from ace import prompts
+from ace import prompts, render
 
 OLD = "pre-rewrite"
 OLD_DIR = "ace/methods/prompts"
@@ -186,9 +186,8 @@ OPS = [dict(operation="UPDATE", id="r1", content="new"), dict(operation="ADD", i
 @pytest.mark.parametrize("records", [[], [("r1", "one")], [("r1", "one"), ("r2", "two")]])
 @pytest.mark.parametrize("ops", [[], OPS[:1], OPS[1:2], OPS])
 def test_batch_table(records, ops):
-    from ace.curate import batch_table
     from ace.memory import Kind, Memory
     memory = Memory({"experience": Kind()})
     for _, text in records:
         memory.add(text)
-    assert batch_table(memory, ops) == old_batch_table(records, ops)
+    assert render.batch_table(memory.of(), ops) == old_batch_table(records, ops)

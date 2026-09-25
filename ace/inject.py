@@ -27,7 +27,7 @@
 import random
 from dataclasses import dataclass, field, replace
 
-from . import embed, fs, prompts
+from . import embed, fs, prompts, render
 from .feedback import failed
 from .memory import Skill, needs, requirements, slug
 
@@ -47,29 +47,12 @@ class View:
 # строка записи
 
 
-def plain(r):
-    return r.text
-
-
-def dashed(r):
-    return f"- {r.text}"
-
-
-def numbered(r):
-    return f"[{r.id}] {r.text}"
-
-
-def dotted(r):
-    return f"[{r.id}]. {r.text}"
+plain, dashed, numbered, dotted, prefixed = render.plain, render.dashed, render.numbered, render.dotted, render.prefixed
 
 
 @needs("helpful", "harmful")
 def counted(r):
-    return f"[{r.id}] helpful={r.helpful} harmful={r.harmful} :: {r.text}"
-
-
-def prefixed(prefix):
-    return lambda r: prefix + r.text
+    return render.counted(r)
 
 # какие записи
 
@@ -132,7 +115,7 @@ def by_group(line, by, order=(), header="## {}", sep="\n\n", title=str):
     def layout(records):
         group = lambda r: getattr(r, by)
         groups = list(order) or [(g, title(g)) for g in dict.fromkeys(map(group, records))]
-        return sep.join("\n".join([header.format(t)] + [line(r) for r in records if group(r) == g]) for g, t in groups)
+        return render.grouped(records, line, group, groups, header, sep)
     return layout
 
 
@@ -151,15 +134,7 @@ def pairs(scored, note=""):
     самая похожая последней; иначе (полная история) по порядку."""
     @needs("question")
     def layout(records):
-        text = "### PREVIOUS SOLUTIONS (START)\n\n" + (f"{note}\n\n" if scored else "")
-        for i, r in enumerate(records[::-1] if scored else records):
-            if scored:
-                text += (f"#### Previous Input #{i + 1} (Similarity: {r.score:.2f}):\n\n{r.question}\n\n"
-                         f"#### Model Solution to Previous Input  #{i + 1}:\n\n{r.text}\n---\n---\n\n")
-            else:
-                text += (f"#### Previous Input #{i + 1}:\n\n{r.question}\n\n"
-                         f"#### Model Solution to Previous Input #{i + 1}:\n\n{r.text}\n---\n---\n\n")
-        return (text.strip() + "\n\n" if scored else text) + "#### PREVIOUS SOLUTIONS (END)"
+        return render.pairs(records, scored, note)
     return layout
 
 
@@ -186,7 +161,7 @@ def show(kinds=(), pick=None, line=numbered, sep="\n", layout=None, before="", a
             recs = pick(recs, item)
         if not recs:
             return View(empty, head=head) if empty is not None else View()
-        body = layout(recs) if layout else sep.join(line(r) for r in recs)
+        body = layout(recs) if layout else render.lines(recs, line, sep)
         return View(before + body + after, [r.id for r in recs], head=head)
     return inject
 
@@ -253,7 +228,7 @@ def catalog(always=(), listed=()):
         if not rules and not entries:
             return View()
         skills = fs.FS({"skills": fs.Mount(memory, listed, "ro", track=True)})
-        text = CATALOG.fill(always=bool(always), rules="\n".join(dashed(r) for r in rules), listing=fs.listing(skills, "skills"))
+        text = CATALOG.fill(always=bool(always), rules=render.lines(rules, dashed), listing=fs.listing(skills, "skills"))
         return View(text, [r.id for r in rules], fs.READ_TOOLS, skills, rounds=3)
     inject.reads = True
     return inject
