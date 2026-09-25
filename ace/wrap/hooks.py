@@ -1,5 +1,6 @@
-"""Хуки по ошибкам инструментов: обёртка Hooks(ученик) = извлечение (extract/hooks.py) + память (memory/hooks.py) +
-показ (show/hooks.py) поверх любого ученика.
+"""Хуки по ошибкам инструментов: обёртка Hooks(ученик) — рядом с учеником второй ученик-хуки со своим конвейером
+(извлечение extract/hooks.py, память memory/hooks.py, та же сверка стыка и добавок) и показ хуков (show/hooks.py)
+поверх показа ученика.
 
     learn="model"   уроки по ошибкам попытки выводит модель; learn="raw" — ошибка и следующий вызов, который прошёл
     show="after"    после шага с ошибкой исполнения хуки с её trigger — сообщением в конец истории (Patch(append)):
@@ -9,10 +10,8 @@
                     его ошибки в ней не было
 Исходы показа (fired) — метки хуков. Учатся хуки только на ошибках исполнения (traceback), не на отбивках вызова
 инструмента. Ошибки шага бывают только у решателя с инструментами: ученику нужна среда с исполнением кода."""
-import copy
-
-from ..extract import missing
 from ..extract.hooks import LEARN, FromErrors, failures
+from ..learner import Learner
 from ..memory.hooks import PRUNE, HookBook
 from ..show.hooks import AFTER, SYSTEM, fired
 from . import Wrapper
@@ -21,12 +20,13 @@ from . import Wrapper
 class Hooks(Wrapper):
     def __init__(self, inner, name=None, learn="model", prune=PRUNE, show="after"):
         super().__init__(inner, name)
-        self.hooks, self.extract_hooks, self.show_at = HookBook(prune), FromErrors(LEARN[learn]), show
-        self.pending_hooks = []
+        self.book = Learner(f"{self.name}: хуки", memory=HookBook(prune), extract=FromErrors(LEARN[learn]))
+        self.show_at = show
         self.waiting = None         # (попытка, ответ, id хуков, показанных после него) — ждут исхода
-        lack = missing(self.hooks, self.extract_hooks)
-        if lack:
-            raise ValueError(f"{self.name}: память хуков требует {', '.join(sorted(lack))}")
+
+    @property
+    def hooks(self):
+        return self.book.memory
 
     def check(self):
         if self.inner.solver is not None:
@@ -70,26 +70,22 @@ class Hooks(Wrapper):
 
     def on_question(self, ex, group):
         self.inner.on_question(ex, group)
-        x = self.extract_hooks(ex, group, self.hooks)
-        if x:
-            self.pending_hooks.append(x)
+        self.book.on_question(ex, group)
 
     def on_batch(self, ex, groups):
         self.inner.on_batch(ex, groups)
-        if self.pending_hooks:
-            self.hooks.learn(ex, self.pending_hooks)
-        self.pending_hooks = []
+        self.book.on_batch(ex, groups)
 
     def on_pass(self, ex):
         self.inner.on_pass(ex)
-        self.pending_hooks = []
+        self.book.on_pass(ex)
 
     def snapshot(self):
-        return self.inner.snapshot(), copy.deepcopy(self.hooks)
+        return self.inner.snapshot(), self.book.snapshot()
 
     def restore(self, snapshot):
         self.inner.restore(snapshot[0])
-        self.hooks = copy.deepcopy(snapshot[1])
+        self.book.restore(snapshot[1])
 
     def key(self):
         key = self.inner.key()
