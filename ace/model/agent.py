@@ -8,7 +8,7 @@ from pydantic_ai import Agent, Tool, UsageLimits, capture_run_messages
 from pydantic_ai.exceptions import UnexpectedModelBehavior, UsageLimitExceeded
 from pydantic_ai.messages import (ModelRequest, ModelResponse, RetryPromptPart, SystemPromptPart, TextPart, ToolCallPart,
                                   ToolReturnPart, UserPromptPart)
-from pydantic_ai.models.openai import OpenAIChatModel
+from pydantic_ai.models.openai import OpenAIChatModel, OpenAIChatModelSettings
 from pydantic_ai.providers.openai import OpenAIProvider
 
 from .. import config, render
@@ -109,9 +109,19 @@ class PydanticAI:
         return result, messages, outcome
 
 
+SETTINGS = {"max_completion_tokens": "max_tokens", "reasoning_effort": "openai_reasoning_effort", "stop": "stop_sequences"}
+KNOWN = set(OpenAIChatModelSettings.__annotations__)
+
+
 def settings(params):
-    """Параметры вызова -> настройки pydantic-ai: предел генерации у них один, max_tokens."""
-    return {"max_tokens" if k == "max_completion_tokens" else k: v for k, v in params.items()}
+    """Параметры вызова -> настройки pydantic-ai (предел генерации у них один, max_tokens; reasoning_effort —
+    openai_reasoning_effort). Параметр, которого pydantic-ai не знает, он молча выбросил бы — ошибка."""
+    out = {}
+    for k, v in params.items():
+        if SETTINGS.get(k, k) not in KNOWN:
+            raise ValueError(f"параметр вызова {k} бэкенд pydantic-ai не передаст модели")
+        out[SETTINGS.get(k, k)] = v
+    return out
 
 
 def steps(messages):

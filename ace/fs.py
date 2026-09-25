@@ -4,7 +4,9 @@ FS через deps и чужую память не видят.
 
 Правила как у агентских харнесов: читать обязательно только перед edit (видеть текущий текст для точной
 замены: литеральная замена, old_string один раз, replace_all явно); create, append и delete — без чтения;
-read постранично (offset, limit); папки — части пути, создаются вместе с файлом."""
+read постранично (offset, limit); папки — части пути, создаются вместе с файлом. Правки файлов идут под замком FS:
+вызовы одного ответа модели pydantic-ai исполняет в потоках, и две правки одного файла не должны терять друг друга."""
+import threading
 from dataclasses import dataclass, field
 
 from pydantic_ai import ModelRetry, RunContext
@@ -43,6 +45,7 @@ class FS:
     mounts: dict                                # имя -> Mount
     seen: set = field(default_factory=set)      # прочитанные пути: без этого edit запрещён
     root: str = ""                              # абсолютный путь корня, как его видит агент (MCE: /workspace/...)
+    lock: object = field(default_factory=threading.Lock, repr=False, compare=False)    # правки — по одной
 
     @property
     def reads(self):
@@ -119,17 +122,19 @@ def create(ctx: RunContext[FS], path: str, content: str) -> str:
     m, rest = ctx.deps.writable(path)
     if not rest:
         raise ModelRetry("give a file path inside a directory, e.g. context/notes.md")
-    if m.store.read(rest) is not None:
-        raise ModelRetry(f"{path} already exists; use edit or append")
-    m.store.write(rest, content.strip())
+    with ctx.deps.lock:
+        if m.store.read(rest) is not None:
+            raise ModelRetry(f"{path} already exists; use edit or append")
+        m.store.write(rest, content.strip())
     return path.strip("/")
 
 
 def append(ctx: RunContext[FS], path: str, text: str) -> str:
     """Append text as new lines at the end of a file."""
     m, rest = ctx.deps.writable(path)
-    old = ctx.deps.text(path)
-    m.store.write(rest, old.rstrip("\n") + "\n" + text.strip())
+    with ctx.deps.lock:
+        old = ctx.deps.text(path)
+        m.store.write(rest, old.rstrip("\n") + "\n" + text.strip())
     return "ok"
 
 
@@ -137,23 +142,25 @@ def edit(ctx: RunContext[FS], path: str, old_string: str, new_string: str, repla
     """Replace old_string with new_string. old_string must occur exactly once unless replace_all.
     An empty new_string deletes the fragment. Read the file before editing it."""
     m, rest = ctx.deps.writable(path)
-    text = ctx.deps.text(path)
-    if ctx.deps.norm(path) not in ctx.deps.seen:
-        raise ModelRetry(f"read {path} before editing it")
-    n = text.count(old_string)
-    if n == 0:
-        raise ModelRetry("old_string not found in the file")
-    if n > 1 and not replace_all:
-        raise ModelRetry(f"old_string occurs {n} times; add surrounding context or set replace_all")
-    m.store.write(rest, text.replace(old_string, new_string).strip())
+    with ctx.deps.lock:
+        text = ctx.deps.text(path)
+        if ctx.deps.norm(path) not in ctx.deps.seen:
+            raise ModelRetry(f"read {path} before editing it")
+        n = text.count(old_string)
+        if n == 0:
+            raise ModelRetry("old_string not found in the file")
+        if n > 1 and not replace_all:
+            raise ModelRetry(f"old_string occurs {n} times; add surrounding context or set replace_all")
+        m.store.write(rest, text.replace(old_string, new_string).strip())
     return "ok"
 
 
 def delete(ctx: RunContext[FS], path: str) -> str:
     """Delete a file."""
     m, rest = ctx.deps.writable(path)
-    ctx.deps.text(path)
-    m.store.delete(rest)
+    with ctx.deps.lock:
+        ctx.deps.text(path)
+        m.store.delete(rest)
     return "ok"
 
 

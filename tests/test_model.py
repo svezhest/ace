@@ -239,3 +239,14 @@ def test_usage_counts_agents_and_embeddings(monkeypatch):
     monkeypatch.setattr("ace.embed.embed", lambda texts: np.zeros((len(texts), 2)))
     m.embed(["a", "b"], "bge")
     assert m.usage() == dict(calls=4, prompt_tokens=100, completion_tokens=7, agent_calls=4, embedded=2)
+
+
+def test_settings_keep_every_param():
+    """reasoning_effort уходит модели (openai_reasoning_effort), незнакомый pydantic-ai параметр — ошибка, а не потеря."""
+    import pytest
+
+    from ace.model.agent import settings
+    assert settings({"max_completion_tokens": 5, "reasoning_effort": "high", "temperature": 0}) == \
+        {"max_tokens": 5, "openai_reasoning_effort": "high", "temperature": 0}
+    with pytest.raises(ValueError, match="best_of"):
+        settings({"best_of": 2})

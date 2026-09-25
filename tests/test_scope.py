@@ -198,3 +198,9 @@ def test_answer_order_chosen_first():
     assert x.extras[ATTEMPT] == [1, 0]
     kinds = ["classify" if MARK["classify"] in c["user"] else "propose" for c in model.calls]
     assert kinds == ["propose", "propose", "classify", "classify"]
+
+
+def test_confidence_null():
+    """Уверенность null от модели — умолчание, а не падение прогона."""
+    from ace.extract.scope import DEFAULT_CONFIDENCE, Proposal
+    assert Proposal("x", "", None).initial() == DEFAULT_CONFIDENCE and Proposal("x", "", 0.8).initial() == 0.8

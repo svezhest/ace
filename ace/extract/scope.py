@@ -36,9 +36,12 @@ class Proposal:
     confidence: object = "medium"       # метка low / medium / high или число, как пришло от модели
 
     def initial(self):
-        """Начальная confidence: метка по LEVEL (чужая — DEFAULT_CONFIDENCE), число как есть."""
+        """Начальная confidence: метка по LEVEL (чужая — DEFAULT_CONFIDENCE), число как есть, прочее (null) —
+        DEFAULT_CONFIDENCE."""
         c = self.confidence
-        return LEVEL.get(c.lower(), DEFAULT_CONFIDENCE) if isinstance(c, str) else float(c)
+        if isinstance(c, str):
+            return LEVEL.get(c.lower(), DEFAULT_CONFIDENCE)
+        return float(c) if isinstance(c, (int, float)) and not isinstance(c, bool) else DEFAULT_CONFIDENCE
 
 
 def tool_step(step):

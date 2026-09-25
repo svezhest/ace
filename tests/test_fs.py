@@ -91,3 +91,20 @@ def test_root_paths():
     assert fs.edit(ctx, "context/notes.md", "units", "signs") == "ok"
     fs.create(ctx, "/workspace/iter1_sub0/context/new.md", "x")
     assert store.read("new.md") == "x"
+
+
+def test_parallel_edits_keep_both():
+    """Две правки одного файла из одного ответа (pydantic-ai исполняет их в потоках) — обе в файле."""
+    import threading
+    import time
+    ctx, store = files()
+    ctx.deps.seen.add("context/notes.md")
+    read = store.read
+    store.read = lambda path: (read(path), time.sleep(0.05))[0]     # шире окно гонки
+    edits = [threading.Thread(target=fs.edit, args=(ctx, "context/notes.md", old, old.upper()))
+             for old in ("Check", "Second")]
+    for t in edits:
+        t.start()
+    for t in edits:
+        t.join()
+    assert store.files["notes.md"] == "CHECK units.\nSECOND line."
