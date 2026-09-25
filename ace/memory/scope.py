@@ -20,7 +20,8 @@ P = {n: prompts.load(f"scope_{n}") for n in ("analyze", "merge", "subsumed", "co
 ACCEPT = 0.5                # auto_accept_threshold "medium"
 STRATEGIC = 0.85            # strategic_confidence_threshold
 PER_RUN = 20                # max_rules_per_task
-CAP, TARGET = 10, 8         # max_strategic_rules_per_domain и int(10 * 0.8)
+CAP = 10                    # max_strategic_rules_per_domain
+TARGET_SHARE = 0.8          # оптимизатор сжимает домен до int(0.8 * cap) правил (target_count)
 RULE_CONFIDENCE = 0.85      # confidence записи без своей (пункт ACE в оптимизаторе)
 OPTIMIZER_PASSES = 2
 DUPLICATE_OVERLAP = 0.7     # доля общих слов, с которой правило — дубль
@@ -97,6 +98,10 @@ def rule_optimizer(passes=OPTIMIZER_PASSES):
     return optimize
 
 
+def target_count(cap):
+    return int(cap * TARGET_SHARE)
+
+
 def compress(model, records, optimizer, target, cap, new):
     """Записи сверх cap сжимаются оптимизатором до target, остаток обрезается до cap. Нетронутая запись
     остаётся собой (id и статистика); исправленное и слитое — новые записи new(правило). Сбой оптимизатора
@@ -142,7 +147,7 @@ class Book(Container):
 
     def __init__(self, name=THOROUGHNESS, optimizer=None, cap=CAP, per_run=PER_RUN):
         self.name, self.optimizer, self.cap, self.per_run = name, optimizer or rule_optimizer(), cap, per_run
-        self.target = int(cap * 0.8)    # target_count апстрима
+        self.target = target_count(cap)
         self.ids, self.domains, self.tactical, self.accepted = Ids(), {}, [], 0
 
     def records(self):

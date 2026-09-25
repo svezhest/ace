@@ -9,7 +9,7 @@ from ace.extract import ATTEMPT, CONFIDENCE, DOMAIN, RATIONALE, Extraction
 from ace.extract.scope import Proposal, Rules, answer_step, tool_step
 from ace.learner import swap
 from ace.loop import Attempt, Group, Prompt, run
-from ace.memory.scope import Book, CAP, PER_RUN, Perspectives, Strategic, TARGET, compress, duplicate_words
+from ace.memory.scope import Book, CAP, PER_RUN, Perspectives, Strategic, compress, target_count, duplicate_words
 from ace.methods.scope import scope, scope_k2
 from ace.model import Patch, Step
 from ace.show.scope import StrategicRules
@@ -124,7 +124,7 @@ def test_domain_cap_optimizer():
     for i in range(CAP + 1):
         book.learn(ex, [rule(" ".join(f"w{i}{j}" for j in range(5)), 0.86 + i / 1000)])
     kept = [r.text for r in book.records()]
-    assert len(kept) == TARGET and kept[-1] == "merged"
+    assert len(kept) == target_count(CAP) and kept[-1] == "merged"
     assert [MARK["analyze"] in c["user"] for c in model.calls] == [True, False]        # после слияния 8 правил: второго прохода нет
     # нетронутая запись осталась собой
     assert all(isinstance(r, Strategic) for r in book.records())

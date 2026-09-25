@@ -8,6 +8,7 @@ from . import config
 
 MODEL = "BAAI/bge-m3"
 TABLES = ("meb",)           # задачи, для вопросов которых у DC есть готовые эмбеддинги
+CSV_FIELD_LIMIT = 1 << 30   # вектор в строке csv длиннее предела поля по умолчанию
 _model = None
 _table = None
 
@@ -24,7 +25,7 @@ def table():
     """Готовые эмбеддинги апстрима DC: вопрос -> вектор."""
     global _table
     if _table is None:
-        csv.field_size_limit(1 << 30)
+        csv.field_size_limit(CSV_FIELD_LIMIT)
         _table = {}
         for task in TABLES:
             with open(config.DATA / f"{task}_embeddings.csv", newline="") as f:

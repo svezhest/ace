@@ -10,18 +10,24 @@ from .. import render
 IMAGE = "cestand-sandbox"
 TIMEOUT = 10                # секунд на запуск кода внутри контейнера
 DOCKER_GRACE = 15           # сверх TIMEOUT на старт и остановку контейнера
-HEAD_LINES, TAIL_LINES = 20, 20
+HEAD_LINES = 20             # длинный вывод: начало и конец, середина вырезается
+TAIL_LINES = 20
 MAX_BYTES = 64_000
 TIMEOUT_RC = 124            # код возврата timeout(1)
 KILLED_RC = 137             # timeout(1) добил SIGKILL-ом код, который не вышел по SIGTERM
 KILL_AFTER = 1              # секунд от SIGTERM до SIGKILL
 
+MEMORY = "512m"             # память контейнера, без swap
+CPUS = "1"
+PIDS = "64"                 # процессов в контейнере: fork-бомба не положит хост
+TMP_SIZE = "64m"            # /tmp — единственное место для записи
+
 ISOLATION = [
     "--network", "none",
-    "--memory", "512m", "--memory-swap", "512m",
-    "--cpus", "1",
-    "--pids-limit", "64",
-    "--read-only", "--tmpfs", "/tmp:size=64m,exec",
+    "--memory", MEMORY, "--memory-swap", MEMORY,
+    "--cpus", CPUS,
+    "--pids-limit", PIDS,
+    "--read-only", "--tmpfs", f"/tmp:size={TMP_SIZE},exec",
     "--security-opt", "no-new-privileges",
     "--cap-drop", "ALL",
 ]

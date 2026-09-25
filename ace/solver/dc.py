@@ -70,7 +70,8 @@ def generate(model, call, code):
         reply = model.ask(Call(list(history), call.params))
         output = reply.output or render.DC_NO_RESPONSE
         head = output.split(FLAG)[0].strip()
-        if not (code and FLAG in output and len(head) >= 3 and head.endswith("```")):
+        runs_code = code and FLAG in output and head.endswith("```")      # перед флагом — закрытый блок кода
+        if not runs_code:
             break
         ran = run_block(head)
         current = f"{head}\n{FLAG}\n\n{ran.strip() if ran else render.DC_NO_BLOCK}"

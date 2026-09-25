@@ -25,6 +25,7 @@ from . import Container, Ids, Lessons, Operation, Record
 P = {n: prompts.load(f"evolib_{n}") for n in ("merge_skills", "merge_insights", "compare")}
 SIM, RATE = 0.8, 0.5        # порог слияния похожих, доля нового IG у слитого skill
 EMBEDDING = "text-embedding-3-small"    # EmbeddingModel апстрима
+NORM_EPS = 1e-8             # знаменатель косинуса embedding_similarity апстрима
 
 
 @dataclass(frozen=True, eq=False)
@@ -54,7 +55,7 @@ def merged_insights(text):
 def similarity(a, b):
     """embedding_similarity апстрима."""
     a, b = np.array(a), np.array(b)
-    return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b) + 1e-8)
+    return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b) + NORM_EPS)
 
 
 def graded(task, best):

@@ -16,7 +16,7 @@ from ..model import Call, Reader, messages, params
 from ..upstream.ace import ace_params, question_context
 from . import Ids, Lessons, Operation, Sections
 from .counters import HARMFUL, HELPFUL, Counted, count, prune_harmful
-from .scope import CAP, TARGET, compress, rule_optimizer
+from .scope import CAP, compress, rule_optimizer, target_count
 
 # стенд
 
@@ -75,9 +75,11 @@ class Playbook(Lessons):
 class CappedPlaybook(Playbook):
     """Пункты стенда с пределом SCOPE вместо отсева: сверх cap пунктов оптимизатор правил сжимает до target,
     остаток обрезается до cap; нетронутые пункты остаются со своими счётчиками, исправленные и слитые — новые."""
-    def __init__(self, cap=CAP, target=TARGET):
+    def __init__(self, cap=CAP):
         super().__init__(prune=None)
-        self.cap, self.target, self.optimizer = cap, target, rule_optimizer()
+        self.cap = cap
+        self.target = target_count(cap)
+        self.optimizer = rule_optimizer()
 
     def learn(self, ex, extractions):
         super().learn(ex, extractions)
