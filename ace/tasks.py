@@ -166,6 +166,22 @@ CHECK = {"finer": finer_ok, "formula": formula_ok, "meb": meb_ok, "gpqa": gpqa_o
 
 TASKS = {name: Task(name) for name in ("finer", "formula", "meb", "gpqa", "dapo", "hmmt", "symptom")}
 
+# Метод × задача — единственное место, где метод узнаёт задачу по имени. На бенчмарке своего апстрима метод берёт
+# его тексты, разбор входа и параметры (вариант); на остальных задачах — запасной вариант стенда "" (DEVIATIONS S2).
+VARIANTS = {
+    ("ace", "formula"): "formula",      # DataProcessor: вопрос между «Question: » и «. Answer:», приписка про число
+    ("ace", "finer"): "instruction",    # DataProcessor: Instruction / Input
+    ("dc", "meb"): "meb",               # вход с вступлением MathEquationBalancer
+    ("tfgrpo", "dapo"): "math",         # math_agent.yaml и math_reasoning.yaml, в зачёт весь ответ (math_verify)
+    ("evolib", "hmmt"): "math",         # HMMT_SOLVER_PROMPT, reasoning API, проверка по тексту решения
+    ("mce", "symptom"): "symptom",      # интерфейс get_context, промпт диагноза, инструкция и поле symptoms
+}
+
+
+def variant(method, task):
+    """Вариант метода на задаче (task — задача или её имя); "" — запасной вариант стенда."""
+    return VARIANTS.get((method, getattr(task, "name", task)), "")
+
 
 def accuracy(task, answers, targets):
     """Отчётная точность, как evaluate_accuracy апстрима ACE: у finer — доля верных сущностей по всем вопросам,

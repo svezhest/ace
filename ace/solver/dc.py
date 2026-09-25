@@ -21,6 +21,7 @@ from ..env import sandbox
 from ..loop import Prompt, Solver
 from ..memory.dc import CHEATSHEET, MAX_TOKENS, TOKENS, dc_params
 from ..model import Call, Reply, messages
+from ..tasks import variant
 from ..show import TopK, Whole
 from . import OwnSolver
 
@@ -39,7 +40,7 @@ CODE_FILE = "/tmp/code.py"  # код исполняется файлом, как
 def dc_input(task, i, question):
     """Вход задачи i (с нуля), как его строит run_benchmark.py апстрима: у meb — вступление MathEquationBalancer."""
     text = f"Question #{i + 1}:\n{question}"
-    return MEB + text if task == "meb" else text
+    return MEB + text if variant("dc", task) == "meb" else text
 
 
 @dataclass

@@ -18,7 +18,7 @@ from .. import prompts, render
 from ..env.tfgrpo import Kernel
 from ..loop import Prompt, Solver
 from ..model import Call, Reply, messages
-from ..tasks import final_answer
+from ..tasks import final_answer, variant
 from . import OwnSolver
 
 TEMPLATE, PROBLEM = prompts.load("tfgrpo_agent"), prompts.load("tfgrpo_problem")
@@ -36,14 +36,14 @@ RETRIES = 3                 # rollout_with_semaphore
 
 
 def instructions(task):
-    if task.name == "dapo":
+    if variant("tfgrpo", task) == "math":
         return TEMPLATE.fill(role="", answer=prompts.text("tfgrpo_answer_dapo"))
     return TEMPLATE.fill(role=task.system + "\n\n", answer=task.instr)
 
 
 def answer(task):
     """Ответ в зачёт: у dapo весь итоговый ответ (его судит math_verify), у задач стенда — строка FINAL ANSWER."""
-    return (lambda text: text) if task.name == "dapo" else final_answer
+    return (lambda text: text) if variant("tfgrpo", task) == "math" else final_answer
 
 
 class Failed(Exception):

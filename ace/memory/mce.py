@@ -13,6 +13,7 @@ from pathlib import Path
 
 from .. import fs, prompts, render
 from ..model import Call, claude, messages, params
+from ..tasks import variant
 from . import Files, Record
 
 BASE = prompts.load("mce_base")
@@ -89,7 +90,7 @@ SIGNATURES = {"symptom": (Signature("get_context", (("symptoms", "str", "Patient
 
 def signatures(task):
     """Интерфейсы задачи (get_interface_signatures); у задач стенда их нет (MCE1)."""
-    return SIGNATURES.get(task.name, ())
+    return SIGNATURES.get(variant("mce", task), ())
 
 
 def folder_name(iteration, sub=None):
@@ -368,7 +369,7 @@ class Folder:
         eps = [g.episodes[g.chosen] for g in groups]
         items = ex.learner.passed[ex.i + 1 - len(groups): ex.i + 1]
         acc = sum(1.0 if e.ok else 0.0 for e in eps) / len(eps) if eps else 0.0
-        field = "symptoms" if ex.task.name == "symptom" else "question"
+        field = "symptoms" if variant("mce", ex.task) == "symptom" else "question"
         results = [{"id": it["id"], field: g.question, "ground_truth": g.target, "llm_prediction": e.answer,
                     "is_correct": bool(e.ok)} for it, g, e in zip(items, groups, eps)]
         summary = {"train_accuracy": acc, "train_metrics": {"accuracy": acc} if eps else {}, "train_total": len(eps),

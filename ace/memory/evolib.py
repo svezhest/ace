@@ -19,6 +19,7 @@ from .. import parse, prompts
 from ..extract import ATTRIBUTION, BEST_ANSWER, IG
 from ..extract.evolib import domain, future_gains, generate, llm_params, second_better
 from ..model import Call, Reader, messages
+from ..tasks import variant
 from . import Container, Ids, Lessons, Operation, Record
 
 P = {n: prompts.load(f"evolib_{n}") for n in ("merge_skills", "merge_insights", "compare")}
@@ -59,7 +60,7 @@ def similarity(a, b):
 def graded(task, best):
     """Что проверка задачи видит как решение (eval_function апстрима): у hmmt — весь текст решения, у задач стенда —
     ответ FINAL ANSWER."""
-    return best.output if task.name == "hmmt" else best.answer
+    return best.output if variant("evolib", task) == "math" else best.answer
 
 
 class Library(Container):

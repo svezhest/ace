@@ -19,7 +19,7 @@ from .. import parse, prompts
 from ..extract.evolib import EPS, generate, llm_params
 from ..loop import Prompt, Solver
 from ..model import Call, messages
-from ..tasks import final_answer
+from ..tasks import final_answer, variant
 from . import OwnSolver
 
 K, W_IG = 10, 1.0
@@ -50,7 +50,7 @@ def upstream_answer(text):
 
 def solver_texts(task):
     """(инструкция, формат, ответ в зачёт) решателя задачи."""
-    if task.name == "hmmt":
+    if variant("evolib", task) == "math":
         return prompts.text("evolib_instruction_hmmt"), prompts.text("evolib_format_hmmt"), upstream_answer
     return (prompts.text("evolib_instruction", role=task.system, instr=task.instr), prompts.text("evolib_format"),
             final_answer)

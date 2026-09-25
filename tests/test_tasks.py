@@ -55,3 +55,36 @@ def test_hmmt():
     assert t.check("<answer>\\boxed{\\frac{9\\sqrt{23}}{23}}</answer>", "\\frac{9 \\sqrt{23}}{23}")
     assert not t.check("x \\boxed{3375}", "\\boxed{3375}") and not t.check("\\boxed{3375}", "3376")
     assert len(t.load()) == 40 and t.load()[0]["target"] == "103"
+
+
+def test_every_method_on_every_task(monkeypatch):
+    """Метод × задача: на задаче вне таблицы вариантов (tasks.VARIANTS) метод идёт запасным вариантом стенда, а не
+    падает; протокол без нужной выборки (офлайн на задаче без train / val) — понятная ошибка до обучения.
+    mce (агенты Claude SDK) — только его части, зависящие от задачи."""
+    from types import SimpleNamespace
+
+    import numpy as np
+    from stub import Stub
+
+    from ace import config, render
+    from ace.loop import run
+    from ace.memory.mce import Folder, signatures
+    from ace.methods import METHODS
+    from ace.solver.mce import Environment
+    monkeypatch.setattr("ace.embed.embed", lambda texts: np.array([[len(t) % 7 + 1.0, 1.0] for t in texts]))
+    monkeypatch.setattr(config, "VAL_SIZE", 2)
+    runs = 0
+    for task in TASKS.values():
+        render.task_instruction(task), signatures(task)
+        Environment().prompt(SimpleNamespace(task=task), Folder(), task.load()[0], 0)
+        for name, method in METHODS.items():
+            if name == "mce":
+                continue
+            try:
+                summary = run(task, method, Stub(), 2)
+            except ValueError as error:
+                assert "нужна выборка" in str(error), (name, task.name, error)
+                continue
+            assert summary["errors"] == 0 and summary["n"] == 2, (name, task.name)
+            runs += 1
+    assert runs >= 100

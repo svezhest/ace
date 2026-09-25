@@ -7,7 +7,7 @@ T = 0.0 без предела генерации (LLMClient), ответ — _ex
 from .. import prompts, render
 from ..loop import Prompt, Solver
 from ..model import Call, messages
-from ..tasks import symptom_diagnosis
+from ..tasks import symptom_diagnosis, variant
 from ..show import Whole
 from . import OwnSolver
 
@@ -20,7 +20,7 @@ class Environment(OwnSolver):
         self.files = Whole(line=render.plain, sep="\n\n")
 
     def prompt(self, ex, memory, item, k):
-        if ex.task.name != "symptom":
+        if variant("mce", ex.task) != "symptom":
             return self.files.prompt(ex, memory, item, k)
         get_context = memory.interfaces(ex.task).get("get_context")
         context = ""

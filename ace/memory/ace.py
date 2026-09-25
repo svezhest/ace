@@ -13,6 +13,7 @@ from pydantic import BaseModel
 from .. import embed, parse, prompts, render
 from ..extract import LABELS
 from ..model import Call, Reader, messages, params
+from ..tasks import variant
 from ..wrap import skilled
 from . import HARMFUL, HELPFUL, Ids, Lessons, Operation, Sections
 from .scope import CAP, TARGET, compress, rule_optimizer
@@ -133,7 +134,7 @@ def ace_input(task, text):
     припиской про число, context пуст — формула из входа не попадает никуда. Остальные
     (parse_instruction_and_input): при «Instruction: ... Input: ... Answer: » context — текст после «Input: »,
     вопрос — инструкция; иначе context пуст, вопрос — весь вход."""
-    if task == "formula":
+    if variant("ace", task) == "formula":
         if "Question: " not in text or ". Answer:" not in text:
             return "", text
         question = text.split("Question: ", 1)[1].split(". Answer:")[0].strip()

@@ -18,6 +18,7 @@ import numpy as np
 
 from .. import parse, prompts, render
 from ..model import TEXT, Call, Reader, Reply, messages, params
+from ..tasks import variant
 from . import ATTRIBUTION, BEST_ANSWER, IG, Extraction, Extractor
 
 EPS = 0.01                  # пол логарифма в IG
@@ -30,12 +31,12 @@ TRIES = 20                  # пустой ответ — тот же запро
 
 def llm_params(task):
     """Параметры всех вызовов EvoLib: у hmmt — как у апстрима (reasoning API), у задач стенда — стенда (S4)."""
-    return dict(REASONING) if task.name == "hmmt" else params()
+    return dict(REASONING) if variant("evolib", task) == "math" else params()
 
 
 def domain(task):
     """Поля промптов EvoLib: у hmmt — тексты апстрима (math), у задач стенда — без math (S2)."""
-    return dict(expert="a math expert", math="math ") if task.name == "hmmt" else dict(expert="an expert", math="")
+    return dict(expert="a math expert", math="math ") if variant("evolib", task) == "math" else dict(expert="an expert", math="")
 
 
 def generate(model, call):
