@@ -32,6 +32,8 @@ from .feedback import failed
 from .memory import Skill, needs, requirements, slug
 
 HEAD = prompts.text("memory_head")
+CATALOG_ROUNDS = 3          # лишних шагов решателю на чтение записей каталога
+FIG_PRIOR = 0.5             # Future IG записи, которая ещё ни разу не была в промпте лучшей попытки (EvoLib)
 
 
 @dataclass
@@ -99,7 +101,7 @@ def gain_weight(w_ig, eps):
     В апстриме у skill пола нет: отрицательный вес ломает random.choices молча, поэтому здесь пол eps."""
     @needs("fig")
     def weight(r):
-        future = sum(r.fig) / len(r.fig) if r.fig else 0.5
+        future = sum(r.fig) / len(r.fig) if r.fig else FIG_PRIOR
         if isinstance(r, Skill):
             return max(w_ig * max(r.ig, eps) + future, eps)
         return max(future, eps)
@@ -229,7 +231,7 @@ def catalog(always=(), listed=()):
             return View()
         skills = fs.FS({"skills": fs.Mount(memory, listed, "ro", track=True)})
         text = CATALOG.fill(always=bool(always), rules=render.lines(rules, dashed), listing=fs.listing(skills, "skills"))
-        return View(text, [r.id for r in rules], fs.READ_TOOLS, skills, rounds=3)
+        return View(text, [r.id for r in rules], fs.READ_TOOLS, skills, rounds=CATALOG_ROUNDS)
     inject.reads = True
     return inject
 

@@ -31,12 +31,13 @@ MEMORY = {"skill": Kind(Skill, ("add", "delete")), "insight": Kind(Insight, ("ad
 # 2. инжект
 
 K, W_IG, EPS = 10, 1.0, 0.01
+P_SKILLS, P_INSIGHTS = 0.4, 0.7     # накопленные вероятности веток показа
 WEIGHT = inject.gain_weight(W_IG, EPS)
 
 sample = inject.choose(
-    (0.4, inject.show(("skill",), pick=inject.sample(K, WEIGHT), line=inject.plain, head="",
+    (P_SKILLS, inject.show(("skill",), pick=inject.sample(K, WEIGHT), line=inject.plain, head="",
                       before=prompts.text("evolib_skills_intro"))),
-    (0.7, inject.show(("insight",), pick=inject.sample(K, WEIGHT), line=inject.plain, head="",
+    (P_INSIGHTS, inject.show(("insight",), pick=inject.sample(K, WEIGHT), line=inject.plain, head="",
                       before=prompts.text("evolib_insights_intro"))))
 
 # 4. обновление
@@ -58,8 +59,10 @@ library = curate.each(curate.gains(curate.add_insight(P["merge_insights"], SIM),
 
 # решатель
 
+SAMPLES = 2                 # ещё попыток: всего 3, ответ большинством
+
 SUBTASKS = prompts.text("evolib_subtasks")
 
 evolib = Method("evolib", MEMORY, sample, Feedback("majority"), Update(attempts(), library),
-                Solver(samples=2, temperature=0, vote=True, hint=SUBTASKS))
+                Solver(samples=SAMPLES, temperature=0, vote=True, hint=SUBTASKS))
 evolib_judge = swap(evolib, "evolib_judge", feedback=Feedback("judge"), reflect=attempts(evaluated=True))

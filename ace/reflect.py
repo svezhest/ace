@@ -39,8 +39,14 @@ from pydantic import BaseModel
 from . import parse, prompts, render
 from .feedback import failed
 from .inject import counted, text_of
-from .memory import needs, perspective_kind
+from .memory import HEAD_CHARS, needs, perspective_kind
 from .update import Delta, count, maybe, on_prev, seq, snapshot, when  # noqa: F401  общие блоки цепочки
+
+EPS = 0.01                  # пол логарифма в IG EvoLib
+BEST_OF_TEMPERATURE = 0.7   # кандидаты Best-of-N (SCOPE)
+DEFAULT_CONFIDENCE = 0.5    # метка confidence не из списка уровней
+UNEVALUATED = 0.5           # множитель баллов EvoLib без внешней оценки
+ERROR_KIND_CHARS = 60       # trigger хука из траектории, если имени исключения нет
 
 # обёртки
 
@@ -101,7 +107,7 @@ def perspectives(inner):
     return block
 
 
-def best_of(inner, n, select, valid=lambda c, **extra: True, temperature=0.7):
+def best_of(inner, n, select, valid=lambda c, **extra: True, temperature=BEST_OF_TEMPERATURE):
     """n = 1: просто inner. Иначе n кандидатов при temperature, отбор valid, из двух и более
     выбирает select(ctx, ep, memory, candidates=..., **extra) -> индекс или None."""
     if n == 1:
@@ -179,7 +185,7 @@ def lesson_fields(form, sees="memory"):
 
 
 def provenance(ep):
-    return dict(text=f"{ep.verdict()}: {ep.answer}", when=ep.question[:80])
+    return dict(text=f"{ep.verdict()}: {ep.answer}", when=ep.question[:HEAD_CHARS])
 
 
 def labeled_lessons(episode=False):
@@ -296,7 +302,7 @@ def rule_lesson(levels):
         if not prev.update_text:
             return None
         return dict(perspective=ep.perspective, text=prev.update_text, rationale=prev.rationale,
-                    confidence=levels.get(prev.confidence.lower(), 0.5))
+                    confidence=levels.get(prev.confidence.lower(), DEFAULT_CONFIDENCE))
     return block
 
 
@@ -377,7 +383,7 @@ def with_insight(evaluated):
         insight = parse.fenced(text, "insight").strip() or parse.between(text or "", "<insight>", "</insight>")
         insight = "" if insight == "N/A" else insight
         halve = insight and not evaluated                         # без внешней оценки баллы делятся пополам
-        return dict(prev, insight=insight, scores=[s * 0.5 for s in prev["scores"]] if halve else prev["scores"])
+        return dict(prev, insight=insight, scores=[s * UNEVALUATED for s in prev["scores"]] if halve else prev["scores"])
     return then
 
 
@@ -420,12 +426,12 @@ def finish(eps):
     return block
 
 
-def log_gain(best, scores, eps=0.01):
+def log_gain(best, scores, eps=EPS):
     """log(best) - log(mean(scores)), оба снизу ограничены eps."""
     return math.log(max(best, eps)) - math.log(max(sum(scores) / len(scores), eps))
 
 
-def future_gain(attempts, scores, best, eps=0.01):
+def future_gain(attempts, scores, best, eps=EPS):
     """Каждой записи, бывшей в промпте лучшей попытки (с повторами), прирост лучшего балла над средним
     по попыткам без этой записи; если таких попыток нет, записи ничего."""
     out = []
@@ -511,7 +517,7 @@ def error_kind(result):
     """Последняя строка ошибки до двоеточия (ZeroDivisionError) или её начало."""
     line = [l for l in result.strip().splitlines() if l.strip()][-1].strip()
     head = line.split(":")[0].strip()
-    return head if head and head != "Error" and " " not in head else line[:60]
+    return head if head and head != "Error" and " " not in head else line[:ERROR_KIND_CHARS]
 
 
 def raw_hooks(ctx, ep, memory, **extra):

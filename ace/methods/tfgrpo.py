@@ -34,6 +34,8 @@ experiences = inject.show(line=inject.dotted, head="",
 OBJECTIVE = {t: prompts.text(f"tfgrpo_objective_{t}") for t in ("formula", "finer", "meb", "gpqa")}
 LEARNING = prompts.text("tfgrpo_learning")
 NUM, BATCH = 1, 20
+GROUP, TEMPERATURE = 5, 0.7
+PLAN_RETRIES = 3            # повторы плана батча, пока JSON не разберётся
 GOALS = objectives(OBJECTIVE, LEARNING, NUM)
 
 summarize = paired("tfgrpo_single_rollout_summary_template", reflect.rollout_fields, GOALS)
@@ -41,9 +43,9 @@ advantage = paired("tfgrpo_single_query_group_advantage", reflect.advantage_fiel
 against_library = paired("tfgrpo_group_experience_update_template", reflect.library_fields, GOALS, parse=reflect.nonempty_ops)
 
 group_advantage = reflect.when(reflect.partial_group, seq(reflect.each_attempt(summarize), reflect.summarized, advantage))
-plan = retry(paired("tfgrpo_batch_experience_update_template", curate.plan_fields, GOALS, parse=parse.json_block), 3)
+plan = retry(paired("tfgrpo_batch_experience_update_template", curate.plan_fields, GOALS, parse=parse.json_block), PLAN_RETRIES)
 
 tfgrpo = Method("tfgrpo", MEMORY, experiences, Feedback("golden"),
                 Update(seq(group_advantage, against_library, reflect.as_ops), curate.planned(plan, curate.apply_ops(curate.op_list)),
                        every=BATCH),
-                Solver(samples=5, temperature=0.7))
+                Solver(samples=GROUP, temperature=TEMPERATURE))

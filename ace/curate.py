@@ -39,6 +39,9 @@ from . import bound, embed, fs, parse, prompts, render, update
 from .memory import Forbidden, Kind, Memory, needs, perspective_kind, slug
 from .reflect import Lesson, Typed, best_solution
 
+DUPLICATE_OVERLAP = 0.7     # доля общих слов, с которой правило SCOPE — дубль
+HIGH_HELPFUL, HIGH_HARMFUL = 5, 2   # пункт ACE «high performing»: helpful больше и harmful меньше этих
+
 # обёртки
 
 
@@ -182,7 +185,7 @@ def memory_itself(memory, d):
     return memory
 
 
-def duplicate_words(text, texts, overlap=0.7):
+def duplicate_words(text, texts, overlap=DUPLICATE_OVERLAP):
     """Дубль, если одна строка — подстрока другой или общих слов больше overlap (strategic_store SCOPE)."""
     new = text.strip().lower()
     for t in texts:
@@ -258,7 +261,7 @@ def playbook_stats(memory, sections):
     for s in sections:
         for r in (r for r in memory.of() if r.section == slug(s)):
             stats["total_bullets"] += 1
-            if r.helpful > 5 and r.harmful < 2:
+            if r.helpful > HIGH_HELPFUL and r.harmful < HIGH_HARMFUL:
                 stats["high_performing"] += 1
             elif r.harmful >= r.helpful and r.harmful > 0:
                 stats["problematic"] += 1

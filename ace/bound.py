@@ -15,7 +15,11 @@ from dataclasses import asdict, fields
 from pydantic import BaseModel
 
 from . import embed, parse, render
-from .memory import needs, requirements
+from .memory import RULE_CONFIDENCE, needs, requirements
+
+CHARS_PER_TOKEN = 4         # грубо, для доли бюджета
+BUDGET_TOKENS = 4096        # бюджет генерации, от которого считается доля памяти
+MERGE_TEMPERATURE = 0.3     # слияние пунктов ACE (BulletpointAnalyzer)
 
 
 def chain(*bounds):
@@ -42,9 +46,9 @@ def more_harmful(n):
     return needs("helpful", "harmful")(lambda r: r.harmful >= n and r.harmful > r.helpful)
 
 
-def budget(share, max_tokens=4096):
+def budget(share, max_tokens=BUDGET_TOKENS):
     """Память в промпте занимает не больше share бюджета генерации. Первыми уходят слабые insight, потом procedure."""
-    limit = share * max_tokens * 4                        # символов, грубо 4 на токен
+    limit = share * max_tokens * CHARS_PER_TOKEN          # в символах
 
     @needs("helpful", "harmful", kinds=("insight", "procedure"))
     def bound(ctx, memory, before):
@@ -95,7 +99,7 @@ def merge_similar(threshold, merge):
     return bound
 
 
-def merge_counted(prompt, temperature=0.3):
+def merge_counted(prompt, temperature=MERGE_TEMPERATURE):
     """Слияние группы моделью по prompt; ответ «[id] helpful=N harmful=M :: текст» с id первой записи."""
     @needs("helpful", "harmful")
     def merge(ctx, group):
@@ -127,7 +131,7 @@ class Subsumed(BaseModel):
 def as_rule(r):
     """Запись -> правило оптимизатора; прочие поля записи едут с правилом и возвращаются в put_rules."""
     values = {k: v for k, v in asdict(r).items() if k not in ("id", "text", "kind")}
-    return dict(rule=r.text, rationale=values.get("rationale", ""), confidence=values.get("confidence", 0.85), values=values)
+    return dict(rule=r.text, rationale=values.get("rationale", ""), confidence=values.get("confidence", RULE_CONFIDENCE), values=values)
 
 
 def put_rules(memory, kind, rules, **group):
@@ -159,7 +163,7 @@ def rule_optimizer(prompts, passes=2):
             if r:
                 done |= {a["id"], b["id"]}
                 fixed[a["id"]] = dict(rule=r.rule, rationale=r.rationale, id=a["id"],
-                                      confidence=max(a.get("confidence", 0.85), b.get("confidence", 0.85)))
+                                      confidence=max(a.get("confidence", RULE_CONFIDENCE), b.get("confidence", RULE_CONFIDENCE)))
         return [fixed.get(x["id"], x) for x in rules if x["id"] not in done or x["id"] in fixed]
 
     def prune_subsumed(model, rules, pairs):
@@ -183,7 +187,7 @@ def rule_optimizer(prompts, passes=2):
             r = llm(model, "merge", dict(rules_text=render.rule_group(parts)), Rule)
             if r:
                 out.append(dict(rule=r.rule, rationale=r.rationale, id=parts[0]["id"],
-                                confidence=max(x.get("confidence", 0.85) for x in parts)))
+                                confidence=max(x.get("confidence", RULE_CONFIDENCE) for x in parts)))
             else:
                 out += parts
         return out

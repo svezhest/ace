@@ -5,19 +5,21 @@ from ..loop import Solver, swap
 from ..memory import Hook, Kind
 from ..update import ask, on_prev, seq, when
 from .ace import ace as ACE, reflect_json
-from .proto import proto as PROTO
+from .proto import BUDGET_SHARE, proto as PROTO
 from .scope import CAP, TARGET, optimizer
 from .tfgrpo import group_advantage
 
 SELECT, HOOK = prompts.load("hybrid_select"), prompts.load("hook_reflect")
 
+GROUP = 3                   # попыток в группе ace_group
+
 # reflect ACE, но два кандидата и селектор (Best-of-N из SCOPE)
 select = ask(SELECT, reflect.two_fields, system=prompts.text("selector_system"), parse=reflect.one_or_two)
 ace_bo2 = swap(ACE, "ace_bo2", reflect=reflect.best_of(reflect_json, 2, select, temperature=0))
 # семантическое преимущество TF-GRPO по группе попыток; дальше куратор ACE
-ace_group = swap(ACE, "ace_group", reflect=seq(group_advantage, on_prev(reflect.free_lessons())), solver=Solver(samples=3))
+ace_group = swap(ACE, "ace_group", reflect=seq(group_advantage, on_prev(reflect.free_lessons())), solver=Solver(samples=GROUP))
 ace_opt = swap(ACE, "ace_opt", bound=bound.optimize(("bullet",), optimizer, CAP, TARGET))
-proto_opt = swap(PROTO, "proto_opt", bound=bound.chain(bound.budget(0.25), bound.optimize(("insight",), optimizer, CAP, TARGET)))
+proto_opt = swap(PROTO, "proto_opt", bound=bound.chain(bound.budget(BUDGET_SHARE), bound.optimize(("insight",), optimizer, CAP, TARGET)))
 # хуки по ошибкам инструментов. Урок с фрагментом ошибки (trigger) дописывается к промпту после шага с той же
 # ошибкой. Откуда урок: model — после задачи модель выводит уроки по ошибкам, в память идут только уверенные,
 # и ей же показываются хуки, которые не помогли (их можно переписать); raw — как пары DC, без модели: ошибка

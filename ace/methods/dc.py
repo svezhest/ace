@@ -43,15 +43,16 @@ MEMORY_RS = {"pair": Kind(Pair, ("add",)), "sheet": Kind(Note, ("add", "edit"))}
 # 2. инжект
 
 TOP = 3
+TOKENS = 2                  # куратор и синтез пишут до 2 * max_tokens, как в апстриме
 
 whole = inject.show(("sheet",), line=inject.plain, empty=EMPTY)
 retrieval = inject.show(("pair",), pick=inject.topk(TOP, key=lambda r: r.question), layout=inject.pairs(scored=True, note=NOTE), empty=EMPTY)
 history = inject.show(("pair",), layout=inject.pairs(scored=False), empty=EMPTY)
-retrieve_synth = inject.synth(retrieval, SYNTH, inject.pairs_and_sheet("sheet", EMPTY), CHEATSHEET)
+retrieve_synth = inject.synth(retrieval, SYNTH, inject.pairs_and_sheet("sheet", EMPTY), CHEATSHEET, max_tokens=TOKENS)
 
 # 4. обновление
 
-curator = ask(CURATOR, reflect.answer_and_sheet("sheet", EMPTY), tokens=2, parse=CHEATSHEET, then=reflect.rewritten)
+curator = ask(CURATOR, reflect.answer_and_sheet("sheet", EMPTY), tokens=TOKENS, parse=CHEATSHEET, then=reflect.rewritten)
 rewrite = curate.each(curate.rewrite("sheet", text=lambda d: d.lessons[0]))
 pair = curate.remember("pair", text=lambda ep: ep.output, question=lambda ep: ep.question)
 store = curate.each(pair, curate.rewrite("sheet", text=lambda ep: ep.context))

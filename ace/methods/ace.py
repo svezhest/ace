@@ -35,8 +35,11 @@ reflect_json = ask(REFLECT, reflect.lesson_fields(""), reflect.Reflection, syste
                    then=reflect.labeled_lessons())
 reflect_text = ask(REFLECT, reflect.lesson_fields(prompts.text("reflect_free_form")), system=REFLECTOR, then=reflect.free_lessons())
 
+CURATOR_ROUNDS = 6          # шагов куратору с файловыми инструментами
+PRUNE_HARMFUL = 3           # пункт уходит, когда вредных меток не меньше и больше, чем полезных
+
 # куратор: файловые инструменты по одной операции, все операции одной схемой или вся память заново
-merge_tools = curate.tools(CURATE["tools"], curate.lessons_fields(curate.files_view), curate.memory_files, rounds=6)
+merge_tools = curate.tools(CURATE["tools"], curate.lessons_fields(curate.files_view), curate.memory_files, rounds=CURATOR_ROUNDS)
 merge_json = ask(CURATE["json"], curate.lessons_fields(curate.text_view), curate.Ops, system=CURATOR,
                  then=curate.apply_ops(curate.op_dicts, missing="skip"))
 merge_rewrite = ask(CURATE["rewrite"], curate.lessons_fields(curate.text_view), system=CURATOR,
@@ -45,7 +48,7 @@ curate_tools, curate_json, curate_rewrite = (curate.each(curate.count, curate.ad
                                              for m in (merge_tools, merge_json, merge_rewrite))
 
 ace = Method("ace", MEMORY, inject.full(), Feedback("golden"),
-             Update(reflect_json, curate_tools, bound.prune(bound.more_harmful(3))))
+             Update(reflect_json, curate_tools, bound.prune(bound.more_harmful(PRUNE_HARMFUL))))
 
 # ace_exact
 
@@ -53,6 +56,7 @@ P = {n: prompts.load(f"ace_{n}") for n in ("reflector", "reflector_nogt", "curat
 SECTIONS = ["STRATEGIES & INSIGHTS", "FORMULAS & CALCULATIONS", "CODE SNIPPETS & TEMPLATES", "COMMON MISTAKES TO AVOID",
             "PROBLEM-SOLVING HEURISTICS", "CONTEXT CLUES & INDICATORS", "OTHERS"]
 ROUNDS, TOKEN_BUDGET = 3, 80000
+DEDUP = 0.85                # порог косинуса слияния пунктов
 
 PLAYBOOK = {"bullet": Kind(Bullet, ("add",))}
 LAYOUT = inject.sections(SECTIONS)
@@ -66,4 +70,4 @@ ace_exact = Method("ace_exact", PLAYBOOK, inject.show(layout=LAYOUT), Feedback("
                    Update(reflect.rounds(diagnosis, ROUNDS), curate.each(curate.count, curator), needs_usage=True))
 # порог апстрима 0.90 подобран под all-mpnet; у BGE-M3 косинусы ниже
 ace_exact_dedup = swap(ace_exact, "ace_exact_dedup", memory={"bullet": Kind(Bullet, ("add", "edit", "delete"))},
-                       bound=bound.merge_similar(0.85, bound.merge_counted(P["merge"])))
+                       bound=bound.merge_similar(DEDUP, bound.merge_counted(P["merge"])))

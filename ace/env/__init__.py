@@ -17,6 +17,6 @@ def run_python(code: str) -> str:
 
 
 class Sandbox(Env):
-    rounds = 3
+    rounds = 3              # вызовов run_python до ответа
     hint = "\n" + prompts.text("sandbox_hint")
     tools = (run_python,)

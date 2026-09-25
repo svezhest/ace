@@ -36,13 +36,16 @@ reflect_json = ask(REFLECT, reflect.lesson_fields("", sees="used"), reflect.Type
 reflect_text = ask(REFLECT, reflect.lesson_fields(prompts.text("reflect_free_form"), sees="used"), system=REFLECTOR,
                    then=reflect.free_lessons(episode=True))
 
+CURATOR_ROUNDS = 4
+BUDGET_SHARE = 0.25         # доля бюджета генерации под память в промпте
+
 # куратор: по одной операции за вызов, все операции одной схемой или все записи заново; эпизоды не трогает никто
 FIELDS = curate.lessons_fields(curate.entries_view)
-merge_tools = curate.tools(CURATE["tools"], FIELDS, curate.memory_itself, rounds=4, toolset=curate.TYPED_TOOLS)
+merge_tools = curate.tools(CURATE["tools"], FIELDS, curate.memory_itself, rounds=CURATOR_ROUNDS, toolset=curate.TYPED_TOOLS)
 merge_json = ask(CURATE["json"], FIELDS, curate.TypedOps, system=CURATOR, then=curate.apply_typed)
 merge_rewrite = ask(CURATE["rewrite"], FIELDS, curate.Entries, system=CURATOR, then=curate.replace_entries)
 curate_tools, curate_json, curate_rewrite = (curate.each(curate.add_episode, curate.count, curate.admit(curate.has_lessons, m))
                                              for m in (merge_tools, merge_json, merge_rewrite))
 
 proto = Method("proto", MEMORY, INJECT, Feedback("golden", usage="env"),
-               Update(reflect_json, curate_tools, bound.budget(0.25), needs_usage=True))
+               Update(reflect_json, curate_tools, bound.budget(BUDGET_SHARE), needs_usage=True))

@@ -8,7 +8,7 @@ from ace.loop import Solver, run, swap
 from ace.methods import ace, baseline, proto
 from ace.methods.ace import curate_json, curate_rewrite, curate_tools, reflect_text
 from ace.methods.hybrids import hooks
-from ace.methods.proto import curate_json as proto_json, curate_rewrite as proto_rewrite
+from ace.methods.proto import BUDGET_SHARE, curate_json as proto_json, curate_rewrite as proto_rewrite
 from ace.model import Model
 from ace.tasks import TASKS
 
@@ -28,7 +28,7 @@ CHAIN = {
     "ops5_json": swap(proto, bound=nobound, curate=proto_json),       # операции одной схемой
     "ops5_rewrite": swap(proto, bound=nobound, curate=proto_rewrite), # все записи заново
     "gate": swap(proto, bound=bound.gate()),                                   # ограничение: gate на val
-    "budget": swap(proto, bound=bound.budget(0.25)),                           # ограничение: доля бюджета
+    "budget": swap(proto, bound=bound.budget(BUDGET_SHARE)),                           # ограничение: доля бюджета
     "proto": proto,
     "code": swap(proto, solver=Solver(env=Sandbox())),                         # решатель: исполнение python
     "hooks": hooks(proto, "hooks"),                                            # хуки по ошибкам: уроки моделью

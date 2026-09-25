@@ -27,6 +27,8 @@ from dataclasses import asdict, dataclass, field, fields
 from . import render
 
 ALL = ("add", "edit", "narrow", "delete")
+HEAD_CHARS = 80             # длина краткой строки записи (каталог, ls)
+RULE_CONFIDENCE = 0.85      # confidence правила SCOPE по умолчанию, как в апстриме
 
 
 class Forbidden(Exception):
@@ -44,7 +46,7 @@ class Note:
 
     def head(self):
         """Строка в каталоге."""
-        return self.text.splitlines()[0][:80] if self.text else ""
+        return self.text.splitlines()[0][:HEAD_CHARS] if self.text else ""
 
     def key(self):
         """Что сравнивается, когда решают, та же ли это память (оценка на val)."""
@@ -64,7 +66,7 @@ class Rule(Note):
     """Стратегическое правило SCOPE."""
     domain: str = ""
     rationale: str = ""
-    confidence: float = 0.85
+    confidence: float = RULE_CONFIDENCE
 
 
 @dataclass(slots=True)
