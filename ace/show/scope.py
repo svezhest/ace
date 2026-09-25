@@ -4,29 +4,10 @@
 системным промптом. После шага, где принято новое правило: patch="system" — системный промпт переписывается:
 исходный + «## Learned Guideline:» на каждое tactical правило попытки (как в апстриме); patch="append" —
 абляция: новые правила сообщением в конец истории, системный промпт и префикс истории целы."""
-from .. import prompts, render
 from ..loop import Prompt
 from ..model import Patch
+from ..upstream.scope import current_system, guidelines, strategic_text
 from . import Show
-
-INTRO = prompts.text("scope_strategic_intro")
-GUIDELINE = prompts.text("scope_guideline")
-
-
-def strategic_text(book):
-    """get_strategic_rules_text апстрима; пусто без правил."""
-    return render.strategic(INTRO, render.domains(book.domains.items()) if book.records() else "")
-
-
-def guidelines(records):
-    """Правила в конце системного промпта: «## Learned Guideline:» на каждое."""
-    return render.lines(records, render.prefixed(GUIDELINE), "\n\n")
-
-
-def current_system(system, book):
-    """Системный промпт решателя сейчас: как при запуске попытки и tactical правила, принятые в ней."""
-    return system + "\n\n" + guidelines(book.tactical) if book.tactical else system
-
 
 class StrategicRules(Show):
     watches_steps = True

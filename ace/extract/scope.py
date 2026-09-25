@@ -16,7 +16,7 @@ from dataclasses import dataclass
 
 from .. import parse, prompts, render
 from ..model import Call, Reader, parts
-from ..show.scope import current_system, strategic_text
+from ..upstream.scope import current_system, strategic_text
 from . import ATTEMPT, CONFIDENCE, DOMAIN, RATIONALE, Extraction, Extractor
 
 P = {n: prompts.load(f"scope_{n}") for n in ("error", "efficiency", "thoroughness", "selector", "classify")}

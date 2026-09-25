@@ -16,7 +16,7 @@ import random
 import numpy as np
 
 from .. import parse, prompts
-from ..extract.evolib import EPS, generate, llm_params
+from ..upstream.evolib import EPS, generate, llm_params
 from ..loop import Prompt, Solver
 from ..model import Call, messages
 from ..tasks import final_answer, variant

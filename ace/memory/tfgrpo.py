@@ -6,7 +6,7 @@
 метки, память переводит их в свои id."""
 from .. import parse, render
 from ..extract import OPERATIONS
-from ..extract.tfgrpo import ask
+from ..upstream.tfgrpo import ask
 from ..model import Reader
 from . import Lessons
 

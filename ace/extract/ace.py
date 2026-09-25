@@ -12,7 +12,7 @@ import copy
 from pydantic import BaseModel
 
 from .. import parse, prompts, render
-from ..memory.ace import ace_input, ace_params
+from ..upstream.ace import ace_input, ace_params
 from ..memory.counters import count
 from ..model import Call, Reader, messages, params
 from . import LABELS, Extraction, Extractor, Labels, scores

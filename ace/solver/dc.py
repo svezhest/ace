@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from .. import parse, prompts, render
 from ..env import sandbox
 from ..loop import Prompt, Solver
-from ..memory.dc import CHEATSHEET, MAX_TOKENS, TOKENS, dc_params
+from ..upstream.dc import CHEATSHEET, MAX_TOKENS, TOKENS, dc_params
 from ..model import Call, Reply, messages
 from ..tasks import variant
 from ..show import TopK, Whole

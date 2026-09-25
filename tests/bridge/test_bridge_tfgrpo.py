@@ -17,6 +17,7 @@ from ace.memory import Lesson
 from ace.model import roles, text_reply
 from ace.tasks import TASKS
 
+U = importlib.import_module("ace.upstream.tfgrpo")      # пары промптов обучения апстрима
 M = importlib.import_module("ace.methods.tfgrpo")      # имя tfgrpo в пакете занято самим методом
 MEM = importlib.import_module("ace.memory.tfgrpo")
 SHOW = importlib.import_module("ace.solver.tfgrpo")
@@ -61,8 +62,8 @@ class Ex:
 def upstream_objectives(monkeypatch):
     """Цели задачи стенда -> цели, с которыми снят эталон."""
     deviation("S2")
-    monkeypatch.setitem(T.OBJECTIVE, Task.name, AGENT_OBJ)
-    monkeypatch.setattr(T, "LEARNING", LEARN_OBJ)
+    monkeypatch.setitem(U.OBJECTIVE, Task.name, AGENT_OBJ)
+    monkeypatch.setattr(U, "LEARNING", LEARN_OBJ)
 
 
 def stage(user):
@@ -98,16 +99,16 @@ def test_templates(key):
     values = dict(agent_objective=AGENT_OBJ, learning_objective=LEARN_OBJ, num_experiences=2, question="Q", trajectory="T",
                   answer="A", critique="C", trajectories="TS", existing_experiences="E", new_experiences="N",
                   experiences_and_operations="EO")
-    ours = T.P[name][part == "up"]
+    ours = U.P[name][part == "up"]
     assert ours.fill(values) == jinja2.Template(PROMPTS["templates"][key]).render(**values)
 
 
 def test_objectives_form():
     """Цели апстрима — yaml-блоки с переводом строки в конце; наши той же формы."""
     practice = CONFIG["math_reasoning"]["practice"]
-    for text in [practice["agent_objective"], practice["learning_objective"], *T.OBJECTIVE.values(), T.LEARNING]:
+    for text in [practice["agent_objective"], practice["learning_objective"], *U.OBJECTIVE.values(), U.LEARNING]:
         assert text.endswith("\n") and not text.endswith("\n\n")
-    assert all(t.startswith("input: ") and "\noutput: " in t for t in list(T.OBJECTIVE.values()) + [practice["agent_objective"]])
+    assert all(t.startswith("input: ") and "\noutput: " in t for t in list(U.OBJECTIVE.values()) + [practice["agent_objective"]])
 
 
 def test_summary_requests():
@@ -118,7 +119,7 @@ def test_summary_requests():
         g = group("A", [1, 0][:len(calls)], target="42" if labeled else "")
         # критика эталона: у первой попытки "Correct.", у второй нет; у math апстрима её нет никогда (test_loop)
         for e, critique, call in zip(T.rollouts(g, False), ["Correct.", render.NO_CRITIQUE], calls):
-            T.ask(Ex(model), STAGES[0], question=e.question, trajectory=e.output, answer=g.target or render.REDACTED,
+            U.ask(Ex(model), STAGES[0], question=e.question, trajectory=e.output, answer=g.target or render.REDACTED,
                   critique=critique)
             assert model.calls[-1]["user"] == messages(call)[1]
         assert model.calls[0]["system"] == messages(calls[0])[0]
@@ -128,7 +129,7 @@ def test_advantage_requests():
     for case, labeled in (("advantage_gt", True), ("advantage_no_gt", False)):
         call = PROMPTS["requests"][case][0]
         g = group("A", [1, 0], target="42" if labeled else "")
-        user = T.P[STAGES[1]][1].fill(question=g.question, answer=g.target or render.REDACTED,
+        user = U.P[STAGES[1]][1].fill(question=g.question, answer=g.target or render.REDACTED,
                                       trajectories=render.attempts(list(zip(T.rollouts(g, False), ["S0", "S1"])), labeled))
         assert user == messages(call)[1]
 
@@ -138,7 +139,7 @@ def test_group_update_requests():
                         ("group_update_library", ["Units: check units.", "Verify: recompute."])):
         call = PROMPTS["requests"][case][0]
         model = Fake([call])
-        ops = T.operations(T.ask(Ex(model), STAGES[2], existing_experiences=render.experiences(library(texts).records()),
+        ops = T.operations(U.ask(Ex(model), STAGES[2], existing_experiences=render.experiences(library(texts).records()),
                                  new_experiences="1. Rule A: check the arithmetic of A."))
         assert model.calls[0]["user"] == messages(call)[1]
         assert ops == [{"operation": "ADD", "id": None, "content": "Rule A: check the arithmetic of A."}]
@@ -297,7 +298,7 @@ def test_settings():
     # rollout меняет у агента только температуру: top_p итогового агента у всех попыток
     assert [p["top_p"] for p in sent] == [cfg["loaded"]["agent_top_p"]] * at.n == [SHOW.TOP_P] * at.n
     assert built["original_temperature"] == final["temperature"] == SHOW.TEMPERATURE and final["top_p"] == SHOW.TOP_P
-    assert T.NUM == practice["num_experiences_per_query"]
+    assert U.NUM == practice["num_experiences_per_query"]
     assert practice["given_ground_truth"] and M.tfgrpo.verdict is verdict.golden
     assert M.tfgrpo.protocol.epochs == practice["epochs"] and not M.tfgrpo.flush and M.tfgrpo.protocol.final
     assert cfg["updater_query_params"] == {}            # обновление без температуры: test_loop

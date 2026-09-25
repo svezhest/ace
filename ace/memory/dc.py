@@ -8,21 +8,12 @@ dc_curator.j2 дословно). Вердикта и извлечения нет
                 последний синтезированный под вопрос cheatsheet (его показ оставляет в промпте попытки)"""
 from dataclasses import dataclass
 
-from .. import parse, prompts, render
-from ..model import Call, Reader, messages
+from .. import prompts, render
+from ..model import Call, messages
+from ..upstream.dc import CHEATSHEET, MAX_TOKENS, TOKENS, dc_params
 from . import Document, Lessons, Operation, Record
 
 CURATOR = prompts.load("dc_curator")
-CHEATSHEET = Reader(text=parse.opened("cheatsheet"))   # extract_cheatsheet апстрима
-MAX_TOKENS = 2048           # --max_tokens апстрима
-TOKENS = 2                  # куратор и синтез пишут до 2 * max_tokens, как в апстриме
-
-
-def dc_params(tokens=MAX_TOKENS):
-    """Параметры всех вызовов апстрима (_generate_openai: T = 0.0 и max_completion_tokens)."""
-    return dict(temperature=0.0, max_completion_tokens=tokens)
-
-
 class Sheet(Document):
     """Cheatsheet: до первой записи его нет (показ "(empty)"); записанный пустым показывается пустым,
     как в апстриме."""

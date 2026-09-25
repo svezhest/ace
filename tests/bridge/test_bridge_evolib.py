@@ -13,7 +13,9 @@ from upstream import deviation, fixture
 
 from ace import parse, prompts, verdict
 from ace.extract import ATTRIBUTION, BEST_ANSWER, IG
-from ace.extract.evolib import Attribution, Best, Gains, future_gains, insight_of, log_gain, second_better
+from ace.extract.evolib import Attribution, Best, Gains, insight_of
+from ace.memory.evolib import second_better
+from ace.upstream.evolib import future_gains, log_gain
 from ace.learner import swap
 from ace.loop import Episode, Group, Prompt, Protocol, run
 from ace.model import roles, text_reply

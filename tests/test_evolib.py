@@ -8,7 +8,8 @@ from stub import TASK, Stub, episode
 
 from ace import verdict
 from ace.extract import ATTRIBUTION, BEST_ANSWER, IG, Extraction
-from ace.extract.evolib import Attribution, Best, Gains, future_gains, log_gain
+from ace.extract.evolib import Attribution, Best, Gains
+from ace.upstream.evolib import future_gains, log_gain
 from ace.learner import Learner
 from ace.loop import Group, run
 from ace.memory.evolib import Library, Skill

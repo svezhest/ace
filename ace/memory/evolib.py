@@ -17,7 +17,7 @@ import numpy as np
 
 from .. import parse, prompts
 from ..extract import ATTRIBUTION, BEST_ANSWER, IG
-from ..extract.evolib import domain, future_gains, generate, llm_params, second_better
+from ..upstream.evolib import domain, future_gains, generate, llm_params
 from ..model import Call, Reader, messages
 from ..tasks import variant
 from . import Container, Ids, Lessons, Operation, Record
@@ -61,6 +61,11 @@ def graded(task, best):
     """Что проверка задачи видит как решение (eval_function апстрима): у hmmt — весь текст решения, у задач стенда —
     ответ FINAL ANSWER."""
     return best.output if variant("evolib", task) == "math" else best.answer
+
+
+def second_better(judgment):
+    """Сравнение решений в пользу второго: «solution 2» в первом блоке ```judgment (is_better_solution апстрима)."""
+    return "solution 2" in parse.first_fenced(judgment, "judgment").lower()
 
 
 class Library(Container):

@@ -3,7 +3,8 @@ user с playbook текстом апстрима, рефлексией («(empty
 апстрима); ответ в зачёт — extract_answer. Показ ace_used (общий решатель с playbook) — show/ace.py."""
 from .. import parse, prompts
 from ..loop import Prompt, Solver
-from ..memory.ace import ace_input, ace_params, layout
+from ..memory.ace import layout
+from ..upstream.ace import ace_input, ace_params
 from ..model import Call, messages
 from . import OwnSolver
 
