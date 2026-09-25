@@ -10,5 +10,9 @@ def fired(records, step):
     return [r for r in records if r.fires(step.result)] if step.exec_error else []
 
 
-AFTER = AfterError(Show(), lambda memory: memory.records(), trigger=lambda r: r.trigger)
-SYSTEM = Whole(layout=lambda records, memory: render.hooks(records), head=prompts.text("hook_system_intro"))
+def hooks_layout(records, memory):
+    return render.hooks(records)
+
+
+AFTER = AfterError(Show())
+SYSTEM = Whole(layout=hooks_layout, head=prompts.text("hook_system_intro"))

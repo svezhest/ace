@@ -14,6 +14,8 @@ Generator — решатель попытки: одно сообщение user 
                 вопросе тоже (пары "(empty)"); без блока <cheatsheet> генератор видит сами пары, и они же
                 сохраняются как cheatsheet (extract_cheatsheet(old_cheatsheet=пары), как в апстриме)
     history     все прошлые пары подряд (dc_history, FullHistoryAppending)"""
+from functools import partial
+
 from .. import parse, prompts, render
 from ..env import sandbox
 from ..loop import Prompt, Solver
@@ -47,19 +49,18 @@ def dc_input(task, i, question):
 class Generator(OwnSolver):
     """Решатель DC апстрима; sheet(ex, память, item, вход) -> (текст для [[CHEATSHEET]], показанные записи)."""
     def __init__(self, sheet, code=False):
-        self.sheet, self.code = sheet, code
+        self.sheet = sheet
+        self.code = code
         self.reads = READS.get(sheet, ())
 
     def prompt(self, ex, memory, item, k):
         question = dc_input(ex.task.name, ex.i, item["question"])
         text, recs = self.sheet(ex, memory, item, question)
 
-        def call(note):
+        def call(note):         # заметки рефлектора у DC нет
             return Call(messages(GENERATOR.fill(QUESTION=question, CHEATSHEET=text)), dc_params())
-
-        def talk(model, call):
-            return generate(model, call, self.code)
-        return Prompt(shown=[r.id for r in recs], solver=Solver(call, parse.dc_answer, talk), seen={INPUT: question, SHEET: text})
+        solver = Solver(call, parse.dc_answer, talk=partial(generate, code=self.code))
+        return Prompt(shown=[r.id for r in recs], solver=solver, seen={INPUT: question, SHEET: text})
 
 
 def generate(model, call, code):
@@ -67,7 +68,8 @@ def generate(model, call, code):
     стоит блок в ```, обрезается по FLAG, код исполняется, и разговор продолжается (в последнем раунде — с
     предупреждением); после ROUNDS продолжений последний блок с выводом дописывается ещё раз, как в апстриме.
     -> Reply: весь накопленный текст (final_output апстрима)."""
-    history, final = list(call.messages), ""
+    history = list(call.messages)
+    final = ""
     for depth in range(1, ROUNDS + 2):
         reply = model.ask(Call(list(history), call.params))
         output = reply.output or DC.no_response()
@@ -76,7 +78,7 @@ def generate(model, call, code):
         if not runs_code:
             break
         ran = run_block(head)
-        current = f"{head}\n{FLAG}\n\n{ran.strip() if ran else DC.no_block()}"
+        current = DC.code_turn(code=head, output=ran.strip() if ran else DC.no_block())
         final = f"{final}\n\n{current}".strip()
         if depth > ROUNDS:
             output = current
@@ -108,7 +110,8 @@ def execute(code):
     r = sandbox.run(code, limit=CODE_LIMIT, path=CODE_FILE)
     if r["timeout"]:
         return DC.timeout()
-    out, err = r["stdout"].strip(), r["stderr"].strip()
+    out = r["stdout"].strip()
+    err = r["stderr"].strip()
     if out:
         return out
     return DC.execution_error(stderr=err) if err else DC.no_output()
@@ -118,8 +121,20 @@ def cumulative(ex, memory, item, question):
     return memory.current(), memory.records()
 
 
-RETRIEVAL = TopK(TOP, key=lambda r: r.question, layout=lambda recs, memory: render.pairs(recs, True, NOTE), empty=DC.empty())
-HISTORY = Whole(layout=lambda recs, memory: render.pairs(recs, False), empty=DC.empty())
+def question_of(pair):
+    return pair.question
+
+
+def retrieved_pairs(records, memory):
+    return render.pairs(records, True, NOTE)
+
+
+def all_pairs(records, memory):
+    return render.pairs(records, False)
+
+
+RETRIEVAL = TopK(TOP, key=question_of, layout=retrieved_pairs, empty=DC.empty())
+HISTORY = Whole(layout=all_pairs, empty=DC.empty())
 
 
 def retrieval(ex, memory, item, question):

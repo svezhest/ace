@@ -27,7 +27,7 @@ def test_whole():
     p = Whole().prompt(Ex, memory("a", "b"), ITEM, 0)
     assert p.system == "\n\n" + HEAD + "[r1] a\n[r2] b" and p.shown == ["r1", "r2"]
     assert Whole(empty="(empty)").prompt(Ex, memory(), ITEM, 0).system == "\n\n" + HEAD + "(empty)"
-    assert Whole(head="", before="B:", after="!").prompt(Ex, memory("a"), ITEM, 0).system == "\n\nB:[r1] a!"
+    assert Whole(head="", after="!").prompt(Ex, memory("a"), ITEM, 0).system == "\n\n[r1] a!"
 
 
 def test_topk(monkeypatch):
@@ -52,7 +52,7 @@ def test_catalog():
 
 def test_after_error():
     m = memory("Check the denominator.")
-    show = AfterError(Whole(), lambda mem: mem.records(), trigger=lambda r: "zerodivisionerror")
+    show = AfterError(Whole(), trigger=lambda r: "zerodivisionerror")
     a = Attempt("q", 0, True, Prompt())
     assert show.watches_steps
     assert show.on_step(Ex, m, a, Step("run_python", "{}", "1.0")) is None

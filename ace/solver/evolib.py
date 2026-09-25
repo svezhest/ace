@@ -15,19 +15,22 @@ import random
 
 import numpy as np
 
-from .. import parse, prompts
+from .. import parse, prompts, render
 from ..upstream.evolib import EPS, generate, llm_params
 from ..loop import Prompt, Solver
 from ..model import Call, messages
 from ..tasks import final_answer, variant
 from . import OwnSolver
 
-K, W_IG = 10, 1.0
+K = 10                      # записей в выборке
+W_IG = 1.0                  # вес IG в весе skill
 LEGACY_W_IG = 100           # при w_IG от 100 апстрим не прибавляет Future IG к весу skill («legacy defaults»)
 FIG_PRIOR = 0.5             # Future IG записи, которая ещё ни разу не была в промпте лучшей попытки
-P_SKILLS, P_INSIGHTS = 0.4, 0.7     # накопленные вероятности веток показа
+P_SKILLS = 0.4              # накопленные вероятности веток показа: skills, затем insights
+P_INSIGHTS = 0.7
 SOLVER = prompts.load("evolib_solver")
-INTRO = {"skills": prompts.text("evolib_skills_intro"), "insights": prompts.text("evolib_insights_intro")}
+SKILLS_INTRO = prompts.text("evolib_skills_intro")
+INSIGHTS_INTRO = prompts.text("evolib_insights_intro")
 
 
 def future(r):
@@ -62,16 +65,19 @@ class Sampler(OwnSolver):
     reads = ("skills", "insights")
 
     def __init__(self, k=K, w_ig=W_IG, temperature=None):
-        self.k, self.w_ig, self.temperature = k, w_ig, temperature
+        self.k = k
+        self.w_ig = w_ig
+        self.temperature = temperature
 
     def sample(self, memory):
         """-> (skills, insights): _sample_from_library апстрима."""
-        p = random.random()
-        skills, insights = memory.skills.records(), memory.insights.records()
-        if skills and p < P_SKILLS:
+        roll = random.random()
+        skills = memory.skills.records()
+        insights = memory.insights.records()
+        if skills and roll < P_SKILLS:
             weights = [skill_weight(r, self.w_ig) for r in skills]
             return random.choices(skills, weights=weights, k=min(len(skills), self.k)), []
-        if insights and p < P_INSIGHTS:
+        if insights and roll < P_INSIGHTS:
             weights = [insight_weight(r) for r in insights]
             return [], random.choices(insights, weights=weights, k=min(len(insights), self.k))
         return [], []
@@ -79,16 +85,18 @@ class Sampler(OwnSolver):
     def prompt(self, ex, memory, item, k):
         skills, insights = self.sample(memory)
         shown = skills or insights
-        section = INTRO["skills" if skills else "insights"] + "\n".join(r.text for r in shown) if shown else ""
+        intro = SKILLS_INTRO if skills else INSIGHTS_INTRO
+        section = render.section(intro, shown)
         instruction, form, answer = solver_texts(ex.task)
         user = SOLVER.fill(instruction=instruction, problem=item["question"], section=section, format=form)
-        p = llm_params(ex.task)
+        params = llm_params(ex.task)
         if self.temperature is not None:
-            p["temperature"] = self.temperature(k)
+            params["temperature"] = self.temperature(k)
 
-        def call(note):
-            return Call(messages(user), p)
-        return Prompt(shown=[r.id for r in shown], temperature=p.get("temperature", 0), solver=Solver(call, answer, generate))
+        def call(note):         # заметки рефлектора у EvoLib нет
+            return Call(messages(user), params)
+        solver = Solver(call, answer, generate)
+        return Prompt(shown=[r.id for r in shown], temperature=params.get("temperature", 0), solver=solver)
 
 
 SAMPLER = Sampler()

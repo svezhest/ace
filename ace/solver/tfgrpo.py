@@ -46,9 +46,19 @@ def instructions(task):
     return TEMPLATE.fill(role=task.system + "\n\n", answer=task.instr)
 
 
+def whole(text):
+    return text
+
+
 def answer(task):
     """Ответ в зачёт: у dapo весь итоговый ответ (его судит math_verify), у задач стенда — строка FINAL ANSWER."""
-    return (lambda text: text) if variant("tfgrpo", task) == "math" else final_answer
+    return whole if variant("tfgrpo", task) == "math" else final_answer
+
+
+def tool_call(call):
+    """Вызов инструмента в истории, как его пишет openai-agents: пустые аргументы — "{}"."""
+    function = {"name": call["function"]["name"], "arguments": call["function"]["arguments"] or "{}"}
+    return {"id": call["id"], "type": "function", "function": function}
 
 
 class Failed(Exception):
@@ -59,14 +69,15 @@ def converse(model, history, params, tool):
     """Ходы агента: -> (сообщения после системного, итоговый текст, обрыв по длине)."""
     history = list(history)
     for turn in range(1, MAX_TURNS + 1):
-        msg, finish = model.message(history + [LAST_TURN] * (turn == MAX_TURNS), params)
-        content, calls = msg.get("content") or None, msg.get("tool_calls") or []
-        # сообщение без текста и без вызовов в историю не идёт; пустые аргументы в истории — "{}"
-        if content is not None or calls:
-            history.append({"role": "assistant", "content": content, **({"tool_calls": [
-                {"id": c["id"], "type": "function",
-                 "function": {"name": c["function"]["name"], "arguments": c["function"]["arguments"] or "{}"}}
-                for c in calls]} if calls else {})})
+        request = history + [LAST_TURN] if turn == MAX_TURNS else list(history)
+        msg, finish = model.message(request, params)
+        content = msg.get("content") or None
+        calls = msg.get("tool_calls") or []
+        if content is not None or calls:        # сообщение без текста и без вызовов в историю не идёт
+            message = {"role": "assistant", "content": content}
+            if calls:
+                message["tool_calls"] = [tool_call(c) for c in calls]
+            history.append(message)
         if not calls:
             return history[1:], content or "", finish == "length"
         for c in calls:
@@ -98,8 +109,12 @@ class Agent(OwnSolver):
             user = PROBLEM.fill(problem=item["question"], experiences=render.experiences(recs))
             temperature = ROLLOUT_TEMPERATURE
         else:
-            system = instructions(ex.task) + (INTRO + render.experiences(recs) if recs else "")
-            user, temperature = item["question"], TEMPERATURE if recs else ROLLOUT_TEMPERATURE
+            system = instructions(ex.task)
+            temperature = ROLLOUT_TEMPERATURE
+            if recs:
+                system += INTRO + render.experiences(recs)
+                temperature = TEMPERATURE
+            user = item["question"]
         params = {"temperature": temperature, "top_p": TOP_P, "tools": [TOOL]}
 
         def call(note):

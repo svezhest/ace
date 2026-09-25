@@ -3,6 +3,10 @@
 {% macro question(n, text) %}Question #{{ n }}:
 {{ text }}{% endmacro %}
 {% macro flag() %}EXECUTE CODE!{% endmacro %}
+{% macro code_turn(code, output) %}{{ code }}
+{{ flag() }}
+
+{{ output }}{% endmacro %}
 {% macro empty() %}(empty){% endmacro %}
 {% macro no_response() %}(No response generated){% endmacro %}
 {% macro no_block() %}(No code block found to execute){% endmacro %}

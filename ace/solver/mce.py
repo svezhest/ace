@@ -29,8 +29,11 @@ class Environment(OwnSolver):
         if get_context:
             try:
                 context = get_context(item["question"])
-                len(context)            # апстрим печатает длину: не строка без len — как упавший интерфейс
+                len(context)            # апстрим печатает len(context): значение без len — как упавший интерфейс
             except Exception:
                 context = ""
         text = DIAGNOSIS.fill(symptoms=item["question"], context=context)
-        return Prompt(solver=Solver(lambda note: Call(messages(text), dict(PARAMS)), symptom_diagnosis))
+
+        def call(note):         # заметки рефлектора у MCE нет
+            return Call(messages(text), dict(PARAMS))
+        return Prompt(solver=Solver(call, symptom_diagnosis))

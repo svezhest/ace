@@ -371,6 +371,13 @@ def signature_args(inputs):
     return ", ".join(f"{name}: {typ}" for name, typ, _ in inputs)
 
 
+def section(intro, records):
+    """Выборка из библиотеки EvoLib в промпте решателя: вступление и тексты записей строками; пусто — ничего."""
+    if not records:
+        return ""
+    return intro + "\n".join(r.text for r in records)
+
+
 def merge_input(old, new):
     """Старая и новая запись EvoLib для промпта слияния — строками подряд."""
     return f"{old}\n{new}"
