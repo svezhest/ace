@@ -5,8 +5,12 @@ dapo — DAPO-Math-17k в порядке апстрима TF-GRPO (scripts/data/
 shuffle Random(42)), задачи на английском с условием короче 160 символов: train — первые 40, val — следующие 10,
 тест — ещё 40.
 hmmt — бенчмарк EvoLib (eval_main.py _build_hmmt_task): MathArena/hmmt_feb_2025, hmmt_nov_2025, hmmt_feb_2026 подряд
-(93 задачи, в hmmt40 — первые 40), ответ — answer без пробелов по краям; только онлайн, без train и val."""
+(93 задачи, в hmmt40 — первые 40), ответ — answer без пробелов по краям; только онлайн, без train и val.
+symptom — бенчмарк MCE (env/symptom_diagnosis апстрима, данные gretelai/symptom_to_diagnosis) целиком, строки как у
+апстрима: train 200, val 50, тест 212; выборки — первые SIZE / VAL_SIZE. Проверка — _normalize апстрима; решатель
+среды апстрима (get_context и промпт диагноза) — у mce (show/mce.py), общий решатель — ответ FINAL ANSWER."""
 import json
+import re
 from dataclasses import dataclass, field
 
 from math_verify.metric import math_metric
@@ -26,12 +30,21 @@ class Task:
         self.system = prompts.text(f"task_{self.name}_system")
         self.instr = prompts.text(f"task_{self.name}_instr")
 
-    def load(self, split="", size=None):
-        """split: "" | "train" | "val"; size — размер выборки в имени файла (по умолчанию из config)."""
+    def file(self, split="", size=None):
+        """Файл данных: выборка с размером в имени (formula_train40.jsonl), а если её нет — бенчмарк целиком
+        (symptom_train.jsonl). split: "" (тест) | "train" | "val"; size по умолчанию из config."""
         size = size or (config.VAL_SIZE if split == "val" else config.SIZE)
-        file = config.DATA / f"{self.name}{'_' + split if split else ''}{size}.jsonl"
-        rows = [json.loads(l) for l in file.open() if l.strip()]
-        return [{"context": r.get("context") or r["input"], "target": r["target"]} for r in rows]
+        name = f"{self.name}{'_' + split if split else ''}"
+        sized = config.DATA / f"{name}{size}.jsonl"
+        return sized if sized.exists() else config.DATA / f"{name}.jsonl"
+
+    def load(self, split="", size=None, whole=False):
+        """Первые size вопросов файла (whole — все); поля апстримов: input | context | question, target | answer."""
+        size = size or (config.VAL_SIZE if split == "val" else config.SIZE)
+        rows = [json.loads(l) for l in self.file(split, size).open() if l.strip()]
+        items = [{"context": r.get("context") or r.get("input") or r["question"], "target": r.get("target", r.get("answer"))}
+                 for r in rows]
+        return items if whole else items[:size]
 
     def check(self, answer, target):
         """Исключение проверки — неверно (как except у апстримов)."""
@@ -111,15 +124,38 @@ def hmmt_ok(pred, tgt):
     return matharena.grade(pred, tgt)
 
 
+def symptom_ok(pred, tgt):
+    """Проверка symptom_diagnosis апстрима MCE (symptom_diagnosis_environment.py: _normalize): нижний регистр,
+    пробелы схлопнуты, без . ! ? в конце."""
+    return symptom_normalize(pred) == symptom_normalize(tgt)
+
+
+def symptom_normalize(text):
+    return re.sub(r"\s+", " ", text.lower().strip()).rstrip(".!?")
+
+
+def symptom_diagnosis(response):
+    """_extract_diagnosis апстрима MCE: [DIAGNOSIS]...[/DIAGNOSIS], иначе «diagnosis:» / «conclusion:», иначе
+    последняя строка."""
+    match = re.search(r"\[DIAGNOSIS\](.*?)\[/DIAGNOSIS\]", response, re.IGNORECASE | re.DOTALL)
+    if match:
+        return match.group(1).strip()
+    match = re.search(r"(?:diagnosis|conclusion)[:：]\s*([^\n]+)", response, re.IGNORECASE)
+    if match:
+        return match.group(1).strip()
+    return response.strip().split("\n")[-1]
+
+
 def gpqa_ok(pred, tgt):
     """Наша: буква варианта в начале ответа. Не eval_for_multiple_choice DC (тот принимает и текст варианта из
     вопроса): GPQA в стенде — наша задача, не из статей методов."""
     return pred.strip("()`*. ").upper()[:1] == tgt.strip("()").upper()[:1]
 
 
-CHECK = {"finer": finer_ok, "formula": formula_ok, "meb": meb_ok, "gpqa": gpqa_ok, "dapo": dapo_ok, "hmmt": hmmt_ok}
+CHECK = {"finer": finer_ok, "formula": formula_ok, "meb": meb_ok, "gpqa": gpqa_ok, "dapo": dapo_ok, "hmmt": hmmt_ok,
+         "symptom": symptom_ok}
 
-TASKS = {name: Task(name) for name in ("finer", "formula", "meb", "gpqa", "dapo", "hmmt")}
+TASKS = {name: Task(name) for name in ("finer", "formula", "meb", "gpqa", "dapo", "hmmt", "symptom")}
 
 
 def accuracy(task, answers, targets):
