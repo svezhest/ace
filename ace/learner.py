@@ -51,7 +51,7 @@ class Learner:
     def prompt(self, ex, item, k, memory=None):
         """Промпт попытки k; memory — показать другую версию памяти (новая попытка из извлечения)."""
         p = self.show.prompt(ex, self.memory if memory is None else memory, item, k)
-        p.temperature = self.attempts.temperature(k)
+        p.temperature, p.top_p = self.attempts.temperature(k), self.attempts.top_p(k)
         return p
 
     def on_step(self, ex, attempt, step):

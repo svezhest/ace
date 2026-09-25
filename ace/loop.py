@@ -112,12 +112,18 @@ def at_zero(k):
     return 0
 
 
+def default(k):
+    """Настройка по умолчанию сервера (top_p)."""
+    return None
+
+
 @dataclass
 class Attempts:
-    """Сколько попыток на вопрос и что в зачёт. Различие попыток: температура попытки k; выборка показа и
-    разделённая память — в prompt(ex, item, k) ученика; заметка рефлектора — ex.retry из извлечения."""
+    """Сколько попыток на вопрос и что в зачёт. Различие попыток: температура и top_p попытки k; выборка
+    показа и разделённая память — в prompt(ex, item, k) ученика; заметка рефлектора — ex.retry из извлечения."""
     n: int = 1
     temperature: callable = at_zero
+    top_p: callable = default
     pick: callable = first
 
 
