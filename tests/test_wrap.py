@@ -19,7 +19,7 @@ from ace.memory import Lessons
 from ace.memory.ace import Ops
 from ace.memory.mce import Context
 from ace.methods.mce import mce_ace_stand, mce_fs as mce
-from ace.wrap.mce import META, MISSING, meta_agent
+from ace.wrap.mce import META, MISSING, MetaAgent
 from ace.render import skilled
 from ace.wrap import Gate, Wrapper
 from ace.wrap.mce import Meta
@@ -170,7 +170,7 @@ def test_meta_agent_asks_for_skill():
     model = FileAgent(lambda call, deps: None)
     ex = Ex()
     ex.model = model
-    author = meta_agent(META)
+    author = MetaAgent(META)
     assert author(ex, []) == ""
     assert len(model.calls) == 3 and model.calls[1]["user"] == MISSING.fill(
         expected_path="/workspace/iter1_sub0/.agent/skills/learning-context/SKILL.md")

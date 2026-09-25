@@ -12,9 +12,15 @@
 инструмента. Ошибки шага бывают только у решателя с инструментами: ученику нужна среда с исполнением кода."""
 from ..extract.hooks import LEARN, FromErrors, error_steps
 from ..learner import Learner
+from ..loop import combine
 from ..memory.hooks import PRUNE, HookBook
 from ..show.hooks import AFTER, SYSTEM, fired
 from . import Wrapper
+
+
+def helped(hook, step):
+    """Исход показа по следующему шагу: помог, если шаг не упал с ошибкой хука."""
+    return not (step.exec_error and hook.fires(step.result))
 
 
 class Hooks(Wrapper):
@@ -22,7 +28,7 @@ class Hooks(Wrapper):
         super().__init__(inner, name)
         self.book = Learner(f"{self.name}: хуки", memory=HookBook(prune), extract=FromErrors(LEARN[learn]))
         self.show_at = show
-        self.waiting = None         # (попытка, ответ, id хуков, показанных после него) — ждут исхода
+        self.waiting = None         # (попытка, номер ответа, id хуков, показанных после него) — ждут исхода
 
     @property
     def hooks(self):
@@ -33,12 +39,12 @@ class Hooks(Wrapper):
             raise ValueError(f"{self.name}: хуки по ошибкам инструментов при своём решателе метода не действуют")
 
     def prompt(self, ex, item, k, memory=None):
-        p = self.inner.prompt(ex, item, k, memory)
+        prompt = self.inner.prompt(ex, item, k, memory)
         if self.show_at == "system":
             mine = SYSTEM.prompt(ex, self.hooks, item, k)
-            p.system += mine.system
-            p.shown = p.shown + mine.shown
-        return p
+            prompt.system += mine.system
+            prompt.shown = prompt.shown + mine.shown
+        return prompt
 
     @property
     def watches_steps(self):
@@ -50,8 +56,11 @@ class Hooks(Wrapper):
             return patch
         turn = attempt.turns[-1] if attempt.turns else len(attempt.steps)
         if self.waiting and self.waiting[0] is attempt and self.waiting[1] < turn:
-            attempt.fired += [(id, not (step.exec_error and self.hooks.get(id).fires(step.result)))
-                              for id in self.waiting[2] if self.hooks.get(id)]
+            # первый шаг следующего ответа модели: хук помог, если его ошибка не повторилась
+            for rid in self.waiting[2]:
+                hook = self.hooks.get(rid)
+                if hook is not None:
+                    attempt.fired.append((rid, helped(hook, step)))
             self.waiting = None
         shown = [r.id for r in fired(self.hooks.records(), step)]
         if shown:
@@ -59,15 +68,16 @@ class Hooks(Wrapper):
                 self.waiting[2].extend(shown)
             else:
                 self.waiting = (attempt, turn, shown)
-        mine = AFTER.on_step(ex, self.hooks, attempt, step)
-        return mine if patch is None else patch.merge(mine) if mine else patch
+        return combine(patch, AFTER.on_step(ex, self.hooks, attempt, step))
 
     def on_attempt(self, ex, episode):
         self.inner.on_attempt(ex, episode)
         if self.show_at == "system":
             errors = [s.result for s in error_steps(episode)]
-            episode.fired += [(id, not any(self.hooks.get(id).fires(e) for e in errors))
-                              for id in episode.shown if self.hooks.get(id)]
+            for rid in episode.shown:
+                hook = self.hooks.get(rid)
+                if hook is not None:
+                    episode.fired.append((rid, not any(hook.fires(e) for e in errors)))
 
     def on_question(self, ex, group):
         self.inner.on_question(ex, group)

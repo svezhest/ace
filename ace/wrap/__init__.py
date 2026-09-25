@@ -14,8 +14,11 @@ from ..learner import swap
 
 
 class Wrapper:
+    """Всё, чего нет у обёртки, берётся у inner (уровни, хуки, снимки); inner и служебные dunder — нет, иначе
+    рекурсия при deepcopy."""
     def __init__(self, inner, name=None):
-        self.inner, self.name = inner, name or inner.name
+        self.inner = inner
+        self.name = name or inner.name
         self.check()
 
     def check(self):
@@ -29,7 +32,8 @@ class Wrapper:
     def swap(self, name=None, **levels):
         """Та же обёртка над учеником с заменёнными уровнями."""
         out = copy.deepcopy(self)
-        out.inner, out.name = swap(self.inner, **levels), name or self.name
+        out.inner = swap(self.inner, **levels)
+        out.name = name or self.name
         out.check()
         return out
 
@@ -46,16 +50,19 @@ class Gate(Wrapper):
     """Правка на батче принимается, если на val верных не меньше и обрывов не больше, чем до неё. Если память
     не изменилась, проверять нечего."""
     needs_val = True
+
     def __init__(self, inner, name=None):
         super().__init__(inner, name)
         self.gated = []
 
     def on_batch(self, ex, groups):
-        before, key = self.inner.snapshot(), self.inner.key()
+        before = self.inner.snapshot()
+        key = self.inner.key()
         self.inner.on_batch(ex, groups)
         if key is not None and self.inner.key() == key:
             return
-        after, new = ex.evaluate(), self.inner.snapshot()
+        after = ex.evaluate()
+        new = self.inner.snapshot()
         self.inner.restore(before)
         prev = ex.evaluate()
         ok = correct(after) >= correct(prev) and truncated(after) <= truncated(prev)

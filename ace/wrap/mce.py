@@ -3,7 +3,7 @@
 
     Meta(ученик, author)    итерация = проход по train батчами ученика (батч — под-итерация); перед первой попыткой
                             прохода author пишет навык; в конце прохода val, следующая итерация — с лучшей по val
-    meta_agent(шаблон)      author: мета-агент с файлами (корень /workspace, как E2B-пути апстрима) читает
+    MetaAgent(шаблон)       author: мета-агент с файлами (корень /workspace, как E2B-пути апстрима) читает
                             meta_agent/ (train.jsonl, evaluations.json, skills/iter*/SKILL.md) и папки прошлых
                             под-итераций и пишет SKILL.md в iter{k}_sub0/.agent/skills/learning-context/"""
 import atexit
@@ -22,7 +22,8 @@ from ..memory.mce import CLAUDE_SKILL, ROUNDS, SKILL, WORKSPACE, Workspace, clea
 from ..loop import best_index
 from . import Wrapper, correct
 
-META, META_ACE = prompts.load("mce_meta"), prompts.load("mce_meta_ace")
+META = prompts.load("mce_meta")
+META_ACE = prompts.load("mce_meta_ace")
 MISSING = prompts.load("mce_skill_missing")
 SKILL_TRIES = 3             # max_validation_attempts мета-агента: ответов, пока SKILL.md не записан
 
@@ -50,7 +51,8 @@ def offline_only(wrapper):
         raise ValueError(f"{wrapper.name}: MCE — только офлайн с val (итерация — проход по train)")
 
 
-def accuracy(results):
+def share_correct(results):
+    """Доля верных по (верно, обрыв) вопросов val."""
     return correct(results) / len(results) if results else 0.0
 
 
@@ -63,8 +65,15 @@ class Meta(Wrapper):
     умолчанию начинает с iter1, а iter0 в выборе не участвует."""
     def __init__(self, inner, author, name=None):
         super().__init__(inner, name)
-        self.author, self.history = author, []
-        self.right, self.seen, self.folders = 0, 0, {}
+        self.author = author
+        self.history = []       # Iteration по порядку
+        self.new_pass()
+
+    def new_pass(self):
+        """Счётчики прохода: верных и вопросов train, папки под-итераций."""
+        self.right = 0
+        self.seen = 0
+        self.folders = {}
 
     def check(self):
         offline_only(self)
@@ -78,19 +87,28 @@ class Meta(Wrapper):
         self.right += sum(bool(g.episodes[g.chosen].ok) for g in groups)
         self.seen += len(groups)
         self.inner.on_batch(ex, groups)
-        folder = getattr(self.inner.memory, "folder", dict)()
-        self.folders[sub_folder(ex)] = {SKILL: ex.skill, **folder} if ex.skill else folder
+        memory = self.inner.memory
+        folder = memory.folder() if hasattr(memory, "folder") else {}      # память, отдающая себя папкой (Context)
+        if ex.skill:
+            folder = {SKILL: ex.skill, **folder}
+        self.folders[sub_folder(ex)] = folder
 
     def on_pass(self, ex):
         self.inner.on_pass(ex)
         val = ex.evaluate()
-        self.history.append(Iteration(ex.skill, self.right / self.seen if self.seen else 0.0, accuracy(val),
-                                      self.inner.snapshot(), len(val), self.seen, self.folders))
-        self.inner.restore(self.history[best_index([h.val for h in self.history])].memory)
-        self.right, self.seen, self.folders = 0, 0, {}
+        train = self.right / self.seen if self.seen else 0.0
+        self.history.append(Iteration(ex.skill, train=train, val=share_correct(val), memory=self.inner.snapshot(),
+                                      val_total=len(val), rollouts=self.seen, folders=self.folders))
+        self.inner.restore(self.history[best(self.history)].memory)
+        self.new_pass()
 
     def dump(self):
         return self.inner.dump() + [h.dump(i) for i, h in enumerate(self.history, 1)]
+
+
+def best(history):
+    """Номер лучшей по val итерации (строго больше, при равенстве первая)."""
+    return best_index([h.val for h in history])
 
 
 def evaluations(history):
@@ -117,29 +135,35 @@ def reference(ex, history):
     return ref
 
 
-def meta_agent(template):
+class MetaAgent:
     """author для Meta — мета-агент с файлами (run_meta_agent): читает всё в workspace (meta_agent/ и папки
     прошлых под-итераций), пишет SKILL.md в папку первой под-итерации. Не записал — до SKILL_TRIES раз просьба в
     том же разговоре; так и не записал — навык прошлой итерации."""
-    def author(ex, history):
+    def __init__(self, template):
+        self.template = template
+
+    def __call__(self, ex, history):
         name = f"iter{len(history) + 1}_sub0"
         out = Files("skill")
         mounts = {"meta_agent": fs.Mount(reference(ex, history), "ro")}
-        mounts.update({n: fs.Mount(Files.of(f), "ro") for h in history for n, f in h.folders.items()})
+        for h in history:
+            for folder, files in h.folders.items():
+                mounts[folder] = fs.Mount(Files.of(files), "ro")
         mounts[name] = fs.Mount(out)
         path = f"{WORKSPACE}/{name}/{SKILL}"
-        user = template.fill(task_instruction=render.task_instruction(ex.task), workspace=WORKSPACE, iter_name=name,
-                             skill_output_path=path, skill_database=render.skill_database(
-                                 evaluations(history), skills(history), len(history) + 1))
-        talk = None
+        database = render.skill_database(evaluations(history), skills(history), len(history) + 1)
+        user = self.template.fill(task_instruction=render.task_instruction(ex.task), workspace=WORKSPACE, iter_name=name,
+                                  skill_output_path=path, skill_database=database)
+        conversation = None     # история разговора: просьба записать идёт в тот же разговор
         for _ in range(SKILL_TRIES):
-            reply = ex.model.ask(Call(messages(user), params(), tools=fs.TOOLS, deps=fs.FS(mounts, root=WORKSPACE), rounds=ROUNDS,
-                                      history=talk))
+            call = Call(messages(user), params(), tools=fs.TOOLS, deps=fs.FS(mounts, root=WORKSPACE), rounds=ROUNDS,
+                        history=conversation)
+            reply = ex.model.ask(call)
             if out.read(SKILL) is not None:
                 return out.read(SKILL)
-            user, talk = MISSING.fill(expected_path=path), reply.messages
+            user = MISSING.fill(expected_path=path)
+            conversation = reply.messages
         return history[-1].text if history else ""
-    return author
 
 
 # MCE апстрима на Claude Agent SDK (mce/main.py run_iteration, meta_agent.py): workspace на диске, мета-агент и
@@ -197,8 +221,10 @@ def claude_meta(ex, ws, folder, iteration):
                               skill_database=render.skill_database(ws.evaluations(), ws.skills(), iteration))
     options = ClaudeAgentOptions(cwd=str(ws.base), allowed_tools=META_TOOLS,
                                  can_use_tool=partial(meta_permission, iter_dir=folder))
-    ok = ex.model.session(prompt, options, lambda: None if skill.exists() else CLAUDE_MISSING.fill(expected_path=skill),
-                          SKILL_TRIES, ws.root)
+
+    def feedback():
+        return None if skill.exists() else CLAUDE_MISSING.fill(expected_path=skill)
+    ok = ex.model.session(prompt, options, feedback, SKILL_TRIES, ws.root)
     cleanup(folder)
     if not ok:
         raise RuntimeError(f"Meta-agent failed to generate SKILL.md after {SKILL_TRIES} attempts")
@@ -215,8 +241,11 @@ class Iterations(Wrapper):
     <задача>-<pid>; без корня — временная папка, удаляется при выходе."""
     def __init__(self, inner, root=None, workspace=None, name=None):
         super().__init__(inner, name)
-        self.root, self.workspace = root, workspace
-        self.ws, self.history, self.subs = None, [], []
+        self.root = root
+        self.workspace = workspace
+        self.ws = None          # Workspace на диске, создаётся при первой выборке
+        self.history = []       # Iteration по порядку
+        self.subs = []          # итоги батчей прохода (aggregate_iteration_results)
 
     def check(self):
         offline_only(self)
@@ -244,8 +273,8 @@ class Iterations(Wrapper):
         folder = self.ws.create(iteration, sub)
         if sub == 0:
             ex.skill = claude_meta(ex, self.ws, folder, iteration)
-            best = best_index([h.val for h in self.history])
-            source = self.ws.base / (self.history[best].folder if self.history else folder_name(0))
+            last = self.history[best(self.history)].folder if self.history else folder_name(0)
+            source = self.ws.base / last
         else:
             source = self.inner.memory.path
             self.ws.copy_skills(source, folder)
@@ -253,19 +282,22 @@ class Iterations(Wrapper):
         self.inner.memory.at(self.ws, folder)
 
     def on_batch(self, ex, groups):
-        metrics = {"accuracy": sum(1.0 if g.episodes[g.chosen].ok else 0.0 for g in groups) / len(groups)}
+        right = sum(bool(g.episodes[g.chosen].ok) for g in groups)
+        metrics = {"accuracy": right / len(groups)}
         self.subs.append(dict(batch_size=len(groups), metric=metrics["accuracy"], metrics=metrics))
         self.inner.on_batch(ex, groups)
 
     def on_pass(self, ex):
         self.inner.on_pass(ex)
         val = ex.evaluate()
-        metrics = {"accuracy": sum(1.0 if c else 0.0 for c, _ in val) / len(val)} if val else {}
+        metrics = {"accuracy": share_correct(val)} if val else {}
         last = self.inner.memory.path
         train = self.ws.aggregate(ex.epoch + 1, self.subs, metrics, len(val), last)
-        self.history.append(Iteration(ex.skill, train, metrics.get("accuracy", 0.0), self.inner.snapshot(), len(val),
-                                      sum(s["batch_size"] for s in self.subs), folder=last.name))
-        self.inner.restore(self.history[best_index([h.val for h in self.history])].memory)
+        rollouts = sum(s["batch_size"] for s in self.subs)
+        self.history.append(Iteration(ex.skill, train=train, val=metrics.get("accuracy", 0.0),
+                                      memory=self.inner.snapshot(), val_total=len(val), rollouts=rollouts,
+                                      folder=last.name))
+        self.inner.restore(self.history[best(self.history)].memory)
         self.subs = []
 
     def dump(self):
