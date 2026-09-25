@@ -20,7 +20,7 @@ class Replayer(wire.Server):
     инструментов CLI Claude, DEVIATIONS MCE7)."""
     def __init__(self, addr, rec: Path, normalize=None):
         super().__init__(addr, ReplayHandler)
-        self.normalize = normalize or (lambda c: c)
+        self.normalize = normalize or wire.as_is
         self.rec = defaultdict(list)       # ключ -> ответы по номеру повтора
         for line in rec.read_text().splitlines():
             r = json.loads(line)
@@ -49,7 +49,7 @@ class Replayer(wire.Server):
     def miss(self, path: str, c: str, n: int) -> str:
         if wire.key(path, c) in self.rec:
             return f"{path}: request recorded {n} time(s), repeat n={n} was not recorded"
-        known = [k.split(" ", 1)[1] for k in self.rec if k.split(" ", 1)[0] == path]
+        known = [request for recorded_path, request in self.rec if recorded_path == path]
         near = wire.nearest(c, known)
         if near is None:
             return f"{path}: nothing recorded for this path"
@@ -66,7 +66,7 @@ class ReplayHandler(wire.Handler):
         if self.path == "/_status":
             return self.reply(200, json.dumps(self.server.status()).encode())
         if self.path == "/v1/models":
-            models = sorted({json.loads(k.split(" ", 1)[1]).get("model", "") for k in self.server.rec})
+            models = sorted({json.loads(request).get("model", "") for _, request in self.server.rec})
             data = [{"id": m, "object": "model", "owned_by": "replay"} for m in models]
             return self.reply(200, json.dumps({"object": "list", "data": data}).encode())
         self.error(404, f"unsupported path {self.path}", "not_found")

@@ -20,18 +20,23 @@ from pathlib import Path
 
 from tools.record import wire
 
+UPSTREAM_TIMEOUT = 3600     # секунд на ответ модели наверху
+
 
 class Recorder(wire.Server):
     def __init__(self, addr, out: Path, upstream: str, emb_upstream: str | None, seed: bool, cache: Path = None,
                  normalize=None, salt=""):
         super().__init__(addr, RecordHandler)
         self.salt = salt
-        self.normalize = normalize or (lambda c: c)
-        self.cache, self.hits = defaultdict(list), Counter()
+        self.normalize = normalize or wire.as_is
+        self.cache = defaultdict(list)      # ключ после normalize -> записи прошлой записи (--cache)
+        self.hits = Counter()               # сколько из них уже отдано
         for line in cache.read_text().splitlines() if cache else []:
             r = json.loads(line)
             self.cache[wire.key(r["path"], self.normalize(r["request"]))].append(r)
-        self.out, self.upstream, self.emb_upstream = out, upstream.rstrip("/"), (emb_upstream or upstream).rstrip("/")
+        self.out = out
+        self.upstream = upstream.rstrip("/")
+        self.emb_upstream = (emb_upstream or upstream).rstrip("/")
         self.seed = seed
         self.lock = threading.Lock()
         self.count = Counter()
@@ -42,18 +47,11 @@ class Recorder(wire.Server):
 
     def forward(self, path: str, body: dict, auth: str) -> tuple[int, dict]:
         base = self.emb_upstream if path.endswith("embeddings") else self.upstream
-        req = urllib.request.Request(base + path, json.dumps(body).encode(), method="POST",
-                                     headers={"Content-Type": "application/json",
-                                              "Authorization": auth})
         try:
-            with urllib.request.urlopen(req, timeout=3600) as r:
+            with post(base + path, body, auth) as r:
                 return r.status, json.loads(r.read())
         except urllib.error.HTTPError as e:
-            data = e.read()
-            try:
-                return e.code, json.loads(data)
-            except ValueError:
-                return e.code, {"error": {"message": data.decode(errors="replace"), "type": "upstream"}}
+            return e.code, error_body(e)
 
     def write(self, path, c, n, seed, status, resp, **more):
         rec = {"path": path, "request": c, "n": n, "seed": seed, "status": status, "response": resp, **more}
@@ -75,7 +73,7 @@ class Recorder(wire.Server):
         """Запрос наверх: без stream, с seed_for, если просили --seed. -> (запрос, seed)."""
         sent = {x: v for x, v in body.items() if x not in ("stream", "stream_options")}
         seed = None
-        if self.seed and path == wire.PATHS[0] and "seed" not in body:
+        if self.seed and path == wire.CHAT and "seed" not in body:
             seed = sent["seed"] = wire.seed_for(c, n, self.salt)
         return sent, seed
 
@@ -105,21 +103,16 @@ class Recorder(wire.Server):
             n = self.count[wire.key(path, c)]
             hit = self.cached(path, c, n)
             if hit:
-                return out.reply(hit[0], wire.sse(hit[1], body) if hit[0] == 200 else json.dumps(hit[1]).encode(),
-                                 "text/event-stream" if hit[0] == 200 else "application/json")
+                status, resp = hit
+                if status == 200:
+                    return out.reply(status, wire.sse(resp, body), "text/event-stream")
+                return out.reply(status, json.dumps(resp).encode(), "application/json")
             sent, seed = self.prepare(path, body, c, n)
             sent.update(stream=True, stream_options={"include_usage": True})
-            req = urllib.request.Request(self.upstream + path, json.dumps(sent).encode(), method="POST",
-                                         headers={"Content-Type": "application/json",
-                                                  "Authorization": headers.get("Authorization") or "Bearer none"})
             try:
-                up = urllib.request.urlopen(req, timeout=3600)
+                up = post(self.upstream + path, sent, headers.get("Authorization") or "Bearer none")
             except urllib.error.HTTPError as e:
-                data = e.read()
-                try:
-                    resp = json.loads(data)
-                except ValueError:
-                    resp = {"error": {"message": data.decode(errors="replace"), "type": "upstream"}}
+                resp = error_body(e)
                 self.write(path, c, n, seed, e.code, resp)
                 return out.reply(e.code, json.dumps(resp).encode())
             except urllib.error.URLError as e:
@@ -135,6 +128,22 @@ class Recorder(wire.Server):
             out.send(wire.sse(resp, body))
             out.end_stream()
             self.write(path, c, n, seed, 200, resp)
+
+
+def post(url, body, auth):
+    """POST JSON наверх; ответ — открытый поток (HTTPError при коде ошибки)."""
+    req = urllib.request.Request(url, json.dumps(body).encode(), method="POST",
+                                 headers={"Content-Type": "application/json", "Authorization": auth})
+    return urllib.request.urlopen(req, timeout=UPSTREAM_TIMEOUT)
+
+
+def error_body(error):
+    """Тело ответа с ошибкой: JSON как есть, иначе текст в оболочке ошибки OpenAI."""
+    data = error.read()
+    try:
+        return json.loads(data)
+    except ValueError:
+        return {"error": {"message": data.decode(errors="replace"), "type": "upstream"}}
 
 
 class RecordHandler(wire.Handler):

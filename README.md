@@ -34,7 +34,7 @@ BACKEND=wire uv run python run.py formula dc 40          # вызовы без �
 uv run python ablate.py formula 40        # цепочка абляций; ступени по именам: ablate.py formula 40 ace_stand ace_stand_opt
 uv run python report.py                   # таблица по results/
 uv run pytest -q                          # тесты, в том числе мостик к апстримам (tests/bridge)
-uv run python tools/trace.py /tmp/a.json   # снимок запросов всех методов на фиктивной модели
+uv run python -m tools.trace /tmp/a.json   # снимок запросов всех методов на фиктивной модели
 uv run python tools/compare.py /tmp/a.json /tmp/b.json   # два снимка: что поменяла правка
 ```
 

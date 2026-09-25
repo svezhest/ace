@@ -8,7 +8,9 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 # stream_options бывает только вместе со stream.
 DROP = ("stream", "stream_options", "id")
 
-PATHS = ("/v1/chat/completions", "/v1/embeddings")
+CHAT = "/v1/chat/completions"
+EMBEDDINGS = "/v1/embeddings"
+PATHS = (CHAT, EMBEDDINGS)
 
 
 def canon(body: dict) -> str:
@@ -17,8 +19,14 @@ def canon(body: dict) -> str:
     return json.dumps(body, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
 
 
-def key(path: str, c: str) -> str:
-    return path + " " + c
+def key(path: str, c: str) -> tuple[str, str]:
+    """Ключ записи: путь и канонический запрос."""
+    return path, c
+
+
+def as_is(c: str) -> str:
+    """normalize по умолчанию: запрос сравнивается как есть."""
+    return c
 
 
 def seed_for(c: str, n: int, salt: str = "") -> int:
@@ -162,12 +170,12 @@ class Handler(BaseHTTPRequestHandler):
             body = json.loads(raw)
         except ValueError as e:
             return self.error(400, f"bad json: {e}", "invalid_request")
-        if path == PATHS[0] and wants_stream(body) and hasattr(self.server, "stream"):
+        if path == CHAT and wants_stream(body) and hasattr(self.server, "stream"):
             return self.server.stream(path, body, self.headers, self)
         status, resp = self.server.handle(path, body, self.headers)
         if isinstance(resp, str):
             return self.error(status, resp, "upstream" if status == 502 else "replay_mismatch")
-        if status == 200 and path == PATHS[0] and wants_stream(body):
+        if status == 200 and path == CHAT and wants_stream(body):
             return self.reply(200, sse(resp, body), "text/event-stream")
         self.reply(status, json.dumps(resp, ensure_ascii=False).encode())
 

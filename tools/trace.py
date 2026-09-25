@@ -1,5 +1,5 @@
 """Снимок поведения методов на фиктивной модели: все запросы, итог и память.
-    uv run python tools/trace.py OUT.json [method ...]
+    uv run python -m tools.trace OUT.json [method ...]
 Одинаковые промпты -> одинаковые ответы, поэтому два снимка сравнимы (tools/compare.py): так видно, что
 правка кода не поменяла запросы там, где не должна."""
 import gzip
@@ -7,17 +7,17 @@ import hashlib
 import json
 import sys
 import tempfile
+import types
 import typing
 from pathlib import Path
 
-out, names = sys.argv[1], sys.argv[2:]
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-import pydantic  # noqa: E402
-from ace.model import Call, Reply, roles, text_reply  # noqa: E402
-from ace.loop import Protocol, run  # noqa: E402
-from ace.learner import swap  # noqa: E402
-from ace.methods import METHODS  # noqa: E402
-from ace.tasks import TASKS  # noqa: E402
+import pydantic
+
+from ace.model import Call, Reply, roles, text_reply
+from ace.loop import Protocol, run
+from ace.learner import swap
+from ace.methods import METHODS
+from ace.tasks import TASKS
 
 BLOB = """Reasoning about the task.
 <subtask>
@@ -46,7 +46,8 @@ VERDICT: correct
 USED: r1, r2"""
 
 
-def h(*parts):
+def stable_hash(*parts):
+    """Число из частей, одно и то же от запуска к запуску (hash() строк случаен)."""
     return int(hashlib.md5("|".join(map(str, parts)).encode()).hexdigest(), 16)
 
 
@@ -68,11 +69,16 @@ def fill(tp, seed):
         return args[0]
     if origin in (list, typing.List):
         return [fill(args[0], seed + 1)] if args else []
-    if origin in (typing.Union, getattr(__import__("types"), "UnionType", None)):
+    if origin in (typing.Union, types.UnionType):
         return fill([a for a in args if a is not type(None)][0], seed)
     if isinstance(tp, type) and issubclass(tp, pydantic.BaseModel):
-        return tp(**{k: NAMED.get(k) if k in NAMED and f.annotation is str else fill(f.annotation, seed + i)
-                     for i, (k, f) in enumerate(tp.model_fields.items())})
+        values = {}
+        for i, (name, f) in enumerate(tp.model_fields.items()):
+            if name in NAMED and f.annotation is str:
+                values[name] = NAMED[name]
+            else:
+                values[name] = fill(f.annotation, seed + i)
+        return tp(**values)
     return None
 
 
@@ -81,15 +87,20 @@ class Fake:
     name = "fake"
 
     def __init__(self, targets):
-        self.targets, self.log = targets, []
+        self.targets = targets
+        self.log = []
 
     def ask(self, call):
         system, user = roles(call.messages)
-        schema, p = call.reader.schema, call.params
-        self.log.append(dict(system=system, user=user, output=schema.__name__ if schema else "str",
-                             tools=[t.__name__ for t in call.tools], rounds=call.rounds, temperature=p.get("temperature"),
-                             max_tokens=p.get("max_tokens"), **({"top_p": p["top_p"]} if "top_p" in p else {})))
-        seed = h(system, user, p.get("temperature"), len(self.log) if p.get("temperature") else "")
+        schema, params = call.reader.schema, call.params
+        entry = dict(system=system, user=user, output=schema.__name__ if schema else "str",
+                     tools=[t.__name__ for t in call.tools], rounds=call.rounds, temperature=params.get("temperature"),
+                     max_tokens=params.get("max_tokens"))
+        if "top_p" in params:
+            entry["top_p"] = params["top_p"]
+        self.log.append(entry)
+        # при T > 0 ответ зависит и от номера вызова: повтор того же запроса — другой ответ
+        seed = stable_hash(system, user, params.get("temperature"), len(self.log) if params.get("temperature") else "")
         if schema is None:
             target = next((t for q, t in self.targets.items() if q in user), None)
             answer = target if target and seed % 3 else "1.00"
@@ -104,25 +115,34 @@ class Fake:
 
     def embed(self, texts, name):
         """Векторы без модели: по хешу текста."""
-        return [[(h(t) % 97 + 1) / 97, 1.0] for t in texts]
+        return [[(stable_hash(t) % 97 + 1) / 97, 1.0] for t in texts]
 
     def usage(self):
         return dict(calls=len(self.log), prompt_tokens=0, completion_tokens=0)
 
 
-task = TASKS["formula"]
-targets = {r["question"]: r["target"] for s in ("", "train", "val") for r in task.load(s)}
 # батч 2 и офлайн, чтобы на 4 вопросах сработали события батча и прохода
-special = {"tfgrpo": dict(every=2), "mce_fs": dict(every=2, protocol=Protocol(offline=True, epochs=2)),
+SPECIAL = {"tfgrpo": dict(every=2), "mce_fs": dict(every=2, protocol=Protocol(offline=True, epochs=2)),
            "mce_ace_stand": dict(every=2, protocol=Protocol(offline=True, epochs=2))}
-traces = {}
-tmp = Path(tempfile.mkdtemp(prefix="trace-"))
-# mce — агенты Claude SDK через LiteLLM (model/claude.py): на фиктивной модели не идёт, его сверка — tests/live/test_mce.py
-for name in names or sorted(set(METHODS) - {"mce"}):
-    parts = special.get(name, {})
-    fake = Fake(targets)
-    summary = run(task, swap(METHODS[name], **parts) if parts else METHODS[name], fake, 4, str(tmp / name))
-    traces[name] = dict(summary=summary, calls=fake.log, memory=json.load(open(tmp / name / "memory.json")))
-    print(name, summary["correct"], len(fake.log), "errors", summary["errors"], flush=True)
-with (gzip.open(out, "wt") if out.endswith(".gz") else open(out, "w")) as f:
-    json.dump(traces, f, ensure_ascii=False, indent=1)
+
+
+def main():
+    out, names = sys.argv[1], sys.argv[2:]
+    task = TASKS["formula"]
+    targets = {r["question"]: r["target"] for s in ("", "train", "val") for r in task.load(s)}
+    traces = {}
+    tmp = Path(tempfile.mkdtemp(prefix="trace-"))
+    # mce — агенты Claude SDK через LiteLLM (model/claude.py): на фиктивной модели не идёт, его сверка — tests/live/test_mce.py
+    for name in names or sorted(set(METHODS) - {"mce"}):
+        levels = SPECIAL.get(name, {})
+        learner = swap(METHODS[name], **levels) if levels else METHODS[name]
+        fake = Fake(targets)
+        summary = run(task, learner, fake, 4, str(tmp / name))
+        traces[name] = dict(summary=summary, calls=fake.log, memory=json.load(open(tmp / name / "memory.json")))
+        print(name, summary["correct"], len(fake.log), "errors", summary["errors"], flush=True)
+    with (gzip.open(out, "wt") if out.endswith(".gz") else open(out, "w")) as f:
+        json.dump(traces, f, ensure_ascii=False, indent=1)
+
+
+if __name__ == "__main__":
+    main()

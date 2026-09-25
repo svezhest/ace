@@ -121,8 +121,8 @@ def test_requests(replayed):
     отдан хотя бы раз, сообщение одно — user, без инструментов."""
     status, _ = replayed
     assert status["misses"] == 0 and status["served"] + status["unused"] == status["recorded"] == RUN["calls"]
-    for key, (served, recorded) in status["left"].items():
-        body = json.loads(key.split(" ", 1)[1])
+    for (_, request), (served, recorded) in status["left"].items():
+        body = json.loads(request)
         assert served >= 1 and "tools" not in body and [m["role"] for m in body["messages"]] == ["user"]
     assert status["unused"] <= RUN["agent_retries"]
 

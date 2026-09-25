@@ -31,8 +31,8 @@ class Embedder(wire.Server):
         super().__init__(addr, wire.Handler)
 
     def handle(self, path, body, headers):
-        if path != wire.PATHS[1]:
-            return 404, f"only {wire.PATHS[1]}"
+        if path != wire.EMBEDDINGS:
+            return 404, f"only {wire.EMBEDDINGS}"
         return 200, response(body)
 
 
