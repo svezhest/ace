@@ -14,7 +14,7 @@ from pathlib import Path
 from .. import fs, prompts, render
 from ..model import Call, messages, params
 from ..tasks import variant
-from . import Files, Record
+from . import Files, Memory, Record
 
 BASE = prompts.load("mce_base")
 ROUNDS = 30
@@ -329,18 +329,13 @@ def load_interfaces(folder, sigs):
     return {n: getattr(module, n) for n in names if callable(getattr(module, n, None))}
 
 
-class Folder:
+class Folder(Memory):
     """Память базового агента MCE апстрима: папка под-итерации на диске (context/, interfaces/, навык). На батче —
     data/train.json с итогами батча (format_result_for_training) и сессия базового агента Claude SDK
     (run_base_agent: промпт с интерфейсами задачи, cwd — папка под-итерации, проект .claude/ — навык; с
     интерфейсами — проверка и до 3 ответов с ошибками проверки). Версия памяти — путь папки."""
-    requires = frozenset()
-
     def __init__(self):
         self.at(None, None)
-
-    def begin(self, k):
-        pass
 
     def at(self, ws, path):
         """Текущая папка; интерфейсы перечитываются при следующем показе."""

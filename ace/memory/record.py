@@ -1,8 +1,19 @@
 """Запись памяти: id и неизменяемый текст. Правка текста — новая запись со своей статистикой.
-Запись сама отдаёт краткую строку (head) и сериализуется (dump). Счётчики ACE — counters.py."""
+Запись сама отдаёт краткую строку (head) и сериализуется (dump). Счётчики ACE — counters.py. Здесь же общее у
+памяти обоих миров (Memory)."""
 from dataclasses import asdict, dataclass, field
 
 HEAD_CHARS = 80             # длина краткой строки записи (каталог, ls)
+
+
+class Memory:
+    """Общее у памяти обоих миров: records(), chars(), key(), dump(), learn(ex, extractions) — у каждой свои;
+    requires — добавки, которые память требует от извлечения (extract/__init__.py); begin(k) — начало попытки k
+    (здесь уходят записи со сроком жизни «попытка», tactical SCOPE)."""
+    requires = frozenset()
+
+    def begin(self, k):
+        pass
 
 
 @dataclass(frozen=True, eq=False)

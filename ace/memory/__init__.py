@@ -9,7 +9,7 @@
 from .documents import Document, Files
 from .lessons import Container, Ids, Lessons, Sections
 from .counters import HARMFUL, HELPFUL, Counted
-from .record import HEAD_CHARS, Lesson, Record
+from .record import HEAD_CHARS, Lesson, Memory, Record
 
 __all__ = ["Container", "Counted", "Document", "Files", "HARMFUL", "HEAD_CHARS", "HELPFUL", "Ids", "Lesson", "Lessons",
-           "Record", "Sections"]
+           "Memory", "Record", "Sections"]

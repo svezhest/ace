@@ -86,10 +86,10 @@ class Learner:
         return ex.task.load(split, n)
 
     def on_pass_start(self, ex):
-        pass
+        """Начало прохода — для обёрток (MCE: навык меты, выборка)."""
 
     def on_batch_start(self, ex):
-        pass
+        """Начало батча — для обёрток (MCE: папка под-итерации)."""
 
     def on_step(self, ex, attempt, step):
         if attempt.training and self.extract is not None:
@@ -99,7 +99,7 @@ class Learner:
         return self.viewer().on_step(ex, self.memory, attempt, step)
 
     def on_attempt(self, ex, episode):
-        pass
+        """После попытки при обучении — для обёрток (Hooks: исходы показанных хуков)."""
 
     def on_question(self, ex, group):
         if self.extract is not None and self.extract.scale == "question":

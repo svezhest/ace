@@ -10,7 +10,7 @@
 
 Контейнеры: Lessons — список записей; Sections — разделы (каждый Lessons) с общей нумерацией. Политики метода
 (отсев, слияние) — его код."""
-from .record import Lesson
+from .record import Lesson, Memory
 
 
 class Ids:
@@ -27,15 +27,10 @@ class Ids:
         return int(id[len(self.prefix):])
 
 
-class Container:
+class Container(Memory):
     """Общее для контейнеров уроков: поиск, размер, ключ, сериализация."""
-    requires = frozenset()      # добавки, которые память требует от извлечения (extract/__init__.py)
-
     def records(self):
         raise NotImplementedError
-
-    def begin(self, k):
-        """Новая попытка k: здесь уходят записи со сроком жизни «попытка» (tactical SCOPE)."""
 
     def get(self, id):
         return next((r for r in self.records() if r.id == id), None)

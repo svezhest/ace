@@ -2,21 +2,16 @@
 
     Document    один текст, переписывается целиком (DC)
     Files       файлы и папки: путь -> текст, правка инструментами fs.py (MCE)"""
-from .record import Record
+from .record import Memory, Record
 
 
-class Document:
-    requires = frozenset()
-
+class Document(Memory):
     def __init__(self, text="", kind="document"):
         self.text = text
         self.kind = kind
 
     def rewrite(self, text):
         self.text = text
-
-    def begin(self, k):
-        pass
 
     def records(self):
         return [Record(self.kind, self.text)] if self.text else []
@@ -31,9 +26,8 @@ class Document:
         return [dict(kind=self.kind, id=self.kind, text=self.text)] if self.text else []
 
 
-class Files:
+class Files(Memory):
     """Путь — строка «папка/подпапка/имя»; папки существуют, пока в них есть файлы."""
-    requires = frozenset()
 
     def __init__(self, kind="file"):
         self.kind = kind
@@ -45,9 +39,6 @@ class Files:
         out = cls(kind)
         out.files = dict(files)
         return out
-
-    def begin(self, k):
-        pass
 
     def read(self, path):
         return self.files.get(path)
