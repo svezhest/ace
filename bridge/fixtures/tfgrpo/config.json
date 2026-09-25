@@ -1,7 +1,7 @@
 {
  "header": {
   "repo": "youtu-agent",
-  "path": "/Users/user/Projects/upstreams/youtu-agent",
+  "path": "$UPSTREAMS/youtu-agent",
   "commit": "c2caa539f4c95ae1c39ed24dc8a99cb3651e1d5d",
   "functions": {
    "TrainingFreeGRPO.build": "utu/practice/training_free_grpo.py:63",

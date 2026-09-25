@@ -1,12 +1,12 @@
 {
  "header": {
   "repo": "SCOPE",
-  "path": "/Users/user/Projects/upstreams/SCOPE",
+  "path": "$UPSTREAMS/SCOPE",
   "commit": "4dc0da5e7843dce84a851bd7a53e4e45932b27d0",
   "functions": {
    "SCOPEOptimizer.on_step_complete": "scope/optimizer.py:345",
    "CallableModelAdapter.generate": "scope/models/base.py:193",
-   "loop_as_in": "itmo/cs-masters/thesis/repro/scope_run.py:37-52"
+   "loop_as_in": "$REPRO/scope_run.py:37-52"
   },
   "command": "$UPSTREAMS/.venvs/light/bin/python bridge/capture_scope.py",
   "python": "3.11.11"

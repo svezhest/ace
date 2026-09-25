@@ -31,8 +31,10 @@ import numpy as np  # noqa: E402
 from dynamic_cheatsheet.language_model import LanguageModel  # noqa: E402
 from dynamic_cheatsheet.utils import evaluation, extractor  # noqa: E402
 
-PATCHED = "/Users/user/Projects/itmo/cs-masters/thesis/repro/dynamic-cheatsheet/dynamic_cheatsheet/utils/extractor.py"
-OURS = "/Users/user/Projects/ace/ace/parse.py"
+# extract_cheatsheet с локальной правкой в рабочей копии апстрима (REPRO — папка клонов, bridge/setup_envs.sh)
+PATCHED = "dynamic-cheatsheet/dynamic_cheatsheet/utils/extractor.py"
+OURS = "ace/parse.py"          # от корня стенда
+STAND = os.path.dirname(fake.BRIDGE)
 
 # настройки run_benchmark.py по умолчанию
 MODEL = "openai/gpt-4o-mini"
@@ -373,8 +375,9 @@ def load_file(path, name):
 def cheatsheet_compare():
     """HEAD extract_cheatsheet против пропатченного в repro и нашего parse.opened("cheatsheet").
     У нас None значит «оставить старый» — приводим к old для сравнения."""
-    patched = load_file(PATCHED, "dc_patched_extractor").extract_cheatsheet
-    ours = load_file(OURS, "ace_parse").opened("cheatsheet")
+    patched_file, ours_file = os.path.join(os.environ["REPRO"], PATCHED), os.path.join(STAND, OURS)
+    patched = load_file(patched_file, "dc_patched_extractor").extract_cheatsheet
+    ours = load_file(ours_file, "ace_parse").opened("cheatsheet")
     old = "OLD CHEATSHEET"
     rows = {}
     for k, v in CHEATSHEET_INPUTS.items():
@@ -384,10 +387,10 @@ def cheatsheet_compare():
         rows[k] = {"input": v, "head": head, "patched": pat, "ours": our,
                    "patched_differs": pat != head, "ours_differs": our != head}
     sha = lambda p: hashlib.sha256(open(p, "rb").read()).hexdigest()[:16]  # noqa: E731
-    ace_head = subprocess.run(["git", "-C", os.path.dirname(OURS), "rev-parse", "HEAD"],
+    ace_head = subprocess.run(["git", "-C", STAND, "rev-parse", "HEAD"],
                               capture_output=True, text=True).stdout.strip()
-    return {"sources": {"patched": {"path": PATCHED, "sha256": sha(PATCHED)},
-                        "ours": {"path": OURS, "sha256": sha(OURS), "ace_commit": ace_head,
+    return {"sources": {"patched": {"path": f"$REPRO/{PATCHED}", "sha256": sha(patched_file)},
+                        "ours": {"path": OURS, "sha256": sha(ours_file), "ace_commit": ace_head,
                                  "function": "opened('cheatsheet')"}},
             "rows": rows}
 

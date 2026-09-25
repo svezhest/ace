@@ -1,7 +1,7 @@
 {
  "header": {
   "repo": "youtu-agent",
-  "path": "/Users/user/Projects/upstreams/youtu-agent",
+  "path": "$UPSTREAMS/youtu-agent",
   "commit": "c2caa539f4c95ae1c39ed24dc8a99cb3651e1d5d",
   "functions": {
    "ExperienceUpdater.run": "utu/practice/experience_updater.py:30",

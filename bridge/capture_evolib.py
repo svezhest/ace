@@ -1,6 +1,6 @@
 """Эталоны EvoLib: промпты HMMT, разборщики utils.py, операции над библиотекой, run_iteration на 4 задачах.
 
-Запуск из корня стенда: /Users/user/Projects/upstreams/.venvs/light/bin/python bridge/capture_evolib.py
+Запуск из корня стенда: $UPSTREAMS/.venvs/light/bin/python bridge/capture_evolib.py
 LLMAgent и EmbeddingModel — апстримные, подменён только клиент (fake). EvoLib последователен, поэтому
 разные ответы на одинаковый промпт (k_q сэмплов) выдаются по счётчику на маркер задачи.
 """

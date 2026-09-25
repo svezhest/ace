@@ -9,8 +9,8 @@ OUT=$(cd "$1" && pwd)
 mkdir -p "$OUT/rec"
 cp "$2" "$OUT/test.db"
 HERE=$(cd "$(dirname "$0")" && pwd)
-U=${UPSTREAMS:-/Users/user/Projects/upstreams}
-ACE=${ACE:-/Users/user/Projects/ace}
+U=${UPSTREAMS:-$HOME/Projects/upstreams}
+ACE=${ACE:-$(cd "$(dirname "$0")/../../.." && pwd)}
 M=ornith15-9b
 docker network inspect tfnet >/dev/null 2>&1 || docker network create --internal tfnet >/dev/null
 docker run -d --rm --name tfrec --network bridge -v "$ACE/tools":/ace/tools:ro -v "$OUT/rec":/out -e PYTHONPATH=/ace \

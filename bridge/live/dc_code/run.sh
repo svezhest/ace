@@ -5,8 +5,8 @@
 set -eu
 OUT=$(cd "$1" && pwd)
 mkdir -p "$OUT/rec" "$OUT/results"
-U=${UPSTREAMS:-/Users/user/Projects/upstreams}
-ACE=${ACE:-/Users/user/Projects/ace}
+U=${UPSTREAMS:-$HOME/Projects/upstreams}
+ACE=${ACE:-$(cd "$(dirname "$0")/../../.." && pwd)}
 docker network inspect dcnet >/dev/null 2>&1 || docker network create --internal dcnet >/dev/null
 docker run -d --rm --name dcrec --network bridge -v "$ACE/tools":/ace/tools:ro -v "$OUT/rec":/out -e PYTHONPATH=/ace \
     -e PYTHONDONTWRITEBYTECODE=1 dc-upstream python -c "

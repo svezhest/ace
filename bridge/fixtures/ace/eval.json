@@ -1,7 +1,7 @@
 {
  "header": {
   "repo": "ace",
-  "path": "/Users/user/Projects/upstreams/ace",
+  "path": "$UPSTREAMS/ace",
   "commit": "82709de050e1db6e6ef2f07bcb0393560b94992a",
   "functions": {
    "DataProcessor.answer_is_correct": "eval/finance/data_processor.py:165",

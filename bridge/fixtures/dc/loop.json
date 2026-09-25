@@ -1,7 +1,7 @@
 {
  "header": {
   "repo": "dynamic-cheatsheet",
-  "path": "/Users/user/Projects/upstreams/dynamic-cheatsheet",
+  "path": "$UPSTREAMS/dynamic-cheatsheet",
   "commit": "5cfe3c37e8e52b1d858d0f3df46e7f17c50991b9",
   "functions": {
    "advanced_generate": "dynamic_cheatsheet/language_model.py:290",

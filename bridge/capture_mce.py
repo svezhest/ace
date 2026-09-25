@@ -1,6 +1,6 @@
 """Эталоны MCE (meta-context-engineering c4b7a7c): промпты, разборщики, итерации, цикл main().
 
-Запуск из корня стенда: /Users/user/Projects/upstreams/.venvs/mce/bin/python bridge/capture_mce.py
+Запуск из корня стенда: $UPSTREAMS/.venvs/mce/bin/python bridge/capture_mce.py
 Агентов Claude SDK не запускаем: run_meta_agent и run_base_agent заменены заготовками, которые
 строят промпт настоящими билдерами и пишут файлы, как агент; модель оценки — фейк.
 """

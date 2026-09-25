@@ -1,7 +1,7 @@
 {
  "header": {
   "repo": "meta-context-engineering",
-  "path": "/Users/user/Projects/upstreams/meta-context-engineering",
+  "path": "$UPSTREAMS/meta-context-engineering",
   "commit": "c4b7a7c2ce3ffc4bf4a74c52d2dd8a9a8fb14c30",
   "functions": {
    "build_meta_agent_prompt": "mce/prompts/meta_agent.py:16",

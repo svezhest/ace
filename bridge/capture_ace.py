@@ -1,6 +1,6 @@
 """Эталоны ACE (ace-agent/ace @ 82709de): промпты, разборщики, операции над плейбуком, цикл online, чекеры finance.
 
-запуск из корня стенда: /Users/user/Projects/upstreams/.venvs/ace/bin/python bridge/capture_ace.py
+запуск из корня стенда: $UPSTREAMS/.venvs/ace/bin/python bridge/capture_ace.py
 """
 import contextlib
 import importlib.util

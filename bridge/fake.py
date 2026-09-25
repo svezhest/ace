@@ -15,7 +15,7 @@ from types import SimpleNamespace
 
 BRIDGE = os.path.dirname(os.path.abspath(__file__))
 FIXTURES = os.path.join(BRIDGE, "fixtures")
-UPSTREAMS = os.environ.get("UPSTREAMS", "/Users/user/Projects/upstreams")
+UPSTREAMS = os.environ.get("UPSTREAMS", os.path.expanduser("~/Projects/upstreams"))
 # до offline(): он меняет cwd на tmp
 SCRIPT = os.path.abspath(sys.argv[0]) if sys.argv and sys.argv[0] else ""
 
@@ -156,7 +156,7 @@ def header(repo, funcs, command=None):
     root = os.path.join(UPSTREAMS, repo)
     return {
         "repo": repo,
-        "path": root,
+        "path": f"$UPSTREAMS/{repo}",
         "commit": git_head(root),
         "functions": {name: where(f, root) if not isinstance(f, str) else f for name, f in funcs.items()},
         # запуск из корня стенда

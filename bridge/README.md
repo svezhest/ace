@@ -9,10 +9,10 @@
 bridge/setup_envs.sh            # все; или: bridge/setup_envs.sh ace mce youtu light
 ```
 
-Скрипт делает `git worktree add --detach` апстримов из `repro/` в `$UPSTREAMS` (по умолчанию
-`/Users/user/Projects/upstreams`) на коммитах ниже и ставит venv в `$UPSTREAMS/.venvs/`. Где есть
-`uv.lock`, зависимости ставятся из него, сам проект не ставится. Рабочие копии в `repro/` не трогаются:
-у ace и dynamic-cheatsheet там локальные правки.
+Скрипт делает `git worktree add --detach` апстримов из `$REPRO` (папка с git-клонами апстримов; дальше в тексте —
+`repro/`) в `$UPSTREAMS` (по умолчанию `~/Projects/upstreams`) на коммитах ниже и ставит venv в
+`$UPSTREAMS/.venvs/`. Где есть `uv.lock`, зависимости ставятся из него, сам проект не ставится. Рабочие копии в
+`repro/` не трогаются: у ace и dynamic-cheatsheet там локальные правки.
 
 | метод  | апстрим                  | коммит  | venv  |
 |--------|--------------------------|---------|-------|
@@ -28,9 +28,9 @@ bridge/setup_envs.sh            # все; или: bridge/setup_envs.sh ace mce y
 Все команды запускаются из корня стенда. Каждая занимает секунды, реальных вызовов модели нет.
 
 ```sh
-U=/Users/user/Projects/upstreams/.venvs
+U=$UPSTREAMS/.venvs
 $U/ace/bin/python   bridge/capture_ace.py
-$U/light/bin/python bridge/capture_dc.py
+REPRO=... $U/light/bin/python bridge/capture_dc.py     # dc/cheatsheet_compare сверяет и патч в repro/
 $U/light/bin/python bridge/capture_scope.py
 $U/light/bin/python bridge/capture_evolib.py
 $U/youtu/bin/python bridge/capture_tfgrpo.py
@@ -38,7 +38,7 @@ $U/mce/bin/python   bridge/capture_mce.py
 ```
 
 Каждая команда пишет `bridge/fixtures/<метод>/*.json` в виде `{"header": ..., "data": ...}`. В `header`
-указаны репозиторий, путь, полный коммит, `file:line` каждой вызванной функции апстрима, команда и
+указаны репозиторий, путь (от `$UPSTREAMS`), полный коммит, `file:line` каждой вызванной функции апстрима, команда и
 версия python. Повторный запуск даёт побайтно те же файлы, это проверено на всех шести.
 
 Уровни (не у каждого метода есть все):
@@ -170,3 +170,15 @@ bullet_ids ACE — регулярка апстрима как есть (тест
 
 Не сравниваются: разборщики кодовых задач EvoLib и ответы symptom_diagnosis MCE — у нас таких задач
 нет; журнал SCOPE (history_store) — лог, а не память.
+
+## Записи живой модели (`bridge/live/`)
+
+Апстрим, запущенный как есть на живой модели через записывающий прокси `tools/record`: пары запрос -> ответ
+(`rec.jsonl`) и снимки памяти. `tests/live/` воспроизводит запись без модели и сверяет запросы стенда побайтно.
+Пути хоста в записях — через `$UPSTREAMS`, `$HOME`, `@ROOT@`, `@UV@` (подставляет раннер записи). В запросах
+MCE путей хоста нет вне вывода Bash агентов, а его воспроизведение не сравнивает (`tools/record/mce.py`).
+
+Запись MCE (`mce/rec.jsonl.gz`) содержит системный промпт Claude Code CLI 2.1.20: агенты MCE апстрима — Claude
+Agent SDK, и CLI сам отправляет модели свой промпт (с описаниями инструментов, шаблоном сообщения коммита и
+прочим). Это часть запросов апстрима: без неё воспроизведение не сверит запросы побайтно, поэтому промпт оставлен
+в записи как есть.

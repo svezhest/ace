@@ -2,13 +2,12 @@
 # Окружения для снятия эталонов: чистые worktree апстримов на зафиксированных коммитах и venv через uv.
 # usage: bridge/setup_envs.sh [ace|mce|youtu|light|litellm ...]   (без аргументов — все)
 set -e
-REPRO=${REPRO:-/Users/user/Projects/itmo/cs-masters/thesis/repro}
-UP=${UPSTREAMS:-/Users/user/Projects/upstreams}
+UP=${UPSTREAMS:-$HOME/Projects/upstreams}
 V=$UP/.venvs
 mkdir -p "$V"
 
 tree() {  # name commit
-  [ -d "$UP/$1" ] || git -C "$REPRO/$1" worktree add --detach "$UP/$1" "$2"
+  [ -d "$UP/$1" ] || git -C "${REPRO:?REPRO — папка с git-клонами апстримов}/$1" worktree add --detach "$UP/$1" "$2"
   test "$(git -C "$UP/$1" rev-parse --short=7 HEAD)" = "$2"
 }
 tree ace 82709de

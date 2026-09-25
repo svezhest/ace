@@ -1,7 +1,7 @@
 {
  "header": {
   "repo": "dynamic-cheatsheet",
-  "path": "/Users/user/Projects/upstreams/dynamic-cheatsheet",
+  "path": "$UPSTREAMS/dynamic-cheatsheet",
   "commit": "5cfe3c37e8e52b1d858d0f3df46e7f17c50991b9",
   "functions": {
    "extract_cheatsheet": "dynamic_cheatsheet/utils/extractor.py:62"
@@ -12,11 +12,11 @@
  "data": {
   "sources": {
    "patched": {
-    "path": "/Users/user/Projects/itmo/cs-masters/thesis/repro/dynamic-cheatsheet/dynamic_cheatsheet/utils/extractor.py",
+    "path": "$REPRO/dynamic-cheatsheet/dynamic_cheatsheet/utils/extractor.py",
     "sha256": "0ce0eff6b8493a08"
    },
    "ours": {
-    "path": "/Users/user/Projects/ace/ace/parse.py",
+    "path": "ace/parse.py",
     "sha256": "e65e1b0b37de688d",
     "ace_commit": "e5d361999f6377b8be7916a6613fbf1c4c4bcb59",
     "function": "opened('cheatsheet')"

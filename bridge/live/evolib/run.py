@@ -1,6 +1,6 @@
 """Запись EvoLib: eval_main.main() апстрима как есть на HMMT, клиенты и данные подменены здесь, в раннере.
 
-    /Users/user/Projects/upstreams/.venvs/light/bin/python run.py OUT URL [ЗАДАЧ]
+    $UPSTREAMS/.venvs/light/bin/python run.py OUT URL [ЗАДАЧ]
     (URL — записывающий прокси tools/record с --seed и --embeddings-upstream на tools/record/embeddings.py;
     по готовой записи — tools/record/replay: прогон без модели, те же запросы и снимки)
 
@@ -23,7 +23,7 @@ import random
 import sys
 import types
 
-UP = os.environ.get("UPSTREAMS", "/Users/user/Projects/upstreams")
+UP = os.environ.get("UPSTREAMS", os.path.expanduser("~/Projects/upstreams"))
 SRC = f"{UP}/EvoLib/EvoLib"
 SEED = 0
 OUT, URL = sys.argv[1], sys.argv[2]

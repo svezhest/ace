@@ -5,7 +5,7 @@
   "model": "ornith15-9b (ornith15-9b-mlx-8bit через шлюз :8080)",
   "slice": "formula (data/formula40.jsonl), первые 2 задач, онлайн",
   "driver": "bridge/live/scope/driver.py: обвязка агента стенда (ace.loop, решатель S1) и библиотека SCOPE как есть (SCOPEOptimizer, create_openai_model(base_url) без параметров); DEVIATIONS SC2",
-  "env": "PYTHONPATH=/Users/user/Projects/upstreams/SCOPE, venv стенда (uv run)",
+  "env": "PYTHONPATH=$UPSTREAMS/SCOPE, venv стенда (uv run)",
   "record": "uv run python -m tools.record.record bridge/live/scope_k2/rec.jsonl --port 8094 --upstream http://localhost:8080 --seed",
   "command": "uv run python bridge/live/scope/driver.py scope_k2 bridge/live/scope_k2 --base-url http://127.0.0.1:8094/v1",
   "note": "два SCOPEOptimizer: synthesis_mode efficiency (попытка 0) и thoroughness (попытка 1), у каждого свой exp_path; в зачёт первая верная по метке (pass@k)",

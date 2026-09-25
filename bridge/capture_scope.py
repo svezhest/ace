@@ -1,6 +1,6 @@
 """Эталоны SCOPE (4dc0da5): промпты, разборщики, стратегическая память, цикл on_step_complete.
 
-Запуск из корня стенда: /Users/user/Projects/upstreams/.venvs/light/bin/python bridge/capture_scope.py
+Запуск из корня стенда: $UPSTREAMS/.venvs/light/bin/python bridge/capture_scope.py
 Модель — фейк через CallableModelAdapter (async, чтобы gather шёл по порядку), ответы по маркерам.
 """
 import asyncio
@@ -495,7 +495,7 @@ async def main():
     fake.write(M, "loop", head({
         "SCOPEOptimizer.on_step_complete": optimizer.SCOPEOptimizer.on_step_complete,
         "CallableModelAdapter.generate": CallableModelAdapter.generate,
-        "loop_as_in": "itmo/cs-masters/thesis/repro/scope_run.py:37-52",
+        "loop_as_in": "$REPRO/scope_run.py:37-52",
     }), norm(await capture_loop()))
 
 

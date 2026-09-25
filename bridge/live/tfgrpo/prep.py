@@ -5,12 +5,13 @@ snapshot_download — no-op); срез DAPO-Math-17k-live — первые 4 з�
 usage (venv youtu, UTU_* и UTU_DB_URL=sqlite:///DB): python prep.py DIR"""
 import importlib.util
 import json
+import os
 import pathlib
 import re
 import sqlite3
 import sys
 
-REPO = pathlib.Path("/Users/user/Projects/upstreams/youtu-agent")
+REPO = pathlib.Path(os.environ.get("UPSTREAMS", "~/Projects/upstreams")).expanduser() / "youtu-agent"
 sys.path.insert(0, str(REPO))
 
 

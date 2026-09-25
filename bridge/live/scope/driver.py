@@ -18,7 +18,7 @@
                 метке; 2 задачи
 
 usage (из корня стенда; запись — tools.record.record с --seed на PORT):
-    PYTHONPATH=/Users/user/Projects/upstreams/SCOPE uv run python bridge/live/scope/driver.py VARIANT OUT \\
+    PYTHONPATH=$UPSTREAMS/SCOPE uv run python bridge/live/scope/driver.py VARIANT OUT \\
         --base-url http://127.0.0.1:PORT/v1
 В OUT: log.json и summary.json цикла, steps.json — память после каждой задачи, exp/<перспектива>/ — exp_path SCOPE
 (strategic_memory/global_rules.json, prompt_updates/)."""

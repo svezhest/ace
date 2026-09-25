@@ -1,7 +1,7 @@
 {
  "header": {
   "repo": "SCOPE",
-  "path": "/Users/user/Projects/upstreams/SCOPE",
+  "path": "$UPSTREAMS/SCOPE",
   "commit": "4dc0da5e7843dce84a851bd7a53e4e45932b27d0",
   "functions": {
    "GuidelineSynthesizer._extract_json": "scope/synthesizer.py:525",

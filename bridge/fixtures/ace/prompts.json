@@ -1,7 +1,7 @@
 {
  "header": {
   "repo": "ace",
-  "path": "/Users/user/Projects/upstreams/ace",
+  "path": "$UPSTREAMS/ace",
   "commit": "82709de050e1db6e6ef2f07bcb0393560b94992a",
   "functions": {
    "Generator.generate": "ace/core/generator.py:33",

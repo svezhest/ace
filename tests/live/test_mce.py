@@ -8,6 +8,7 @@ workspace на выходе (навык, context/, interfaces/, train.json, eval
 лучшая итерация и ответы теста — как у его mce.eval."""
 import gzip
 import json
+import os
 import shutil
 import socket
 import subprocess
@@ -148,7 +149,8 @@ def test_env():
     """Окружение CLI стенда — то же, что у записи (bridge/live/mce/env.txt), с адресами прокси и модели."""
     ours = claude.env(ROOT, RUN["model"], "http://127.0.0.1:8090/v1")
     ours["ANTHROPIC_BASE_URL"] = "http://127.0.0.1:4000"
-    theirs = dict(line.split("=", 1) for line in (LIVE / "env.txt").read_text().replace("@ROOT@", str(ROOT)).splitlines())
+    text = (LIVE / "env.txt").read_text().replace("@ROOT@", str(ROOT)).replace("@UV@", os.path.dirname(shutil.which("uv")))
+    theirs = dict(line.split("=", 1) for line in text.splitlines())
     assert ours == theirs
 
 

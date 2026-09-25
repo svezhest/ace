@@ -1,7 +1,7 @@
 {
  "header": {
   "repo": "EvoLib",
-  "path": "/Users/user/Projects/upstreams/EvoLib",
+  "path": "$UPSTREAMS/EvoLib",
   "commit": "98266b2d22e146c19c651b1126ae81ff072f65e0",
   "functions": {
    "EvoLibAgent.run_iteration": "EvoLib/evolib_agent.py:248",
