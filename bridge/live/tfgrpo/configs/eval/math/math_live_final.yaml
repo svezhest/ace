@@ -1,0 +1,17 @@
+# @package _global_
+# итоговый агент с опытом (configs/agents/practice/tf_live_agent.yaml, его пишет run_training_free_GRPO.py) на
+# тех же 4 задачах практики (DAPO-Math-17k-live), по разу, concurrency: 1; как configs/eval/math/math_practice_AIME24.yaml
+defaults:
+  - /agents/practice/tf_live_agent@agent
+  - _self_
+
+exp_id: "tf_live_final"
+
+data:
+  dataset: "DAPO-Math-17k-live"
+
+concurrency: 1
+pass_k: 1
+
+verify_filename: "math.py"
+verify_func_name: "verify_func"

@@ -1,0 +1,20 @@
+{
+  "upstream": "youtu-agent",
+  "commit": "c2caa53",
+  "date": "2026-09-25",
+  "model": "ornith15-9b (ornith15-9b-mlx-8bit через шлюз :8080)",
+  "slice": "DAPO-Math-17k апстрима (process_training_free_GRPO_data.py): первые 4 задачи на английском с условием короче 160 символов (индексы 8, 16, 19, 24) — датасет DAPO-Math-17k-live (prep.py); на задаче 0 агент 9B зацикливался на инструменте (9+ ходов на rollout), срез выбран по бюджету",
+  "tasks": 4,
+  "grpo_n": 3,
+  "batch_size": 4,
+  "epochs": 1,
+  "final_exp_id": "tf_live_final",
+  "env": "апстрим целиком в контейнере youtu-upstream (Dockerfile: python 3.12, версии .venvs/youtu с ipython, matplotlib (local-python) и math-verify[antlr4_9_3]); сеть — внутренняя tfnet, единственный выход — контейнер записи tfrec к шлюзу; код модели исполняет python_executor апстрима только в контейнере; sitecustomize.py: as_completed в порядке создания (DEVIATIONS TF9) и клиенты AsyncOpenAI живут до конца процесса (иначе прогон виснет на переиспользованном fd)",
+  "configs": "configs/practice/math_live.yaml = math_reasoning.yaml с eval-конфигом math_live (math_AIME24.yaml с concurrency: 1); итоговый агент — configs/eval/math/math_live_final.yaml (tf_live_agent.yaml, те же 4 задачи, pass_k 1, concurrency 1)",
+  "record": "tools.record.record.Recorder внутри tfrec (seed подставляется); запуск целиком — run.sh",
+  "command": "python scripts/run_training_free_GRPO.py --config_name math_live --experiment_name tf_live --epochs 1 --batch_size 4 --grpo_n 3 --rollout_concurrency 1 --rollout_data_truncate 4 --restart_step 0 --practice_dataset_name DAPO-Math-17k-live && python scripts/run_eval.py --config_name math/math_live_final",
+  "note": "rollout 24 вызова (12 попыток, до 4 ходов), сводки 12, преимущества 3 (у задачи 2 все попытки верны), сверки 3, план батча 1, итоговый агент 10; ответы преимуществ обрезаны умолчанием шлюза 1024 токена — <Experiences> нет, сверки и план дают NONE, библиотека пуста, и итоговый агент остался при T = 0.7 (поверхностная копия апстрима)",
+  "calls": 50,
+  "rollout_rewards": [[0, 1, 1], [1, 1, 0], [1, 1, 1], [1, 0, 1]],
+  "final_correct": 4
+}
