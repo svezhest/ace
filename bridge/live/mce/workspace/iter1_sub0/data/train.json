@@ -1,0 +1,28 @@
+{
+  "summary": {
+    "train_accuracy": 1.0,
+    "train_metrics": {
+      "accuracy": 1.0
+    },
+    "train_total": 2,
+    "train_errors": 0,
+    "batch_idx": 0,
+    "cumulative_rollouts": 2
+  },
+  "detailed_results": [
+    {
+      "id": 98,
+      "symptoms": "I have a runny nose and sneeze a lot. My eyes are sore and watery, and I have a hoarse voice. My head hurts all the time.",
+      "ground_truth": "allergy",
+      "llm_prediction": "allergy",
+      "is_correct": true
+    },
+    {
+      "id": 194,
+      "symptoms": "I have a lot of stomach pain, and it's hard for me to sleep. I also feel really anxious and have no appetite.",
+      "ground_truth": "peptic ulcer disease",
+      "llm_prediction": "peptic ulcer disease",
+      "is_correct": true
+    }
+  ]
+}

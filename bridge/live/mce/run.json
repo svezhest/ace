@@ -1,0 +1,16 @@
+{
+ "upstream": "meta-context-engineering c4b7a7c",
+ "root": "/private/tmp/mce-live",
+ "workspace": "live",
+ "env": "symptom_diagnosis",
+ "model": "ornith15-9b",
+ "model_port": 8090,
+ "iterations": 1,
+ "train_limit": 2,
+ "train_batch_size": 2,
+ "val_limit": 2,
+ "seed": 0,
+ "calls": 123,
+ "cutoff": "запись обрывается в сессии базового агента (итерация 1, батч 0): мета-агент записал SKILL.md, батч решён (2 вызова), базовый агент на 9B при T = 1 за 79 вызовов не дописал interfaces/ и был остановлен по бюджету; val, выбор итерации и тест не сняты",
+ "takes": "run1: чистый прогон (46 вызовов, ответ с SKILL.md CLI бросал по таймауту — остановлен); run2: record.py --cache run1 --normalize mce, stream (39 из кэша + 86 вызовов); run3: --cache run2 без модели — запись, согласованная с воспроизведением (123 строки, все из run1/run2)"
+}
