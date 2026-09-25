@@ -10,6 +10,7 @@ import copy
 from pydantic import BaseModel
 
 from .. import prompts, render
+from ..wrap import skilled
 from . import LABELS, Extraction, Extractor, Labels, scores
 
 # стенд
@@ -35,9 +36,9 @@ class Reflector(Extractor):
         prompt = REFLECT.fill(question=ep.question, output=ep.output, verdict=render.verdict(ep.ok, ep.target),
                               form=FREE if self.free else "", memory=render.lines(memory.records()) or render.EMPTY)
         if self.free:
-            text = ex.model.run(REFLECTOR, prompt).output
+            text = ex.model.run(skilled(REFLECTOR, ex), prompt).output
             return Extraction(group, [text], scores(group)) if text else None
-        r = ex.model.run(REFLECTOR, prompt, output=Reflection).output
+        r = ex.model.run(skilled(REFLECTOR, ex), prompt, output=Reflection).output
         if not r:
             return None
         return Extraction(group, r.lessons, scores(group), {LABELS: Labels(r.helpful, r.harmful)})

@@ -29,6 +29,7 @@ from ..extract.ace import Diagnose, Reflector
 from ..learner import Learner, swap
 from ..memory import HARMFUL, HELPFUL, Lessons, Operation, Sections
 from ..show import Whole
+from ..wrap import skilled
 
 # ace
 
@@ -53,13 +54,13 @@ def curator_prompt(template, memory, x):
 
 def curate_ops(ex, memory, x):
     """Все операции одной схемой; UPDATE несуществующего id пропускается."""
-    r = ex.model.run(CURATOR, curator_prompt(CURATE["json"], memory, x), output=Ops).output
+    r = ex.model.run(skilled(CURATOR, ex), curator_prompt(CURATE["json"], memory, x), output=Ops).output
     memory.apply([dict(operation=o.op, id=o.id, content=o.text) for o in (r.ops if r else [])])
 
 
 def curate_rewrite(ex, memory, x):
     """Вся память заново одним текстом; пустой ответ — память как была."""
-    new = ex.model.run(CURATOR, curator_prompt(CURATE["rewrite"], memory, x)).output
+    new = ex.model.run(skilled(CURATOR, ex), curator_prompt(CURATE["rewrite"], memory, x)).output
     if new:
         memory.replace([new.strip()])
 
