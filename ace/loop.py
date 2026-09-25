@@ -192,6 +192,7 @@ class Experiment:
         self.task, self.learner, self.model = task, learner, model
         self.training, self.epoch, self.batch, self.i, self.total, self.item = True, 0, 0, 0, 0, None
         self.skill = ""         # навык от мета-уровня (MCE): уровни ученика подставляют его в промпты обучения
+        self.retried = []       # попытки из извлечения (retry) на текущем вопросе — в лог по вопросу
         self.scores = {}        # кэш val по ключу памяти
 
     def attempt(self, item, k, prompt):
@@ -262,9 +263,11 @@ class Experiment:
         p.note = note
         training, self.training = self.training, False
         try:
-            return self.attempt(self.item, 0, p)
+            ep = self.attempt(self.item, 0, p)
         finally:
             self.training = training
+        self.retried.append(ep)
+        return ep
 
     def evaluate(self):
         """(верно, обрыв) по вопросам val без обучения. Одна и та же память не считается дважды; при случайном
@@ -295,15 +298,16 @@ def finish(ep):
     return {Outcome.step: "rounds", Outcome.broken: "broken"}.get(ep.outcome, "stop")
 
 
-def entry(phase, epoch, i, g, item, correct, gated, memory_chars, sec):
-    """Запись лога по вопросу: ответ в зачёт, как выбран, и вся группа."""
+def entry(phase, epoch, i, g, item, correct, gated, memory_chars, sec, retried=()):
+    """Запись лога по вопросу: ответ в зачёт, как выбран, вся группа и попытки из извлечения (раунды ACE)."""
     chosen = g.episodes[g.chosen]
     return dict(phase=phase, epoch=epoch, i=i, question=g.question, target=item["target"], answer=g.answer, correct=correct,
                 pick=g.pick, pass_at_k=g.pass_at_k, vote=g.vote, finish=finish(chosen), output=chosen.output,
                 shown=chosen.shown, read=chosen.used, gated=gated, memory_chars=memory_chars, sec=sec,
                 group=[dict(k=e.k, answer=e.answer, ok=e.ok, temperature=e.prompt.temperature, finish=finish(e),
                             shown=e.shown, read=e.used, fired=e.fired, patches=[asdict(p) for p in e.patches])
-                       for e in g.episodes])
+                       for e in g.episodes],
+                retries=[dict(answer=e.answer, ok=e.ok, finish=finish(e), note=e.prompt.note, output=e.output) for e in retried])
 
 
 def failed(phase, epoch, i, item, error):
@@ -368,9 +372,10 @@ def run(task, learner, model, n=config.SIZE, out=None, split=""):
             print(f"{task.name} {learner.name} {phase}{ex.epoch} {i:3} ОШИБКА {error!r}", flush=True)
         save()
 
-    def record(phase, i, g, item, t0, gated):
+    def record(phase, i, g, item, t0, gated, retried=()):
         correct = task.check(g.answer, item["target"])
-        log.append(entry(phase, ex.epoch, i, g, item, correct, gated, learner.memory.chars(), round(time.time() - t0, 1)))
+        log.append(entry(phase, ex.epoch, i, g, item, correct, gated, learner.memory.chars(), round(time.time() - t0, 1),
+                         retried))
         done = [r for r in log if r["phase"] == phase and r["epoch"] == ex.epoch]
         print(f"{task.name} {learner.name} {phase}{ex.epoch} {i:3} {'+' if correct else '-'} "
               f"{sum(r['correct'] for r in done)}/{len(done)} mem={learner.memory.chars()}", flush=True)
@@ -386,7 +391,7 @@ def run(task, learner, model, n=config.SIZE, out=None, split=""):
         guarded(phase, i, item, step)
 
     def train(i, item, batch):
-        t0, gates = time.time(), len(learner.gated)
+        t0, gates, ex.retried = time.time(), len(learner.gated), []
         ex.i, ex.item = i, item
         if i % learner.every == 0:
             ex.batch = i // learner.every
@@ -396,7 +401,7 @@ def run(task, learner, model, n=config.SIZE, out=None, split=""):
         if len(batch) == learner.every:
             learner.on_batch(ex, batch)
             batch.clear()
-        record("train" if proto.offline or proto.window else "online", i, g, item, t0, learner.gated[gates:])
+        record("train" if proto.offline or proto.window else "online", i, g, item, t0, learner.gated[gates:], ex.retried)
 
     def end_pass(epoch, batch):
         if batch and learner.flush:

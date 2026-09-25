@@ -171,11 +171,14 @@ class Retry(Extractor):
         return Extraction(group, [], [])
 
 
-def test_retry():
+def test_retry(tmp_path):
+    """Новая попытка из извлечения: заметка в сообщении решателю; в логе вопроса — в retries."""
     extractor, model = Retry(), Stub()
-    run(TASK, Learner("x", extract=extractor, memory=Memory()), model, 1)
+    run(TASK, Learner("x", extract=extractor, memory=Memory()), model, 1, str(tmp_path))
     assert model.solver_calls()[-1]["user"].endswith("Reflection:\ntry harder")
     assert extractor.training and extractor.again.ok is not None
+    [r] = json.load(open(tmp_path / "log.json"))
+    assert [(x["note"], x["answer"]) for x in r["retries"]] == [("try harder", "0")]
 
 
 def test_seam():
