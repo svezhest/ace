@@ -41,6 +41,7 @@ class Attempt:
     k: int                      # номер попытки в группе
     training: bool
     prompt: Prompt
+    system: str = ""            # системный промпт попытки целиком (Patch(system) пишет новый на его основе)
     steps: list = field(default_factory=list)       # model.Step до текущего включительно
     patches: list = field(default_factory=list)     # model.Patch, применённые после шагов
     fired: list = field(default_factory=list)       # (id показанного урока, помог ли) — исходы показа после ошибки
@@ -129,11 +130,11 @@ class Experiment:
         self.scores = {}        # кэш val по ключу памяти
 
     def attempt(self, item, k, prompt):
-        a = Attempt(item["context"], k, self.training, prompt)
         env = self.learner.env.open()
+        a = Attempt(item["context"], k, self.training, prompt, self.task.system + env.hint + prompt.system)
         try:
             tools = env.tools + prompt.tools
-            reply = self.model.run(self.task.system + env.hint + prompt.system,
+            reply = self.model.run(a.system,
                                    render.user_message(self.task.instr, item["context"], prompt.note),
                                    tools=tools, deps=prompt.deps, rounds=env.rounds + prompt.rounds,
                                    temperature=prompt.temperature,
