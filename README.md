@@ -25,9 +25,10 @@ extract=Reflector(free=True), memory=Playbook(prune=None))`. Вмешатель�
 ace_rewrite; ace_exact и ace_exact_dedup (как в апстриме). В docstring метода — что взято из апстрима и где
 расходимся; все отклонения — в [DEVIATIONS.md](DEVIATIONS.md).
 DC (`ace/methods/dc.py`): dc (DC-Cu: cheatsheet целиком, куратор переписывает), dc_code (с песочницей,
-контейнер на вызов), dc_rs (пары и синтез cheatsheet под вопрос), контроли dc_retrieval и dc_history.
+контейнер на вызов), dc_rs (пары и синтез cheatsheet под вопрос), контроли dc_retrieval и dc_history. TF-GRPO (`ace/methods/tfgrpo.py`, извлечение `ace/extract/tfgrpo.py`):
+в зачёт итоговый агент (T = 0.3, top_p 0.95), группа из 5 при T = 0.7, контраст попыток, план батча раз в 20.
 
-**Идёт переписывание.** SCOPE, TF-GRPO, EvoLib, MCE, прототип, хуки по ошибкам и гибриды ещё не
+**Идёт переписывание.** SCOPE, EvoLib, MCE, прототип, хуки по ошибкам и гибриды ещё не
 перенесены на уровни: их старый код — в коммите 2c5433e (`git show 2c5433e:ace/methods/scope.py`) и в теге
 `pre-rewrite`. `ablate.py` пока не работает (импортирует старые методы).
 
@@ -40,6 +41,8 @@ uv run python report.py                   # таблица по results/
 uv run pytest -q                          # тесты; старые логи results/ переигрываются проверками задач
 uv run python tools/trace.py /tmp/t.json && uv run python tools/compare.py tools/ref_variants.json /tmp/t.json
                                           # трасса промптов против старого кода (DEVIATIONS.md)
+uv run python tools/as_old.py /tmp/o.json && uv run python tools/compare.py /tmp/o.json
+                                          # то же с настройками старого кода там, где решено иначе
 ```
 
 Настройки (`ace/config.py`, из окружения): `OPENAI_BASE_URL` (по умолчанию `http://localhost:8080/v1`; старое
