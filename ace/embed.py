@@ -3,34 +3,36 @@ DC для вопросов его бенчмарков (data/<задача>_embe
 embedding)."""
 import csv
 import json
+from functools import cache
 
 from . import config
 
 MODEL = "BAAI/bge-m3"
 TABLES = ("meb",)           # задачи, для вопросов которых у DC есть готовые эмбеддинги
 CSV_FIELD_LIMIT = 1 << 30   # вектор в строке csv длиннее предела поля по умолчанию
-_model = None
-_table = None
+
+
+@cache
+def model():
+    """BGE-M3, загружается при первом вызове."""
+    from sentence_transformers import SentenceTransformer
+    return SentenceTransformer(MODEL, device=config.EMBED_DEVICE)
 
 
 def embed(texts):
-    global _model
-    if _model is None:
-        from sentence_transformers import SentenceTransformer
-        _model = SentenceTransformer(MODEL, device=config.EMBED_DEVICE)
-    return _model.encode(list(texts), normalize_embeddings=True, convert_to_numpy=True)
+    return model().encode(list(texts), normalize_embeddings=True, convert_to_numpy=True)
 
 
+@cache
 def table():
     """Готовые эмбеддинги апстрима DC: вопрос -> вектор."""
-    global _table
-    if _table is None:
-        csv.field_size_limit(CSV_FIELD_LIMIT)
-        _table = {}
-        for task in TABLES:
-            with open(config.DATA / f"{task}_embeddings.csv", newline="") as f:
-                _table.update((r["input"], json.loads(r["embedding"])) for r in csv.DictReader(f))
-    return _table
+    csv.field_size_limit(CSV_FIELD_LIMIT)
+    out = {}
+    for task in TABLES:
+        with open(config.DATA / f"{task}_embeddings.csv", newline="") as f:
+            for row in csv.DictReader(f):
+                out[row["input"]] = json.loads(row["embedding"])
+    return out
 
 
 def similarity(texts, query):

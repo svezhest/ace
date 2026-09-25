@@ -53,11 +53,15 @@ class Learner:
         ошибка сборки, а не молча выключенная ступень абляции."""
         if self.solver is None:
             return
-        dead = [name for name, on in (
-            ("показ", self.show is not None),
-            ("температура попыток", self.attempts.temperature is not greedy),
-            ("среда", bool(self.env.tools or self.env.hint)),
-            ("извлечение на шаге", self.extract is not None and self.extract.steps)) if on]
+        dead = []
+        if self.show is not None:
+            dead.append("показ")
+        if self.attempts.temperature is not greedy:
+            dead.append("температура попыток")
+        if self.env.tools or self.env.hint:
+            dead.append("среда")
+        if self.extract is not None and self.extract.steps:
+            dead.append("извлечение на шаге")
         if dead:
             raise ValueError(f"{self.name}: при своём решателе метода не действуют: {', '.join(dead)} "
                              "(меняются параметры решателя)")

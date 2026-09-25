@@ -6,16 +6,16 @@
 контейнер убивается, модели — тот же текст о пределе времени. Ядро умерло (нехватка памяти убила контейнер) —
 модели текст об этом. Следующий вызов начинает новое ядро. Код ядра уходит через -c: контейнер только на чтение."""
 import json
-import os
 import select
 import subprocess
 import uuid
+from pathlib import Path
 
 from .. import render
 from .sandbox import DOCKER_GRACE, IMAGE, ISOLATION
 
 DEFAULT_TIMEOUT = 30        # timeout execute_python_code_args по умолчанию
-CODE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tfgrpo_kernel.py")
+CODE = Path(__file__).parent / "tfgrpo_kernel.py"
 ENV = ["-e", "HOME=/tmp", "-e", "MPLCONFIGDIR=/tmp/mpl", "-e", "IPYTHONDIR=/tmp/ipython"]
 
 
@@ -30,8 +30,9 @@ def timeout_of(arguments):
 
 class Kernel:
     def __init__(self):
-        self.code = open(CODE).read()
-        self.proc = self.name = None
+        self.code = CODE.read_text()
+        self.proc = None        # процесс docker run с ядром; None — ядра нет
+        self.name = None        # имя контейнера
 
     def start(self):
         self.name = f"tfgrpo-kernel-{uuid.uuid4().hex[:12]}"

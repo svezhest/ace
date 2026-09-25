@@ -30,13 +30,14 @@ from ..solver.mce import Environment
 from ..wrap.mce import META, META_ACE, Iterations, Meta, MetaAgent
 from .ace import ace_stand
 
-BATCH, ITERATIONS = 20, 3
+BATCH = 20
+ITERATIONS = 3
 
 PROTOCOL = Protocol(offline=True, epochs=ITERATIONS)     # итерация = проход по train, val после неё
 
 mce = Iterations(Learner("mce", memory=Folder(), solver=Environment(), extract=Raw(), every=BATCH, flush=True,
                          protocol=PROTOCOL))
-base = Learner("mce_base", memory=Context(), show=Whole(line=render.plain, sep="\n\n"), extract=Raw(), every=BATCH,
-               flush=True, protocol=PROTOCOL)
-mce_fs = Meta(base, MetaAgent(META), "mce_fs")
+mce_base = Learner("mce_base", memory=Context(), show=Whole(line=render.plain, sep="\n\n"), extract=Raw(), every=BATCH,
+                   flush=True, protocol=PROTOCOL)
+mce_fs = Meta(mce_base, MetaAgent(META), "mce_fs")
 mce_ace_stand = Meta(swap(ace_stand, protocol=PROTOCOL), MetaAgent(META_ACE), "mce_ace_stand")
