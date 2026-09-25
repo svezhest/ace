@@ -1,10 +1,10 @@
-"""Замер ACE апстрима (ace_exact): сколько меток helpful / harmful доходит до счётчиков.
+r"""Замер ACE апстрима (ace_exact): сколько меток helpful / harmful доходит до счётчиков.
 
 Цепочка: решатель называет пункты -> разбор находит их id -> рефлектор видит эти пункты и ставит метки ->
 метки с id из памяти попадают в счётчики. В апстриме id разбирает регулярка core/generator.py:115
-\\[([a-z]{3,}-\\d{5})\\] по всему ответу (json_mode по умолчанию выключен), а промпт просит JSON-список
-"bullet_ids": ["calc-00001", ...] без скобок — названное списком она не видит. У нас id вида r1 и строка
-USED; регулярка апстрима переложена на наши id: \\[(r\\d+)\\] — id засчитывается, только если стоит в скобках.
+\[([a-z]{3,}-\d{5})\] по всему ответу (json_mode по умолчанию выключен), а промпт просит JSON-список
+"bullet_ids": ["calc-00001", ...] без скобок — названное списком она не видит (и не видит ph-). У нас решатель
+называет пункты строкой USED; id как у апстрима, регулярка взята как есть.
 
 По каждому раунду рефлектора: названные в USED, распознанные нашим разбором (есть в памяти), распознанные
 регуляркой апстрима, метки рефлектора и сколько из них дошло до счётчиков (helpful / harmful с id из памяти).
@@ -16,26 +16,28 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from ace import config  # noqa: E402
-from ace.extract.ace import Diagnose, used_line  # noqa: E402
+from ace import parse  # noqa: E402
+from ace.extract.ace import Diagnose, named, tag_map  # noqa: E402
 from ace.learner import swap  # noqa: E402
 from ace.loop import run  # noqa: E402
 from ace.methods import METHODS  # noqa: E402
 from ace.model import Model  # noqa: E402
 from ace.tasks import TASKS  # noqa: E402
 
-UPSTREAM = re.compile(r"\[(r\d+)\]")    # core/generator.py:115 с нашими id
+UPSTREAM = re.compile(r"\[([a-z]{3,}-\d{5})\]")      # _extract_bullet_ids_regex (core/generator.py:115)
 ROWS = []
 
 
 class Logged(Diagnose):
-    def diagnose(self, ex, ep, used, memory):
-        d = super().diagnose(ex, ep, used, memory)
-        tags = [(t.id, t.tag) for t in d.bullet_tags] if d else []
-        ROWS.append(dict(epoch=ex.epoch, i=ex.i, ok=ep.ok, memory=len(memory),
-                         named=used_line(ep.final), ours=used,
-                         upstream=[i for i in dict.fromkeys(UPSTREAM.findall(ep.final)) if memory.get(i)],
+    def diagnose(self, ex, ep, memory):
+        text = super().diagnose(ex, ep, memory)
+        tags = list(tag_map(parse.bullet_tags(text)).items())
+        ids = named(ep)
+        ROWS.append(dict(epoch=ex.epoch, i=ex.i, ok=ep.ok, memory=len(memory), named=ids,
+                         ours=[i for i in ids if memory.get(i)],
+                         upstream=[i for i in ids if memory.get(i) and i in UPSTREAM.findall(ep.final)],
                          tags=tags, counted=[t for t in tags if t[1] in ("helpful", "harmful") and memory.get(t[0])]))
-        return d
+        return text
 
 
 def share(a, b):
