@@ -72,8 +72,8 @@ def test_playbook_learn():
 def test_playbook_rewrite():
     m = Playbook(curate_rewrite)
     m.add("a")
-    m.learn(Ex(Stub(lambda call: " whole memory \n")), [Extraction(group(episode()), ["l"], [], {})])
-    assert [(r.id, r.text) for r in m.records()] == [("r2", "whole memory")]
+    m.learn(Ex(Stub(lambda call: " first bullet \n\n second\n")), [Extraction(group(episode()), ["l"], [], {})])
+    assert [(r.id, r.text) for r in m.records()] == [("r2", "first bullet"), ("r3", "second")]
     m = Playbook(curate_rewrite)
     m.learn(Ex(Stub(lambda call: "")), [Extraction(group(episode()), ["l"], [], {LABELS: Labels()})])
     assert m.records() == []
