@@ -52,6 +52,7 @@ def truncated(results):
 class Gate(Wrapper):
     """Правка на батче принимается, если на val верных не меньше и обрывов не больше, чем до неё. Если память
     не изменилась, проверять нечего."""
+    needs_val = True
     def __init__(self, inner, name=None):
         super().__init__(inner, name)
         self.gated = []

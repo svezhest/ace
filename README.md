@@ -27,7 +27,7 @@ ace_stand_opt, ace_stand_hooks, ace_stand_group. По умолчанию уро�
 ```
 uv sync                                   # окружение с зависимостями для разработки (pytest)
 docker build -t cestand-sandbox ace/env   # образ docker для исполнения кода
-uv run python run.py formula ace 40       # результаты в results/formula40/ace/
+uv run python run.py formula ace 40       # в results/formula40/ace/online-w15-e1_<модель>_<бэкенд>/
 EPOCHS=3 OFFLINE=1 uv run python run.py formula ace_stand 40   # другой протокол в этом прогоне: офлайн, 3 прохода
 BACKEND=wire uv run python run.py formula dc 40          # вызовы без инструментов — клиентом openai как есть
 uv run python ablate.py formula 40        # цепочка абляций; ступени по именам: ablate.py formula 40 ace_stand ace_stand_opt

@@ -14,12 +14,14 @@ import copy
 import json
 import random
 import time
+import traceback
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 from . import config, render
 from .model import Call, messages, params
 from .tasks import accuracy, final_answer
+from .extract import Contract
 from .verdict import LABELED, majority
 
 
@@ -163,7 +165,8 @@ class Protocol:
 
     @property
     def name(self):
-        return f"{'final' if self.final else 'offline' if self.offline else 'online'}-e{self.epochs}"
+        kind = "final" if self.final else "offline" if self.offline else "online"
+        return f"{kind}{f'-w{self.window}' if self.window else ''}-e{self.epochs}"
 
     def check(self, name, verdict=None, split=""):
         """Ошибка сборки: несовместимые части. С вердиктом — ошибка запуска при утечке метки: онлайн с несколькими
@@ -262,11 +265,13 @@ class Experiment:
         key = self.learner.key()
         if key is not None and key in self.scores:
             return self.scores[key]
-        training, self.training = self.training, False
+        saved, self.training = (self.training, self.i, self.item), False
         try:
-            out = [self.result(self.question(item), item) for item in self.task.load("val")]
+            out = []
+            for self.i, self.item in enumerate(self.task.load("val")):
+                out.append(self.result(self.question(self.item), self.item))
         finally:
-            self.training = training
+            self.training, self.i, self.item = saved
         if key is not None:
             self.scores[key] = out
         return out
@@ -290,19 +295,67 @@ def entry(phase, epoch, i, g, item, correct, gated, memory_chars, sec):
                        for e in g.episodes])
 
 
+def failed(phase, epoch, i, item, error):
+    """Запись лога о вопросе (или событии прохода), на котором прогон упал: неверно, с текстом ошибки."""
+    return dict(phase=phase, epoch=epoch, i=i, question=item["context"] if item else "", target=item["target"] if item else "",
+                answer="", correct=False, finish="error", error="".join(traceback.format_exception(error)), group=[])
+
+
+def folder(task, n, learner, model):
+    """Папка результатов: задача и размер, метод, протокол, модель и бэкенд — прогоны разных настроек не затирают
+    друг друга."""
+    tag = "_".join(x for x in (learner.protocol.name, model.name, getattr(model, "backend", "")) if x)
+    return Path(config.RESULTS) / f"{task.name}{n}" / learner.name / tag
+
+
 def run(task, learner, model, n=config.SIZE, out=None, split=""):
     """Прогон метода на задаче по протоколу ученика (learner.protocol). Онлайн: поток split, память учится по ходу,
     epochs проходов, в зачёт последний: первая попытка обучения, а с window — тест окна; до первого прохода —
     начальный тест всего потока (в лог). Офлайн: обучение на train, после каждого прохода val; тест на split с
     лучшей по val версией памяти (строго больше, при равенстве ранняя), без обучения. final — офлайн без val: тест
     памятью после последнего прохода, как итоговый агент апстрима. recheck — после обучения на вопросе ещё
-    попытка новой памятью, только в лог."""
+    попытка новой памятью, только в лог.
+    Лог и итог пишутся после каждого вопроса, память — в конце. Исключение на вопросе (или в событии прохода)
+    уходит в лог записью finish="error", вопрос засчитывается неверным, прогон идёт дальше; в итоге — errors.
+    Нарушение стыка сборки (Contract) прогон останавливает."""
     random.seed(config.SEED)
     learner = copy.deepcopy(learner)        # в реестре память ученика пуста: каждый прогон с чистой
     proto = learner.protocol
     proto.check(learner.name, learner.verdict, split)
+    for part in ["train"] * proto.offline + ["val"] * (proto.val or learner.needs_val):
+        try:
+            task.load(part)
+        except (FileNotFoundError, ValueError) as error:
+            raise ValueError(f"{learner.name}: протоколу {proto.name} нужна выборка {part} задачи {task.name} — {error}")
     ex = Experiment(task, learner, model)
     log = []
+
+    def summary(done):
+        final = [r for r in log if r["phase"] == "test" or r["phase"] == "online" and r["epoch"] == proto.epochs - 1]
+        return dict(task=task.name, method=learner.name, model=model.name, backend=getattr(model, "backend", ""),
+                    n=len(final), protocol=proto.name, epochs=proto.epochs, offline=proto.offline, done=done,
+                    errors=sum(r["finish"] == "error" for r in log), correct=sum(r["correct"] for r in final),
+                    truncated=sum(r["finish"] == "length" for r in final),
+                    accuracy=accuracy(task, [r["answer"] for r in final], [r["target"] for r in final]), **model.usage())
+
+    def save(done=False, last=False):
+        if out:
+            Path(out).mkdir(parents=True, exist_ok=True)
+            json.dump(log, open(f"{out}/log.json", "w"), ensure_ascii=False, indent=1)
+            json.dump(summary(done), open(f"{out}/summary.json", "w"), indent=1)
+            if last:
+                json.dump(learner.dump(), open(f"{out}/memory.json", "w"), ensure_ascii=False, indent=1)
+
+    def guarded(phase, i, item, step):
+        """step() — вопрос или событие прохода; исключение — в лог, прогон дальше."""
+        try:
+            step()
+        except Contract:
+            raise
+        except Exception as error:
+            log.append(failed(phase, ex.epoch, i, item, error))
+            print(f"{task.name} {learner.name} {phase}{ex.epoch} {i:3} ОШИБКА {error!r}", flush=True)
+        save()
 
     def record(phase, i, g, item, t0, gated):
         correct = task.check(g.answer, item["target"])
@@ -312,58 +365,59 @@ def run(task, learner, model, n=config.SIZE, out=None, split=""):
               f"{sum(r['correct'] for r in done)}/{len(done)} mem={learner.memory.chars()}", flush=True)
 
     def test(phase, i, item):
-        t0, training = time.time(), ex.training
-        ex.i, ex.item, ex.training = i, item, False
-        try:
-            record(phase, i, ex.question(item), item, t0, [])
-        finally:
-            ex.training = training
+        def step():
+            t0, training = time.time(), ex.training
+            ex.i, ex.item, ex.training = i, item, False
+            try:
+                record(phase, i, ex.question(item), item, t0, [])
+            finally:
+                ex.training = training
+        guarded(phase, i, item, step)
 
-    if proto.window:
-        for i, item in enumerate(task.load(split)[:n]):
-            test("initial", i, item)
-    best, best_val = learner.snapshot(), -1
-    for epoch in range(proto.epochs):
-        items = learner.sample(ex, "train" if proto.offline else split, n)
-        ex.epoch, ex.total, batch = epoch, len(items), []
-        for i, item in enumerate(items):
-            if proto.window and i % proto.window == 0:
-                for j in range(i, min(i + proto.window, len(items))):
-                    test("online", j, items[j])
-            t0, gates = time.time(), len(learner.gated)
-            ex.i, ex.item = i, item
-            g = ex.question(item)
-            batch.append(g)
-            if len(batch) == learner.every:
-                learner.on_batch(ex, batch)
-                batch = []
-            record("train" if proto.offline or proto.window else "online", i, g, item, t0, learner.gated[gates:])
-            if proto.recheck:
-                test("post", i, item)
+    def train(i, item, batch):
+        t0, gates = time.time(), len(learner.gated)
+        ex.i, ex.item = i, item
+        g = ex.question(item)
+        batch.append(g)
+        if len(batch) == learner.every:
+            learner.on_batch(ex, batch)
+            batch.clear()
+        record("train" if proto.offline or proto.window else "online", i, g, item, t0, learner.gated[gates:])
+
+    def end_pass(epoch, batch):
         if batch and learner.flush:
             learner.on_batch(ex, batch)
         learner.on_pass(ex)
         if proto.val:
             score = sum(c for c, _ in ex.evaluate())
             print(f"val after epoch {epoch}: {score}", flush=True)
-            if score > best_val:
-                best, best_val = learner.snapshot(), score
-    if proto.offline:
-        if proto.val:
-            learner.restore(best)
-        ex.training, ex.epoch = False, 0
-        for i, item in enumerate(task.load(split)[:n]):
-            t0 = time.time()
-            ex.i, ex.item = i, item
-            record("test", i, ex.question(item), item, t0, [])
-    final = [r for r in log if r["phase"] == "test" or r["phase"] == "online" and r["epoch"] == proto.epochs - 1]
-    summary = dict(task=task.name, method=learner.name, model=model.name, n=len(final), protocol=proto.name,
-                   epochs=proto.epochs, offline=proto.offline, correct=sum(r["correct"] for r in final),
-                   truncated=sum(r["finish"] == "length" for r in final),
-                   accuracy=accuracy(task, [r["answer"] for r in final], [r["target"] for r in final]), **model.usage())
-    if out:
-        Path(out).mkdir(parents=True, exist_ok=True)
-        json.dump(log, open(f"{out}/log.json", "w"), ensure_ascii=False, indent=1)
-        json.dump(summary, open(f"{out}/summary.json", "w"), indent=1)
-        json.dump(learner.dump(), open(f"{out}/memory.json", "w"), ensure_ascii=False, indent=1)
-    return summary
+            if score > best[1]:
+                best[:] = learner.snapshot(), score
+
+    done = False
+    try:
+        if proto.window:
+            for i, item in enumerate(task.load(split, n)):
+                test("initial", i, item)
+        best = [learner.snapshot(), -1]
+        for epoch in range(proto.epochs):
+            items = learner.sample(ex, "train" if proto.offline else split, n)
+            ex.epoch, ex.total, batch = epoch, len(items), []
+            for i, item in enumerate(items):
+                if proto.window and i % proto.window == 0:
+                    for j in range(i, min(i + proto.window, len(items))):
+                        test("online", j, items[j])
+                guarded("train" if proto.offline or proto.window else "online", i, item, lambda: train(i, item, batch))
+                if proto.recheck:
+                    test("post", i, item)
+            guarded("pass", len(items), None, lambda: end_pass(epoch, batch))
+        if proto.offline:
+            if proto.val:
+                learner.restore(best[0])
+            ex.training, ex.epoch = False, 0
+            for i, item in enumerate(task.load(split, n)):
+                test("test", i, item)
+        done = True
+    finally:
+        save(done, last=True)           # прерванный прогон (Ctrl-C) — done=False, память на момент обрыва
+    return summary(True)

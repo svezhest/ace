@@ -31,19 +31,28 @@ class Task:
         self.instr = prompts.text(f"task_{self.name}_instr")
 
     def file(self, split="", size=None):
-        """Файл данных: выборка с размером в имени (formula_train40.jsonl), а если её нет — бенчмарк целиком
-        (symptom_train.jsonl). split: "" (тест) | "train" | "val"; size по умолчанию из config."""
+        """Файл данных: самая малая выборка с размером в имени не меньше size (formula_train40.jsonl), иначе
+        бенчмарк целиком (symptom_train.jsonl); нет ни того ни другого — None. split: "" (тест) | "train" | "val";
+        size по умолчанию из config."""
         size = size or (config.VAL_SIZE if split == "val" else config.SIZE)
         name = f"{self.name}{'_' + split if split else ''}"
-        sized = config.DATA / f"{name}{size}.jsonl"
-        return sized if sized.exists() else config.DATA / f"{name}.jsonl"
+        sized = sorted((int(p.stem[len(name):]), p) for p in config.DATA.glob(f"{name}[0-9]*.jsonl")
+                       if p.stem[len(name):].isdigit())
+        whole = config.DATA / f"{name}.jsonl"
+        return next((p for n, p in sized if n >= size), whole if whole.exists() else None)
 
     def load(self, split="", size=None, whole=False):
-        """Первые size вопросов файла (whole — все); поля апстримов: input | context | question, target | answer."""
+        """Первые size вопросов файла (whole — все); поля апстримов: input | context | question, target | answer.
+        Нет файла или в нём меньше size вопросов — ошибка, а не молча меньше."""
         size = size or (config.VAL_SIZE if split == "val" else config.SIZE)
-        rows = [json.loads(l) for l in self.file(split, size).open() if l.strip()]
+        path = self.file(split, size)
+        if path is None:
+            raise FileNotFoundError(f"{self.name}: нет выборки {split or 'test'} на {size} вопросов в {config.DATA}")
+        rows = [json.loads(l) for l in path.open() if l.strip()]
         items = [{"context": r.get("context") or r.get("input") or r["question"], "target": r.get("target", r.get("answer"))}
                  for r in rows]
+        if len(items) < size and not whole:
+            raise ValueError(f"{self.name}: в {path.name} {len(items)} вопросов, а нужно {size}")
         return items if whole else items[:size]
 
     def check(self, answer, target):

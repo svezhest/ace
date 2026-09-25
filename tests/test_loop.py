@@ -16,6 +16,7 @@ from ace.extract import Extraction, Extractor, Raw
 from ace.learner import Learner, swap
 from ace.loop import Attempts, Experiment, Protocol, best, first, run, vote
 from ace.memory import Lessons
+from ace.tasks import TASKS
 from ace.model import Model, Patch
 from ace.show import Show, Whole
 
@@ -298,3 +299,45 @@ def test_leak_is_error():
         Protocol(final=True).check("x")
     with pytest.raises(ValueError):
         Protocol(offline=True, window=3).check("x")
+
+
+def test_error_logged_and_run_goes_on(tmp_path):
+    """Исключение на вопросе — запись finish="error" в лог, вопрос неверен, прогон идёт дальше; лог и итог — по ходу."""
+    def answer(call):
+        if call["n"] == 1:
+            raise RuntimeError("HTTP 400: context too long")
+        return right(call)
+    summary = run(TASK, Learner("x"), Stub(answer), 3, str(tmp_path))
+    log = json.load(open(tmp_path / "log.json"))
+    assert [r["finish"] for r in log] == ["stop", "error", "stop"] and "HTTP 400" in log[1]["error"]
+    assert summary["errors"] == 1 and summary["correct"] == 2 and summary["n"] == 3 and summary["done"]
+    assert json.load(open(tmp_path / "summary.json"))["errors"] == 1 and (tmp_path / "memory.json").exists()
+
+
+def test_interrupted_run_keeps_log(tmp_path):
+    """Прерванный прогон: лог и итог на момент обрыва (done=False) и память."""
+    def answer(call):
+        if call["n"] == 2:
+            raise KeyboardInterrupt
+        return right(call)
+    with pytest.raises(KeyboardInterrupt):
+        run(TASK, Learner("x"), Stub(answer), 4, str(tmp_path))
+    assert len(json.load(open(tmp_path / "log.json"))) == 2
+    assert json.load(open(tmp_path / "summary.json"))["done"] is False and (tmp_path / "memory.json").exists()
+
+
+def test_missing_split_is_error():
+    """Протоколу нужен val, а у задачи его нет — понятная ошибка до первого вызова модели; вопросов меньше n — тоже."""
+    model = Stub()
+    with pytest.raises(ValueError, match="нужна выборка train задачи gpqa"):
+        run(TASKS["gpqa"], Learner("x", protocol=Protocol(offline=True)), model, 2)
+    assert model.calls == []
+    with pytest.raises(FileNotFoundError, match="на 50 вопросов"):
+        run(TASK, Learner("x"), model, 50)
+
+
+def test_results_folder():
+    """В папке результатов — протокол, модель и бэкенд: разные настройки не затирают друг друга."""
+    from ace.loop import folder
+    path = folder(TASK, 40, Learner("x", protocol=Protocol(offline=True, epochs=3)), Model("m", backend="wire"))
+    assert path.parts[-3:] == ("formula40", "x", "offline-e3_m_wire")

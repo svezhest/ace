@@ -22,7 +22,7 @@ from dataclasses import dataclass, field, replace
 
 from . import verdict as verdicts
 from .env import Env
-from .extract import missing
+from .extract import Contract, missing
 from .loop import Attempts, Protocol
 from .memory import Lessons
 from .show import Show, Whole
@@ -42,6 +42,7 @@ class Learner:
     protocol: Protocol = Protocol()
     env: Env = field(default_factory=Env)
     skill: str = ""             # навык от мета-уровня (MCE над учеником); сам ученик его не пишет
+    needs_val = False           # val нужен и без офлайна (Gate)
     pending: list = field(default_factory=list, init=False, repr=False)    # извлечённое до батча
     gated: list = field(default_factory=list, init=False, repr=False)      # решения Gate (в лог по вопросу)
 
@@ -49,7 +50,7 @@ class Learner:
         self.protocol.check(self.name)
         lack = missing(self.memory, self.extract)
         if lack:
-            raise ValueError(f"{self.name}: память требует от извлечения {', '.join(sorted(lack))}, а оно этого не даёт")
+            raise Contract(f"{self.name}: память требует от извлечения {', '.join(sorted(lack))}, а оно этого не даёт")
 
     # хуки масштабов
 
@@ -64,7 +65,7 @@ class Learner:
 
     def sample(self, ex, split, n):
         """Вопросы прохода: первые n (MCE апстрима — случайная выборка на каждой итерации, wrap/mce.py)."""
-        return ex.task.load(split)[:n]
+        return ex.task.load(split, n)
 
     def on_step(self, ex, attempt, step):
         if attempt.training and self.extract is not None:
@@ -86,7 +87,7 @@ class Learner:
             return
         undeclared = set(x.extras) - set(self.extract.gives)
         if undeclared:
-            raise ValueError(f"{self.name}: извлечение дало необъявленные добавки {', '.join(sorted(undeclared))}")
+            raise Contract(f"{self.name}: извлечение дало необъявленные добавки {', '.join(sorted(undeclared))}")
         self.pending.append(x)
 
     def on_batch(self, ex, groups):

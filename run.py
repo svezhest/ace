@@ -1,11 +1,12 @@
-"""python run.py TASK METHOD [N] [OUT]; протокол — метода (по его апстриму), EPOCHS=3 и OFFLINE=1 меняют его
+"""python run.py TASK METHOD [N] [OUT]; OUT по умолчанию — results/<задача><N>/<метод>/<протокол>_<модель>_<бэкенд>;
+протокол — метода (по его апстриму), EPOCHS=3 и OFFLINE=1 меняют его
 только в этом прогоне (ace/config.py); утечку метки сборка не пропустит."""
 import sys
 from dataclasses import replace
 
 from ace import config
 from ace.learner import swap
-from ace.loop import run
+from ace.loop import folder, run
 from ace.methods import METHODS
 from ace.model import Model
 from ace.tasks import TASKS
@@ -16,5 +17,6 @@ if config.EPOCHS or config.OFFLINE:
     method = swap(method, protocol=replace(method.protocol, epochs=config.EPOCHS or method.protocol.epochs, offline=offline,
                                            window=0 if offline else method.protocol.window))
 n = int(sys.argv[3]) if len(sys.argv) > 3 else config.SIZE
-out = sys.argv[4] if len(sys.argv) > 4 else f"{config.RESULTS}/{task.name}{n}/{method.name}"
-print(run(task, method, Model(), n, out))
+model = Model()
+out = sys.argv[4] if len(sys.argv) > 4 else folder(task, n, method, model)
+print(run(task, method, model, n, out))

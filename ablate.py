@@ -6,7 +6,7 @@ import sys
 from ace import config, prompts, verdict
 from ace.env import Sandbox
 from ace.learner import swap
-from ace.loop import Attempts, Protocol, run, vote
+from ace.loop import Attempts, Protocol, folder, run, vote
 from ace.methods import METHODS
 from ace.methods.mce import ITERATIONS
 from ace.model import Model
@@ -80,4 +80,8 @@ if __name__ == "__main__":
     task = TASKS[sys.argv[1]]
     n = int(sys.argv[2]) if len(sys.argv) > 2 else config.SIZE
     for name in sys.argv[3:] or CHAIN:
-        print(run(task, CHAIN[name], Model(), n, f"{config.RESULTS}/{task.name}{n}/{name}"))
+        model = Model()
+        try:
+            print(run(task, CHAIN[name], model, n, folder(task, n, CHAIN[name], model)))
+        except Exception as error:          # ступень не собралась или не запустилась — цепочка идёт дальше
+            print(f"{name}: {error!r}", flush=True)

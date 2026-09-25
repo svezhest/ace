@@ -27,6 +27,10 @@ OPERATIONS = "operations"
 RATIONALE, TRIGGER, ATTEMPT = "rationale", "trigger", "attempt"
 
 
+class Contract(ValueError):
+    """Нарушен стык сборки (добавки памяти и извлечения): ошибка кода метода, прогон останавливается."""
+
+
 @dataclass
 class Labels:
     helpful: list = field(default_factory=list)
