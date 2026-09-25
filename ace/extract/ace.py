@@ -58,11 +58,6 @@ def used_line(text):
     return [i.strip(" []") for i in lines[-1].split(":", 1)[1].split(",")] if lines else []
 
 
-def reported(ep, memory):
-    """id из строки USED, которые есть в памяти."""
-    return [i for i in used_line(ep.final) if memory.get(i)]
-
-
 def named(ep):
     """id, которые решатель назвал в строке USED (как bullet_ids генератора апстрима); «none» — ни одного."""
     return [i for i in used_line(ep.final) if i and i.lower() != "none"]

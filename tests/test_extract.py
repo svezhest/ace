@@ -7,7 +7,7 @@ from stub import TASK, Stub, episode
 
 from ace import prompts
 from ace.extract import LABELS, Extraction, Labels
-from ace.extract.ace import Diagnose, Reflection, Reflector, reported, used_line
+from ace.extract.ace import Diagnose, Reflection, Reflector, used_line
 from ace.learner import swap
 from ace.loop import Group
 from ace.methods.ace import Op, Ops, Playbook, SectionedPlaybook, ace, curate_rewrite
@@ -84,7 +84,6 @@ def test_playbook_rewrite():
 def test_used_line():
     assert used_line("x\nUSED: r1, [r2]\nFINAL ANSWER: 1") == ["r1", "r2"]
     assert used_line("USED: r1\nused: r3\n") == ["r3"]
-    assert reported(episode(final="USED: r1, r9"), playbook("a")) == ["r1"]
 
 
 def diagnosis(tags):

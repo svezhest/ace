@@ -67,10 +67,10 @@ def test_synth():
 
 def test_catalog():
     m = memory("Check units.\nbody", "Guard division.")
-    p = Catalog(always=lambda mem: mem.records()[:1]).prompt(Ex, m, ITEM, 0)
-    assert p.tools == fs.READ_TOOLS and p.shown == ["r1"] and p.rounds == 3
-    assert "- Check units.\nbody" in p.system and "skills/r2  Guard division." in p.system
-    assert "skills/r1" not in p.system
+    p = Catalog().prompt(Ex, m, ITEM, 0)
+    assert p.tools == fs.READ_TOOLS and p.shown == [] and p.rounds == 3
+    assert "skills/r1  Check units." in p.system and "skills/r2  Guard division." in p.system
+    assert "body" not in p.system
 
     class Ctx:
         deps = p.deps

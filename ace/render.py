@@ -26,10 +26,6 @@ def numbered(r):
     return f"[{r.id}] {r.text}"
 
 
-def dotted(r):
-    return f"[{r.id}]. {r.text}"
-
-
 def counted(r):
     return f"[{r.id}] helpful={r.helpful} harmful={r.harmful} :: {r.text}"
 
@@ -42,11 +38,6 @@ def lines(records, line=numbered, sep="\n"):
     return sep.join(line(r) for r in records)
 
 # раскладки памяти
-
-
-def grouped(records, line, group, groups, header, sep):
-    """Записи под заголовками: groups — пары (группа, заголовок), group(r) — группа записи."""
-    return titled([(t, [r for r in records if group(r) == g]) for g, t in groups], line, header, sep)
 
 
 def titled(groups, line, header="## {}", sep="\n\n"):
@@ -66,20 +57,6 @@ def pairs(records, scored, note=""):
             text += (f"#### Previous Input #{i + 1}:\n\n{r.question}\n\n"
                      f"#### Model Solution to Previous Input #{i + 1}:\n\n{r.text}\n---\n---\n\n")
     return (text.strip() + "\n\n" if scored else text) + "#### PREVIOUS SOLUTIONS (END)"
-
-
-def files(records):
-    """Память как файлы для куратора ACE стенда."""
-    return "\n".join(f"memory/{r.id}: {r.text}" for r in records) or EMPTY
-
-
-def entries(records):
-    """Типизированные записи прототипа для куратора."""
-    return "\n".join(f"[{r.id}] ({r.kind}; when: {r.when}) {r.text}" for r in records) or EMPTY
-
-
-def typed_lesson(kind, when, text):
-    return f"{kind}, when {when}: {text}"
 
 
 def lessons(items):
@@ -146,11 +123,6 @@ def time_limit(seconds):
 
 ERROR_TAIL = 500        # хвост ошибки инструмента: traceback важен в конце
 ARGS_HEAD = 300         # начало аргументов вызова
-
-
-def used(records):
-    """Записи, прочитанные решателем (рефлексия прототипа)."""
-    return "\n".join(f"[{r.id}] {r.text}" for r in records) or NONE
 
 
 def failures(steps):

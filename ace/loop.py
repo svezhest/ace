@@ -93,11 +93,6 @@ def first(group, check):
     return 0
 
 
-def greedy(group, check):
-    """Попытка при температуре 0 (TF-GRPO: жадная в зачёт, остальные — группа для обучения)."""
-    return next((i for i, e in enumerate(group.episodes) if e.prompt.temperature == 0), 0)
-
-
 def vote(group, check):
     """Ответ большинства (self-consistency); при равенстве первый встреченный."""
     top = majority(e.answer for e in group.episodes)

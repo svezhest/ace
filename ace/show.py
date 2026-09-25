@@ -135,20 +135,16 @@ class Synth(Show):
 
 
 class Catalog(Show):
-    """Записи listed(память) строками каталога в промпте, тела по read(path) из skills/ только на чтение.
-    always(память) — записи целиком в промпте (правила прототипа)."""
-    def __init__(self, listed=lambda memory: memory.records(), always=None, rounds=CATALOG_ROUNDS, head=HEAD):
-        self.listed, self.always, self.rounds, self.head = listed, always, rounds, head
+    """Записи listed(память) строками каталога в промпте, тела по read(path) из skills/ только на чтение."""
+    def __init__(self, listed=lambda memory: memory.records(), rounds=CATALOG_ROUNDS, head=HEAD):
+        self.listed, self.rounds, self.head = listed, rounds, head
 
     def prompt(self, ex, memory, item, k):
-        rules = self.always(memory) if self.always else []
-        entries = [r for r in self.listed(memory) if r not in rules]
-        if not rules and not entries:
+        entries = self.listed(memory)
+        if not entries:
             return Prompt()
         files = fs.FS({"skills": fs.Mount(fs.Catalog(entries), "ro")})
-        text = CATALOG.fill(always=self.always is not None, rules=render.lines(rules, render.dashed),
-                            listing=fs.listing(files, "skills"))
-        return Prompt("\n\n" + self.head + text, fs.READ_TOOLS, files, self.rounds, [r.id for r in rules])
+        return Prompt("\n\n" + self.head + CATALOG.fill(listing=fs.listing(files, "skills")), fs.READ_TOOLS, files, self.rounds)
 
 
 class AfterError(Show):

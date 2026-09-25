@@ -14,7 +14,7 @@ from ace import verdict
 from ace.env import Env
 from ace.extract import Extraction, Extractor, Raw
 from ace.learner import Learner
-from ace.loop import Attempts, Experiment, best, greedy, run, vote
+from ace.loop import Attempts, Experiment, best, first, run, vote
 from ace.memory import Lessons
 from ace.model import Model, Patch
 from ace.show import Sample, Show, Whole
@@ -67,13 +67,13 @@ def run_spy(learner, model, n=2, **kw):
     return summary, learner.events.learner
 
 
-def test_group_temperatures_and_greedy():
+def test_group_temperatures():
     model = Stub(lambda call: right(call) if call["temperature"] == 0 else "FINAL ANSWER: 0")
-    attempts = Attempts(3, temperature=lambda k: 0 if k == 0 else 0.7, pick=greedy)
+    attempts = Attempts(3, temperature=lambda k: 0 if k == 0 else 0.7, pick=first)
     summary, learner = run_spy(spy(attempts=attempts), model)
     assert [c["temperature"] for c in model.solver_calls()] == [0, 0.7, 0.7] * 2
     g = last_group(learner)
-    assert len(g.episodes) == 3 and g.chosen == 0 and g.pick == "greedy" and not g.pass_at_k
+    assert len(g.episodes) == 3 and g.chosen == 0 and g.pick == "first" and not g.pass_at_k
     assert summary["correct"] == 2
     assert len(learner.of("attempt")) == 6
 

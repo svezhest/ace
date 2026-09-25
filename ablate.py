@@ -15,7 +15,7 @@ from ace.model import Model
 from ace.show import Catalog, Whole
 from ace.tasks import TASKS
 
-SPREAD = 0.7                # температура попыток после первой (self-consistency, как в старом sc3)
+SPREAD = 0.7                # температура попыток после первой (self-consistency)
 
 
 def spread(k):

@@ -1,9 +1,9 @@
 """Настройки стенда: сервер модели, бюджет генерации, seed, размеры выборок и пути.
-Всё берётся из окружения; LOCAL_BASE_URL — старое имя OPENAI_BASE_URL, читается для совместимости."""
+Всё берётся из окружения."""
 import os
 from pathlib import Path
 
-OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL") or os.getenv("LOCAL_BASE_URL") or "http://localhost:8080/v1"
+OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "http://localhost:8080/v1")
 API_KEY = os.getenv("OPENAI_API_KEY", "local")
 MODEL = os.getenv("MODEL", "ornith15-9b")
 MAX_TOKENS = int(os.getenv("MAX_TOKENS", 4096))
