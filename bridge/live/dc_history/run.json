@@ -1,0 +1,13 @@
+{
+  "upstream": "dynamic-cheatsheet",
+  "commit": "5cfe3c37e8e52b1d858d0f3df46e7f17c50991b9",
+  "date": "2026-09-25",
+  "model": "ornith15-9b (ornith15-9b-mlx-8bit через шлюз :8080)",
+  "slice": "MathEquationBalancer (data/ апстрима), shuffle(seed=10), --max_n_samples 5",
+  "env": "cwd = корень апстрима; OPENAI_BASE_URL=http://127.0.0.1:8097/v1 OPENAI_API_KEY=x TIKTOKEN_CACHE_DIR HF_HUB_OFFLINE=1 HF_DATASETS_OFFLINE=1; typed-argument-parser 1.12.0 доставлен в .venvs/light",
+  "record": "uv run python -m tools.record.record rec.jsonl --port 8097 --upstream http://localhost:8080 --seed",
+  "command": "python run_benchmark.py --task MathEquationBalancer --approach_name FullHistoryAppending --model_name openai/ornith15-9b --generator_prompt_path prompts/generator_prompt.txt --max_n_samples 5 --execute_python_code --save_directory <OUT>",
+  "note": "--execute_python_code при умолчании True выключает исполнение кода (Tap); outputs.jsonl — выход апстрима (по строке на вопрос: final_cheatsheet, final_output, final_answer)",
+  "calls": 5,
+  "correct": 0
+}
