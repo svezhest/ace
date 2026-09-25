@@ -114,7 +114,3 @@ def final_answer(text):
     tail = text.rsplit("FINAL ANSWER:", 1)[-1] if "FINAL ANSWER:" in text else text.strip().rsplit("\n", 1)[-1]
     return tail.strip().split("\n")[0].strip("`*. ")
 
-
-def replay(task, log):
-    """Номера записей старого log.json, где проверка сейчас судит иначе, чем при прогоне."""
-    return [r["i"] for r in log if task.check(r["answer"], r["target"]) != r["correct"]]

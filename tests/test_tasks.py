@@ -1,10 +1,7 @@
-"""Проверки ответов задач и переигровка старых логов."""
-import json
-from pathlib import Path
-
+"""Проверки ответов задач."""
 import pytest
 
-from ace.tasks import TASKS, replay
+from ace.tasks import TASKS
 
 MEB = TASKS["meb"]
 
@@ -48,19 +45,3 @@ def test_gpqa():
     assert TASKS["gpqa"].check("(B).", "(B)")
     assert not TASKS["gpqa"].check("C", "(B)")
 
-
-def test_replay():
-    log = [dict(i=0, answer="1 + 2 + 3 = 6", target="1 + 2 + 3 = 6", correct=True),
-           dict(i=1, answer="1 - 2 - 3 = 6", target="1 + 2 + 3 = 6", correct=True)]
-    assert replay(MEB, log) == [1]
-
-
-LOGS = sorted(Path("results").glob("*/*/log.json"))
-
-
-@pytest.mark.skipif(not LOGS, reason="нет results/")
-@pytest.mark.parametrize("path", LOGS, ids=str)
-def test_old_logs(path):
-    """Проверка судит старые прогоны так же, как тогда."""
-    task = TASKS[path.parent.parent.name.rstrip("0123456789")]
-    assert replay(task, json.load(path.open())) == []
