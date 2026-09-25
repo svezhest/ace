@@ -16,7 +16,8 @@ from ace.methods.mce import mce_fs as mce
 from ace.wrap.mce import META, MISSING, evaluations
 from ace.model import Reply, roles
 from ace.tasks import Task
-from ace.wrap.mce import Iteration, Meta, SKILL, best_iteration, sub_folder
+from ace.loop import best_index as best_iteration
+from ace.wrap.mce import Iteration, Meta, SKILL, sub_folder
 
 PROMPTS, PARSERS, MEMORY, LOOP = (fixture("mce", level) for level in ("prompts", "parsers", "memory", "loop"))
 

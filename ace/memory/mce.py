@@ -22,6 +22,17 @@ WORKSPACE = "/workspace"    # корень, как его видят агент�
 SKILL = ".agent/skills/learning-context/SKILL.md"      # навык в папке под-итерации (MCE5)
 
 
+def train_json(ex, groups, ids, field="question"):
+    """data/train.json под-итерации (format_result_for_training): сводка батча и итоги его вопросов с id ids."""
+    eps = [g.episodes[g.chosen] for g in groups]
+    acc = sum(bool(e.ok) for e in eps) / len(eps) if eps else 0.0
+    summary = dict(train_accuracy=acc, train_metrics=dict(accuracy=acc) if eps else {}, train_total=len(eps),
+                   train_errors=0, batch_idx=ex.batch, cumulative_rollouts=ex.i + 1)
+    results = [{"id": id, field: g.question, "ground_truth": g.target, "llm_prediction": e.answer, "is_correct": bool(e.ok)}
+               for id, g, e in zip(ids, groups, eps)]
+    return render.train_json(summary, results)
+
+
 def sub_folder(ex):
     """Папка под-итерации (get_sub_iteration_folder_name): итерация = проход, под-итерация = батч."""
     return f"iter{ex.epoch + 1}_sub{ex.batch}"
@@ -35,14 +46,8 @@ class Context(Files):
 
     def learn(self, ex, extractions):
         groups = [x.group for x in extractions]
-        done, eps = ex.i + 1, [g.episodes[g.chosen] for g in groups]
-        acc = sum(bool(e.ok) for e in eps) / len(eps) if eps else 0.0
         # id — место вопроса в проходе (порядок train у нас один и тот же), вопрос — поле question
-        results = [dict(id=done - len(groups) + n, question=g.question, ground_truth=g.target, llm_prediction=e.answer,
-                        is_correct=bool(e.ok)) for n, (g, e) in enumerate(zip(groups, eps))]
-        self.train = render.train_json(dict(train_accuracy=acc, train_metrics=dict(accuracy=acc), train_total=len(eps),
-                                            train_errors=0, batch_idx=ex.batch, cumulative_rollouts=done),
-                                       results)
+        self.train = train_json(ex, groups, range(ex.i + 1 - len(groups), ex.i + 1))
         name = sub_folder(ex)
         mounts = {"context": fs.Mount(self), "data": fs.Mount(Files.of({"train.json": self.train}), "ro")}
         if ex.skill:
@@ -153,7 +158,7 @@ class Workspace:
     def aggregate(self, iteration, subs, val_metrics, val_total, last):
         """aggregate_iteration_results: итерация в meta_agent/evaluations.json (train — метрики батчей, среднее с
         весом размера), навык последней под-итерации — в meta_agent/skills/iter{k}/SKILL.md. subs — батчи:
-        {"batch_size", "metric" (accuracy), "metrics"}."""
+        {"batch_size", "metric" (accuracy), "metrics"}. -> train итерации."""
         total = sum(s["batch_size"] for s in subs)
         train = sum(s["metric"] * s["batch_size"] for s in subs) / total if total > 0 else 0.0
         train_metrics = {}
@@ -174,6 +179,7 @@ class Workspace:
             target = self.base / "meta_agent" / "skills" / f"iter{iteration}"
             target.mkdir(parents=True, exist_ok=True)
             shutil.copy2(skill, target / "SKILL.md")
+        return train
 
     def evaluations(self):
         file = self.base / "meta_agent" / "evaluations.json"
@@ -366,16 +372,10 @@ class Folder:
     def learn(self, ex, extractions):
         """Под-итерация: train.json батча, затем базовый агент; не прошёл проверку — ошибка, как у апстрима."""
         groups = [x.group for x in extractions]
-        eps = [g.episodes[g.chosen] for g in groups]
-        acc = sum(1.0 if e.ok else 0.0 for e in eps) / len(eps) if eps else 0.0
         field = "symptoms" if variant("mce", ex.task) == "symptom" else "question"
-        results = [{"id": g.item["id"], field: g.question, "ground_truth": g.target, "llm_prediction": e.answer,
-                    "is_correct": bool(e.ok)} for g, e in zip(groups, eps)]
-        summary = {"train_accuracy": acc, "train_metrics": {"accuracy": acc} if eps else {}, "train_total": len(eps),
-                   "train_errors": 0, "batch_idx": ex.batch, "cumulative_rollouts": ex.i + 1}
         (self.path / "data").mkdir(exist_ok=True)
-        with open(self.path / "data" / "train.json", "w", encoding="utf-8") as f:
-            json.dump({"summary": summary, "detailed_results": results}, f, indent=2, ensure_ascii=False)
+        (self.path / "data" / "train.json").write_text(train_json(ex, groups, [g.item["id"] for g in groups], field),
+                                                        encoding="utf-8")
         if not base_agent(ex, self.ws, self.path):
             raise RuntimeError(f"Base-agent failed at {self.path.name}: validation failed after {VALIDATION_ATTEMPTS} attempts")
         self.loaded = None

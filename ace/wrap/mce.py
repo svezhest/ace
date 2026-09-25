@@ -16,6 +16,7 @@ from .. import config, fs, prompts, render
 from ..memory import Files
 from ..model import Call, claude, messages, params
 from ..memory.mce import CLAUDE_SKILL, ROUNDS, SKILL, WORKSPACE, Workspace, cleanup, folder_name, signatures, sub_folder
+from ..loop import best_index
 from . import Wrapper, correct
 
 META, META_ACE = prompts.load("mce_meta"), prompts.load("mce_meta_ace")
@@ -34,6 +35,10 @@ class Iteration:
     val_total: int = 0
     rollouts: int = 0
     folders: dict = field(default_factory=dict)
+    folder: str = ""            # MCE апстрима: последняя папка под-итерации на диске
+
+    def dump(self, i):
+        return dict(kind="iterations", id=f"iter{i}", text=self.text, train=self.train, val=self.val, folder=self.folder)
 
 
 def offline_only(wrapper):
@@ -44,15 +49,6 @@ def offline_only(wrapper):
 
 def accuracy(results):
     return correct(results) / len(results) if results else 0.0
-
-
-def best_iteration(vals):
-    """_find_best_iteration: номер лучшей по val итерации; строго больше, при равенстве первая."""
-    best, top = None, -1e9
-    for i, v in enumerate(vals):
-        if v > top:
-            best, top = i, v
-    return best
 
 
 class Meta(Wrapper):
@@ -87,12 +83,11 @@ class Meta(Wrapper):
         val = ex.evaluate()
         self.history.append(Iteration(ex.skill, self.right / self.seen if self.seen else 0.0, accuracy(val),
                                       self.inner.snapshot(), len(val), self.seen, self.folders))
-        self.inner.restore(self.history[best_iteration([h.val for h in self.history])].memory)
+        self.inner.restore(self.history[best_index([h.val for h in self.history])].memory)
         self.right, self.seen, self.folders = 0, 0, {}
 
     def dump(self):
-        return self.inner.dump() + [dict(kind="iterations", id=f"iter{i}", text=h.text, train=h.train, val=h.val)
-                                    for i, h in enumerate(self.history, 1)]
+        return self.inner.dump() + [h.dump(i) for i, h in enumerate(self.history, 1)]
 
 
 def evaluations(history):
@@ -240,8 +235,8 @@ class Iterations(Wrapper):
         folder = self.ws.create(iteration, sub)
         if sub == 0:
             ex.skill = claude_meta(ex, self.ws, folder, iteration)
-            best = best_iteration([h["val"] for h in self.history])
-            source = self.ws.base / (self.history[best]["folder"] if self.history else folder_name(0))
+            best = best_index([h.val for h in self.history])
+            source = self.ws.base / (self.history[best].folder if self.history else folder_name(0))
         else:
             source = self.inner.memory.path
             self.ws.copy_skills(source, folder)
@@ -258,12 +253,11 @@ class Iterations(Wrapper):
         val = ex.evaluate()
         metrics = {"accuracy": sum(1.0 if c else 0.0 for c, _ in val) / len(val)} if val else {}
         last = self.inner.memory.path
-        self.ws.aggregate(ex.epoch + 1, self.subs, metrics, len(val), last)
-        self.history.append(dict(val=metrics.get("accuracy", 0.0), folder=last.name, skill=ex.skill,
-                                 memory=self.inner.snapshot()))
-        self.inner.restore(self.history[best_iteration([h["val"] for h in self.history])]["memory"])
+        train = self.ws.aggregate(ex.epoch + 1, self.subs, metrics, len(val), last)
+        self.history.append(Iteration(ex.skill, train, metrics.get("accuracy", 0.0), self.inner.snapshot(), len(val),
+                                      sum(s["batch_size"] for s in self.subs), folder=last.name))
+        self.inner.restore(self.history[best_index([h.val for h in self.history])].memory)
         self.subs = []
 
     def dump(self):
-        return self.inner.dump() + [dict(kind="iterations", id=f"iter{i}", text=h["skill"], val=h["val"], folder=h["folder"])
-                                    for i, h in enumerate(self.history, 1)]
+        return self.inner.dump() + [h.dump(i) for i, h in enumerate(self.history, 1)]

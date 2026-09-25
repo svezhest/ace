@@ -290,6 +290,15 @@ class Experiment:
         return self.task.check(group.answer, item["target"]), group.episodes[group.chosen].truncated
 
 
+def best_index(values):
+    """Номер лучшего по val: строго больше, при равенстве ранний (выбор версии офлайн, _find_best_iteration MCE)."""
+    best, top = None, float("-inf")
+    for i, v in enumerate(values):
+        if v > top:
+            best, top = i, v
+    return best
+
+
 def finish(ep):
     """Чем кончилась попытка: length — обрыв по длине, rounds — запросы кончились без ответа, broken — вывод так и не
     прошёл схему, stop — ответ."""
@@ -410,15 +419,14 @@ def run(task, learner, model, n=config.SIZE, out=None, split=""):
         if proto.val:
             score = sum(c for c, _ in ex.evaluate())
             print(f"val after epoch {epoch}: {score}", flush=True)
-            if score > best[1]:
-                best[:] = learner.snapshot(), score
+            versions.append((score, learner.snapshot()))
 
     done = False
     try:
         if proto.window:
             for i, item in enumerate(task.load(split, n)):
                 test("initial", i, item)
-        best = [learner.snapshot(), -1]
+        versions = []           # (верных на val, версия памяти) после каждого прохода
         for epoch in range(proto.epochs):
             items = learner.sample(ex, "train" if proto.offline else split, n)
             ex.epoch, ex.total, ex.batch, batch = epoch, len(items), 0, []
@@ -432,8 +440,8 @@ def run(task, learner, model, n=config.SIZE, out=None, split=""):
                     test("post", i, item)
             guarded("pass", len(items), None, lambda: end_pass(epoch, batch))
         if proto.offline:
-            if proto.val:
-                learner.restore(best[0])
+            if versions:
+                learner.restore(versions[best_index([v for v, _ in versions])][1])
             ex.training, ex.epoch = False, 0
             for i, item in enumerate(task.load(split, n)):
                 test("test", i, item)
