@@ -272,9 +272,6 @@ class Task:
     def check(self, answer, target):
         return TASKS["formula"].check(answer, target)
 
-    def accuracy(self, answers, targets):
-        return TASKS["formula"].accuracy(answers, targets)
-
 
 def generator_json(system, user):
     """Ответ генератора фейка апстрима (capture_ace.generator_reply) на наш промпт: id — из показанного playbook."""

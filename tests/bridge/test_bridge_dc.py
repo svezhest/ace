@@ -177,9 +177,6 @@ class Task:
     def check(self, answer, target):
         return False
 
-    def accuracy(self, answers, targets):
-        return 0.0
-
 
 def upstream_sheet(generator_prompt):
     """То, что апстрим подставил в [[CHEATSHEET]] промпта решателя."""

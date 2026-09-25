@@ -24,15 +24,6 @@ class Task:
         rows = [json.loads(l) for l in file.open() if l.strip()]
         return [{"context": r.get("context") or r["input"], "target": r["target"]} for r in rows]
 
-    def accuracy(self, answers, targets):
-        """Отчётная точность, как evaluate_accuracy апстрима ACE: у finer — доля верных сущностей по всем вопросам,
-        у остальных — доля верных вопросов."""
-        if self.name == "finer":
-            counts = [finer_counts(a, t) for a, t in zip(answers, targets)]
-            total = sum(n for _, n in counts)
-            return sum(c for c, _ in counts) / total if total else 0.0
-        return sum(self.check(a, t) for a, t in zip(answers, targets)) / len(answers) if answers else 0.0
-
     def check(self, answer, target):
         """Исключение проверки — неверно (как except у апстримов)."""
         try:
@@ -106,6 +97,16 @@ def gpqa_ok(pred, tgt):
 CHECK = {"finer": finer_ok, "formula": formula_ok, "meb": meb_ok, "gpqa": gpqa_ok}
 
 TASKS = {name: Task(name) for name in ("finer", "formula", "meb", "gpqa")}
+
+
+def accuracy(task, answers, targets):
+    """Отчётная точность, как evaluate_accuracy апстрима ACE: у finer — доля верных сущностей по всем вопросам,
+    у остальных — доля верных вопросов."""
+    if task.name == "finer":
+        counts = [finer_counts(a, t) for a, t in zip(answers, targets)]
+        total = sum(n for _, n in counts)
+        return sum(c for c, _ in counts) / total if total else 0.0
+    return sum(task.check(a, t) for a, t in zip(answers, targets)) / len(answers) if answers else 0.0
 
 
 def final_answer(text):

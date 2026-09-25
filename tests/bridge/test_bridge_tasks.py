@@ -2,7 +2,7 @@
 eval_equation_balancer DC. gpqa — наша (CHK2)."""
 import pytest
 
-from ace.tasks import TASKS, finer_counts
+from ace.tasks import TASKS, accuracy, finer_counts
 from upstream import deviation, fixture
 
 ACE = fixture("ace", "eval")
@@ -28,7 +28,7 @@ def test_finer_counts(row):
 def test_accuracy(task):
     """evaluate_accuracy на тех же парах: у finer доля сущностей, у formula доля вопросов."""
     rows = ACE[f"{task}_answer_is_correct"]
-    got = TASKS[task].accuracy([r["pred"] for r in rows], [r["target"] for r in rows])
+    got = accuracy(TASKS[task], [r["pred"] for r in rows], [r["target"] for r in rows])
     assert got == pytest.approx(ACE[f"{task}_evaluate_accuracy"]["ok"])
 
 
