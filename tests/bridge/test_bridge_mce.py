@@ -175,9 +175,9 @@ def test_find_best_iteration():
 
 def test_evaluations_json():
     """aggregate_iteration_results после iter1: батчи 3 и 1 с долей 1/3 и 1 -> train 0.5 (среднее с весом), val,
-    число под-итераций и последняя папка. Метрика у задач одна — accuracy (MCE1)."""
+    число под-итераций и последняя папка. Метрика у задач одна — accuracy (S2)."""
     want = json.loads(MEMORY["aggregate_iteration_results"]["after_iter1"]["evaluations.json"])
-    deviation("MCE1")
+    deviation("S2")
     want["iter1"]["train_metrics"] = {"accuracy": want["iter1"]["train_metrics"]["accuracy"]}
     h = Iteration("s", (1 + 1) / (3 + 1), 0.5, None, val_total=4, rollouts=4, folders={"iter1_sub0": {}, "iter1_sub1": {}})
     assert evaluations([h]) == want
@@ -240,7 +240,7 @@ def upstream_files(files):
 
 
 def test_loop(tmp_path):
-    deviation("MCE4")       # train у нас в одном порядке: состав батчей тот же на каждом проходе
+    deviation("S3")       # train у нас в одном порядке: состав батчей тот же на каждом проходе
     """main(): 3 итерации, train 6 батчами по 4, val 4 (argv эталона). Совпадают порядок агентов и папки
     под-итераций, что видит каждый агент (без interfaces/ и utils/), сводки train.json (только текущий батч),
     evaluations.json и база навыков (кроме долей верных: данные другие), с какой папки начинается итерация."""

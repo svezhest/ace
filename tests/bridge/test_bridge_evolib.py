@@ -34,13 +34,13 @@ def solution(desc, result, answer):
 
 def no_math(text):
     """Промпты апстрима без «math»: наши задачи не только математические."""
-    deviation("EV1")
+    deviation("S2")
     return text.replace("a math expert", "an expert").replace("math ", "")
 
 
 def no_evaluation(text):
-    """Строка вердикта лучшей попытки в промпте insight: у HMMT апстрима test_result в промпт не идёт."""
-    deviation("EV3")
+    """Строка вердикта лучшей попытки в промпте insight — вариант evolib_judge стенда (methods/evolib.py): у HMMT
+    апстрима test_result в промпт не идёт, и метода «EvoLib с оценкой» у него нет."""
     if "\nEvaluation: " not in text:
         return text
     head, tail = text.split("\nEvaluation: ", 1)
@@ -49,7 +49,7 @@ def no_evaluation(text):
 
 def upstream_answer(text):
     """Ответ попытки, как run_iteration: первый <answer>...</answer> без $; у нас — FINAL ANSWER стенда."""
-    deviation("EV2")
+    deviation("S1")
     return parse.between(text or "", "<answer>", "</answer>").replace("<answer>", "").replace("$", "").strip()
 
 
@@ -142,7 +142,7 @@ def section(user, problem):
 
 def shown(system):
     """Раздел памяти в нашем системном промпте: после просьбы решать подзадачами."""
-    deviation("EV2")
+    deviation("S1")
     tail = system.split(HINT, 1)[1]
     return tail.removeprefix("\n\n")
 

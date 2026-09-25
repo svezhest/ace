@@ -59,7 +59,7 @@ class Ex:
 @pytest.fixture(autouse=True)
 def upstream_objectives(monkeypatch):
     """Цели задачи стенда -> цели, с которыми снят эталон."""
-    deviation("TF1")
+    deviation("S2")
     monkeypatch.setitem(T.OBJECTIVE, Task.name, AGENT_OBJ)
     monkeypatch.setattr(T, "LEARNING", LEARN_OBJ)
 
@@ -70,7 +70,7 @@ def stage(user):
 
 def trajectory(case, i, reward):
     """Траектория, как её печатает промпт сводки апстрима: repr списка сообщений агента."""
-    deviation("TF2")
+    deviation("S1")
     return str([{"role": "user", "content": f"Problem {case}"},
                 {"role": "assistant", "content": f"attempt {i} of {case}: answer {'42' if reward else '41'}"}])
 
@@ -267,7 +267,7 @@ def test_loop():
 
 def test_show():
     """Показ опытов — хвост инструкций итогового агента апстрима (_create_agent_config_with_experiences)."""
-    deviation("TF2")            # начало инструкций — задача стенда
+    deviation("S1")            # начало инструкций — задача стенда
     instructions = yaml.safe_load(CONFIG["math_reasoning"]["final_agent_yaml"])["agent"]["instructions"]
     shown = SHOW.EXPERIENCES.prompt(Ex(None), library(["Units: check units.", "Verify: recompute."]), {}, 0).system
     assert instructions.endswith(shown) and shown.startswith("\n\nWhen solving problems")
@@ -291,6 +291,5 @@ def test_settings():
     assert cfg["updater_query_params"] == {}            # обновление без температуры: test_loop
     # eval при обучении делит агента с rollout (T = 0.7) и идёт Mean@32; у нас val и тест — итоговый агент
     assert built["practice_and_eval_share_agent"] and built["eval_rollout_temperature"] == M.TEMPERATURE
-    deviation("TF8")
-    deviation("TF5")            # батч 20 из 40 задач против 50 из 100: те же 2 шага за эпоху
+    deviation("S3")             # батч 20 из 40 задач против 50 из 100: те же 2 шага за эпоху
     assert (M.BATCH, practice["batch_size"]) == (20, 50)

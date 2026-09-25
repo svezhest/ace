@@ -120,8 +120,8 @@ def test_synthesizer_requests():
 
 def test_best_of_n_selector():
     """Best-of-N: кандидаты и выбор; промпт селектора из наших полей — как у апстрима. Кандидаты у нас — одна
-    модель при T = 0.7 (SC2)."""
-    deviation("SC2")
+    модель при T = 0.7 (S4)."""
+    deviation("S4")
     calls = PROMPTS["synthesizer"]["primary_calls"]
     cand = PROMPTS["synthesizer"]["candidate_calls"][0]
     first = Proposal(**parse.scope_guideline(calls[4]["response"]))
@@ -415,7 +415,7 @@ SYSTEM_BLOCK = re.compile(r"(Current system prompt \(for reference[^\n]*\n)(.*?)
 
 def with_system(prompt, system):
     """Запрос апстрима с нашим текущим системным промптом: repro дописывает правила всех прошлых задач, у нас —
-    strategic при запуске попытки и tactical только этой попытки (B2, SC3)."""
+    strategic при запуске попытки и tactical только этой попытки (S2)."""
     return SYSTEM_BLOCK.sub(lambda m: m.group(1) + system + m.group(3), prompt)
 
 
@@ -450,8 +450,8 @@ def check_steps(done, model):
         want = step["calls"]
         assert [kind(c["user"]) for c in calls] == [kind(user(c)) for c in want], step["task_id"]
         assert [c["response"] for c in want] == [model.reply(c["user"]) for c in calls], step["task_id"]
-        # синтезатор: тип ошибки у нас по событию (SC1), системный промпт — текущий нашей попытки (SC3)
-        deviation("SC1", "SC3")
+        # синтезатор: тип ошибки у нас по событию (SC1), системный промпт — текущий нашей попытки (S2)
+        deviation("SC1", "S2")
         ours = calls[0]["user"].replace("- Error Type: IncorrectAnswer", "- Error Type: Exception")
         assert ours == with_system(user(want[0]), ep.system), step["task_id"]
         if len(want) > 1:

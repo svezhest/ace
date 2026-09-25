@@ -1,6 +1,6 @@
 """ACE (ace_exact) против апстрима ace 82709de: шаблоны и запросы рефлектора и куратора, разборщики ответов,
 операции над playbook (id, разделы, метки, статистика) и цикл online на 4 задачах эталона с той же фейковой
-моделью. Генератор апстрима не сверяется: решатель общий (ACE1)."""
+моделью. Генератор апстрима не сверяется: решатель общий (S1)."""
 import json
 import re
 import string
@@ -298,7 +298,7 @@ class Replay:
             text = next(self.replies[role])
         else:
             # решатель называет те id, что апстрим вынул бы регуляркой из своего ответа (ACE2), и ответ — строкой
-            # FINAL ANSWER (ACE1)
+            # FINAL ANSWER (S1)
             gen = generator_json(system, user)
             text = f"{gen}\nUSED: {', '.join(UPSTREAM_ID.findall(gen))}\nFINAL ANSWER: {json.loads(gen)['final_answer']}"
         return text_reply(call, text)
@@ -308,15 +308,15 @@ class Replay:
 
 
 def solver_tail(text):
-    """Строки USED и FINAL ANSWER нашего решателя — в траектории, которую видит рефлектор (ACE1)."""
+    """Строки USED и FINAL ANSWER нашего решателя — в траектории, которую видит рефлектор (S1)."""
     return re.sub(r"\nUSED: [^\n]*\nFINAL ANSWER: [^\n]*", "", text)
 
 
 @pytest.mark.parametrize("key", ["online_gt", "online_nogt"])
 def test_online_loop(tmp_path, key):
     """Запросы рефлектора и куратора — посимвольно и по порядку, раунды рефлексии, итоговый playbook и номер.
-    Генерации апстрима вне обучения (начальный тест, тест окна, решение после куратора) не делаем (ACE3)."""
-    deviation("ACE1", "ACE2", "ACE3")
+    Генерации апстрима вне обучения (начальный тест, тест окна, решение после куратора) не делаем (S3)."""
+    deviation("S1", "ACE2", "S3")
     up = LOOP[key]
     assert up["config"]["json_mode"] is False and up["config"]["max_num_rounds"] == 3
     model = Replay(up["calls"])

@@ -31,7 +31,7 @@ def budget(monkeypatch):
 
 
 def raw(step, i):
-    """Сырой вход датасета: input_txt апстрима без префикса задачи и «Question #k:» (DC2)."""
+    """Сырой вход датасета: input_txt апстрима без префикса задачи и «Question #k:» (S2)."""
     return step["input"].split(f"Question #{i + 1}:\n", 1)[1]
 
 
@@ -46,7 +46,7 @@ def upstream_fill(template, values):
 
 
 def as_raw(text, i, steps):
-    deviation("DC2")
+    deviation("S2")
     return text.replace(steps[i]["input"], QUESTIONS[i])
 
 
@@ -192,9 +192,9 @@ def upstream_sheet(generator_prompt):
 
 
 def check_loop(steps, ours):
-    """Вызов за вызовом: решатель видит тот же текст памяти (DC1), куратор и синтез — тот же запрос (DC2);
+    """Вызов за вызовом: решатель видит тот же текст памяти (S1), куратор и синтез — тот же запрос (S2);
     температура и бюджет те же."""
-    deviation("DC1")
+    deviation("S1")
     calls = iter(ours)
     for i, step in enumerate(steps):
         for up in step["calls"]:
