@@ -288,8 +288,7 @@
     "hash": "5925252b551f0228",
     "matched": "rule:0",
     "response": "```json\n{\"update_text\": \"Check the sign of each value before tagging.\", \"rationale\": \"The agent confused losses with gains.\", \"confidence\": \"high\"}\n```",
-    "model": "ornith15-9b",
-    "temperature": 0
+    "model": "ornith15-9b"
    }
   ],
   "step_summary": {

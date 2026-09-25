@@ -56,10 +56,21 @@ def messages(user, system=""):
     return ([{"role": "system", "content": system}] if system else []) + [{"role": "user", "content": user}]
 
 
+def parts(user):
+    """Одно сообщение user с содержимым частями [{"type": "text"}], как шлёт SCOPE (OpenAIAdapter)."""
+    return [{"role": "user", "content": [{"type": "text", "text": user}]}]
+
+
+def content(m):
+    """Текст сообщения; содержимое частями — их тексты подряд."""
+    c = m["content"]
+    return c if isinstance(c, str) else "".join(x.get("text", "") for x in c)
+
+
 def roles(messages):
     """(системный или "", последний пользовательский) — модели-заглушки, трасса."""
-    system = next((m["content"] for m in messages if m["role"] == "system"), "")
-    return system, next((m["content"] for m in reversed(messages) if m["role"] == "user"), "")
+    system = next((content(m) for m in messages if m["role"] == "system"), "")
+    return system, next((content(m) for m in reversed(messages) if m["role"] == "user"), "")
 
 
 def params(temperature=0, top_p=None, max_tokens=None):

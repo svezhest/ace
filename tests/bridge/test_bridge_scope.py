@@ -44,7 +44,8 @@ class Model:
     def ask(self, call):
         assert call.reader.schema is None
         _, user = roles(call.messages)
-        self.calls.append(dict(user=user, temperature=call.params.get("temperature")))
+        self.calls.append(dict(user=user, temperature=call.params.get("temperature"), params=call.params,
+                               messages=call.messages))
         return text_reply(call, self.reply(user))
 
 
@@ -113,14 +114,18 @@ def test_synthesizer_requests():
     got = [Rules().propose(ex(model), attempt(), Book(), SUMMARY, ERROR),
            Rules().propose(ex(model), attempt(), Book("efficiency"), SUMMARY, None)]
     assert [c["user"] for c in model.calls] == [user(calls[1]), user(calls[3])]
-    assert [c["temperature"] for c in model.calls] == [PROMPTS["openai_adapter_request"][0]["temperature"]] * 2
+    # запрос как у OpenAIAdapter (create_openai_model без temperature): сообщение частями, параметров нет
+    sent = PROMPTS["openai_adapter_request"][0]
+    assert model.calls[0]["messages"] == sent["messages"]
+    assert [c["params"] for c in model.calls] == [{k: v for k, v in sent.items()
+                                                   if k not in ("messages", "model", "prompt", "hash", "matched", "response")}] * 2
     for g, key in zip(got, ["error_no_rules", "quality_efficiency"]):
         assert (g.update_text, g.rationale, g.confidence) == tuple(results[key][k] for k in ("update_text", "rationale", "confidence"))
 
 
 def test_best_of_n_selector():
-    """Best-of-N: кандидаты и выбор; промпт селектора из наших полей — как у апстрима. Кандидаты у нас — одна
-    модель при T = 0.7 (S4)."""
+    """Best-of-N: кандидаты и выбор; промпт селектора из наших полей — как у апстрима. candidate_models у нас —
+    та же модель при T = 0.7 (S4)."""
     deviation("S4")
     calls = PROMPTS["synthesizer"]["primary_calls"]
     cand = PROMPTS["synthesizer"]["candidate_calls"][0]
@@ -133,7 +138,7 @@ def test_best_of_n_selector():
     model = Model(lambda prompt: next(answers))
     best = Rules(n=2).propose(ex(model), attempt(), Book(), SUMMARY, ERROR)
     assert best.update_text == PROMPTS["synthesizer"]["results"]["best_of_n_error"]["update_text"]
-    assert [c["temperature"] for c in model.calls] == [0.7, 0.7, 0]
+    assert [c["temperature"] for c in model.calls] == [None, 0.7, None]
 
 
 def test_classifier_requests():
@@ -323,7 +328,7 @@ def test_threshold_is_one_constant():
 def test_overflow_truncate():
     """Сверх предела без изменений оптимизатором — усечение по confidence; домены раздельно."""
     case = MEMORY["overflow_truncate(max=3)"]
-    book = Book(optimizer=lambda model, rules, target: rules, cap=3, target=2)
+    book = Book(optimizer=lambda model, rules, target: rules, cap=3)
     for i, c in enumerate(case["confidences"]):
         book.promote(ex(Model(None)), rule(i)[0], c, "general", rule(i)[1])
     book.promote(ex(Model(None)), rule(9)[0], 0.88, "efficiency", rule(9)[1])
@@ -337,7 +342,8 @@ def test_overflow_optimizer(case, cap, target, n, conf):
     """Предел домена: оптимизатор до int(0.8 * предела), остаток усекается; запросы и итог как у апстрима."""
     case = MEMORY[case]
     model = by_kind(case["calls"])
-    book = Book(cap=cap, target=target)
+    book = Book(cap=cap)
+    assert book.target == target
     for i in range(n):
         book.promote(ex(model), rule(i)[0], conf(i), "general", rule(i)[1])
     assert [c["user"] for c in model.calls] == [user(c) for c in case["calls"]]

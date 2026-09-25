@@ -12,7 +12,7 @@ from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
 
 from .. import config, render
-from . import Outcome, Reply, Step
+from . import Outcome, Reply, Step, content
 
 # запросов сверх раундов инструментов: ответ и одна попытка исправить вывод, не прошедший схему
 EXTRA_REQUESTS = 2
@@ -39,13 +39,13 @@ def apply(messages, patch):
 def split(messages):
     """Сообщения вызова -> (системный промпт, история pydantic-ai до последнего сообщения, последнее — user).
     При непустой истории системный промпт входит в её первый запрос: pydantic-ai ставит его только без истории."""
-    system = "\n\n".join(m["content"] for m in messages if m["role"] == "system")
+    system = "\n\n".join(content(m) for m in messages if m["role"] == "system")
     turns = [m for m in messages if m["role"] != "system"]
-    history = [ModelRequest([UserPromptPart(m["content"])]) if m["role"] == "user" else ModelResponse([TextPart(m["content"])])
+    history = [ModelRequest([UserPromptPart(content(m))]) if m["role"] == "user" else ModelResponse([TextPart(content(m))])
                for m in turns[:-1]]
     if history and system and isinstance(history[0], ModelRequest):
         history[0].parts.insert(0, SystemPromptPart(system))
-    return system, history, turns[-1]["content"]
+    return system, history, content(turns[-1])
 
 
 class PydanticAI:

@@ -2,15 +2,16 @@
 
 У каждой перспективы своя память (Book): strategic правила по доменам с rationale и confidence, tactical —
 правила текущей попытки, счётчик принятых за прогон. Допуск: confidence >= 0.5 и не больше 20 принятых за
-прогон (max_rules_per_task апстрима: счётчик на агента и между задачами не сбрасывается, optimizer.py:206);
+прогон (max_rules_per_task апстрима, per_run: счётчик на агента и между задачами не сбрасывается, optimizer.py:206);
 принятое идёт в tactical; strategic при confidence >= 0.85 без дубля по словам (0.85 в апстриме и параметр
 оптимизатора, и зашит в strategic_store.py:201; при значении по умолчанию одно и то же — у нас одна константа);
-домен по убыванию confidence, сверх 10 правил оптимизатор (конфликты, поглощение, слияние, до двух проходов)
-сжимает до 8, остаток обрезается до 10. Оптимизатор и предел (compress) берёт и ace_opt."""
+домен по убыванию confidence, сверх 10 правил (cap) оптимизатор (конфликты, поглощение, слияние, до двух проходов)
+сжимает до int(0.8 * cap), остаток обрезается до cap. Запросы оптимизатора — как у OpenAIAdapter апстрима: одно
+сообщение user частями, без параметров. Оптимизатор и предел (compress) берёт и ace_opt."""
 from dataclasses import dataclass
 
 from .. import parse, prompts, render
-from ..model import Call, Reader, messages, params
+from ..model import Call, Reader, parts
 from ..extract import ATTEMPT, CONFIDENCE, DOMAIN, RATIONALE
 from . import Container, Ids, Record
 
@@ -33,7 +34,7 @@ def rule_optimizer(passes=OPTIMIZER_PASSES):
     """-> optimize(model, rules, target): анализ, затем конфликты, поглощение, слияние, до passes проходов;
     номера правил стабильны между проходами. Модель отвечает текстом, разбор — parse.scope_* (как у апстрима)."""
     def llm(model, name, fields, read):
-        return model.ask(Call(messages(P[name].fill(fields)), params(), Reader(text=read))).output
+        return model.ask(Call(parts(P[name].fill(fields)), {}, Reader(text=read))).output
 
     def resolve(model, rules, pairs):
         by_id, done, fixed = {x["id"]: x for x in rules}, set(), {}
@@ -139,8 +140,9 @@ class Book(Container):
     как в апстриме); tactical — правила текущей попытки, живут до начала следующей."""
     requires = frozenset({CONFIDENCE, DOMAIN, RATIONALE})
 
-    def __init__(self, name=THOROUGHNESS, optimizer=None, cap=CAP, target=TARGET):
-        self.name, self.optimizer, self.cap, self.target = name, optimizer or rule_optimizer(), cap, target
+    def __init__(self, name=THOROUGHNESS, optimizer=None, cap=CAP, per_run=PER_RUN):
+        self.name, self.optimizer, self.cap, self.per_run = name, optimizer or rule_optimizer(), cap, per_run
+        self.target = int(cap * 0.8)    # target_count апстрима
         self.ids, self.domains, self.tactical, self.accepted = Ids(), {}, [], 0
 
     def records(self):
@@ -157,7 +159,7 @@ class Book(Container):
 
     def admit(self, ex, text, confidence, domain, rationale):
         """_should_accept_update и add_strategic_rule; domain None — правило тактическое."""
-        if self.accepted >= PER_RUN or confidence < ACCEPT:
+        if self.accepted >= self.per_run or confidence < ACCEPT:
             return
         self.accepted += 1
         self.tactical.append(Record(self.ids.next(), text))
@@ -183,8 +185,8 @@ class Perspectives(Container):
     перспективы попытки, на которой он извлечён (attempt)."""
     requires = Book.requires | {ATTEMPT}
 
-    def __init__(self, names=(THOROUGHNESS,)):
-        self.books = [Book(n) for n in names]
+    def __init__(self, names=(THOROUGHNESS,), **book):
+        self.books = [Book(n, **book) for n in names]
 
     def book(self, k):
         return self.books[k % len(self.books)]

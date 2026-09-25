@@ -2,18 +2,20 @@
 
 Шаг — вызов инструмента (посреди попытки) или итоговый ответ (после попытки). Правило:
     propose     кандидат по ошибке шага (scope_error) или по качеству (промпт перспективы: thoroughness,
-                efficiency); n > 1 — Best-of-N: n кандидатов при BEST_OF_TEMPERATURE и селектор (в апстриме
-                кандидаты от разных моделей). Пустой кандидат и «no improvement needed» без ошибки отбрасываются.
+                efficiency); n > 1 — Best-of-N: кандидат основной модели и n - 1 от candidate_models (у нас та же
+                модель при BEST_OF_TEMPERATURE), затем селектор. Пустой кандидат и «no improvement needed» без
+                ошибки отбрасываются.
     classify    классификатор: дубль — урока нет; уточнённая confidence; домен strategic-правила
 Добавки: confidence, domain (None — правило тактическое), rationale, attempt (память перспективы попытки).
 
 Что правило видит о памяти, берёт у памяти перспективы попытки (book): её имя (промпт качества),
 tactical правила (applied_rules и текущий системный промпт) и текст strategic для классификатора.
-Модель отвечает текстом, разбор — функции апстрима в parse.py (scope_*), с его откатами."""
+Запросы — как у OpenAIAdapter апстрима (create_openai_model): одно сообщение user частями, без параметров. Модель
+отвечает текстом, разбор — функции апстрима в parse.py (scope_*), с его откатами."""
 from dataclasses import dataclass
 
 from .. import parse, prompts, render
-from ..model import Call, Reader, messages, params
+from ..model import Call, Reader, parts
 from ..show.scope import current_system, strategic_text
 from . import ATTEMPT, CONFIDENCE, DOMAIN, RATIONALE, Extraction, Extractor
 
@@ -79,21 +81,22 @@ class Rules(Extractor):
             fields.update(error_type=error[0], error_message=error[1])
         prompt = (P["error"] if error else P[book.name]).fill(fields)
 
-        def one(temperature, quality):
+        def one(extra, quality):
             read = Reader(text=lambda text: parse.scope_guideline(text, quality))
-            c = ex.model.ask(Call(messages(prompt), params(temperature), read)).output
+            c = ex.model.ask(Call(parts(prompt), extra, read)).output
             return Proposal(**c) if c else None
         if self.n == 1:
-            c = one(0, not error)
+            c = one({}, not error)
             return c if c and c.update_text else None
-        cands = [c for c in (one(BEST_OF_TEMPERATURE, False) for _ in range(self.n)) if c and (error or meaningful(c))]
+        models = [{}] + [{"temperature": BEST_OF_TEMPERATURE}] * (self.n - 1)
+        cands = [c for c in (one(p, False) for p in models) if c and (error or meaningful(c))]
         if len(cands) < 2:
             best = cands[0] if cands else None
         else:
             select = P["selector"].fill(agent_context(ex, attempt, book), issue_type="error" if error else "quality",
                                         issue_details=render.issue(summary, error), candidates=render.candidates(cands))
             read = Reader(text=lambda text: parse.scope_selection(text, len(cands)))
-            best = cands[ex.model.ask(Call(messages(select), params(), read)).output]
+            best = cands[ex.model.ask(Call(parts(select), {}, read)).output]
         return best if best and best.update_text else None
 
     def classify(self, ex, proposal, book, k=0, group=None):
@@ -104,7 +107,7 @@ class Rules(Extractor):
         prompt = P["classify"].fill(allowed_domains=", ".join(DOMAINS), update_text=proposal.update_text,
                                     rationale=proposal.rationale, initial_confidence=initial, all_rules_context=context)
         read = Reader(text=lambda text: parse.scope_classification(text, initial, DOMAINS))
-        c = ex.model.ask(Call(messages(prompt), params(), read)).output
+        c = ex.model.ask(Call(parts(prompt), {}, read)).output
         if c["is_duplicate"]:
             return None
         domain = c["domain"] if c["scope"] == "strategic" else None

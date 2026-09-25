@@ -154,9 +154,9 @@ async def capture_prompts():
     data["memory_optimizer"] = {"result": await MemoryOptimizer(adapter(mo)).optimize_rules(six, target_count=3),
                                 "calls": mo.calls}
 
-    # как в repro/scope_run.py: OpenAIAdapter(temperature=0) — какие параметры уходят в API
+    # как create_openai_model(model, base_url) без temperature: какие параметры уходят в API
     oa = fake.FakeLLM([(ERR, js(upd))])
-    openai_model = OpenAIAdapter(fake.FakeOpenAI(oa, asynchronous=True), model="ornith15-9b", temperature=0)
+    openai_model = OpenAIAdapter(fake.FakeOpenAI(oa, asynchronous=True), model="ornith15-9b")
     await GuidelineSynthesizer(openai_model).generate_update_from_error(**kw, **err)
     data["openai_adapter_request"] = oa.calls
 

@@ -79,7 +79,7 @@ def test_best_of_two():
     model = Stub(texts(quality=lambda call: js(update_text=next(cands)), select=js(selected_index=1)))
     p = Rules(n=2).propose(Ex(model), attempt(), Book(), *tool_step(FINE))
     assert p.update_text == "second"
-    assert [c["temperature"] for c in model.calls] == [0.7, 0.7, 0]
+    assert [c["temperature"] for c in model.calls] == [None, 0.7, None]    # основная, кандидат, селектор
     assert "[Candidate 0]\nUpdate: first" in model.calls[2]["user"]
 
 
