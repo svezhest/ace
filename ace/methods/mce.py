@@ -1,40 +1,65 @@
 """MCE (meta-context-engineering: mce/main.py, utils.py, prompts/meta_agent.py, prompts/base_agent.py).
-Промпты prompts/mce_*.txt: апстрим без кодовых интерфейсов, утилит и записи навыка в файл.
+Промпты ace/prompts/mce_*.j2: апстрим без кодовых интерфейсов, утилит и записи навыка в файл.
 
-    1 память      файлы context/, их заводит и правит базовый агент; скрыто от решателя — история итераций
-                  (навык, точность на train и val, память после итерации)
-    2 инжект      все файлы context/ (интерфейс get_context у апстрима пишет сам агент кодом: не делаем)
-    3 сигнал      верный ответ; базовому агенту идут только итоги (question, llm_answer, target, is_correct)
-    4 обновление  итерация = проход по train батчами по 20; reflect: keep;
-                  curate: chain(iteration — в начале итерации мета-агент ask пишет SKILL.md по истории,
-                  base — curate.tools: агент по навыку правит context/, итоги батча в data/ только на чтение);
-                  конец прохода: flush неполного батча, best_by_val — val, следующая итерация стартует с лучшей
-                  по val (строго >, при равенстве ранняя; итерация 0 — пустой контекст)
-    решатель      общий
+mce = Meta(базовый агент с файлами):
+    мета        итерация = проход; в начале итерации мета-агент пишет навык (SKILL.md) по истории итераций:
+                обзор навыков с train и val, evaluations, архив навыков (wrap.Meta); в конце прохода val, следующая
+                итерация начинается с лучшей по val из пройденных (строго больше, при равенстве первая)
+    память      файлы context/ (мир документов); их заводит и правит базовый агент по навыку файловыми
+                инструментами, до 30 раундов; итоги батча (question, llm_answer, target, is_correct) — в data/
+                только на чтение, только текущий батч (train.json под-итерации)
+    показ       все файлы context/ (интерфейс get_context апстрим пишет сам агент кодом: не делаем)
+    извлечение  нет: память читает сырое
+    когда учится  батч 20; неполный батч применяется в конце прохода
+Параметры scripts/train_symptom_diagnosis.sh: 3 итерации, train 50 батчами по 25, val 20; у нас 40 батчами
+по 20 и val 10. Базовому агенту апстрима доступны ещё python, call_llm и эмбеддинги.
 
-Параметры scripts/train_symptom_diagnosis.sh: 3 итерации, train 50 батчами по 25, val 20;
-у нас 40 батчами по 20 и val 10. Базовому агенту апстрима доступны ещё python, call_llm и эмбеддинги.
+mce_ace = Meta(ACE): тот же мета-агент (промпт mce_meta_ace — про рефлектор и куратор ACE), навык идёт в
+системные промпты рефлектора и куратора ACE. Нового в сравнении нет, кроме меты: ученик — ace как есть.
 """
-from .. import bound, curate, inject, prompts, reflect, update
-from ..feedback import Feedback
-from ..loop import Method
-from ..memory import Iteration, Kind, Note
-from ..update import Update, ask
+from .. import fs, prompts, render
+from ..extract import Raw
+from ..learner import Learner, swap
+from ..memory import Files
+from ..show import Whole
+from ..wrap import Meta
+from .ace import ace
 
-META, BASE = prompts.load("mce_meta.txt"), prompts.load("mce_base.txt")
+META, META_ACE, BASE = prompts.load("mce_meta"), prompts.load("mce_meta_ace"), prompts.load("mce_base")
+BASE_SYSTEM = prompts.text("mce_base_system")
 
-# 1. память
+BATCH, ROUNDS, ITERATIONS = 20, 30, 3
 
-MEMORY = {"context": Kind(Note), "iterations": Kind(Iteration, ("add", "edit"), private=True, ids="i")}
 
-# 4. обновление
+def meta_agent(template):
+    """author для Meta: навык по истории итераций; пустой ответ — навык прошлой итерации."""
+    def author(ex, history):
+        out = ex.model.run("", template.fill(task_instruction=render.task_instruction(ex.task),
+                                             skill_database=render.skill_database(history),
+                                             evaluations=render.evaluations(history), skills=render.skills(history))).output
+        return (out or "").strip() or (history[-1].text if history else "")
+    return author
 
-BATCH, ROUNDS = 20, 30
 
-meta = ask(META, curate.meta_fields, then=curate.new_skill)
-base = curate.tools(BASE, curate.skill_fields, curate.context_and_results, rounds=ROUNDS,
-                    system="You are a context engineer working with file tools.")
+class Context(Files):
+    """Файлы context/ базового агента. На батче агент по навыку правит их инструментами; итоги батча — в data/."""
+    def __init__(self, rounds=ROUNDS):
+        super().__init__("context")
+        self.rounds = rounds
 
-mce = Method("mce", MEMORY, inject.full(inject.plain, sep="\n\n"), Feedback("golden"),
-             Update(reflect.keep, curate.chain(curate.iteration(meta), base), every=BATCH,
-                    epoch=update.chain(update.flush, bound.best_by_val())), epochs=3)
+    def learn(self, ex, extractions):
+        groups = [x.group for x in extractions]
+        data = Files("result")
+        for i, g in enumerate(groups, 1):
+            e = g.episodes[g.chosen]
+            data.write(f"r{i}", render.result(e.ok, e.answer, g.target, g.question))
+        prompt = BASE.fill(task_instruction=render.task_instruction(ex.task), skill=ex.learner.skill,
+                           summary=render.train_summary(sum(bool(g.episodes[g.chosen].ok) for g in groups), len(groups)))
+        files = fs.FS({"context": fs.Mount(self), "data": fs.Mount(data, "ro")})
+        ex.model.run(BASE_SYSTEM, prompt, tools=fs.TOOLS, deps=files, rounds=self.rounds)
+
+
+base = Learner("mce_base", memory=Context(), show=Whole(line=render.plain, sep="\n\n"), extract=Raw(), every=BATCH,
+               flush=True, epochs=ITERATIONS)
+mce = Meta(base, meta_agent(META), "mce")
+mce_ace = Meta(swap(ace, epochs=ITERATIONS), meta_agent(META_ACE), "mce_ace")

@@ -2,4 +2,19 @@
 name = "ace"
 version = "0.1"
 requires-python = ">=3.11"
-dependencies = ["pydantic-ai-slim[openai]>=2.46", "sentence-transformers>=3.0"]
+dependencies = [
+    "jinja2>=3.1.6",
+    "pydantic-ai-slim[openai]>=2.46",
+    "sentence-transformers>=3.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "pyyaml>=6.0.3",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+filterwarnings = ["ignore::DeprecationWarning:pydantic_graph"]

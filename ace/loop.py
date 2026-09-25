@@ -1,235 +1,285 @@
-"""Один цикл на все методы. Метод = четыре элемента памяти и решатель:
+"""Цикл, один на все методы. Эксперимент — проходы по задачам; вопрос — группа попыток; попытка — шаги
+решателя. Ученик (learner.py) даёт промпт попытки и отвечает на события своих масштабов:
 
-    1 память     схема: виды записей, их поля и разрешённые операции   memory.py
-    2 инжект     что из памяти видит решатель: при запуске, по запросу, после шага   inject.py
-    3 сигнал     что после попытки возвращается в систему              feedback.py
-    4 обновление обработчики событий: шаг, задача, батч, проход         update.py
+    шаг       on_step(ex, attempt, step) -> Patch | None     при обучении и на val / тесте
+    попытка   prompt(ex, item, k) -> Prompt до, on_attempt(ex, episode) после
+    вопрос    on_question(ex, group)                        группа есть всегда, обычно из одной попытки
+    батч      on_batch(ex, groups) раз в learner.every вопросов; неполный в конце прохода — если learner.flush
+    проход    on_pass(ex); ex.evaluate() — точность на val
 
-    решатель     среда задачи, число попыток, голосование, перспективы
-
-    память -> инжект -> решатель (шаги: обновление, хук инжекта) -> сигнал -> обновление -> память
-
-При сборке метод сверяет, что блоки инжекта и обновления требуют от памяти (needs), со схемой памяти.
-"""
+На val и тесте (training = False) цикл зовёт только prompt и on_step. Сам цикл делает: среду попытки,
+вердикты (верный ответ в эпизоде только при golden), выбор ответа в зачёт, запись прочитанного
+инструментами (episode.used), протокол (онлайн; офлайн с выбором лучшей по val версии) и лог."""
+import copy
 import json
-import os
 import random
 import time
-from collections import Counter
-from dataclasses import dataclass, field, replace
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-from . import inject as injects
-from .env import Env
-from .feedback import Episode, Feedback, failed
-from .memory import Hook, Kind, Memory, check, requirements
+from . import config, render
 from .tasks import final_answer
-from .update import Ctx, Update, snapshot
+from .verdict import majority
 
 
 @dataclass
-class Solver:
-    env: Env = field(default_factory=Env)
-    samples: int = 0            # сколько ещё попыток (группа для сигнала или голосования)
-    temperature: float = 0.7    # температура дополнительных попыток
-    vote: bool = False          # ответ большинством по всем попыткам (self-consistency)
-    perspectives: tuple = ()    # K решений, у каждого своя часть памяти; засчитывается лучшее
-    hint: str = ""              # добавка метода к системному промпту решателя (формат ответа)
-
-
-@dataclass
-class Method:
-    name: str
-    memory: dict = field(default_factory=lambda: {"note": Kind()})
-    inject: callable = field(default_factory=injects.full)
-    feedback: Feedback = field(default_factory=Feedback)
-    update: Update = field(default_factory=Update)
-    solver: Solver = field(default_factory=Solver)
-    epochs: int = 1             # проходов по train по умолчанию, как в апстриме
-
-    def __post_init__(self):
-        if self.update.needs_usage and self.feedback.usage == "none":
-            raise ValueError(f"{self.name}: обновлению нужно, что решатель прочёл, а сигнал этого не отдаёт (usage=none)")
-        if self.feedback.usage == "env" and not getattr(self.inject, "reads", False):
-            raise ValueError(f"{self.name}: usage=env, но инжект не даёт инструментов чтения")
-        u = self.update
-        problems = check(self.memory, requirements(self.inject, u.reflect, u.curate, u.bound, u.step, u.epoch))
-        if problems:
-            raise ValueError(f"{self.name}: блоки не сходятся с памятью: " + "; ".join(problems))
-
-
-def swap(method, name=None, **parts):
-    """Метод с заменёнными частями: элементами (memory, inject, feedback, solver) или частями
-    обновления (reflect, curate, bound, every, step, epoch). Проверки метода выполняются заново."""
-    stages = {k: parts.pop(k) for k in ("reflect", "curate", "bound", "every", "step", "epoch", "needs_usage") if k in parts}
-    return replace(method, name=name or method.name, update=replace(parts.pop("update", method.update), **stages), **parts)
+class Prompt:
+    """Что ученик даёт попытке."""
+    system: str = ""            # добавка к системному промпту решателя; роль задачи и подсказку среды ставит цикл
+    tools: tuple = ()           # инструменты чтения памяти
+    deps: object = None         # их fs.FS; прочитанное (deps.reads) цикл пишет в episode.used
+    rounds: int = 0             # лишних шагов решателю на чтение
+    shown: list = field(default_factory=list)   # id показанных записей
+    temperature: float = 0
+    top_p: float = None         # None — по умолчанию сервера (TF-GRPO: итоговый агент апстрима с top_p 0.95)
+    note: str = ""              # заметка к сообщению решателю (раунды рефлексии ACE)
 
 
 @dataclass
 class Attempt:
-    """Всё, что известно об одной попытке, включая верный ответ. Обновлению идёт через сигнал."""
+    """Идущая попытка: что видит on_step."""
     question: str
-    target: str
-    output: str
+    k: int                      # номер попытки в группе
+    training: bool
+    prompt: Prompt
+    system: str = ""            # системный промпт попытки целиком (Patch(system) пишет новый на его основе)
+    steps: list = field(default_factory=list)       # model.Step до текущего включительно
+    patches: list = field(default_factory=list)     # model.Patch, применённые после шагов
+    fired: list = field(default_factory=list)       # (id показанного урока, помог ли) — исходы показа после ошибки
+
+
+@dataclass
+class Episode:
+    """Законченная попытка, как её видит обучение."""
+    question: str
+    k: int
+    prompt: Prompt
+    output: str                 # вся траектория текстом: ответы, вызовы инструментов, их результаты
+    final: str                  # последний ответ модели
     answer: str
-    correct: bool
-    truncated: bool
     steps: list
-    context: str
-    shown: list
-    reads: list                 # что прочитано инструментами инжекта
-    reported: list              # что решатель назвал сам
-    perspective: str = ""
-    fired: list = field(default_factory=list)   # (id хука, помог ли)
+    truncated: bool
+    used: list                  # id записей, прочитанных инструментами показа
+    fired: list
+    patches: list
+    ok: bool = None             # вердикт попытки; None — его нет
+    target: str = ""            # верный ответ — только при golden
+
+    @property
+    def shown(self):
+        return self.prompt.shown
 
 
-def solve(model, task, method, memory, item, temperature=0, note="", ctx=None):
-    """ctx — идёт обучение: тогда на шагах решателя срабатывает обновление (update.step)."""
-    env, view = method.solver.env, method.inject(model, memory, item)
-    self_report = method.feedback.usage == "self"
-    system = task.system + env.hint + method.solver.hint
-    if view.text:
-        system += "\n\n" + view.head + view.text
-    if self_report and memory.of():
-        system += ("\n\nRight before the final answer line, write one line 'USED: <ids of the memory bullets "
-                   "you actually relied on, comma-separated, or none>'.")
-    user = f"{task.instr}\n\n{item['context']}" + (f"\n\nReflection:\n{note}" if note else "")
-    learn = ctx is not None and method.update.step
-    events = Steps(ctx, method, memory, item, view) if env.tools + view.tools and (learn or view.hook) else None
-    r = model.run(system, user, tools=env.tools + view.tools, deps=view.fs,
-                  rounds=env.rounds + view.rounds, temperature=temperature, on_step=events)
-    fired = events.finish() if events else []
-    answer = final_answer(r.output or "")
-    reported = [i for i in used_line(r.output or "") if memory.get(i)] if self_report else []
-    return Attempt(item["context"], item["target"], r.text, answer, task.check(answer, item["target"]), r.truncated,
-                   r.steps, view.text, view.shown, list(view.fs.reads) if view.fs else [], reported,
-                   item.get("perspective", ""), fired)
+@dataclass
+class Group:
+    """Попытки одного вопроса."""
+    question: str
+    episodes: list
+    target: str = ""            # верный ответ — только при golden
+    vote: str = ""              # вердикт группы vote: самый частый ответ
+    chosen: int = 0             # чья попытка в зачёт
+    pick: str = "first"         # как она выбрана
+    pass_at_k: bool = False     # выбрана по метке: зачёт — pass@k, а не точность
+
+    @property
+    def answer(self):
+        return self.episodes[self.chosen].answer
+
+# что в зачёт: pick(group, check) -> номер попытки; check(ответ) — проверка задачи
 
 
-class Steps:
-    """Событие шага: при обучении обновление правит память сразу; хук инжекта отдаёт текст к системному
-    промпту. Показанные хуки по ошибкам судятся следующим шагом: помог, если их ошибка не повторилась;
-    без следующего шага исход неизвестен и не считается."""
-    def __init__(self, ctx, method, memory, item, view):
-        self.ctx, self.method, self.memory, self.item, self.view = ctx, method, memory, item, view
-        self.done, self.waiting, self.fired = [], [], []
-
-    def __call__(self, new):
-        text = None
-        for step in new:
-            self.fired += [(r.id, not (failed(step[2]) and r.recurred(step[2]))) for r in self.waiting]
-            self.waiting = []
-            self.done.append(step)
-            if self.ctx is not None and self.method.update.step:
-                ep = Episode(self.item["context"], "", "", list(self.done), False, self.view.text, self.view.shown,
-                             perspective=self.item.get("perspective", ""))
-                self.method.update.step(self.ctx, ep, self.memory, step=step)
-            v = self.view.hook(step) if self.view.hook else None
-            if v and v.text:
-                text = v.text
-                self.waiting = [r for r in map(self.memory.get, v.shown) if isinstance(r, Hook)]
-        return text
-
-    def finish(self):
-        return self.fired
+def first(group, check):
+    return 0
 
 
-def used_line(text):
-    """Самоотчёт ACE (bullet_ids) строкой «USED: r1, r3» в обычном ответе: решатель рассуждает так же, как у остальных методов."""
-    lines = [l for l in text.splitlines() if l.strip().upper().startswith("USED:")]
-    return [i.strip(" []") for i in lines[-1].split(":", 1)[1].split(",")] if lines else []
+def greedy(group, check):
+    """Попытка при температуре 0 (TF-GRPO: жадная в зачёт, остальные — группа для обучения)."""
+    return next((i for i, e in enumerate(group.episodes) if e.prompt.temperature == 0), 0)
 
 
-def attempt(model, task, method, memory, item, ctx=None):
-    """Попытка, которая идёт в зачёт, и остальные попытки (группа)."""
-    s = method.solver
-    if s.perspectives:
-        # у каждой перспективы своя память (SCOPE K=2): инжект и обновление читают item["perspective"]
-        tried = [solve(model, task, method, memory, dict(item, perspective=p), ctx=ctx) for p in s.perspectives]
-        a = max(tried, key=lambda t: t.correct)
-        group = [t for t in tried if t is not a]
-    else:
-        a, group = solve(model, task, method, memory, item, ctx=ctx), []
-    group += [solve(model, task, method, memory, item, temperature=s.temperature, ctx=ctx) for _ in range(s.samples)]
-    if s.vote:
-        a.answer = majority([a] + group)
-        a.correct = task.check(a.answer, a.target)
-    return a, group
+def vote(group, check):
+    """Ответ большинства (self-consistency); при равенстве первый встреченный."""
+    top = majority(e.answer for e in group.episodes)
+    return next((i for i, e in enumerate(group.episodes) if top and e.answer == top), 0)
 
 
-def majority(attempts):
-    """Самый частый непустой ответ; при равенстве первый встреченный."""
-    votes = Counter(t.answer for t in attempts if t.answer)
-    return votes.most_common(1)[0][0] if votes else ""
+def best(group, check):
+    """Первая верная по метке, иначе первая (SCOPE K=2). Это pass@k — помечается в логе."""
+    group.pass_at_k = True
+    return next((i for i, e in enumerate(group.episodes) if check(e.answer)), 0)
 
 
-def run(task, method, model, n=40, out=None, split="", epochs=None, offline=False):
-    """Онлайн: поток split, память обновляется по ходу, epochs проходов, в зачёт последний.
-    Офлайн (ACE offline, MCE): обучение на train, после каждого прохода val, затем split
-    с лучшей по val памятью без обновлений."""
-    random.seed(int(os.getenv("SEED", 0)))
-    epochs = epochs or method.epochs
-    memory = Memory(dict(method.memory))
-    item = None
-    scores = {}
+def at_zero(k):
+    return 0
 
-    def evaluate(m):
-        """(верно, обрыв) на val; одна и та же память (открытые записи) не считается дважды."""
-        key = m.key()
-        if key not in scores:
-            scores[key] = [(t.correct, t.truncated) for t in (solve(model, task, method, m, it) for it in task.load("val"))]
-        return scores[key]
 
-    ctx = Ctx(model, task, evaluate=evaluate,
-              render=lambda m: method.inject(model, m, item).text,
-              retry=lambda m, note: solve(model, task, method, m, item, note=note), update=method.update)
+def default(k):
+    """Настройка по умолчанию сервера (top_p)."""
+    return None
+
+
+@dataclass
+class Attempts:
+    """Сколько попыток на вопрос и что в зачёт. Различие попыток: температура и top_p попытки k; выборка
+    показа и разделённая память — в prompt(ex, item, k) ученика; заметка рефлектора — ex.retry из извлечения."""
+    n: int = 1
+    temperature: callable = at_zero
+    top_p: callable = default
+    pick: callable = first
+
+
+class Experiment:
+    """Метод × задача. Хукам ученика — как ex: модель, задача, флаг обучения, номер вопроса и их число,
+    evaluate() и retry()."""
+    def __init__(self, task, learner, model):
+        self.task, self.learner, self.model = task, learner, model
+        self.training, self.epoch, self.i, self.total, self.item = True, 0, 0, 0, None
+        self.scores = {}        # кэш val по ключу памяти
+
+    def attempt(self, item, k, prompt):
+        env = self.learner.env.open()
+        a = Attempt(item["context"], k, self.training, prompt, self.task.system + env.hint + prompt.system)
+        try:
+            tools = env.tools + prompt.tools
+            reply = self.model.run(a.system,
+                                   render.user_message(self.task.instr, item["context"], prompt.note),
+                                   tools=tools, deps=prompt.deps, rounds=env.rounds + prompt.rounds,
+                                   temperature=prompt.temperature, top_p=prompt.top_p,
+                                   on_step=self.stepper(a) if tools and self.learner.watches_steps() else None)
+        finally:
+            env.close()
+        final = reply.output or ""
+        ep = Episode(a.question, k, prompt, reply.text, final, final_answer(final), reply.steps, reply.truncated,
+                     list(prompt.deps.reads) if prompt.deps is not None else [], a.fired, a.patches)
+        self.learner.verdict(self, ep, item["target"])
+        return ep
+
+    def stepper(self, a):
+        """on_step для модели: каждый новый шаг — ученику; его Patch-и одного запроса сливаются."""
+        def on_step(new):
+            patch = None
+            for step in new:
+                a.steps.append(step)
+                p = self.learner.on_step(self, a, step)
+                if p:
+                    a.patches.append(p)
+                    patch = p if patch is None else patch.merge(p)
+            return patch
+        return on_step
+
+    def question(self, item):
+        """Группа попыток одного вопроса; при обучении — события попытки и вопроса."""
+        learner, eps = self.learner, []
+        for k in range(learner.attempts.n):
+            ep = self.attempt(item, k, learner.prompt(self, item, k))
+            eps.append(ep)
+            if self.training:
+                learner.on_attempt(self, ep)
+        g = Group(item["context"], eps, target=eps[0].target)
+        learner.group_verdict(self, g)
+        g.pick = learner.attempts.pick.__name__
+        g.chosen = learner.attempts.pick(g, lambda answer: self.task.check(answer, item["target"]))
+        if self.training:
+            learner.on_question(self, g)
+        return g
+
+    def retry(self, memory, note):
+        """Новая попытка текущего вопроса с показом из memory и заметкой — стрелка извлечение -> попытки
+        (раунды рефлексии ACE). На её шагах не учатся."""
+        p = self.learner.prompt(self, self.item, 0, memory)
+        p.note = note
+        training, self.training = self.training, False
+        try:
+            return self.attempt(self.item, 0, p)
+        finally:
+            self.training = training
+
+    def evaluate(self):
+        """(верно, обрыв) по вопросам val без обучения. Одна и та же память не считается дважды; при случайном
+        показе ключа нет и кэша тоже."""
+        key = self.learner.key()
+        if key is not None and key in self.scores:
+            return self.scores[key]
+        training, self.training = self.training, False
+        try:
+            out = [self.result(self.question(item), item) for item in self.task.load("val")]
+        finally:
+            self.training = training
+        if key is not None:
+            self.scores[key] = out
+        return out
+
+    def result(self, group, item):
+        return self.task.check(group.answer, item["target"]), group.episodes[group.chosen].truncated
+
+
+def finish(ep):
+    return "length" if ep.truncated else "stop"
+
+
+def entry(phase, epoch, i, g, item, correct, gated, memory_chars, sec):
+    """Запись лога по вопросу: ответ в зачёт, как выбран, и вся группа."""
+    chosen = g.episodes[g.chosen]
+    return dict(phase=phase, epoch=epoch, i=i, question=g.question, target=item["target"], answer=g.answer, correct=correct,
+                pick=g.pick, pass_at_k=g.pass_at_k, vote=g.vote, finish=finish(chosen), output=chosen.output,
+                shown=chosen.shown, read=chosen.used, gated=gated, memory_chars=memory_chars, sec=sec,
+                group=[dict(k=e.k, answer=e.answer, ok=e.ok, temperature=e.prompt.temperature, finish=finish(e),
+                            shown=e.shown, read=e.used, fired=e.fired, patches=[asdict(p) for p in e.patches])
+                       for e in g.episodes])
+
+
+def run(task, learner, model, n=config.SIZE, out=None, split="", epochs=None, offline=False):
+    """Онлайн: поток split, память учится по ходу, epochs проходов, в зачёт последний.
+    Офлайн (ACE offline, MCE): обучение на train, после каждого прохода val; тест на split с лучшей по val
+    версией памяти (строго больше, при равенстве ранняя), без обучения."""
+    random.seed(config.SEED)
+    learner = copy.deepcopy(learner)        # в реестре память ученика пуста: каждый прогон с чистой
+    ex = Experiment(task, learner, model)
+    epochs = epochs or learner.epochs
     log = []
 
-    def record(phase, epoch, i, a, t0):
-        log.append(dict(phase=phase, epoch=epoch, i=i, question=a.question, target=a.target, answer=a.answer,
-                        correct=a.correct, finish="length" if a.truncated else "stop", output=a.output, shown=a.shown,
-                        read=a.reads, reported=a.reported, gated=ctx.gated[-1:], memory_chars=memory.chars(),
-                        sec=round(time.time() - t0, 1)))
-        done = [r for r in log if r["phase"] == phase and r["epoch"] == epoch]
-        print(f"{task.name} {method.name} {phase}{epoch} {i:3} {'+' if a.correct else '-'} "
-              f"{sum(r['correct'] for r in done)}/{len(done)} mem={memory.chars()}", flush=True)
+    def record(phase, i, g, item, t0, gated):
+        correct = task.check(g.answer, item["target"])
+        log.append(entry(phase, ex.epoch, i, g, item, correct, gated, learner.memory.chars(), round(time.time() - t0, 1)))
+        done = [r for r in log if r["phase"] == phase and r["epoch"] == ex.epoch]
+        print(f"{task.name} {learner.name} {phase}{ex.epoch} {i:3} {'+' if correct else '-'} "
+              f"{sum(r['correct'] for r in done)}/{len(done)} mem={learner.memory.chars()}", flush=True)
 
-    best, best_val = snapshot(memory), -1
+    best, best_val = learner.snapshot(), -1
     for epoch in range(epochs):
         items = task.load("train" if offline else split)[:n]
+        ex.epoch, ex.total, batch = epoch, len(items), []
         for i, item in enumerate(items):
-            t0 = time.time()
-            ctx.step, ctx.total = i + 1, len(items)
-            memory.new_task()
-            a, group = attempt(model, task, method, memory, item, ctx)
-            episode = method.feedback.observe(model, a, group)
-            delta = method.update.reflect(ctx, episode, memory)
-            if delta:
-                ctx.pending.append(delta)
-            if (i + 1) % method.update.every == 0:
-                method.update.batch(ctx, memory)
-            record("train" if offline else "online", epoch, i, a, t0)
-        if method.update.epoch:
-            method.update.epoch(ctx, memory)
-        ctx.pending = []                # неполный батч без обработчика прохода отбрасывается
+            t0, gates = time.time(), len(learner.gated)
+            ex.i, ex.item = i, item
+            g = ex.question(item)
+            batch.append(g)
+            if len(batch) == learner.every:
+                learner.on_batch(ex, batch)
+                batch = []
+            record("train" if offline else "online", i, g, item, t0, learner.gated[gates:])
+        if batch and learner.flush:
+            learner.on_batch(ex, batch)
+        learner.on_pass(ex)
         if offline:
-            score = sum(c for c, _ in ctx.evaluate(memory))
+            score = sum(c for c, _ in ex.evaluate())
             print(f"val after epoch {epoch}: {score}", flush=True)
             if score > best_val:
-                best, best_val = snapshot(memory), score
+                best, best_val = learner.snapshot(), score
     if offline:
-        memory = best
+        learner.restore(best)
+        ex.training, ex.epoch = False, 0
         for i, item in enumerate(task.load(split)[:n]):
             t0 = time.time()
-            memory.new_task()
-            record("test", 0, i, attempt(model, task, method, memory, item)[0], t0)
+            ex.i, ex.item = i, item
+            record("test", i, ex.question(item), item, t0, [])
     final = [r for r in log if r["phase"] == "test" or r["phase"] == "online" and r["epoch"] == epochs - 1]
-    summary = dict(task=task.name, method=method.name, model=model.name, n=len(final), epochs=epochs, offline=offline,
+    summary = dict(task=task.name, method=learner.name, model=model.name, n=len(final), epochs=epochs, offline=offline,
                    correct=sum(r["correct"] for r in final), truncated=sum(r["finish"] == "length" for r in final),
                    **model.usage())
     if out:
         Path(out).mkdir(parents=True, exist_ok=True)
         json.dump(log, open(f"{out}/log.json", "w"), ensure_ascii=False, indent=1)
         json.dump(summary, open(f"{out}/summary.json", "w"), indent=1)
-        memory.save(f"{out}/memory.json")
+        json.dump(learner.dump(), open(f"{out}/memory.json", "w"), ensure_ascii=False, indent=1)
     return summary

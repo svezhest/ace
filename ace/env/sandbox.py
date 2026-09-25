@@ -1,13 +1,18 @@
-"""Исполнение python-кода модели в одноразовом docker-контейнере без сети и без доступа к хосту."""
+"""Исполнение python-кода модели в docker-контейнере без сети и без доступа к хосту.
+Контейнер на вызов (run(code)) или на попытку (start -> run(code, container) ... -> stop): внутри попытки
+между вызовами живут файлы в /tmp, между попытками — ничего."""
 import subprocess
 
-IMAGE = "cestand-sandbox"
-TIMEOUT = 10
-HEAD, TAIL = 20, 20
-MAX_BYTES = 64_000
+from .. import render
 
-DOCKER_ARGS = [
-    "docker", "run", "--rm", "-i",
+IMAGE = "cestand-sandbox"
+TIMEOUT = 10                # секунд на запуск кода внутри контейнера
+DOCKER_GRACE = 15           # сверх TIMEOUT на старт и остановку контейнера
+HEAD_LINES, TAIL_LINES = 20, 20
+MAX_BYTES = 64_000
+TIMEOUT_RC = 124            # код возврата timeout(1)
+
+ISOLATION = [
     "--network", "none",
     "--memory", "512m", "--memory-swap", "512m",
     "--cpus", "1",
@@ -15,52 +20,55 @@ DOCKER_ARGS = [
     "--read-only", "--tmpfs", "/tmp:size=64m,exec",
     "--security-opt", "no-new-privileges",
     "--cap-drop", "ALL",
-    IMAGE, "timeout", str(TIMEOUT), "python", "-I", "-",
 ]
+PYTHON = ["timeout", str(TIMEOUT), "python", "-I", "-"]
+DOCKER_ARGS = ["docker", "run", "--rm", "-i", *ISOLATION, IMAGE, *PYTHON]
 
 
-def trim(text, head=HEAD, tail=TAIL):
+def trim(text, head=HEAD_LINES, tail=TAIL_LINES):
     text = text[:MAX_BYTES]
     lines = text.splitlines()
     if len(lines) <= head + tail:
         return text
-    return "\n".join(lines[:head] + [f"... пропущено {len(lines) - head - tail} строк ..."] + lines[-tail:])
+    return "\n".join(lines[:head] + [render.omitted(len(lines) - head - tail)] + lines[-tail:])
 
 
-def run(code):
-    """-> dict(stdout, stderr, rc, timeout). Код уходит через stdin, обратно только текст."""
+def run(code, container=None):
+    """-> dict(stdout, stderr, rc, timeout). Код уходит через stdin, обратно только текст.
+    container — id контейнера попытки (start); без него — одноразовый контейнер на этот вызов."""
+    args = ["docker", "exec", "-i", container, *PYTHON] if container else DOCKER_ARGS
     try:
-        p = subprocess.run(DOCKER_ARGS, input=code.encode(), capture_output=True, timeout=TIMEOUT + 15)
+        p = subprocess.run(args, input=code.encode(), capture_output=True, timeout=TIMEOUT + DOCKER_GRACE)
     except subprocess.TimeoutExpired:
-        return {"stdout": "", "stderr": "sandbox: контейнер не ответил", "rc": -1, "timeout": True}
+        return {"stdout": "", "stderr": render.NO_RESPONSE, "rc": -1, "timeout": True}
     out, err = p.stdout.decode(errors="replace"), p.stderr.decode(errors="replace")
-    timed_out = p.returncode == 124
+    timed_out = p.returncode == TIMEOUT_RC
     if timed_out:
-        err += f"\nsandbox: превышен лимит {TIMEOUT} с"
+        err += "\n" + render.time_limit(TIMEOUT)
     return {"stdout": trim(out), "stderr": trim(err), "rc": p.returncode, "timeout": timed_out}
 
 
+def start():
+    """Контейнер на попытку с той же изоляцией; живёт до stop. -> id."""
+    p = subprocess.run(["docker", "run", "-d", "--rm", *ISOLATION, IMAGE, "sleep", "infinity"],
+                       capture_output=True, text=True, check=True, timeout=DOCKER_GRACE)
+    return p.stdout.strip()
+
+
+def stop(container):
+    subprocess.run(["docker", "rm", "-f", container], capture_output=True, timeout=DOCKER_GRACE)
+
+
 def build():
+    """Образ песочницы из Dockerfile рядом."""
     import os
     d = os.path.dirname(os.path.abspath(__file__))
     subprocess.run(["docker", "build", "-t", IMAGE, d], check=True)
 
 
-if __name__ == "__main__":
-    # проверка изоляции: каждая строка должна не навредить хосту и вернуть ошибку или таймаут
-    import sys
-    if "--build" in sys.argv:
-        build()
-    tests = {
-        "ok": "print(2+2)",
-        "rm": "import shutil,os; shutil.rmtree('/', ignore_errors=True); print(os.listdir('/'))",
-        "loop": "while True: pass",
-        "net": "import urllib.request; print(urllib.request.urlopen('http://example.com', timeout=3).status)",
-        "flood": "print('x'*10_000_000)",
-        "fork": "import os\nwhile True: os.fork()",
-        "write": "open('/usr/bin/x','w').write('1')",
-        "mem": "a=bytearray(2_000_000_000)",
-    }
-    for k, code in tests.items():
-        r = run(code)
-        print(f"{k:6} rc={r['rc']:4} timeout={r['timeout']} out={r['stdout'][:60]!r} err={r['stderr'][-80:]!r}")
+def available():
+    """Есть ли docker и собранный образ."""
+    try:
+        return subprocess.run(["docker", "image", "inspect", IMAGE], capture_output=True).returncode == 0
+    except FileNotFoundError:
+        return False

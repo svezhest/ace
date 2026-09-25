@@ -1,0 +1,8 @@
+
+=== STRATEGIC RULES (Cross-task, persistent): ===
+{{ strategic or "No strategic rules yet." }}
+
+=== TACTICAL RULES (Current task only): ===
+{% for rule in tactical %}{{ loop.index }}. {{ rule }}
+{% else %}No tactical rules yet.
+{% endfor %}

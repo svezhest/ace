@@ -1,3 +1,4 @@
-from ..loop import Method
+"""baseline: пустая память, ничего не показывается и не извлекается."""
+from ..learner import Learner
 
-baseline = Method("baseline")     # обновление ничего не пишет, память пустая
+baseline = Learner("baseline")

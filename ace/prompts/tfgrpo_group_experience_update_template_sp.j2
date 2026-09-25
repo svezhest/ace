@@ -1,0 +1,71 @@
+Your ultimate goal is to help improve the working agent's performance by extracting useful experiences from its past trajectories, which should focus on the learning objective and will be used in the future to guide the agent's behavior. The working agent and learning objective are defined as follows:
+<Working Agent Objective>
+{{ agent_objective }}
+</Working Agent Objective>
+<Learning Objective>
+{{ learning_objective }}
+</Learning Objective>
+
+Now, your task is to perform experience optimzation with four possible operations, given existing experiences and newly input experiences derived from recent agent trajectories.
+
+<Your Input>
+- Existing Experiences: A list of current experiences in the pool, each with a unique ID and content.
+- New Experiences: A list of new experiences derived from recent agent trajectories.
+</Your Input>
+
+<Task Instructions>
+1. **Focusing on Learning Objective**: Always ensure that any update should focus on the learning objective for improving the working agent.
+
+2. **Valid operations**: You can perform four operations on the existing experience pool. For each new experience, compare it with all existing experiences and decide which operation to perform.
+
+- **ADD**: If the new experience contains entirely new information that is not present in any existing experience, choose ADD. The system will assign a new ID automatically; you do not need to generate an ID.
+
+- **UPDATE**: If the new experience refines, expands, or improves upon an existing experience in the pool, you must update the existing experience. Specifically:
+  - If the new experience conveys the same core information as an existing one but with additional details, update the existing experience to incorporate the new information while keeping the same ID. Synthesize the best aspects to create a more comprehensive but high-level version.
+  - If the new experience conflicts slightly or adds nuance, prefer UPDATE to enhance the existing experience, but **focus on the key insight**.
+  - However, if the information is identical or very similar without meaningful addition, do not update (choose NONE).
+
+- **DELETE**: If the new experience directly contradicts an existing experience (e.g., provides opposing guidance or outdated information), or if it is deemed irrelevant or harmful, choose DELETE. You must specify the ID of the existing experience to delete.
+
+- **NONE**: If the new experience is already fully covered by an existing experience, or if it is redundant, irrelevant, or does not add value, choose NONE and make no change.
+
+3. The experience should be formatted as "Experience name: Brief description." where the name is a concise phrase (one or two words) and the description is a sentence to capture the essence and address the learning objective.
+
+<Output Requirements>
+You MUST output a single, well-formed JSON array. Each element in the array is a JSON object representing the decision for the corresponding new experience.
+Each decision object MUST have the following structure:
+
+```json
+{
+  "operation": "ADD | UPDATE | DELETE | NONE",
+  "id": "existing_experience_id_or_null", // Required only for UPDATE and DELETE. For ADD and NONE, set this to null.
+  "content": "Experience name: Brief description."
+}
+```
+
+Note that the number of objects in the output array MUST exactly match the number of new experiences provided as input.
+</Output Requirements>
+
+<Example Output>
+For example, if you received three new experiences, your output should look like this:
+
+```json
+[
+  {
+    "operation": "ADD",
+    "id": null,
+    "content": "News recency: When users ask for recent news, prioritize recent sources and use time filters for time-sensitive queries."
+  },
+  {
+    "operation": "UPDATE",
+    "id": "exp_456",
+    "content": "Product comparison: Search for top models and compare key features."
+  },
+  {
+    "operation": "NONE",
+    "id": null,
+    "content": "URL verification: Always verify the URL of a website before clicking on a search result."
+  }
+]
+```
+</Example Output>

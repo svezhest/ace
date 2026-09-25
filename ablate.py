@@ -1,20 +1,19 @@
 """Цепочка абляций: каждая ступень отличается от предыдущей одной частью.
 python ablate.py TASK [N] [STEP ...]"""
-import os
 import sys
 
-from ace import bound, inject
+from ace import bound, config, inject, prompts
 from ace.env import Sandbox
 from ace.loop import Solver, run, swap
 from ace.methods import ace, baseline, proto
 from ace.methods.ace import curate_json, curate_rewrite, curate_tools, reflect_text
 from ace.methods.hybrids import hooks
-from ace.methods.proto import curate_json as proto_json, curate_rewrite as proto_rewrite
+from ace.methods.proto import BUDGET_SHARE, curate_json as proto_json, curate_rewrite as proto_rewrite
 from ace.model import Model
 from ace.tasks import TASKS
 
 nobound = lambda *_: None
-PLACEBO = "\n".join(f"[r{i}] Read the question carefully and check units before answering." for i in range(1, 9))
+PLACEBO = prompts.text("placebo")
 CHAIN = {
     "baseline": baseline,
     "placebo": swap(baseline, inject=inject.fixed(PLACEBO)),                    # та же длина промпта без знаний
@@ -29,7 +28,7 @@ CHAIN = {
     "ops5_json": swap(proto, bound=nobound, curate=proto_json),       # операции одной схемой
     "ops5_rewrite": swap(proto, bound=nobound, curate=proto_rewrite), # все записи заново
     "gate": swap(proto, bound=bound.gate()),                                   # ограничение: gate на val
-    "budget": swap(proto, bound=bound.budget(0.25)),                           # ограничение: доля бюджета
+    "budget": swap(proto, bound=bound.budget(BUDGET_SHARE)),                           # ограничение: доля бюджета
     "proto": proto,
     "code": swap(proto, solver=Solver(env=Sandbox())),                         # решатель: исполнение python
     "hooks": hooks(proto, "hooks"),                                            # хуки по ошибкам: уроки моделью
@@ -38,6 +37,6 @@ CHAIN = {
 }
 
 task = TASKS[sys.argv[1]]
-n = int(sys.argv[2]) if len(sys.argv) > 2 else 40
+n = int(sys.argv[2]) if len(sys.argv) > 2 else config.SIZE
 for name in sys.argv[3:] or CHAIN:
-    print(run(task, swap(CHAIN[name], name), Model(), n, f"{os.getenv('RESULTS', 'results')}/{task.name}{n}/{name}"))
+    print(run(task, swap(CHAIN[name], name), Model(), n, f"{config.RESULTS}/{task.name}{n}/{name}"))

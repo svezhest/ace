@@ -1,8 +1,0 @@
-Merge the lessons into memory by returning the full new list of entries; keep the id of an entry you keep, leave it empty for a new one.
-Constraints are only added or narrowed, never rewritten. Skip a lesson that duplicates an entry. Reply "done" when finished.
-
-## Lessons
-{lessons}
-
-## Memory
-{memory}

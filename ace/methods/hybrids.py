@@ -1,45 +1,45 @@
-"""Гибриды: деталь одного метода внутри другого. Каждый отличается от ACE (или прототипа) одной заменой."""
-from .. import bound, curate, inject, prompts, reflect
+"""Гибриды: деталь одного метода внутри другого, замена на одном уровне ace.
+
+ace_bo2     извлечение: рефлектор ACE дважды и селектор выбирает один набор уроков (Best-of-N из SCOPE). Кандидаты
+            при температуре 0.7, как у scope_bo2 (в старом коде 0: два почти одинаковых кандидата).
+ace_opt     память: пункты ACE с пределом SCOPE вместо отсева вредных — сверх 10 пунктов оптимизатор правил
+            (конфликты, поглощение, слияние) сжимает до 8, остаток обрезается до 10; нетронутые пункты остаются
+            со своими счётчиками, исправленные и слитые — новые пункты с нуля
+ace_hooks   Hooks(ACE) с исполнением python: урок по ошибке инструмента дописывается в конец истории после
+            шага с той же ошибкой (ace/hooks.py)
+ace_group (контраст TF-GRPO по группе попыток) — после переноса TF-GRPO."""
+from .. import prompts, render
 from ..env import Sandbox
-from ..loop import Solver, swap
-from ..memory import Hook, Kind
-from ..update import ask, on_prev, seq, when
-from .ace import ace as ACE, reflect_json
-from .proto import proto as PROTO
-from .scope import CAP, TARGET, optimizer
-from .tfgrpo import group_advantage
+from ..extract.ace import Reflector
+from ..extract.best import BestOf
+from ..extract.scope import BEST_OF_TEMPERATURE
+from ..hooks import Hooks
+from ..learner import swap
+from .ace import Playbook, ace
+from .scope import CAP, TARGET, compress, rule_optimizer
 
-SELECT, HOOK = prompts.load("hybrid_select.txt"), prompts.load("hook_reflect.txt")
-
-# reflect ACE, но два кандидата и селектор (Best-of-N из SCOPE)
-select = ask(SELECT, reflect.two_fields, system="You are a selector.", parse=reflect.one_or_two)
-ace_bo2 = swap(ACE, "ace_bo2", reflect=reflect.best_of(reflect_json, 2, select, temperature=0))
-# семантическое преимущество TF-GRPO по группе попыток; дальше куратор ACE
-ace_group = swap(ACE, "ace_group", reflect=seq(group_advantage, on_prev(reflect.free_lessons())), solver=Solver(samples=3))
-ace_opt = swap(ACE, "ace_opt", bound=bound.optimize(("bullet",), optimizer, CAP, TARGET))
-proto_opt = swap(PROTO, "proto_opt", bound=bound.chain(bound.budget(0.25), bound.optimize(("insight",), optimizer, CAP, TARGET)))
-# хуки по ошибкам инструментов. Урок с фрагментом ошибки (trigger) дописывается к промпту после шага с той же
-# ошибкой. Откуда урок: model — после задачи модель выводит уроки по ошибкам, в память идут только уверенные,
-# и ей же показываются хуки, которые не помогли (их можно переписать); raw — как пары DC, без модели: ошибка
-# и следующий вызов, который прошёл. Исход каждого показа — в счётчики хука; prune — хук уходит, когда вредных
-# исходов не меньше prune и больше полезных.
-LEARN = {"model": when(reflect.has_failures, ask(HOOK, reflect.failure_fields, reflect.HookLessons,
-                                                 then=reflect.confident_hooks("high"))),
-         "raw": reflect.raw_hooks}
+SELECT = prompts.load("hybrid_select")
+SELECTOR = prompts.text("selector_system")
 
 
-def hooks(method, name, learn="model", prune=2):
-    """Метод + хуки по ошибкам; решатель с исполнением python, иначе ошибок инструментов нет."""
-    u = method.update
-    cut = bound.prune(bound.more_harmful(prune), kinds=("hook",)) if prune else bound.chain()
-    return swap(method, name, memory={**method.memory, "hook": Kind(Hook, ("add", "edit", "delete"), apart=True)},
-                inject=inject.hooked(method.inject, inject.triggered(), on=inject.on_failure),
-                reflect=reflect.also(u.reflect, hooks=LEARN[learn], fired=reflect.fired),
-                curate=curate.chain(u.curate, curate.each(curate.add_hooks())), bound=bound.chain(u.bound, cut),
-                solver=Solver(env=Sandbox()))
+def one_of_two(ex, group, candidates):
+    """Модель выбирает набор уроков: ответ «1» или «2»; без ответа первый."""
+    a, b = (render.lessons(x.lessons) for x in candidates[:2])
+    out = ex.model.run(SELECTOR, SELECT.fill(a=a, b=b)).output
+    return 1 if (out or "1").strip().startswith("2") else 0
 
 
-ace_hooks, proto_hooks = hooks(ACE, "ace_hooks"), hooks(PROTO, "proto_hooks")
-proto_hooks_raw = hooks(PROTO, "proto_hooks_raw", learn="raw")
+class CappedPlaybook(Playbook):
+    def __init__(self, cap=CAP, target=TARGET):
+        super().__init__(prune=None)
+        self.cap, self.target, self.optimizer = cap, target, rule_optimizer()
 
-HYBRIDS = [ace_bo2, ace_group, ace_opt, proto_opt, ace_hooks, proto_hooks, proto_hooks_raw]
+    def learn(self, ex, extractions):
+        super().learn(ex, extractions)
+        self.items = compress(ex.model, self.items, self.optimizer, self.target, self.cap,
+                              lambda x: self.record(self.ids.next(), x["rule"]))
+
+
+ace_bo2 = swap(ace, "ace_bo2", extract=BestOf(Reflector(temperature=BEST_OF_TEMPERATURE), 2, one_of_two))
+ace_opt = swap(ace, "ace_opt", memory=CappedPlaybook())
+ace_hooks = Hooks(swap(ace, env=Sandbox()), "ace_hooks")
