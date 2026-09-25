@@ -3,9 +3,10 @@
     opened(tag)         после <tag> до </tag> или конца; None без <tag> (DC: cheatsheet)
     enclosed(tag)       между <tag> и </tag> без учёта регистра; "" без пары (TF-GRPO: Experiences)
     between(text, a, b) между первым a и следующим b; "" без них (EvoLib)
-    fenced(text, tag)   все блоки ```tag подряд (EvoLib)
+    fenced(text, tag)   все закрытые блоки ```tag подряд, каждый с переводом строки (EvoLib extract_fenced_blocks)
+    first_fenced        первый закрытый блок ```tag без пробелов по краям; "" без него (EvoLib extract_first_fenced_block)
     json_block          JSON из последнего ```json или всего текста; None, если не разбирается (TF-GRPO)
-    subtasks            блоки <subtask> с description (EvoLib)
+    subtasks            блоки <subtask> с description (EvoLib extract_subtasks)
     counted_line(id)    «[id] helpful=N harmful=M :: текст» -> (текст, N, M) (ACE BulletpointAnalyzer)"""
 import json
 
@@ -39,7 +40,19 @@ def between(text, start, end):
 
 
 def fenced(text, tag):
-    return "\n".join(part.split("```")[0] for part in (text or "").split("```" + tag)[1:])
+    out, rest = "", text or ""
+    while "```" + tag in rest:
+        rest = rest.split("```" + tag, 1)[1]
+        if "```" not in rest:
+            break
+        block, rest = rest.split("```", 1)
+        out += block + "\n"
+    return out
+
+
+def first_fenced(text, tag):
+    rest = (text or "").split("```" + tag, 1)
+    return rest[1].split("```", 1)[0].strip() if len(rest) == 2 and "```" in rest[1] else ""
 
 
 def json_block(text):
@@ -50,15 +63,18 @@ def json_block(text):
 
 
 def subtasks(text):
-    """Пары (блок <subtask> целиком, его description); без description извлечение не удаётся целиком."""
-    out = []
-    for chunk in text.split("<subtask>")[1:]:
-        if "</subtask>" not in chunk:
-            continue
-        block = chunk.split("</subtask>")[0]
-        if not between(block, "<description>", "</description>"):
+    """Пары (блок <subtask>...</subtask> целиком, его первый <description>...</description> вместе с тегами), как
+    extract_subtasks апстрима: блок кончается на первом </subtask>; блок без description — пусто целиком."""
+    out, rest = [], text or ""
+    while "<subtask>" in rest:
+        rest = rest.split("<subtask>", 1)[1]
+        if "</subtask>" not in rest:
+            break
+        block, rest = rest.split("</subtask>", 1)
+        if "<description>" not in block or "</description>" not in block.split("<description>", 1)[1]:
             return []
-        out.append((f"<subtask>{block}</subtask>", between(block, "<description>", "</description>")))
+        description = block.split("<description>", 1)[1].split("</description>", 1)[0]
+        out.append((f"<subtask>{block}</subtask>", f"<description>{description}</description>"))
     return out
 
 
