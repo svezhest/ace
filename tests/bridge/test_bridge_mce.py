@@ -153,7 +153,8 @@ def best_of(evals, current):
 
 def test_find_best_iteration():
     """_find_best_iteration: с iter2 лучшая из прошлых, строго больше, при равенстве первая; будущие итерации и
-    итерации без метрики не в счёт. iter0 в evaluations.json main() не пишет (B6), поэтому и у нас её нет."""
+    итерации без метрики не в счёт. iter0 в evaluations.json main() не пишет (--start-iter 1 по умолчанию),
+    поэтому и у нас её нет."""
     cases = {
         "iter2_only_iter1": ({"iter1": 0.4}, 2),
         "iter3_all_worse_iter0_absent": ({"iter1": 0.4, "iter2": 0.3}, 3),
@@ -166,7 +167,6 @@ def test_find_best_iteration():
     for name, (vals, current) in cases.items():
         evals = {k: ({} if v is None else {"val_accuracy": v}) for k, v in vals.items()}
         assert best_of(evals, current) == MEMORY["find_best_iteration"][name]["iteration"], name
-    deviation("B6")
     assert MEMORY["find_best_iteration"]["iter3_all_worse_than_iter0_in_file"]["iteration"] == 0     # только руками
     assert MEMORY["find_best_iteration"]["iter1_with_iter0"]["iteration"] == 0      # iter1 — с исходной памяти
 

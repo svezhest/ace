@@ -309,8 +309,7 @@ def test_strategic_threshold():
 
 def test_threshold_is_one_constant():
     """strategic_confidence_threshold=0.7 апстрима до хранилища не доходит: правило с 0.8 возвращается как
-    strategic, но в память не попадает. У нас порог один (B4) — то же поведение при любом значении."""
-    deviation("B4")
+    strategic, но в память не попадает. У нас порог один — то же поведение, что у апстрима с порогом по умолчанию."""
     case, book = MEMORY["strategic_confidence_threshold=0.7, classifier 0.8"], Book()
     book.admit(ex(Model(None)), case["returned"][0], 0.8, "general", "r")
     assert [r.text for r in book.tactical] == [case["returned"][0]] and not book.records() and not case["strategic_rules"]
@@ -448,8 +447,8 @@ def check_steps(done, model):
         want = step["calls"]
         assert [kind(c["user"]) for c in calls] == [kind(user(c)) for c in want], step["task_id"]
         assert [c["response"] for c in want] == [model.reply(c["user"]) for c in calls], step["task_id"]
-        # синтезатор: тип ошибки у нас по событию (SC1), системный промпт — текущий нашей попытки (B2, SC3)
-        deviation("SC1", "B2", "SC3")
+        # синтезатор: тип ошибки у нас по событию (SC1), системный промпт — текущий нашей попытки (SC3)
+        deviation("SC1", "SC3")
         ours = calls[0]["user"].replace("- Error Type: IncorrectAnswer", "- Error Type: Exception")
         assert ours == with_system(user(want[0]), ep.system), step["task_id"]
         if len(want) > 1:

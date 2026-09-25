@@ -296,6 +296,6 @@ def test_settings():
     assert cfg["updater_query_params"] == {}            # обновление без температуры: test_loop
     # eval при обучении делит агента с rollout (T = 0.7) и идёт Mean@32; у нас val и тест — итоговый агент
     assert built["practice_and_eval_share_agent"] and built["eval_rollout_temperature"] == M.TEMPERATURE
-    deviation("D14", "D6")
+    deviation("TF8")
     deviation("TF5")            # батч 20 из 40 задач против 50 из 100: те же 2 шага за эпоху
     assert (M.BATCH, practice["batch_size"]) == (20, 50)

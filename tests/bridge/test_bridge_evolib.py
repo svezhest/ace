@@ -460,7 +460,7 @@ def test_loop(monkeypatch, mode):
         up_rest = [no_math(u) for u in up if not u.startswith("You are a math expert. For the following math problem")]
         solver, rest = calls_of(model, model.calls[start:end])
         rest = [no_evaluation(u) for u in rest]
-        deviation("D18")
+        deviation("EV5")
         assert solver == up_solver, it["kiter"]
         assert sorted(rest) == sorted(up_rest) and [u for u in rest if "two solutions" not in u] == \
                [u for u in up_rest if "two solutions" not in u], it["kiter"]
