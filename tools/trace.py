@@ -13,7 +13,7 @@ from pathlib import Path
 out, names = sys.argv[1], sys.argv[2:]
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import pydantic  # noqa: E402
-from ace.model import Reply, roles, text_reply  # noqa: E402
+from ace.model import Call, Reply, roles, text_reply  # noqa: E402
 from ace.loop import Protocol, run  # noqa: E402
 from ace.learner import swap  # noqa: E402
 from ace.methods import METHODS  # noqa: E402
@@ -97,6 +97,15 @@ class Fake:
         obj = fill(schema, seed)
         return Reply(obj, json.dumps(obj.model_dump()))
 
+    def message(self, messages, params):
+        """Агентный цикл метода (TF-GRPO): ответ без вызовов инструментов."""
+        reply = self.ask(Call(messages, {k: v for k, v in params.items() if k != "tools"}))
+        return {"role": "assistant", "content": reply.output}, "stop"
+
+    def embed(self, texts, name):
+        """Векторы без модели: по хешу текста."""
+        return [[(h(t) % 97 + 1) / 97, 1.0] for t in texts]
+
     def usage(self):
         return dict(calls=len(self.log), prompt_tokens=0, completion_tokens=0)
 
@@ -114,6 +123,6 @@ for name in names or sorted(set(METHODS) - {"mce"}):
     fake = Fake(targets)
     summary = run(task, swap(METHODS[name], **parts) if parts else METHODS[name], fake, 4, str(tmp / name))
     traces[name] = dict(summary=summary, calls=fake.log, memory=json.load(open(tmp / name / "memory.json")))
-    print(name, summary["correct"], len(fake.log), flush=True)
+    print(name, summary["correct"], len(fake.log), "errors", summary["errors"], flush=True)
 with (gzip.open(out, "wt") if out.endswith(".gz") else open(out, "w")) as f:
     json.dump(traces, f, ensure_ascii=False, indent=1)
