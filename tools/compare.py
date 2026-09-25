@@ -1,10 +1,9 @@
-"""Сравнение трасс: uv run python tools/compare.py [REF] NEW; REF по умолчанию tools/ref_trace.json(.gz).
+"""Сравнение двух снимков tools/trace.py: uv run python tools/compare.py OLD NEW.
 Код возврата 1, если хоть один метод разошёлся."""
 import difflib
 import gzip
 import json
 import sys
-from pathlib import Path
 
 HIDDEN = ("best", "iterations")
 
@@ -15,14 +14,8 @@ def load(path):
         return json.load(f)
 
 
-def default_ref():
-    here = Path(__file__).parent
-    return next(p for p in (here / "ref_trace.json.gz", here / "ref_trace.json") if p.exists())
-
-
 def texts(trace):
-    """Тексты записей по видам: порядок внутри вида сравнивается, чередование видов — нет (в старом коде все
-    виды лежали одним списком, в новом у каждого свой контейнер)."""
+    """Тексты записей по видам: порядок внутри вида сравнивается, чередование видов — нет."""
     out = {}
     for r in trace["memory"]:
         if r["kind"] not in HIDDEN:
@@ -62,5 +55,4 @@ def compare(a, b):
 
 
 if __name__ == "__main__":
-    ref, new = (sys.argv[1], sys.argv[2]) if len(sys.argv) > 2 else (default_ref(), sys.argv[1])
-    sys.exit(bool(compare(load(ref), load(new))))
+    sys.exit(bool(compare(load(sys.argv[1]), load(sys.argv[2]))))

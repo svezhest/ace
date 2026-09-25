@@ -41,11 +41,9 @@ uv run python run.py formula ace 40       # результаты в results/form
 EPOCHS=3 OFFLINE=1 uv run python run.py formula ace 40   # офлайн: обучение на train, тест с лучшей по val памятью
 uv run python ablate.py formula 40        # цепочка абляций; ступени по именам: ablate.py formula 40 ace ace_opt
 uv run python report.py                   # таблица по results/
-uv run pytest -q                          # тесты; старые логи results/ переигрываются проверками задач
-uv run python tools/trace.py /tmp/t.json && uv run python tools/compare.py tools/ref_variants.json /tmp/t.json
-                                          # трасса промптов против старого кода (DEVIATIONS.md)
-uv run python tools/as_old.py /tmp/o.json && uv run python tools/compare.py /tmp/o.json
-                                          # то же с настройками старого кода там, где решено иначе
+uv run pytest -q                          # тесты, в том числе мостик к апстримам (tests/bridge)
+uv run python tools/trace.py /tmp/a.json   # снимок запросов всех методов на фиктивной модели
+uv run python tools/compare.py /tmp/a.json /tmp/b.json   # два снимка: что поменяла правка
 ```
 
 Настройки (`ace/config.py`, из окружения): `OPENAI_BASE_URL` (по умолчанию `http://localhost:8080/v1`; старое

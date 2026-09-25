@@ -1,7 +1,7 @@
-"""Трасса промптов методов на фиктивной модели:
-    uv run python tools/trace.py [--root DIR] OUT.json [method ...]
-DIR — каталог, где лежит пакет ace (по умолчанию корень репозитория; для эталона — worktree тега).
-Одинаковые промпты -> одинаковые ответы, поэтому трассы сравнимы (tools/compare.py)."""
+"""Снимок поведения методов на фиктивной модели: все запросы, итог и память.
+    uv run python tools/trace.py OUT.json [method ...]
+Одинаковые промпты -> одинаковые ответы, поэтому два снимка сравнимы (tools/compare.py): так видно, что
+правка кода не поменяла запросы там, где не должна."""
 import gzip
 import hashlib
 import json
@@ -10,19 +10,12 @@ import tempfile
 import typing
 from pathlib import Path
 
-args = sys.argv[1:]
-root = Path(__file__).resolve().parent.parent
-if args and args[0] == "--root":
-    root, args = Path(args[1]).resolve(), args[2:]
-out, names = args[0], args[1:]
-sys.path.insert(0, str(root))
+out, names = sys.argv[1], sys.argv[2:]
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import pydantic  # noqa: E402
 from ace import model as M  # noqa: E402
 from ace.loop import run  # noqa: E402
-try:
-    from ace.learner import swap  # noqa: E402
-except ImportError:             # старый код (эталон с тега)
-    from ace.loop import swap  # noqa: E402
+from ace.learner import swap  # noqa: E402
 from ace.methods import METHODS  # noqa: E402
 from ace.tasks import TASKS  # noqa: E402
 
