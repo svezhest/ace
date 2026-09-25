@@ -9,15 +9,23 @@ class BestOf(Extractor):
     """select(ex, group, кандидаты) -> номер кандидата или None (тогда первый); кандидатов меньше двух —
     выбирать не из чего."""
     def __init__(self, inner, n, select):
-        self.inner, self.n, self.select = inner, n, select
+        self.inner = inner
+        self.n = n
+        self.select = select
         self.gives = inner.gives
 
     def __call__(self, ex, group, memory):
-        cands = [x for x in (self.inner(ex, group, memory) for _ in range(self.n)) if x]
+        cands = []
+        for _ in range(self.n):
+            x = self.inner(ex, group, memory)
+            if x:
+                cands.append(x)
         if len(cands) < 2:
             return cands[0] if cands else None
         i = self.select(ex, group, cands)
-        return cands[i] if i is not None and 0 <= i < len(cands) else cands[0]
+        if i is None or not 0 <= i < len(cands):
+            i = 0
+        return cands[i]
 
 
 SELECT = prompts.load("hybrid_select")

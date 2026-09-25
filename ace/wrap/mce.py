@@ -199,7 +199,7 @@ def claude_meta(ex, ws, folder, iteration):
                                  can_use_tool=partial(meta_permission, iter_dir=folder))
     ok = ex.model.session(prompt, options, lambda: None if skill.exists() else CLAUDE_MISSING.fill(expected_path=skill),
                           SKILL_TRIES, ws.root)
-    cleanup(folder, "meta")
+    cleanup(folder)
     if not ok:
         raise RuntimeError(f"Meta-agent failed to generate SKILL.md after {SKILL_TRIES} attempts")
     return skill.read_text()

@@ -9,7 +9,8 @@ class Document:
     requires = frozenset()
 
     def __init__(self, text="", kind="document"):
-        self.text, self.kind = text, kind
+        self.text = text
+        self.kind = kind
 
     def rewrite(self, text):
         self.text = text
@@ -35,7 +36,8 @@ class Files:
     requires = frozenset()
 
     def __init__(self, kind="file"):
-        self.kind, self.files = kind, {}
+        self.kind = kind
+        self.files = {}         # путь -> текст
 
     @classmethod
     def of(cls, files, kind="folder"):
@@ -58,7 +60,8 @@ class Files:
 
     def ls(self, folder=""):
         """Прямое содержимое папки: (подпапки, [(имя, краткая строка)])."""
-        prefix = folder.strip("/") + "/" if folder.strip("/") else ""
+        folder = folder.strip("/")
+        prefix = folder + "/" if folder else ""
         folders, files = [], []
         for path in sorted(self.files):
             if not path.startswith(prefix):

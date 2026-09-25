@@ -28,21 +28,22 @@ def train_json(ex, groups, ids, field="question"):
     acc = sum(bool(e.ok) for e in eps) / len(eps) if eps else 0.0
     summary = dict(train_accuracy=acc, train_metrics=dict(accuracy=acc) if eps else {}, train_total=len(eps),
                    train_errors=0, batch_idx=ex.batch, cumulative_rollouts=ex.i + 1)
-    results = [{"id": id, field: g.question, "ground_truth": g.target, "llm_prediction": e.answer, "is_correct": bool(e.ok)}
-               for id, g, e in zip(ids, groups, eps)]
+    results = [{"id": rid, field: g.question, "ground_truth": g.target, "llm_prediction": e.answer, "is_correct": bool(e.ok)}
+               for rid, g, e in zip(ids, groups, eps)]
     return render.train_json(summary, results)
 
 
 def sub_folder(ex):
-    """Папка под-итерации (get_sub_iteration_folder_name): итерация = проход, под-итерация = батч."""
-    return f"iter{ex.epoch + 1}_sub{ex.batch}"
+    """Папка текущей под-итерации: итерация = проход, под-итерация = батч."""
+    return folder_name(ex.epoch + 1, ex.batch)
 
 
 class Context(Files):
     """Файлы context/ базового агента; train — data/train.json последнего батча."""
     def __init__(self, rounds=ROUNDS):
         super().__init__("context")
-        self.rounds, self.train = rounds, ""
+        self.rounds = rounds
+        self.train = ""         # data/train.json последнего батча
 
     def learn(self, ex, extractions):
         groups = [x.group for x in extractions]
@@ -71,7 +72,8 @@ BASE_TOOLS = ["Skill", "Read", "Write", "Edit", "Bash", "Glob", "Grep", "Task", 
               "KillShell", "EnterPlanMode"]
 VALIDATION_TRIES = 3        # max_validation_attempts run_base_agent: ответов, пока проверка не прошла
 UTILS = Path(__file__).parent / "mce_utils"     # mce/workspace_utils апстрима дословно: копия в utils/ под-итерации
-CLAUDE_BASE, INTERFACES = prompts.load("mce_claude_base"), prompts.load("mce_claude_interfaces")
+CLAUDE_BASE = prompts.load("mce_claude_base")
+INTERFACES = prompts.load("mce_claude_interfaces")
 INVALID = prompts.load("mce_claude_invalid")
 MCE = prompts.macros("mce_strings")
 
@@ -166,14 +168,12 @@ class Workspace:
             for name in subs[0]["metrics"]:
                 weighted = sum(s["metrics"].get(name, 0.0) * s["batch_size"] for s in subs)
                 train_metrics[name] = weighted / total if total > 0 else 0.0
-        file = self.base / "meta_agent" / "evaluations.json"
-        evaluations = json.loads(file.read_text()) if file.exists() else {}
+        evaluations = self.evaluations()
         evaluations[f"iter{iteration}"] = {"train_accuracy": train, "train_metrics": train_metrics,
                                            "val_accuracy": val_metrics.get("accuracy", 0.0), "val_metrics": val_metrics,
                                            "val_total": val_total, "total_rollouts": total, "num_sub_iters": len(subs),
                                            "last_sub_folder": last.name}
-        with open(file, "w") as f:
-            json.dump(evaluations, f, indent=2)
+        (self.base / "meta_agent" / "evaluations.json").write_text(render.pretty_json(evaluations))
         skill = last / CLAUDE_SKILL
         if iteration >= 1 and skill.exists():
             target = self.base / "meta_agent" / "skills" / f"iter{iteration}"
@@ -182,6 +182,7 @@ class Workspace:
         return train
 
     def evaluations(self):
+        """meta_agent/evaluations.json; нет файла — {}."""
         file = self.base / "meta_agent" / "evaluations.json"
         return json.loads(file.read_text()) if file.exists() else {}
 
@@ -190,8 +191,9 @@ class Workspace:
         return {p.parent.name: p.read_text() for p in (self.base / "meta_agent" / "skills").glob("iter*/SKILL.md")}
 
 
-def cleanup(folder, agent):
-    """cleanup_irrelevant_files: в корне под-итерации остаётся только своё (скрытое не трогается)."""
+def cleanup(folder):
+    """cleanup_irrelevant_files: в корне под-итерации остаётся только своё (скрытое не трогается); у апстрима вид
+    агента выбирает только строку лога."""
     keep = {"data", "utils", "__pycache__", ".claude", "context", "interfaces"}
     for item in folder.iterdir():
         if item.name in keep or item.name.startswith("."):
@@ -234,21 +236,28 @@ async def base_permission(tool_name, input_data, context, iter_dir):
     return {"behavior": "allow", "updatedInput": input_data}
 
 
-def import_function(file_path, name):
-    """_import_function (validation.py)."""
-    module_name = f"interfaces_{name}_{id(file_path)}"
-    if module_name in sys.modules:
-        del sys.modules[module_name]
-    spec = importlib.util.spec_from_file_location(module_name, file_path)
+def load_module(name, path, failed):
+    """Модуль из файла под именем name, как у апстрима (прежний с тем же именем выгружается); упал при исполнении —
+    ImportError с текстом failed(error=...)."""
+    if name in sys.modules:
+        del sys.modules[name]
+    spec = importlib.util.spec_from_file_location(name, path)
     if spec is None or spec.loader is None:
-        raise ImportError(MCE.no_spec(path=file_path))
+        raise ImportError(MCE.no_spec(path=path))
     module = importlib.util.module_from_spec(spec)
-    sys.modules[module_name] = module
+    sys.modules[name] = module
     try:
         spec.loader.exec_module(module)
     except Exception as e:
-        del sys.modules[module_name]
-        raise ImportError(MCE.exec_failed(error=e))
+        del sys.modules[name]
+        raise ImportError(failed(error=e))
+    return module
+
+
+def import_function(file_path, name):
+    """_import_function (validation.py)."""
+    module_name = f"interfaces_{name}_{id(file_path)}"
+    module = load_module(module_name, file_path, MCE.exec_failed)
     if not hasattr(module, name):
         del sys.modules[module_name]
         raise ImportError(MCE.no_attribute(name=name))
@@ -307,21 +316,13 @@ def load_interfaces(folder, sigs):
     init = folder / "interfaces" / "__init__.py"
     if not init.exists():
         raise FileNotFoundError(f"No interfaces found in {folder}. Expected interfaces/__init__.py")
-    module_name = f"interfaces_module_{id(folder)}"
-    if module_name in sys.modules:
-        del sys.modules[module_name]
-    spec = importlib.util.spec_from_file_location(module_name, init)
-    if spec is None or spec.loader is None:
-        raise ImportError(f"Could not load spec for {init}")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[module_name] = module
     if str(folder) not in sys.path:
         sys.path.insert(0, str(folder))
-    try:
-        spec.loader.exec_module(module)
-    except Exception as e:
-        raise ImportError(f"Failed to load interfaces module: {e}")
-    names = module.__all__ if hasattr(module, "__all__") else [n for n in dir(module) if not n.startswith("_")]
+    module = load_module(f"interfaces_module_{id(folder)}", init, MCE.load_failed)
+    if hasattr(module, "__all__"):
+        names = module.__all__
+    else:
+        names = [n for n in dir(module) if not n.startswith("_")]
     return {n: getattr(module, n) for n in names if callable(getattr(module, n, None))}
 
 
@@ -333,14 +334,16 @@ class Folder:
     requires = frozenset()
 
     def __init__(self):
-        self.ws, self.path, self.loaded = None, None, None
+        self.at(None, None)
 
     def begin(self, k):
         pass
 
     def at(self, ws, path):
         """Текущая папка; интерфейсы перечитываются при следующем показе."""
-        self.ws, self.path, self.loaded = ws, path, None
+        self.ws = ws
+        self.path = path
+        self.loaded = None      # интерфейсы папки (load_interfaces) или None — ещё не читались
 
     def interfaces(self, task):
         """Интерфейсы папки (load_interfaces один раз на батч или val, как у апстрима); нет — {}."""
@@ -352,10 +355,15 @@ class Folder:
         return self.loaded
 
     def files(self):
+        """Файлы context/ и interfaces/ папки: путь от папки -> текст."""
         if self.path is None:
             return {}
-        return {str(p.relative_to(self.path)): p.read_text(errors="replace") for part in ("context", "interfaces")
-                for p in sorted((self.path / part).rglob("*")) if p.is_file() and "__pycache__" not in p.parts}
+        out = {}
+        for part in ("context", "interfaces"):
+            for p in sorted((self.path / part).rglob("*")):
+                if p.is_file() and "__pycache__" not in p.parts:
+                    out[str(p.relative_to(self.path))] = p.read_text(errors="replace")
+        return out
 
     def records(self):
         return [Record(p, t) for p, t in self.files().items()]
@@ -374,10 +382,11 @@ class Folder:
         groups = [x.group for x in extractions]
         field = "symptoms" if variant("mce", ex.task) == "symptom" else "question"
         (self.path / "data").mkdir(exist_ok=True)
-        (self.path / "data" / "train.json").write_text(train_json(ex, groups, [g.item["id"] for g in groups], field),
-                                                        encoding="utf-8")
+        train = train_json(ex, groups, [g.item["id"] for g in groups], field)
+        (self.path / "data" / "train.json").write_text(train, encoding="utf-8")
         if not base_agent(ex, self.ws, self.path):
-            raise RuntimeError(f"Base-agent failed at {self.path.name}: validation failed after {VALIDATION_TRIES} attempts")
+            raise RuntimeError(f"Base-agent failed at {self.path.name}: validation failed after {VALIDATION_TRIES} "
+                               "attempts")
         self.loaded = None
 
 
@@ -396,5 +405,5 @@ def base_agent(ex, ws, folder):
         errors = validate(folder, sigs)
         return INVALID.fill(errors=errors) if errors else None
     ok = ex.model.session(prompt, options, feedback, VALIDATION_TRIES if sigs else 1, ws.root)
-    cleanup(folder, "base")
+    cleanup(folder)
     return ok

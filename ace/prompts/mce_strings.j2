@@ -25,6 +25,7 @@
 {% macro import_failed(error) %}Import failed: {{ error }}{% endmacro %}
 {% macro no_spec(path) %}Could not load spec for {{ path }}{% endmacro %}
 {% macro exec_failed(error) %}Failed to execute module: {{ error }}{% endmacro %}
+{% macro load_failed(error) %}Failed to load interfaces module: {{ error }}{% endmacro %}
 {% macro no_attribute(name) %}Module does not have function '{{ name }}'{% endmacro %}
 
 {#- отказы в правах: базовый агент (mce/base_agent.py), мета-агент (mce/meta_agent.py) -#}

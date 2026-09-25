@@ -24,10 +24,18 @@ batch(ex, groups, memory) -> [Extraction] на батче, стадиями по
 Реализации — extract/<метод>.py."""
 from dataclasses import dataclass, field
 
-LABELS, CONFIDENCE, DOMAIN, ATTRIBUTION, IG, BEST_ANSWER = "labels", "confidence", "domain", "attribution", "ig", "best_answer"
+LABELS = "labels"
+CONFIDENCE = "confidence"
+DOMAIN = "domain"
+ATTRIBUTION = "attribution"
+IG = "ig"
+BEST_ANSWER = "best_answer"
 OPERATIONS = "operations"
-RATIONALE, TRIGGER, ATTEMPT = "rationale", "trigger", "attempt"
-INPUT, SHEET = "input", "sheet"
+RATIONALE = "rationale"
+TRIGGER = "trigger"
+ATTEMPT = "attempt"
+INPUT = "input"
+SHEET = "sheet"
 
 
 class Contract(ValueError):
@@ -82,7 +90,9 @@ class Seen(Raw):
 def scores(group):
     """1 / 0 по вердикту каждой попытки; пусто, если вердикта нет."""
     eps = group.episodes
-    return [float(bool(e.ok)) for e in eps] if all(e.ok is not None for e in eps) else []
+    if any(e.ok is None for e in eps):
+        return []
+    return [float(bool(e.ok)) for e in eps]
 
 
 def missing(memory, extractor):
