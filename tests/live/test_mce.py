@@ -1,11 +1,11 @@
 """MCE против записи апстрима meta-context-engineering c4b7a7c на живой модели (bridge/live/mce, run.json):
-symptom_diagnosis, 1 итерация, train 2 одним батчем, val 2. Запись обрывается в сессии базового агента (run.json:
-cutoff) — сверяется всё до обрыва. Запись воспроизводится без модели (tools/record/replay) под mce стенда:
-мета-агент и базовый агент — тот же Claude Agent SDK (CLI из пакета) через LiteLLM proxy, workspace — тот же ROOT
-на диске, окружение CLI — как у записи, адрес модели — тот же. Каждый записанный запрос — вывода задачи, обоих
-агентов и фоновых вызовов CLI — совпадает с пришедшим (без вывода команд Bash хоста и даты в описании WebSearch:
-DEVIATIONS MCE7) и востребован ровно раз, первый незаписанный запрос приходит только после всех записанных;
-workspace в точке обрыва (SKILL.md, context/, data/train.json, meta_agent/) — как у апстрима."""
+symptom_diagnosis, 1 итерация, train 2 одним батчем, val 2, затем тест лучшей итерации на 2 вопросах test.
+Запись воспроизводится без модели (tools/record/replay) под mce стенда: мета-агент и базовый агент — тот же Claude
+Agent SDK (CLI из пакета) через LiteLLM proxy, workspace — тот же ROOT на диске, окружение CLI — как у записи,
+адрес модели — тот же. Каждый запрос — вывода задачи, обоих агентов и фоновых вызовов CLI — совпадает с записанным
+(без вывода команд Bash хоста и даты в описании WebSearch: DEVIATIONS MCE7), все записанные ответы востребованы;
+workspace на выходе (навык, context/, interfaces/, train.json, evaluations.json, архив навыков) — как у апстрима,
+лучшая итерация и ответы теста — как у его mce.eval."""
 import gzip
 import json
 import shutil
@@ -74,16 +74,6 @@ def litellm(model_url, tmp):
     raise RuntimeError("LiteLLM не поднялся")
 
 
-class Cut(Replayer):
-    """Воспроизведение, которое помнит, сколько ответов было отдано к первому промаху."""
-    first_miss = None
-
-    def miss(self, path, c, n):
-        if self.first_miss is None:
-            self.first_miss = sum(self.used.values())
-        return super().miss(path, c, n)
-
-
 @pytest.fixture(scope="module")
 def replayed(tmp_path_factory):
     tmp = tmp_path_factory.mktemp("mce")
@@ -94,12 +84,11 @@ def replayed(tmp_path_factory):
     rec = tmp / "rec.jsonl"
     rec.write_bytes(gzip.decompress((LIVE / "rec.jsonl.gz").read_bytes()))
     # тот же адрес, что у записи: агенты видят его в окружении и зовут модель сами (utils/llm.py, urllib)
-    srv = Cut(("127.0.0.1", RUN["model_port"]), rec, normalize)
+    srv = Replayer(("127.0.0.1", RUN["model_port"]), rec, normalize)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     url = f"http://127.0.0.1:{RUN['model_port']}/v1"
     proc, proxy = litellm(url, tmp)
     patch = pytest.MonkeyPatch()
-    error = None
     try:
         patch.setattr(config, "CLAUDE_BASE_URL", proxy)
         patch.setattr(config, "VAL_SIZE", RUN["val_limit"])
@@ -109,16 +98,14 @@ def replayed(tmp_path_factory):
         learner = swap(mce, every=RUN["train_batch_size"])
         learner.root, learner.workspace = ROOT, RUN["workspace"]
         model = Model(RUN["model"], url, backend="wire")
-        try:
-            run(TASKS["symptom"], learner, model, RUN["train_limit"], str(tmp / "out"), epochs=RUN["iterations"],
-                offline=True)
-        except RuntimeError as e:       # запись кончилась в сессии базового агента: проверка интерфейсов не прошла
-            error = str(e)
+        run(TASKS["symptom"], learner, model, RUN["train_limit"], str(tmp / "out"), epochs=RUN["iterations"],
+            offline=True)
     finally:
         patch.undo()
         proc.kill()
         srv.shutdown()
-    return srv, error
+    left = {k: (srv.used[k], len(v)) for k, v in srv.rec.items() if len(v) > srv.used[k]}
+    return dict(srv.status(), left=left), json.load(open(tmp / "out" / "log.json"))
 
 
 def files(base):
@@ -128,18 +115,33 @@ def files(base):
 
 
 def test_requests(replayed):
-    srv, error = replayed
-    status = srv.status()
-    assert status["served"] == status["recorded"] == RUN["calls"] and status["unused"] == 0
-    assert srv.first_miss == status["recorded"]         # незаписанное — только после обрыва записи
-    assert error and "Base-agent failed at iter1_sub0" in error
+    """Все запросы совпали. Не востребованы только повторы вызовов, которые делает код агента из Bash
+    (utils/llm.py: клиент повторяет по таймауту, а он зависит от скорости модели при записи, DEVIATIONS MCE7): ключ
+    отдан хотя бы раз, сообщение одно — user, без инструментов."""
+    status, _ = replayed
+    assert status["misses"] == 0 and status["served"] + status["unused"] == status["recorded"] == RUN["calls"]
+    for key, (served, recorded) in status["left"].items():
+        body = json.loads(key.split(" ", 1)[1])
+        assert served >= 1 and "tools" not in body and [m["role"] for m in body["messages"]] == ["user"]
+    assert status["unused"] <= RUN["agent_retries"]
 
 
 def test_workspace(replayed):
-    """SKILL.md мета-агента, context/ базового агента, data/train.json батча и meta_agent/ в точке обрыва."""
+    """Навык, context/, interfaces/, data/train.json, evaluations.json и архив навыков."""
     ours, theirs = files(ROOT / "workspace" / RUN["workspace"]), files(LIVE / "workspace")
     assert sorted(ours) == sorted(theirs)
     assert [p for p in ours if ours[p] != theirs[p]] == []
+
+
+def test_best_and_test(replayed):
+    """Лучшая по val итерация и ответы теста ею — как у mce.eval апстрима на её последней папке."""
+    _, log = replayed
+    evals = json.loads((LIVE / "workspace" / "meta_agent" / "evaluations.json").read_text())
+    assert max(evals, key=lambda k: evals[k]["val_accuracy"]) == RUN["best"]
+    theirs = json.load(open(LIVE / "test_evaluation.json"))["results"]
+    test = [r for r in log if r["phase"] == "test"]
+    assert [r["correct"] for r in test] == [r["evaluation"]["metrics"]["accuracy"] == 1.0 for r in theirs]
+    assert [r["answer"] for r in test] == [r["evaluation"]["trajectory"][-1]["prediction"] for r in theirs]
 
 
 def test_env():
