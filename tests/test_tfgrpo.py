@@ -10,14 +10,14 @@ from ace.extract.tfgrpo import Contrast
 from ace.loop import Group, run
 from ace.memory.tfgrpo import Library
 from ace.methods.tfgrpo import GROUP, tfgrpo
-from ace.show.tfgrpo import EXPERIENCES
+from ace.show.tfgrpo import AGENT
 
 
 class Ex:
-    task, training = TASK, True
+    task = TASK
 
-    def __init__(self, model):
-        self.model = model
+    def __init__(self, model, training=True):
+        self.model, self.training = model, training
 
 
 def by_prompt(ops='[{"operation": "ADD", "content": "New: tip."}]', plan=None):
@@ -49,24 +49,25 @@ def library(*texts):
 
 
 def test_contrast_partial():
-    """Попытка в зачёт (0) не входит в группу для обучения; сводка на каждую из остальных, награды 0/1."""
+    """Сводка на каждую попытку группы (все — rollout), награды 0/1; затем преимущество и сверка с библиотекой."""
     model = Stub(by_prompt())
     x = Contrast().batch(Ex(model), [group([True, True, False, True, False, False])], library("Old: one."))[0]
-    assert [c["user"].split("\n")[0] for c in model.calls[:5]] == ["<Working Agent Input>"] * 5
-    advantage = model.calls[5]["user"]
-    assert "Attempt 1 (Reward 1.0)" in advantage and "Attempt 2 (Reward 0.0)" in advantage and "Attempt 6" not in advantage
+    assert [c["user"].split("\n")[0] for c in model.calls[:6]] == ["<Working Agent Input>"] * 6
+    advantage = model.calls[6]["user"]
+    assert "Attempt 1 (Reward 1.0)" in advantage and "Attempt 3 (Reward 0.0)" in advantage and "Attempt 6" in advantage
     assert "<Ground Truth>\n0.5" in advantage
-    assert "[G0]. Old: one." in model.calls[6]["user"] and "1. Tip: check units." in model.calls[6]["user"]
+    assert "[G0]. Old: one." in model.calls[7]["user"] and "1. Tip: check units." in model.calls[7]["user"]
     assert "input: A financial question" in model.calls[0]["system"]
     assert x.lessons == ["1. Tip: check units."] and x.extras[OPERATIONS] == [{"operation": "ADD", "content": "New: tip."}]
 
 
 def test_contrast_skips_uniform_group():
-    """С меткой группа, где все попытки для обучения верны (или все неверны), ничего не даёт — без вызовов;
-    попытка в зачёт не считается."""
-    model = Stub(by_prompt())
-    x = Contrast().batch(Ex(model), [group([False, True, True, True, True, True])], library())[0]
-    assert model.calls == [] and x.extras[OPERATIONS] == [] and x.lessons == []
+    """С меткой группа, где все попытки верны (или все неверны), ничего не даёт — без вызовов. scored (ace_group):
+    попытка в зачёт в группу не входит."""
+    for oks, scored in (([True] * 3, False), ([False] * 3, False), ([False, True, True], True)):
+        model = Stub(by_prompt())
+        x = Contrast(scored=scored).batch(Ex(model), [group(oks)], library())[0]
+        assert model.calls == [] and x.extras[OPERATIONS] == [] and x.lessons == []
 
 
 def test_contrast_without_label():
@@ -74,7 +75,7 @@ def test_contrast_without_label():
     model = Stub(by_prompt())
     g = Group("q", [episode(k=k) for k in range(3)])
     Contrast().batch(Ex(model), [g], library())[0]
-    assert "<Ground Truth>\n[REDACTED]" in model.calls[2]["user"] and "(Reward [REDACTED])" in model.calls[2]["user"]
+    assert "<Ground Truth>\n[REDACTED]" in model.calls[3]["user"] and "(Reward [REDACTED])" in model.calls[3]["user"]
 
 
 def test_contrast_bad_update():
@@ -99,7 +100,8 @@ def test_plan_and_labels():
     table = model.calls[0]["user"]
     assert "Experience G1:\nContent: B: b.\nRelated Operations:" in table and "Experience G0:\nContent: A: a.\nNo related" in table
     assert [(r.id, r.text) for r in m.records()] == [("r4", "A: a2."), ("r2", "B: b."), ("r5", "D: d.")]
-    assert EXPERIENCES.prompt(Ex(model), m, {}, 0).system.endswith("experiences:\n[G0]. A: a2.\n[G1]. B: b.\n[G2]. D: d.")
+    system = AGENT.prompt(Ex(model, training=False), m, {"context": "q"}, 0).solver.call("").messages[0]["content"]
+    assert system.endswith("experiences:\n[G0]. A: a2.\n[G1]. B: b.\n[G2]. D: d.")
 
 
 def test_plan_retries_and_no_ops():
@@ -111,11 +113,17 @@ def test_plan_retries_and_no_ops():
 
 
 def test_attempts_and_batch():
-    """В зачёт итоговый агент (T=0.3, top_p 0.95), группа из 5 при T=0.7 с тем же top_p; неполный батч отбрасывается."""
-    model = Stub(lambda call: right(call) if call["temperature"] == 0.3 else by_prompt()(call))
+    """Протокол апстрима: проход по train — группа из 5 rollout при T=0.7, top_p 0.95, с инструментом и задачей с
+    опытами ("None") в user; неполный батч отбрасывается; в зачёт — тест итоговым агентом, при пустой библиотеке
+    он остаётся при 0.7 (поверхностная копия апстрима), задача в user как есть."""
+    model = Stub(lambda call: right(call) if not call["user"].startswith("<") else by_prompt()(call))
     summary = run(TASK, tfgrpo, model, 2)
-    solver = model.solver_calls()
-    assert [(c["temperature"], c["top_p"]) for c in solver[:1 + GROUP]] == [(0.3, 0.95)] + [(0.7, 0.95)] * GROUP
-    assert summary["correct"] == 2
+    agent = [c for c in model.calls if c["tools"]]
+    assert [(c["temperature"], c["top_p"]) for c in agent] == [(0.7, 0.95)] * (2 * GROUP + 2)
+    assert all(c["user"].startswith("Please solve the problem:\n") and c["user"].endswith("experiences:\nNone")
+               for c in agent[:2 * GROUP])
+    assert [c["user"] for c in agent[2 * GROUP:]] == [r["context"] for r in TASK.load()[:2]]
+    assert agent[0]["system"].startswith(TASK.system + "\n\nSolve the following problem step by step.")
+    assert summary["correct"] == 2 and summary["n"] == 2
     assert not any(c["user"].startswith("<Experiences and Proposed Operations>") for c in model.calls)
     assert render.experiences([]) == "None"

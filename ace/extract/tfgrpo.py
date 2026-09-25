@@ -5,8 +5,8 @@ tfgrpo_*.j2 дословно, пара системный / пользовате
     -> групповое преимущество по сводкам с наградами 0/1 (_group_advantage): не больше NUM опытов в <Experiences>
     -> сверка с библиотекой (_group_update): операции ADD / UPDATE / DELETE / NONE в ```json
 
-Попытки для обучения — все, кроме той, что в зачёт (она — итоговый агент, как оценка апстрима), и без
-пустой траектории (апстрим отбрасывает rollout без trajectories). С верным ответом в работу идёт только группа,
+Попытки для обучения — вся группа rollout (у TF-GRPO в зачёт идёт тест итоговым агентом), у ace_group — без
+той, что в зачёт (scored), и без пустой траектории (апстрим отбрасывает rollout без trajectories). С верным ответом в работу идёт только группа,
 где верна часть попыток: до сводок и после них. Сводка выпадает, только если модель не ответила (исключение
 у апстрима); пустая сводка остаётся.
 Библиотека до конца батча не меняется, поэтому сверка идёт здесь, а план батча — в памяти метода
@@ -16,8 +16,9 @@ from .. import parse, prompts, render
 from ..model import TEXT, Call, Reader, messages
 from . import OPERATIONS, Extraction, Extractor, scores
 
-OBJECTIVE = {t: prompts.text(f"tfgrpo_objective_{t}") for t in ("formula", "finer", "meb", "gpqa")}
-LEARNING = prompts.text("tfgrpo_learning")
+OBJECTIVE = {t: prompts.text(f"tfgrpo_objective_{t}") for t in ("formula", "finer", "meb", "gpqa", "dapo")}
+LEARNING = prompts.text("tfgrpo_learning")        # dapo — свой, дословно math_reasoning.yaml
+LEARNING_DAPO = prompts.text("tfgrpo_learning_dapo")
 NUM = 1                     # num_experiences_per_query
 P = {n: (prompts.load(f"tfgrpo_{n}_sp"), prompts.load(f"tfgrpo_{n}_up"))
      for n in ("single_rollout_summary_template", "single_query_group_advantage", "group_experience_update_template",
@@ -28,7 +29,8 @@ EXPERIENCES = Reader(text=parse.enclosed("Experiences"))
 def ask(ex, name, read=TEXT, **fields):
     """Пара промптов апстрима: системный с целями агента и обучения, пользовательский с полями; параметров нет."""
     sp, up = P[name]
-    system = sp.fill(agent_objective=OBJECTIVE[ex.task.name], learning_objective=LEARNING, num_experiences=NUM)
+    learning = LEARNING_DAPO if ex.task.name == "dapo" else LEARNING
+    system = sp.fill(agent_objective=OBJECTIVE[ex.task.name], learning_objective=learning, num_experiences=NUM)
     return ex.model.ask(Call(messages(up.fill(fields), system), {}, read)).output
 
 
@@ -40,8 +42,8 @@ def partial(rollouts, labeled):
     return 0 < mean < 1
 
 
-def rollouts(group):
-    return [e for i, e in enumerate(group.episodes) if i != group.chosen and e.output]
+def rollouts(group, scored):
+    return [e for i, e in enumerate(group.episodes) if not (scored and i == group.chosen) and e.output]
 
 
 def operations(text):
@@ -54,15 +56,15 @@ class Contrast(Extractor):
     """library=True — масштаб батча, как ExperienceUpdater.run апстрима: стадии идут по всему батчу — все сводки, все
     групповые преимущества, все сверки с библиотекой; у каждого вопроса батча своё извлечение с операциями.
     library=False — масштаб вопроса и только групповое преимущество, без сверки: непустой опыт уходит уроком в
-    чужую память (ace_group, куратор ACE), операций нет."""
-    def __init__(self, library=True):
-        self.library = library
+    чужую память (ace_group, куратор ACE), операций нет. scored — попытка в зачёт в группу не входит."""
+    def __init__(self, library=True, scored=False):
+        self.library, self.scored = library, scored
         self.gives = frozenset({OPERATIONS}) if library else frozenset()
         self.scale = "batch" if library else "question"
 
     def summaries(self, ex, group):
         """Сводки попыток группы; None — группа не идёт в работу. Без ответа модели сводка выпадает."""
-        eps = rollouts(group)
+        eps = rollouts(group, self.scored)
         if not partial(eps, bool(group.target)):
             return None
         answer = group.target or render.REDACTED

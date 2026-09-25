@@ -259,10 +259,12 @@ def run(task, learner, model, n=config.SIZE, out=None, split="", epochs=None, of
     обучения, а с learner.window (ACE online) — тест окна: перед обучением на каждых window вопросах они решаются
     текущей памятью без обучения; до первого прохода — начальный тест всего потока (в лог).
     Офлайн (ACE offline, MCE): обучение на train, после каждого прохода val; тест на split с лучшей по val
-    версией памяти (строго больше, при равенстве ранняя), без обучения.
+    версией памяти (строго больше, при равенстве ранняя), без обучения. learner.final (TF-GRPO) — всегда офлайн
+    и без val: тест памятью после последнего прохода, как итоговый агент апстрима.
     learner.recheck — после обучения на вопросе ещё попытка новой памятью, только в лог (ACE post_train)."""
     random.seed(config.SEED)
     learner = copy.deepcopy(learner)        # в реестре память ученика пуста: каждый прогон с чистой
+    offline = offline or learner.final
     ex = Experiment(task, learner, model)
     epochs = epochs or learner.epochs
     log = []
@@ -307,13 +309,14 @@ def run(task, learner, model, n=config.SIZE, out=None, split="", epochs=None, of
         if batch and learner.flush:
             learner.on_batch(ex, batch)
         learner.on_pass(ex)
-        if offline:
+        if offline and not learner.final:
             score = sum(c for c, _ in ex.evaluate())
             print(f"val after epoch {epoch}: {score}", flush=True)
             if score > best_val:
                 best, best_val = learner.snapshot(), score
     if offline:
-        learner.restore(best)
+        if not learner.final:
+            learner.restore(best)
         ex.training, ex.epoch = False, 0
         for i, item in enumerate(task.load(split)[:n]):
             t0 = time.time()

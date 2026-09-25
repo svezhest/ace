@@ -15,6 +15,7 @@ from ace.extract import tfgrpo as T
 from ace.loop import Episode, Group, Prompt
 from ace.memory import Lesson
 from ace.model import roles, text_reply
+from ace.tasks import TASKS
 
 M = importlib.import_module("ace.methods.tfgrpo")      # имя tfgrpo в пакете занято самим методом
 MEM = importlib.import_module("ace.memory.tfgrpo")
@@ -70,16 +71,15 @@ def stage(user):
 
 def trajectory(case, i, reward):
     """Траектория, как её печатает промпт сводки апстрима: repr списка сообщений агента."""
-    deviation("S1")
     return str([{"role": "user", "content": f"Problem {case}"},
                 {"role": "assistant", "content": f"attempt {i} of {case}: answer {'42' if reward else '41'}"}])
 
 
 def group(case, rewards, target="42", output=trajectory):
-    """Попытка в зачёт (0, в обучение не идёт) и попытки группы с наградами rewards."""
-    eps = [Episode(f"Problem {case}", k, Prompt(), output(case, k - 1, r) if k else "scored", "", "", [], False, [], [], [],
-                   ok=bool(r), target=target) for k, r in enumerate([1] + list(rewards))]
-    return Group(f"Problem {case}", eps, target=target, chosen=0)
+    """Группа rollout с наградами rewards (в зачёт у TF-GRPO — итоговый агент, не попытка группы)."""
+    eps = [Episode(f"Problem {case}", k, Prompt(), output(case, k, r), "", "", [], False, [], [], [], ok=bool(r),
+                   target=target) for k, r in enumerate(rewards)]
+    return Group(f"Problem {case}", eps, target=target)
 
 
 def library(texts):
@@ -117,7 +117,7 @@ def test_summary_requests():
         model = Fake(calls)
         g = group("A", [1, 0][:len(calls)], target="42" if labeled else "")
         # критика эталона: у первой попытки "Correct.", у второй нет; у math апстрима её нет никогда (test_loop)
-        for e, critique, call in zip(T.rollouts(g), ["Correct.", render.NO_CRITIQUE], calls):
+        for e, critique, call in zip(T.rollouts(g, False), ["Correct.", render.NO_CRITIQUE], calls):
             T.ask(Ex(model), STAGES[0], question=e.question, trajectory=e.output, answer=g.target or render.REDACTED,
                   critique=critique)
             assert model.calls[-1]["user"] == messages(call)[1]
@@ -129,7 +129,7 @@ def test_advantage_requests():
         call = PROMPTS["requests"][case][0]
         g = group("A", [1, 0], target="42" if labeled else "")
         user = T.P[STAGES[1]][1].fill(question=g.question, answer=g.target or render.REDACTED,
-                                      trajectories=render.attempts(list(zip(T.rollouts(g), ["S0", "S1"])), labeled))
+                                      trajectories=render.attempts(list(zip(T.rollouts(g, False), ["S0", "S1"])), labeled))
         assert user == messages(call)[1]
 
 
@@ -232,7 +232,7 @@ def test_partial_filter(gt):
     for c, g in groups.items():
         model = Fake(answer=lambda user: "summary" if user.startswith(MARKERS[0]) else "<Experiences>\n1. X\n</Experiences>")
         T.Contrast()(Ex(model), g, library([]))
-        rewards = [float(e.ok) for e in T.rollouts(g)]
+        rewards = [float(e.ok) for e in T.rollouts(g, False)]
         n = sum(stage(call["user"]) == 0 for call in model.calls)
         if n:
             summarized[g.question] = rewards[:n]
@@ -266,11 +266,19 @@ def test_loop():
 
 
 def test_show():
-    """Показ опытов — хвост инструкций итогового агента апстрима (_create_agent_config_with_experiences)."""
-    deviation("S1")            # начало инструкций — задача стенда
-    instructions = yaml.safe_load(CONFIG["math_reasoning"]["final_agent_yaml"])["agent"]["instructions"]
-    shown = SHOW.EXPERIENCES.prompt(Ex(None), library(["Units: check units.", "Verify: recompute."]), {}, 0).system
-    assert instructions.endswith(shown) and shown.startswith("\n\nWhen solving problems")
+    """Итоговый агент: инструкции — ровно итоговый конфиг апстрима (_create_agent_config_with_experiences), T и top_p
+    оттуда же; без опытов агент остаётся при температуре rollout (model_copy поверхностный)."""
+    cfg = CONFIG["math_reasoning"]
+    final = yaml.safe_load(cfg["final_agent_yaml"])
+    test = Ex(None)
+    test.task, test.training = TASKS["dapo"], False
+    p = SHOW.AGENT.prompt(test, library(["Units: check units.", "Verify: recompute."]), {"context": "q"}, 0)
+    call = p.solver.call("")
+    assert call.messages == [{"role": "system", "content": final["agent"]["instructions"]}, {"role": "user", "content": "q"}]
+    settings = final["model"]["model_settings"]
+    assert (call.params["temperature"], call.params["top_p"]) == (settings["temperature"], settings["top_p"])
+    empty = SHOW.AGENT.prompt(test, library([]), {"context": "q"}, 0).solver.call("")
+    assert empty.params["temperature"] == cfg["after_build"]["practice_rollout_temperature"] == SHOW.ROLLOUT_TEMPERATURE
 
 
 def test_settings():
@@ -279,17 +287,17 @@ def test_settings():
     practice, built = cfg["practice"], cfg["after_build"]
     final = yaml.safe_load(cfg["final_agent_yaml"])["model"]["model_settings"]
     at = M.tfgrpo.attempts
-    assert at.n - 1 == M.GROUP == practice["grpo_n"] == built["practice_pass_k"]
-    assert [at.temperature(k) for k in range(1, at.n)] == [practice["rollout_temperature"]] * M.GROUP
-    assert built["practice_rollout_temperature"] == M.TEMPERATURE
+    assert at.n == M.GROUP == practice["grpo_n"] == built["practice_pass_k"]
+    assert [at.temperature(k) for k in range(at.n)] == [practice["rollout_temperature"]] * M.GROUP
+    assert built["practice_rollout_temperature"] == SHOW.ROLLOUT_TEMPERATURE
     # rollout меняет у агента только температуру: top_p итогового агента у всех попыток
-    assert [at.top_p(k) for k in range(at.n)] == [cfg["loaded"]["agent_top_p"]] * at.n
-    assert (at.temperature(0), at.top_p(0)) == (built["original_temperature"], final["top_p"]) == (final["temperature"], M.TOP_P)
+    assert [at.top_p(k) for k in range(at.n)] == [cfg["loaded"]["agent_top_p"]] * at.n == [SHOW.TOP_P] * at.n
+    assert built["original_temperature"] == final["temperature"] == SHOW.TEMPERATURE and final["top_p"] == SHOW.TOP_P
     assert T.NUM == practice["num_experiences_per_query"]
     assert practice["given_ground_truth"] and M.tfgrpo.verdict is verdict.golden
-    assert M.tfgrpo.epochs == practice["epochs"] and not M.tfgrpo.flush
+    assert M.tfgrpo.epochs == practice["epochs"] and not M.tfgrpo.flush and M.tfgrpo.final
     assert cfg["updater_query_params"] == {}            # обновление без температуры: test_loop
-    # eval при обучении делит агента с rollout (T = 0.7) и идёт Mean@32; у нас val и тест — итоговый агент
-    assert built["practice_and_eval_share_agent"] and built["eval_rollout_temperature"] == M.TEMPERATURE
+    # eval при обучении делит агента с rollout (T = 0.7): отсюда и итоговый агент без опытов при 0.7 (test_show)
+    assert built["practice_and_eval_share_agent"] and built["eval_rollout_temperature"] == SHOW.ROLLOUT_TEMPERATURE
     deviation("S3")             # батч 20 из 40 задач против 50 из 100: те же 2 шага за эпоху
     assert (M.BATCH, practice["batch_size"]) == (20, 50)

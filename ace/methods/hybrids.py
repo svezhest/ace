@@ -25,5 +25,5 @@ GROUP, GROUP_TEMPERATURE = 3, 0.7
 ace_bo2 = swap(ace, "ace_bo2", extract=BestOf(Reflector(temperature=BEST_OF_TEMPERATURE), 2, one_of_two))
 ace_opt = swap(ace, "ace_opt", memory=CappedPlaybook())
 ace_hooks = Hooks(swap(ace, env=Sandbox()), "ace_hooks")
-ace_group = swap(ace, "ace_group", extract=Contrast(library=False), memory=Playbook(prune=None),
+ace_group = swap(ace, "ace_group", extract=Contrast(library=False, scored=True), memory=Playbook(prune=None),
                  attempts=Attempts(1 + GROUP, lambda k: 0 if k == 0 else GROUP_TEMPERATURE))

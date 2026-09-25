@@ -7,7 +7,8 @@
     память              контейнер + learn(ex, extractions); requires            memory/
     показ               show.prompt -> Prompt, show.on_step -> Patch            show/
     когда учится        every (раз в сколько вопросов), flush (неполный батч в конце прохода)
-    протокол            window (тест окна в зачёт), recheck (попытка после обучения)   loop.py: run
+    протокол            window (тест окна в зачёт), recheck (попытка после обучения), final (обучение, затем
+                        тест итоговой памятью)                                  loop.py: run
     среда попытки       env: Env | Sandbox(per="call" | "attempt")              env/
 
 Хуки: перед попыткой память узнаёт о новой попытке (begin: срок жизни «попытка»), показ даёт промпт; на шаге
@@ -42,6 +43,7 @@ class Learner:
     epochs: int = 1             # проходов по train по умолчанию, как в апстриме
     window: int = 0             # онлайн: тест окна из window вопросов до обучения на нём (в зачёт); 0 — первая попытка
     recheck: bool = False       # после обучения на вопросе — попытка новой памятью, только в лог
+    final: bool = False         # протокол TF-GRPO: проход по train без зачёта, в зачёт — тест памятью после обучения
     env: Env = field(default_factory=Env)
     skill: str = ""             # навык от мета-уровня (MCE над учеником); сам ученик его не пишет
     pending: list = field(default_factory=list, init=False, repr=False)    # извлечённое до батча
@@ -59,7 +61,8 @@ class Learner:
         memory = self.memory if memory is None else memory
         memory.begin(k)
         p = self.show.prompt(ex, memory, item, k)
-        p.temperature, p.top_p = self.attempts.temperature(k), self.attempts.top_p(k)
+        if p.solver is None:            # свой решатель метода ставит параметры сам
+            p.temperature, p.top_p = self.attempts.temperature(k), self.attempts.top_p(k)
         return p
 
     def on_step(self, ex, attempt, step):
