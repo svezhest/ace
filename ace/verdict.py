@@ -29,10 +29,25 @@ def yes_no(ex, episode, target):
 
 
 def judge(ex, episode, target):
-    """Самопроверка с вердиктом в конце; голое число модель ставит наугад (14/20 против 17/20)."""
+    """Самопроверка с вердиктом в конце; голое число модель ставит наугад (14/20 против 17/20). Вне обучения
+    вердикт никто не читает (в зачёт — проверка задачи), и судья не зовётся."""
+    if not ex.training:
+        return
     prompt = JUDGE.fill(question=episode.question, output=episode.output)
-    s = ex.model.ask(Call(messages(prompt, prompts.text("judge_system")), params())).output or ""
-    episode.ok = "VERDICT:" in s and "correct" in s.split("VERDICT:")[-1].lower()
+    word = judged(ex.model.ask(Call(messages(prompt, prompts.text("judge_system")), params())).output or "")
+    episode.ok = word == "correct"
+
+
+def judged(text):
+    """Слово вердикта из последней строки «VERDICT: ...»: correct | wrong; иначе (incorrect, not correct, нет
+    строки) — None. Звёздочки Markdown и знаки после слова не мешают."""
+    for line in reversed(text.splitlines()):
+        line = line.replace("*", "").strip()
+        if line.upper().startswith("VERDICT:"):
+            words = line[len("VERDICT:"):].split()
+            word = words[0].strip(".,;:!—-").lower() if words else ""
+            return word if word in ("correct", "wrong") else None
+    return None
 
 
 def none(*_):

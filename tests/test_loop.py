@@ -267,3 +267,19 @@ def test_top_p_reaches_model():
     attempts = Attempts(2, temperature=lambda k: 0.3 if k == 0 else 0.7, top_p=lambda k: 0.95 if k == 0 else None)
     run(TASK, Learner("t", attempts=attempts), model, 1)
     assert [(c["temperature"], c["top_p"]) for c in model.calls] == [(0.3, 0.95), (0.7, None)]
+
+
+@pytest.mark.parametrize("text, word", [
+    ("VERDICT: correct", "correct"), ("**VERDICT: correct**", "correct"), ("VERDICT: Correct.", "correct"),
+    ("VERDICT: wrong", "wrong"), ("VERDICT: incorrect", None), ("VERDICT: not correct", None),
+    ("VERDICT: wrong — the correct answer is 12", "wrong"), ("VERDICT: correct\nVERDICT: wrong", "wrong"),
+    ("the answer is correct", None), ("VERDICT:", None)])
+def test_judge_parse(text, word):
+    assert verdict.judged(text) == word
+
+
+def test_judge_not_on_test():
+    """Вне обучения судья не зовётся: на тесте его вердикт никто не читает."""
+    model = Stub(lambda call: "VERDICT: correct" if call["system"] == "You are a strict grader." else "FINAL ANSWER: 0")
+    run(TASK, spy(verdict=verdict.judge), model, 1, offline=True)
+    assert sum(c["system"] == "You are a strict grader." for c in model.calls) == 1
