@@ -55,5 +55,5 @@ uv run python tools/as_old.py /tmp/o.json && uv run python tools/compare.py /tmp
 
 Перенесены на уровни (поток B): scope, scope_bo2, scope_code, scope_k2 (`ace/methods/scope.py`, правило на шаг —
 `ace/extract/scope.py`); mce = Meta(базовый агент с файлами) и mce_ace = Meta(ACE) (`ace/methods/mce.py`);
-обёртки Meta и Gate (`ace/wrap.py`), Hooks — хуки по ошибкам (`ace/hooks.py`); гибриды ace_bo2, ace_opt, ace_hooks
-(`ace/methods/hybrids.py`). ace_group — после переноса TF-GRPO.
+обёртки Meta и Gate (`ace/wrap.py`), Hooks — хуки по ошибкам (`ace/hooks.py`); гибриды ace_bo2, ace_opt, ace_hooks,
+ace_group (`ace/methods/hybrids.py`).

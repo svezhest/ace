@@ -7,14 +7,18 @@ ace_opt     память: пункты ACE с пределом SCOPE вмест�
             со своими счётчиками, исправленные и слитые — новые пункты с нуля
 ace_hooks   Hooks(ACE) с исполнением python: урок по ошибке инструмента дописывается в конец истории после
             шага с той же ошибкой (ace/hooks.py)
-ace_group (контраст TF-GRPO по группе попыток) — после переноса TF-GRPO."""
+ace_group   извлечение: контраст TF-GRPO по группе попыток (3 при T = 0.7, награды — верный ответ; в зачёт — попытка
+            при T = 0, в группу не входит) -> групповое преимущество, не больше 1 опыта; опыт уроком идёт куратору
+            ACE. Меток нет, поэтому память без счётчиков и отсева, как ace_text."""
 from .. import prompts, render
 from ..env import Sandbox
 from ..extract.ace import Reflector
 from ..extract.best import BestOf
 from ..extract.scope import BEST_OF_TEMPERATURE
+from ..extract.tfgrpo import Contrast
 from ..hooks import Hooks
 from ..learner import swap
+from ..loop import Attempts
 from .ace import Playbook, ace
 from .scope import CAP, TARGET, compress, rule_optimizer
 
@@ -43,3 +47,6 @@ class CappedPlaybook(Playbook):
 ace_bo2 = swap(ace, "ace_bo2", extract=BestOf(Reflector(temperature=BEST_OF_TEMPERATURE), 2, one_of_two))
 ace_opt = swap(ace, "ace_opt", memory=CappedPlaybook())
 ace_hooks = Hooks(swap(ace, env=Sandbox()), "ace_hooks")
+GROUP, GROUP_TEMPERATURE = 3, 0.7
+ace_group = swap(ace, "ace_group", extract=Contrast(library=False), memory=Playbook(prune=None),
+                 attempts=Attempts(1 + GROUP, lambda k: 0 if k == 0 else GROUP_TEMPERATURE))

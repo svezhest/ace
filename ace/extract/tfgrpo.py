@@ -49,7 +49,11 @@ def operations(text):
 
 
 class Contrast(Extractor):
-    gives = frozenset({OPERATIONS})
+    """library=False — только групповое преимущество, без сверки с библиотекой: непустой опыт уходит уроком в
+    чужую память (ace_group, куратор ACE), операций нет."""
+    def __init__(self, library=True):
+        self.library = library
+        self.gives = frozenset({OPERATIONS}) if library else frozenset()
 
     def __call__(self, ex, group, memory):
         labeled, answer = bool(group.target), group.target or render.REDACTED
@@ -61,8 +65,10 @@ class Contrast(Extractor):
             if partial([e for e, _ in summaries], labeled):
                 found = EXPERIENCES(ask(ex, "single_query_group_advantage", question=group.question, answer=answer,
                                         trajectories=render.attempts(summaries, labeled)))
-                if found is not None:
+                if found is not None and not self.library:
+                    lessons = [found] if found else []
+                elif found is not None:
                     lessons = [found]
                     ops = operations(ask(ex, "group_experience_update_template",
                                          existing_experiences=render.experiences(memory.records()), new_experiences=found))
-        return Extraction(group, lessons, scores(group), {OPERATIONS: ops})
+        return Extraction(group, lessons, scores(group), {OPERATIONS: ops} if self.library else {})

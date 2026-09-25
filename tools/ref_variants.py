@@ -4,7 +4,7 @@
 База цепочки ace теперь — куратор операциями (curate_json), поэтому новый ace сравнивается со старым
 swap(ace, curate=curate_json), ace_text — с тем же и рефлексией свободным текстом, ace_rewrite — с перезаписью.
 baseline, ace_exact и ace_exact_dedup — те же, что в ref_trace.json. Гибриды над ace (ace_bo2, ace_opt, ace_hooks) —
-тоже над куратором операциями."""
+тоже над куратором операциями, как и ace_group (контраст TF-GRPO и куратор ACE)."""
 import runpy
 import sys
 from pathlib import Path
@@ -22,6 +22,7 @@ METHODS["ace_rewrite"] = swap(ace, "ace_rewrite", curate=curate_rewrite)
 METHODS["ace_bo2"] = swap(METHODS["ace_bo2"], curate=curate_json)
 METHODS["ace_opt"] = swap(METHODS["ace_opt"], curate=curate_json)
 METHODS["ace_hooks"] = hooks(METHODS["ace"], "ace_hooks")
+METHODS["ace_group"] = swap(METHODS["ace_group"], curate=curate_json)
 sys.argv = ["trace.py", "--root", root, out, "baseline", "ace", "ace_text", "ace_rewrite", "ace_exact", "ace_exact_dedup",
-            "ace_bo2", "ace_opt", "ace_hooks"]
+            "ace_bo2", "ace_opt", "ace_hooks", "ace_group"]
 runpy.run_path(str(Path(__file__).parent / "trace.py"), run_name="__main__")

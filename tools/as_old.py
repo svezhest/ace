@@ -9,6 +9,7 @@
                    решатель с vote=True): её балл всегда 1, лучшая — всегда первая
     evolib_judge   то же; судья после всех попыток группы, а не после каждой
     ace_bo2        кандидаты рефлектора при T = 0, а не 0.7 (сравнивать с tools/ref_variants.json)
+    ace_group      контраст TF-GRPO как в старом коде (цели и T = 0, TF6); сравнивать с tools/ref_variants.json
     scope, scope_bo2, scope_code, scope_k2
                    ответы SCOPE по старым схемам pydantic (фиктивная модель заполняет схему, разбор получает её
                    JSON), а не текстом: на тексте фиктивной модели синтезатор правил не находит;
@@ -38,6 +39,13 @@ scope_extract = importlib.import_module("ace.extract.scope")
 
 def old_tfgrpo():
     render.label = lambda i, r: r.id
+    old_contrast()
+    return swap(tfgrpo.tfgrpo, attempts=Attempts(1 + tfgrpo.GROUP, lambda k: 0 if k == 0 else tfgrpo.TEMPERATURE,
+                                                 pick=greedy))
+
+
+def old_contrast():
+    """Контраст TF-GRPO как в старом коде: цели без перевода строки в конце, вызовы при T = 0 (TF6)."""
     contrast = importlib.import_module("ace.extract.tfgrpo")
     for k in contrast.OBJECTIVE:
         contrast.OBJECTIVE[k] = contrast.OBJECTIVE[k].rstrip("\n")
@@ -51,8 +59,6 @@ def old_tfgrpo():
         finally:
             ex.model = model
     contrast.ask = tfgrpo.ask = ask
-    return swap(tfgrpo.tfgrpo, attempts=Attempts(1 + tfgrpo.GROUP, lambda k: 0 if k == 0 else tfgrpo.TEMPERATURE,
-                                                 pick=greedy))
 
 
 class Zero:
@@ -155,7 +161,13 @@ def old_scope(name):
     return make
 
 
+def old_group():
+    old_contrast()
+    return hybrids.ace_group
+
+
 OLD = {"tfgrpo": old_tfgrpo,
+       "ace_group": old_group,
        "evolib": lambda: swap(evolib.evolib, group_verdict=old_vote),
        "evolib_judge": lambda: swap(evolib.evolib_judge, verdict=verdict.none, group_verdict=old_judge),
        "ace_bo2": lambda: swap(hybrids.ace_bo2, extract=hybrids.BestOf(hybrids.Reflector(), 2, hybrids.one_of_two)),
