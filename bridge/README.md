@@ -150,12 +150,12 @@ $U/mce/bin/python   bridge/capture_mce.py
 
 ## Тесты-мостик: итог
 
-`uv run pytest tests/bridge` — 359 тестов. Нормализация только по записям `DEVIATIONS.md` (тест вызывает
+`uv run pytest tests/bridge` — 384 теста. Нормализация только по записям `DEVIATIONS.md` (тест вызывает
 `deviation("ID")`). Наш код, где расходился без причины, приведён к апстриму.
 
 | файл | апстрим | тестов | что сверяется |
 |---|---|---|---|
-| `test_bridge_ace.py` | ACE | 88 | шаблоны и запросы рефлектора и куратора, разборщики, операции над playbook, цикл online на 4 задачах (все запросы рефлектора и куратора, итоговый playbook) |
+| `test_bridge_ace.py` | ACE | 113 | шаблоны и запросы генератора, рефлектора и куратора, параметры, разборщики (и bullet_ids, extract_answer), вход задачи, операции над playbook, цикл online на 4 задачах с окном 2 (все запросы по порядку, итоговый playbook) |
 | `test_bridge_dc.py` | DC | 27 | шаблоны и запросы куратора и синтеза, `extract_cheatsheet`, показ пар, цикл DC-Cu и DC-RS на 5 задачах |
 | `test_bridge_scope.py` | SCOPE | 63 | шаблоны и запросы, все разборщики (текстом, как у апстрима), память (0.85, лимит 20), цикл на 7 задачах |
 | `test_bridge_evolib.py` | EvoLib | 44 | промпты, разборщики, IG и Future IG, выборка из библиотеки, слияния, цикл nogold и gold |
@@ -164,10 +164,9 @@ $U/mce/bin/python   bridge/capture_mce.py
 | `test_bridge_tasks.py` | ACE, DC | 66 | чекеры finer и formula (ACE), meb (DC), отчётная точность; gpqa — наша (CHK2) |
 
 Подозрения: formula `$15.00`/строки, finer eval и `$1,200` — чекеры как у ACE (тест); meb — как у DC, без × ÷;
-bullet_ids ACE — USED вместо регулярки (ACE2); slug `ph` и id — как у ACE (тест); UPDATE / DELETE куратора ACE
+bullet_ids ACE — регулярка апстрима как есть (тест); slug `ph` и id — как у ACE (тест); UPDATE / DELETE куратора ACE
 пропускаются (тест); SCOPE 0.85 и лимит 20 — как у апстрима (тест); DC extract_cheatsheet — как HEAD (тест); MCE
 выбор итерации — как у апстрима, без iter0 (тест); TF-GRPO температуры — как у апстрима (тест, S3).
 
-Не сравниваются: генератор ACE, решатели DC, EvoLib и TF-GRPO — решатель общий (S1); онлайн-окно
-и отчётные генерации ACE (S3); разборщики кодовых задач EvoLib и ответы symptom_diagnosis MCE — у нас таких задач
+Не сравниваются: решатели DC, EvoLib и TF-GRPO — решатель общий (S1); разборщики кодовых задач EvoLib и ответы symptom_diagnosis MCE — у нас таких задач
 нет; журнал SCOPE (history_store) — лог, а не память.

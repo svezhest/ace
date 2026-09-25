@@ -94,7 +94,7 @@ class PydanticAI:
         with capture_run_messages() as messages:
             try:
                 result = agent.run_sync(user, message_history=history, deps=call.deps,
-                                        usage_limits=UsageLimits(request_limit=limit), model_settings=call.params).output
+                                        usage_limits=UsageLimits(request_limit=limit), model_settings=settings(call.params)).output
             except UsageLimitExceeded:
                 outcome = Outcome.step
             except UnexpectedModelBehavior:
@@ -105,6 +105,11 @@ class PydanticAI:
         self.prompt_tokens += sum(m.usage.input_tokens for m in responses)
         self.completion_tokens += sum(m.usage.output_tokens for m in responses)
         return result, messages, outcome
+
+
+def settings(params):
+    """Параметры вызова -> настройки pydantic-ai: предел генерации у них один, max_tokens."""
+    return {"max_tokens" if k == "max_completion_tokens" else k: v for k, v in params.items()}
 
 
 def steps(messages):

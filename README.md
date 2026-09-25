@@ -17,10 +17,11 @@
 | мета: Gate, Meta (MCE), Hooks | `ace/wrap/` |
 
 Методы (`ace/methods/<метод>.py` — только сборка, в docstring — что метод берёт на каждом уровне): baseline;
-ace, ace_text, ace_rewrite (стенд), ace_exact и ace_exact_dedup (как в апстриме); dc, dc_code, dc_rs, dc_retrieval,
+ace, ace_text, ace_rewrite (стенд), ace_exact и ace_exact_dedup (как в апстриме), ace_exact_used; dc, dc_code, dc_rs, dc_retrieval,
 dc_history; scope, scope_bo2, scope_code, scope_k2; tfgrpo; evolib, evolib_judge; mce, mce_ace; гибриды ace_bo2,
 ace_opt, ace_hooks, ace_group. По умолчанию уровни ведут себя как апстрим; неустранимые отличия —
-[DEVIATIONS.md](DEVIATIONS.md), верность — тесты-мостик `tests/bridge/` (эталоны сняты с апстримов, `bridge/`).
+[DEVIATIONS.md](DEVIATIONS.md), верность — тесты-мостик `tests/bridge/` (эталоны сняты с апстримов, `bridge/`)
+и воспроизведение записей апстримов на живой модели `tests/live/` (`bridge/live/<метод>/`).
 Прототип отложен: его код — в теге `pre-rewrite` (`git show pre-rewrite:ace/methods/proto.py`).
 
 ```
@@ -67,7 +68,7 @@ uv run python tools/compare.py /tmp/a.json /tmp/b.json   # два снимка: 
 ```
 uv run python scripts/evolib_ig.py formula 40     # IG по вопросам при голосовании, судье и верном ответе
 uv run python scripts/scope_patch.py formula 40   # перезапись системного промпта против дописывания
-uv run python scripts/ace_labels.py formula 40    # ace_exact: сколько названных пунктов и меток доходит до счётчиков
+uv run python scripts/ace_labels.py formula 40    # ace_exact_used: сколько названных пунктов и меток доходит до счётчиков
 ```
 
 - `evolib_ig.py` — по каждому вопросу ответы попыток, голос, баллы и IG (`ig.json`); таблица IG по числу

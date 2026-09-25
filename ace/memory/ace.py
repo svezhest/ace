@@ -98,6 +98,12 @@ HIGH_HELPFUL, HIGH_HARMFUL = 5, 2   # пункт «high performing»: helpful б
 DEDUP = 0.85                # порог косинуса слияния; у апстрима 0.90 под all-mpnet, у BGE-M3 косинусы ниже
 MERGE_TEMPERATURE = 0.3
 OPERATIONS = Reader(text=parse.ace_operations)      # _extract_and_validate_operations куратора апстрима
+MAX_TOKENS = 4096           # --max_tokens апстрима
+
+
+def ace_params():
+    """Параметры вызова генератора, рефлектора и куратора апстрима (timed_llm_call при api_provider openai)."""
+    return dict(temperature=0.0, max_completion_tokens=MAX_TOKENS)
 
 
 def section_key(name):
@@ -118,13 +124,31 @@ def section_slug(name):
 TITLES = {section_key(s): s for s in SECTIONS}
 
 
+FORMULA_NOTE = prompts.text("ace_formula_note")
+
+
+def ace_input(task, text):
+    """(context, question) из входа задачи, как DataProcessor.process_task_data апстрима. formula
+    (parse_context_and_question_formula): вопрос между «Question: » и «. Answer:», без обрамляющих кавычек и с
+    припиской про число, context пуст — формула из входа не попадает никуда. Остальные
+    (parse_instruction_and_input): при «Instruction: ... Input: ... Answer: » context — текст после «Input: »,
+    вопрос — инструкция; иначе context пуст, вопрос — весь вход."""
+    if task == "formula":
+        if "Question: " not in text or ". Answer:" not in text:
+            return "", text
+        question = text.split("Question: ", 1)[1].split(". Answer:")[0].strip()
+        if question.startswith('"') and question.endswith('"'):
+            question = question[1:-1]
+        return "", question + FORMULA_NOTE
+    if "Input: " not in text or "Instruction: " not in text:
+        return "", text
+    instruction = text.split("Input: ")[0].strip().split("Instruction: ")[1].strip()
+    return text.split("Input: ")[1].split("Answer: ")[0].strip(), instruction
+
+
 def question_context(task, text):
-    """Question Context куратора — context из DataProcessor апстрима: у formula пусто (весь вход — вопрос,
-    parse_context_and_question_formula), у остальных — текст после «Input: », если вход в формате
-    «Instruction: ... Input: ... Answer: » (parse_instruction_and_input), иначе пусто."""
-    if task == "formula" or not ("Input: " in text and "Instruction: " in text):
-        return ""
-    return text.split("Input: ")[1].split("Answer: ")[0].strip()
+    """Question Context куратора — context из DataProcessor апстрима."""
+    return ace_input(task, text)[0]
 
 
 class SlugIds(Ids):
@@ -170,7 +194,7 @@ class SectionedPlaybook(Sections):
                       playbook_stats=render.stats(self.stats()), recent_reflection=x.lessons[-1],
                       current_playbook=layout(self), question_context=question_context(ex.task.name, x.group.question))
         prompt = P["curator" if x.group.target else "curator_nogt"].fill(fields)
-        self.apply(ex.model.ask(Call(messages(prompt), params(), self.read)).output or [])
+        self.apply(ex.model.ask(Call(messages(prompt), ace_params(), self.read)).output or [])
 
     def apply(self, ops):
         """apply_curator_operations апстрима: только ADD; раздел без strip, неизвестный — OTHERS, general — в начало

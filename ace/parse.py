@@ -12,6 +12,8 @@
     ace_json            extract_json_from_text ACE: весь текст, ```json, первый объект {...} (ACE)
     bullet_tags         _extract_bullet_tags рефлектора ACE без json_mode: массив после "bullet_tags" (ACE)
     ace_operations      _extract_and_validate_operations куратора ACE: операции или None (ACE)
+    bullet_ids          id пунктов в ответе генератора ACE, регулярка апстрима (ACE)
+    ace_answer          extract_answer ACE: final_answer из JSON и откаты апстрима (ACE)
     scope_*             ответы синтезатора, селектора, классификатора и оптимизатора SCOPE, с откатами апстрима
     json_object         общий разбор JSON: весь текст, последний ```json, последний объект {...}; None
     structured          общий разбор ответа в pydantic-схему (Reader(schema=...) на проводе); None"""
@@ -188,6 +190,59 @@ def ace_operations(text):
     except TypeError:
         return None
     return info["operations"]
+
+
+def bullet_ids(text):
+    """_extract_bullet_ids_regex генератора ACE (generator.py:115): id в квадратных скобках по всему ответу."""
+    return re.findall(r"\[([a-z]{3,}-\d{5})\]", text or "")
+
+
+NO_ANSWER = "No final answer found"
+
+
+def ace_answer(text):
+    """extract_answer ACE (utils.py:100): весь ответ JSON-объект -> str(final_answer); иначе по очереди последний
+    Finish[...], "final_answer": "..." в двойных, в одинарных кавычках и без кавычек, «the final answer is» с
+    \\boxed{...} и без него; иначе NO_ANSWER."""
+    text = text or ""
+    try:
+        return str(json.loads(text).get("final_answer", NO_ANSWER))
+    except (json.JSONDecodeError, KeyError, AttributeError):
+        pass
+    for pattern in (r"Finish\[(.*?)\]", r'"final_answer"\s*:\s*"([^"]*)"', r"'final_answer'\s*:\s*'([^']*)'"):
+        found = re.findall(pattern, text)
+        if found:
+            return found[-1]
+    found = re.findall(r'[\'"]final_answer[\'"]\s*:\s*([^,}]+)', text)
+    if found:
+        return re.sub(r"[,}]*$", "", found[-1].strip())
+    start = re.search(r"[Tt]he final answer is:?\s*\$?\\boxed\{", text)
+    if start:
+        boxed = boxed_content(text[start.start():])
+        if boxed:
+            return boxed
+    found = re.findall(r"[Tt]he final answer is:?\s*([^\n.]+)", text)
+    if found:
+        answer = re.sub(r"^\$?\\boxed\{([^}]+)\}\$?$", r"\1", found[-1].strip()).replace("$", "").strip()
+        if answer:
+            return answer
+    return NO_ANSWER
+
+
+def boxed_content(text):
+    """extract_boxed_content ACE: содержимое первого \\boxed{...} по балансу скобок; незакрытое — None."""
+    m = re.search(r"\\boxed\{", text)
+    if not m:
+        return None
+    depth = 0
+    for i in range(m.end() - 1, len(text)):
+        if text[i] == "{":
+            depth += 1
+        elif text[i] == "}":
+            depth -= 1
+            if depth == 0:
+                return text[m.end():i]
+    return None
 
 # SCOPE (SCOPE/scope 4dc0da5): разбор ответов дословно, с откатами апстрима
 

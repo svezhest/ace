@@ -1,14 +1,15 @@
-r"""Замер ACE апстрима (ace_exact): сколько меток helpful / harmful доходит до счётчиков.
+r"""Замер ACE с общим решателем (ace_exact_used): сколько меток helpful / harmful доходит до счётчиков.
 
 Цепочка: решатель называет пункты -> разбор находит их id -> рефлектор видит эти пункты и ставит метки ->
 метки с id из памяти попадают в счётчики. В апстриме id разбирает регулярка core/generator.py:115
 \[([a-z]{3,}-\d{5})\] по всему ответу (json_mode по умолчанию выключен), а промпт просит JSON-список
 "bullet_ids": ["calc-00001", ...] без скобок — названное списком она не видит (и не видит ph-). У нас решатель
-называет пункты строкой USED; id как у апстрима, регулярка взята как есть.
+называет пункты строкой USED (ace_exact_used; сам ace_exact — регулярка по ответу генератора апстрима), id как у
+апстрима, регулярка взята как есть.
 
 По каждому раунду рефлектора: названные в USED, распознанные нашим разбором (есть в памяти), распознанные
 регуляркой апстрима, метки рефлектора и сколько из них дошло до счётчиков (helpful / harmful с id из памяти).
-python scripts/ace_labels.py TASK [N]; строки в results/TASKN/labels_ace_exact/labels.json."""
+python scripts/ace_labels.py TASK [N]; строки в results/TASKN/labels_ace_exact_used/labels.json."""
 import json
 import re
 import sys
@@ -46,9 +47,10 @@ def share(a, b):
 if __name__ == "__main__":
     task = TASKS[sys.argv[1]]
     n = int(sys.argv[2]) if len(sys.argv) > 2 else config.SIZE
-    out = f"{config.RESULTS}/{task.name}{n}/labels_ace_exact"
-    base = METHODS["ace_exact"]
-    print(run(task, swap(base, "labels_ace_exact", extract=Logged(base.extract.rounds)), Model(), n, out, epochs=config.EPOCHS))
+    out = f"{config.RESULTS}/{task.name}{n}/labels_ace_exact_used"
+    base = METHODS["ace_exact_used"]
+    print(run(task, swap(base, "labels_ace_exact_used", extract=Logged(base.extract.rounds, ids=named)), Model(), n, out,
+              epochs=config.EPOCHS))
     json.dump(ROWS, open(f"{out}/labels.json", "w"), ensure_ascii=False, indent=1)
     rows = [r for r in ROWS if r["memory"]]         # пока память пуста, называть нечего
     named = sum(len(r["named"]) for r in rows)

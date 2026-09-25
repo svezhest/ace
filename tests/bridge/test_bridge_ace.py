@@ -1,6 +1,6 @@
-"""ACE (ace_exact) против апстрима ace 82709de: шаблоны и запросы рефлектора и куратора, разборщики ответов,
-операции над playbook (id, разделы, метки, статистика) и цикл online на 4 задачах эталона с той же фейковой
-моделью. Генератор апстрима не сверяется: решатель общий (S1)."""
+"""ACE (ace_exact) против апстрима ace 82709de: шаблоны и запросы генератора, рефлектора и куратора, разборщики
+ответов, операции над playbook (id, разделы, метки, статистика) и цикл online на 4 задачах эталона с той же фейковой
+моделью (все запросы по порядку)."""
 import json
 import re
 import string
@@ -12,12 +12,12 @@ from ace.extract.ace import bullets_used, tag_map
 from ace.learner import swap
 from ace.loop import run
 from ace.memory import HARMFUL, HELPFUL, Lesson
-from ace.memory.ace import SectionedPlaybook, SECTIONS, layout, question_context, section_slug
+from ace.memory.ace import SectionedPlaybook, SECTIONS, ace_input, ace_params, layout, question_context, section_slug
 from ace.methods.ace import ace_exact
-from ace.model import roles, text_reply
+from ace.model import text_reply
 from ace.tasks import TASKS
 from ace.verdict import yes_no
-from upstream import deviation, fixture, messages
+from upstream import fixture, messages
 
 PROMPTS, PARSERS, MEMORY, LOOP = (fixture("ace", n) for n in ("prompts", "parsers", "memory", "loop"))
 REFLECTOR = ["question", "reasoning_trace", "predicted_answer", "ground_truth", "environment_feedback", "bullets_used"]
@@ -37,6 +37,7 @@ def fields(template):
 
 
 @pytest.mark.parametrize("ours, theirs, names", [
+    ("ace_generator", "GENERATOR_PROMPT", ["playbook", "reflection", "question", "context"]),
     ("ace_reflector", "REFLECTOR_PROMPT", REFLECTOR),
     ("ace_reflector_nogt", "REFLECTOR_PROMPT_NO_GT", [n for n in REFLECTOR if n != "ground_truth"]),
     ("ace_curator", "CURATOR_PROMPT", CURATOR),
@@ -93,6 +94,12 @@ def test_curator_request(key):
     assert prompts.load("ace_curator" + ("" if key == "curator_gt" else "_nogt")).fill(values) == user
 
 
+def test_params():
+    """Параметры всех трёх ролей при api_provider openai (timed_llm_call): T = 0.0 и max_completion_tokens."""
+    for c in PROMPTS["filled"]["openai_json0"]["calls"]:
+        assert {k: v for k, v in c.items() if k not in ("messages", "response", "prompt", "hash", "matched", "model")} == ace_params()
+
+
 def test_json_mode_only_adds_response_format():
     """json_mode меняет только response_format; по умолчанию (run.py: --json_mode выключен) его нет, как у нас."""
     for provider in ("sambanova", "openai"):
@@ -121,13 +128,15 @@ def test_curator_operations(row):
     assert got == (row["out"]["ok"]["operations"] if "ok" in row["out"] else None)
 
 
-def test_bullet_ids_regex_not_ported():
-    """bullet_ids генератора апстрима — регулярка по тексту: не видит ph-, верхний регистр и JSON-список. У нас id
-    называет решатель строкой USED, берутся все (ACE2)."""
-    deviation("ACE2")
-    rows = {r["in"]: r["out"]["ok"] for r in PARSERS["_extract_bullet_ids_regex"]}
-    assert rows["Used [ph-00003] and [sai-00004]."] == ["sai-00004"]
-    assert rows['{"bullet_ids": ["calc-00001", "ph-00003"], "final_answer": "1"}'] == []
+@pytest.mark.parametrize("row", PARSERS["_extract_bullet_ids_regex"], ids=lambda r: r["in"][:30])
+def test_bullet_ids(row):
+    """Регулярка генератора апстрима как есть: не видит ph-, верхний регистр и JSON-список."""
+    assert parse.bullet_ids(row["in"]) == row["out"]["ok"]
+
+
+@pytest.mark.parametrize("row", PARSERS["extract_answer"], ids=lambda r: r["in"][:30])
+def test_extract_answer(row):
+    assert parse.ace_answer(row["in"]) == row["out"]["ok"]
 
 # память
 
@@ -253,12 +262,15 @@ def test_question_context():
     text = "Instruction: Tag the numbers.\nInput: Revenue was $5 million.\nAnswer: "
     assert question_context("finer", text) == ok["parse_instruction_and_input"]["ok"][0]
 
-# цикл online на 4 задачах: фейк апстрима (bridge/capture_ace.py) — ответы решателя по задаче и по тому, была ли
-# рефлексия; рефлектор и куратор — записанные ответы по порядку
 
+@pytest.mark.parametrize("key", ["online_gt"])
+def test_ace_input(key):
+    """(context, question) из сырого входа — как process_task_data апстрима."""
+    for s in LOOP[key]["samples"]:
+        assert ace_input("formula", s["others"]["original_context"]) == (s["context"], s["question"])
 
-ANSWERS = {"Alpha": ("15.00", "15.00"), "Beta": ("$40.00", "40.00"), "Gamma": ("3.0", "3.0"), "Delta": ("1,200.00", "1,200.00")}
-UPSTREAM_ID = re.compile(r"\[([a-z]{3,}-\d{5})\]")      # _extract_bullet_ids_regex апстрима (generator.py:115)
+# цикл online на 4 задачах: фейк апстрима (bridge/capture_ace.py) отвечает генератору по задаче и по тому, была ли
+# рефлексия, рефлектору и куратору — заготовками; у нас те же ответы по порядку
 
 
 class Task:
@@ -268,64 +280,43 @@ class Task:
         self.samples = samples
 
     def load(self, split="", size=None):
-        return [dict(context=s["question"], target=s["target"]) for s in self.samples]
+        return [dict(context=s["others"]["original_context"], target=s["target"]) for s in self.samples]
 
     def check(self, answer, target):
         return TASKS["formula"].check(answer, target)
 
 
-def generator_json(system, user):
-    """Ответ генератора фейка апстрима (capture_ace.generator_reply) на наш промпт: id — из показанного playbook."""
-    task = next(t for t in ANSWERS if t in user)
-    reflected = "\n\nReflection:\n" in user
-    ids = re.findall(r"\[([^\]\s]+)\] helpful=", system)
-    return json.dumps({"reasoning": f"Task {task}. Used bullets {' '.join(f'[{i}]' for i in ids)}. Reflected: {reflected}.",
-                       "bullet_ids": ids, "final_answer": ANSWERS[task][reflected]})
-
-
 class Replay:
+    """Ответы эталона по порядку; запрос — тот же, что записал фейк."""
     name = "replay"
 
     def __init__(self, upstream):
-        self.replies = {m: iter([c["response"] for c in upstream if messages(c)[1].startswith(m)]) for m in (REF, CUR)}
-        self.calls = []
+        self.upstream, self.calls = upstream, []
 
     def ask(self, call):
-        system, user = roles(call.messages)
-        self.calls.append(dict(system=system, user=user, temperature=call.params.get("temperature")))
-        role = next((m for m in (REF, CUR) if user.startswith(m)), None)
-        if role:
-            text = next(self.replies[role])
-        else:
-            # решатель называет те id, что апстрим вынул бы регуляркой из своего ответа (ACE2), и ответ — строкой
-            # FINAL ANSWER (S1)
-            gen = generator_json(system, user)
-            text = f"{gen}\nUSED: {', '.join(UPSTREAM_ID.findall(gen))}\nFINAL ANSWER: {json.loads(gen)['final_answer']}"
-        return text_reply(call, text)
+        want = self.upstream[len(self.calls)]
+        self.calls.append(call)
+        assert call.messages == want["messages"]
+        assert call.params == dict(temperature=want["temperature"], max_completion_tokens=want["max_tokens"])
+        return text_reply(call, want["response"])
 
     def usage(self):
         return dict(calls=len(self.calls), prompt_tokens=0, completion_tokens=0)
 
 
-def solver_tail(text):
-    """Строки USED и FINAL ANSWER нашего решателя — в траектории, которую видит рефлектор (S1)."""
-    return re.sub(r"\nUSED: [^\n]*\nFINAL ANSWER: [^\n]*", "", text)
-
-
 @pytest.mark.parametrize("key", ["online_gt", "online_nogt"])
 def test_online_loop(tmp_path, key):
-    """Запросы рефлектора и куратора — посимвольно и по порядку, раунды рефлексии, итоговый playbook и номер.
-    Генерации апстрима вне обучения (начальный тест, тест окна, решение после куратора) не делаем (S3)."""
-    deviation("S1", "ACE2", "S3")
+    """Все запросы по порядку, посимвольно: начальный тест, тест окна, генерации, раунды рефлексии, куратор, генерация
+    после куратора; итоговый playbook и номер. Ключ предела генерации — как у api_provider openai (у эталона
+    sambanova: max_tokens)."""
     up = LOOP[key]
     assert up["config"]["json_mode"] is False and up["config"]["max_num_rounds"] == 3
     model = Replay(up["calls"])
-    learner = ace_exact if key == "online_gt" else swap(ace_exact, verdict=yes_no)
+    learner = swap(ace_exact, window=up["config"]["online_eval_frequency"])
+    if key == "online_nogt":
+        learner = swap(learner, verdict=yes_no)
     run(Task(up["samples"]), learner, model, len(up["samples"]), str(tmp_path))
-    theirs = [messages(c)[1] for c in up["calls"] if not messages(c)[1].startswith(GEN)]
-    ours = [solver_tail(c["user"]) for c in model.calls if c["user"].startswith((REF, CUR))]
-    assert ours == theirs
-    assert all(c["system"] == "" and c["temperature"] == 0 for c in model.calls if c["user"].startswith((REF, CUR)))
+    assert len(model.calls) == len(up["calls"])
     memory = json.load(open(tmp_path / "memory.json"))
     final = SectionedPlaybook()
     for r in memory:

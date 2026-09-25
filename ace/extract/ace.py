@@ -4,14 +4,15 @@
                 temperature — для кандидатов Best-of-N (ace_bo2)
     Diagnose    рефлектор апстрима (ace/core/reflector.py; промпты ace_reflector*.j2 дословно): диагноз с
                 метками пунктов; при неверном ответе до rounds раундов «диагноз -> метки в копию памяти ->
-                новая попытка с диагнозом как заметкой» (ex.retry: стрелка извлечение -> попытки).
-                Ответ текстом и разбор, как у апстрима (parse.bullet_tags). Какие пункты решатель использовал,
-                он называет сам строкой USED (вместо bullet_ids)."""
+                новая попытка с диагнозом как рефлексией генератора» (ex.retry: стрелка извлечение -> попытки).
+                Ответ текстом и разбор, как у апстрима (parse.bullet_tags). Какие пункты решатель использовал —
+                регулярка апстрима по его ответу (parse.bullet_ids); ids=named — строка USED (ace_exact_used)."""
 import copy
 
 from pydantic import BaseModel
 
 from .. import parse, prompts, render
+from ..memory.ace import ace_input, ace_params
 from ..model import Call, Reader, messages, params
 from ..wrap import skilled
 from . import LABELS, Extraction, Extractor, Labels, scores
@@ -62,8 +63,13 @@ def used_line(text):
 
 
 def named(ep):
-    """id, которые решатель назвал в строке USED (как bullet_ids генератора апстрима); «none» — ни одного."""
+    """id, которые решатель назвал в строке USED; «none» — ни одного."""
     return [i for i in used_line(ep.final) if i and i.lower() != "none"]
+
+
+def cited(ep):
+    """bullet_ids генератора апстрима: регулярка по всему ответу."""
+    return parse.bullet_ids(ep.final)
 
 
 def bullets_used(memory, ids):
@@ -90,20 +96,21 @@ TAGS = Reader(text=parse.bullet_tags)     # _extract_bullet_tags апстрим�
 
 class Diagnose(Extractor):
     """Рефлектор апстрима: ответ текстом, метки — разбор read (bullet_tags без json_mode, по умолчанию в апстриме),
-    урок для куратора — весь ответ рефлектора, как recent_reflection апстрима."""
+    урок для куратора — весь ответ рефлектора, как recent_reflection апстрима. Вопрос — question из
+    DataProcessor апстрима (ace_input)."""
     gives = frozenset({LABELS})
 
-    def __init__(self, rounds=ROUNDS, read=TAGS):
-        self.rounds, self.read = rounds, read
+    def __init__(self, rounds=ROUNDS, read=TAGS, ids=cited):
+        self.rounds, self.read, self.ids = rounds, read, ids
 
     def diagnose(self, ex, ep, memory):
         """Поля рефлектора апстрима; без верного ответа — промпт _nogt. -> (ответ текстом, метки)."""
-        fields = dict(question=ep.question, reasoning_trace=ep.output, predicted_answer=ep.answer,
-                      environment_feedback=prompts.text("ace_environment_feedback", correct=ep.ok),
-                      bullets_used=bullets_used(memory, named(ep)))
+        fields = dict(question=ace_input(ex.task.name, ep.question)[1], reasoning_trace=ep.output,
+                      predicted_answer=ep.answer, environment_feedback=prompts.text("ace_environment_feedback", correct=ep.ok),
+                      bullets_used=bullets_used(memory, self.ids(ep)))
         if ep.target:
             fields["ground_truth"] = ep.target
-        reply = ex.model.ask(Call(messages(P["reflector" if ep.target else "reflector_nogt"].fill(fields)), params(), self.read))
+        reply = ex.model.ask(Call(messages(P["reflector" if ep.target else "reflector_nogt"].fill(fields)), ace_params(), self.read))
         return reply.raw or "", reply.output
 
     def __call__(self, ex, group, memory):

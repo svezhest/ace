@@ -7,7 +7,7 @@ from stub import TASK, Stub, episode
 
 from ace import prompts
 from ace.extract import LABELS, Extraction, Labels
-from ace.extract.ace import Diagnose, Reflection, Reflector, used_line
+from ace.extract.ace import Diagnose, Reflection, Reflector, named, used_line
 from ace.learner import swap
 from ace.loop import Group
 from ace.memory.ace import Op, Ops, Playbook, SectionedPlaybook, curate_rewrite
@@ -100,7 +100,7 @@ def test_diagnose_rounds():
     memory = playbook("a", "b")
     retries = [episode("5", ok=False, target="4", final="USED: r1"), episode("4", ok=True, target="4")]
     ex = Ex(model, retries)
-    x = Diagnose()(ex, group(episode("3", ok=False, target="4", final="USED: r2, r1")), memory)
+    x = Diagnose(ids=named)(ex, group(episode("3", ok=False, target="4", final="USED: r2, r1")), memory)
     assert [n[1] for n in ex.notes] == [[(0, 1), (0, 0)], [(0, 2), (1, 0)]]     # метки раундов — в копию
     assert x.extras[LABELS] == Labels(["r2"], ["r1", "r1"])
     assert [r.harmful for r in memory.records()] == [0, 0]   # сама память не тронута
@@ -119,11 +119,11 @@ def test_diagnose_tags_as_upstream():
 
 
 def test_diagnose_bullets_used():
-    """Нет строки USED или none — «No bullets used»; названы, но нет в памяти — строка апстрима."""
+    """ace_exact_used: нет строки USED или none — «No bullets used»; названы, но нет в памяти — строка апстрима."""
     for final, text in (("FINAL ANSWER: 4", "ace_no_bullets"), ("USED: none", "ace_no_bullets"),
                         ("USED: r9", "ace_bullets_not_found")):
         model = Stub(lambda call: "")
-        Diagnose()(Ex(model), group(episode("4", ok=True, target="4", final=final)), playbook("a"))
+        Diagnose(ids=named)(Ex(model), group(episode("4", ok=True, target="4", final=final)), playbook("a"))
         assert prompts.text(text) in model.calls[0]["user"]
 
 
