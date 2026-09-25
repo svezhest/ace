@@ -146,7 +146,7 @@ def test_ace_bo2_selects():
 
 
 def test_ace_opt_caps_playbook():
-    model = Stub(schemas={"Analysis": Analysis(consolidation=[[1, 2, 3]]), "Rule": Rule(rule="merged"),
+    model = Stub(schemas={"Analysis": Analysis(consolidation=[[1, 2, 3]]), "Rule": Rule(rule="merged", rationale="m"),
                           "Ops": Ops(ops=[dict(op="ADD", text=f"bullet {i}") for i in range(11)])})
     m = CappedPlaybook()
     m.add("kept")

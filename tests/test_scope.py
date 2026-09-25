@@ -138,7 +138,7 @@ def test_step_patch_rewrites_system():
     # новая попытка: tactical прошлой ушли, strategic показаны при запуске
     p = s.prompt(Ex(model), {"context": "q"}, 0)
     assert memory.book(0).tactical == []
-    assert p.system.startswith("\n\n## Strategic Guidelines") and "### General:\n- Guard division." in p.system
+    assert p.system.startswith("\n## Strategic Guidelines") and "### General:\n- Guard division." in p.system
 
 
 def test_k2_own_memory_per_perspective():

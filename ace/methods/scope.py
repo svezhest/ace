@@ -8,8 +8,9 @@
                 дубля по словам (0.85 ещё раз зашито в strategic_store.py:201, у нас одна константа); домен
                 по убыванию confidence, сверх 10 правил оптимизатор (конфликты, поглощение, слияние, до двух
                 проходов) сжимает до 8, остаток обрезается до 10
-    показ       при запуске strategic по доменам; когда на шаге принято правило, Patch переписывает системный
-                промпт: исходный + «## Learned Guideline:» на каждое tactical правило (как в апстриме)
+    показ       при запуске strategic по доменам, текстом get_strategic_rules_text сразу за системным промптом;
+                когда на шаге принято правило, Patch переписывает системный промпт: исходный + «## Learned
+                Guideline:» на каждое tactical правило (как в апстриме)
     извлечение  правило на шаг (extract/scope.py): на каждом шаге с инструментом — сразу, посреди попытки; на
                 итоговом ответе — после вопроса
     вердикт     верный ответ (адаптер repro: неверный итог — ошибка шага)
@@ -25,15 +26,14 @@ from pydantic import BaseModel
 from .. import prompts, render
 from ..env import Sandbox
 from ..extract import CONFIDENCE, DOMAIN, RATIONALE
-from ..extract.scope import INTRO, Rules
+from ..extract.scope import Rules, current_system, strategic_text
 from ..learner import Learner, swap
-from ..loop import Attempts, best
+from ..loop import Attempts, Prompt, best
 from ..memory import Container, Ids, Record
 from ..model import Patch
-from ..show import Show, Whole
+from ..show import Show
 
 P = {n: prompts.load(f"scope_{n}") for n in ("analyze", "merge", "subsumed", "conflict")}
-GUIDELINE = prompts.text("scope_guideline")
 
 ACCEPT = 0.5                # auto_accept_threshold "medium"
 STRATEGIC = 0.85            # strategic_confidence_threshold
@@ -55,8 +55,9 @@ class Analysis(BaseModel):
 
 
 class Rule(BaseModel):
+    """Слитое или исправленное правило; без rationale апстрим оставляет исходные правила (KeyError)."""
     rule: str
-    rationale: str = ""
+    rationale: str
 
 
 class Subsumed(BaseModel):
@@ -100,7 +101,10 @@ def rule_optimizer(passes=OPTIMIZER_PASSES):
             if len(group) < 2 or not parts:
                 out += parts
                 continue
-            r = llm(model, "merge", dict(rules_text=render.rule_group(parts)), Rule)
+            # номера в промпте — из группы по порядку, как в апстриме (_merge_rules: indices[i]), даже если
+            # какого-то номера среди правил нет
+            numbered = [dict(x, id=i) for i, x in zip(group, parts)]
+            r = llm(model, "merge", dict(rules_text=render.rule_group(numbered)), Rule)
             if r:
                 out.append(dict(rule=r.rule, rationale=r.rationale, id=parts[0]["id"],
                                 confidence=max(x.get("confidence", RULE_CONFIDENCE) for x in parts)))
@@ -162,8 +166,8 @@ class Book(Container):
     как в апстриме); tactical — правила текущей попытки, живут до начала следующей."""
     requires = frozenset({CONFIDENCE, DOMAIN, RATIONALE})
 
-    def __init__(self, name=THOROUGHNESS, optimizer=None):
-        self.name, self.optimizer = name, optimizer or rule_optimizer()
+    def __init__(self, name=THOROUGHNESS, optimizer=None, cap=CAP, target=TARGET):
+        self.name, self.optimizer, self.cap, self.target = name, optimizer or rule_optimizer(), cap, target
         self.ids, self.domains, self.tactical, self.accepted = Ids(), {}, [], 0
 
     def records(self):
@@ -193,7 +197,7 @@ class Book(Container):
             return
         rules = sorted(rules + [Strategic(self.ids.next(), text, domain, rationale, confidence)], key=lambda r: -r.confidence)
         new = lambda x: Strategic(self.ids.next(), x["rule"], domain, x["rationale"], x["confidence"])
-        self.domains[domain] = compress(ex.model, rules, self.optimizer, TARGET, CAP, new)
+        self.domains[domain] = compress(ex.model, rules, self.optimizer, self.target, self.cap, new)
 
     def dump(self, suffix=""):
         """tactical, затем strategic по доменам; suffix — перспектива в имени вида, когда их несколько."""
@@ -223,20 +227,16 @@ class Perspectives(Container):
 # показ
 
 
-class ByPerspective(Show):
-    """Показ base над памятью перспективы попытки."""
-    def __init__(self, base):
-        self.base = base
-
+class StrategicRules(Show):
+    """Strategic правила перспективы попытки сразу за системным промптом, как get_strategic_rules_for_agent
+    апстрима (текст начинается с перевода строки)."""
     def prompt(self, ex, memory, item, k):
-        return self.base.prompt(ex, memory.book(k), item, k)
+        book = memory.book(k)
+        text = strategic_text(book)
+        return Prompt(text, shown=[r.id for r in book.records()]) if text else Prompt()
 
 
-STRATEGIC_RULES = ByPerspective(Whole(layout=lambda records, book: render.domains(book.domains.items()), before=INTRO, head=""))
-
-
-def guidelines(book):
-    return render.lines(book.tactical, render.prefixed(GUIDELINE), "\n\n")
+STRATEGIC_RULES = StrategicRules()
 
 # ученик
 
@@ -262,7 +262,7 @@ class Scope(Learner):
             book.learn(ex, [x])
         if len(book.tactical) == before:
             return None
-        return Patch(system=attempt.system + "\n\n" + guidelines(book))
+        return Patch(system=current_system(attempt.system, book))
 
     def on_question(self, ex, group):
         self.pending += self.extract.answers(ex, group, self.memory)
