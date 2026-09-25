@@ -8,7 +8,7 @@ ace — стенд, основа цепочки абляций:
     вердикт     верный ответ
 ace_text — рефлексия свободным текстом: меток нет, поэтому и память без счётчиков и отсева (иначе стык не
     соберётся: памяти нужны labels).
-ace_rewrite — куратор переписывает всю память одним текстом: старые пункты уходят со счётчиками, новый — с нуля.
+ace_rewrite — куратор переписывает всю память, пункт на строку: старые пункты уходят со счётчиками, новые — с нуля.
 
 ace_exact — как в апстриме (ace/ace/ace.py, core/, playbook_utils.py; промпты ace_*.j2 дословно):
     память      playbook из 7 разделов (контейнеры с общей нумерацией); пункты только добавляются: куратор
@@ -59,10 +59,11 @@ def curate_ops(ex, memory, x):
 
 
 def curate_rewrite(ex, memory, x):
-    """Вся память заново одним текстом; пустой ответ — память как была."""
+    """Вся память заново: промпт просит пункт на строку, каждая непустая строка — новая запись; пустой
+    ответ — память как была."""
     new = ex.model.run(skilled(CURATOR, ex), curator_prompt(CURATE["rewrite"], memory, x)).output
-    if new:
-        memory.replace([new.strip()])
+    if new and new.strip():
+        memory.replace([line.strip() for line in new.splitlines() if line.strip()])
 
 
 class Playbook(Lessons):

@@ -179,11 +179,11 @@ def old_batch_table(records, ops):
     return "\n\n".join(out)
 
 
-OPS = [dict(operation="UPDATE", id="r1", content="new"), dict(operation="ADD", id=None, content="x {y}"),
-       dict(operation="DELETE", id="r1", content="")]
+OPS = [dict(operation="UPDATE", id="G0", content="new"), dict(operation="ADD", id=None, content="x {y}"),
+       dict(operation="DELETE", id="G0", content="")]
 
 
-@pytest.mark.parametrize("records", [[], [("r1", "one")], [("r1", "one"), ("r2", "two")]])
+@pytest.mark.parametrize("records", [[], [("G0", "one")], [("G0", "one"), ("G1", "two")]])
 @pytest.mark.parametrize("ops", [[], OPS[:1], OPS[1:2], OPS])
 def test_batch_table(records, ops):
     from ace.memory import Lessons

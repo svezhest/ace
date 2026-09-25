@@ -31,6 +31,7 @@ class Prompt:
     rounds: int = 0             # лишних шагов решателю на чтение
     shown: list = field(default_factory=list)   # id показанных записей
     temperature: float = 0
+    top_p: float = None         # None — по умолчанию сервера (TF-GRPO: итоговый агент апстрима с top_p 0.95)
     note: str = ""              # заметка к сообщению решателю (раунды рефлексии ACE)
 
 
@@ -112,12 +113,18 @@ def at_zero(k):
     return 0
 
 
+def default(k):
+    """Настройка по умолчанию сервера (top_p)."""
+    return None
+
+
 @dataclass
 class Attempts:
-    """Сколько попыток на вопрос и что в зачёт. Различие попыток: температура попытки k; выборка показа и
-    разделённая память — в prompt(ex, item, k) ученика; заметка рефлектора — ex.retry из извлечения."""
+    """Сколько попыток на вопрос и что в зачёт. Различие попыток: температура и top_p попытки k; выборка
+    показа и разделённая память — в prompt(ex, item, k) ученика; заметка рефлектора — ex.retry из извлечения."""
     n: int = 1
     temperature: callable = at_zero
+    top_p: callable = default
     pick: callable = first
 
 
@@ -137,7 +144,7 @@ class Experiment:
             reply = self.model.run(a.system,
                                    render.user_message(self.task.instr, item["context"], prompt.note),
                                    tools=tools, deps=prompt.deps, rounds=env.rounds + prompt.rounds,
-                                   temperature=prompt.temperature,
+                                   temperature=prompt.temperature, top_p=prompt.top_p,
                                    on_step=self.stepper(a) if tools and self.learner.watches_steps() else None)
         finally:
             env.close()

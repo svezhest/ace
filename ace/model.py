@@ -91,8 +91,11 @@ class Model:
                                                                       api_key=config.API_KEY))
         self.calls = self.prompt_tokens = self.completion_tokens = 0
 
-    def run(self, system, user, output=str, tools=(), deps=None, rounds=0, temperature=0, max_tokens=None, on_step=None):
+    def run(self, system, user, output=str, tools=(), deps=None, rounds=0, temperature=0, max_tokens=None, on_step=None,
+            top_p=None):
         settings = {"temperature": temperature, "max_tokens": max_tokens or self.max_tokens}
+        if top_p is not None:
+            settings["top_p"] = top_p
         limit = rounds + EXTRA_REQUESTS
         if on_step is None:
             result, messages, outcome = self.request(system, user, None, output, tools, deps, limit, settings)

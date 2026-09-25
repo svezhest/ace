@@ -11,13 +11,16 @@
     attribution   какие записи были в промпте каких попыток (EvoLib, Future IG)
     ig            прирост лучшей попытки группы (EvoLib)
     best_answer   лучшее решение вопроса (EvoLib)
+    operations    операции над библиотекой, предложенные по вопросу: словари operation / id / content (TF-GRPO)
     rationale     обоснование урока (SCOPE)
     trigger       фрагмент ошибки, по которому урок показывается (хуки по ошибкам)
 
-Реализации: ace.py — рефлектор стенда и диагноз ACE апстрима с раундами повторной попытки."""
+Реализации: ace.py — рефлектор стенда и диагноз ACE апстрима с раундами повторной попытки; tfgrpo.py —
+контраст попыток TF-GRPO; evolib.py — баллы, IG, insight и улучшение EvoLib."""
 from dataclasses import dataclass, field
 
 LABELS, CONFIDENCE, DOMAIN, ATTRIBUTION, IG, BEST_ANSWER = "labels", "confidence", "domain", "attribution", "ig", "best_answer"
+OPERATIONS = "operations"
 RATIONALE, TRIGGER = "rationale", "trigger"
 
 

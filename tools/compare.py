@@ -21,7 +21,13 @@ def default_ref():
 
 
 def texts(trace):
-    return [r["text"] for r in trace["memory"] if r["kind"] not in HIDDEN]
+    """Тексты записей по видам: порядок внутри вида сравнивается, чередование видов — нет (в старом коде все
+    виды лежали одним списком, в новом у каждого свой контейнер)."""
+    out = {}
+    for r in trace["memory"]:
+        if r["kind"] not in HIDDEN:
+            out.setdefault(r["kind"], []).append(r["text"])
+    return out
 
 
 def compare(a, b):
@@ -49,7 +55,9 @@ def compare(a, b):
                     else:
                         print("   ", x[k], "->", y.get(k))
         elif ma != mb:
-            print("  ", ma[:3], "\n  ", mb[:3])
+            for kind in sorted(set(ma) | set(mb)):
+                if ma.get(kind) != mb.get(kind):
+                    print(f"   {kind}:", [t[:60] for t in ma.get(kind, [])[:3]], "\n   ->", [t[:60] for t in mb.get(kind, [])[:3]])
     return bad_methods
 
 

@@ -127,7 +127,10 @@ class Synth(Show):
         text, recs = self.base.text(ex, memory, item)
         out = self.parse(ex.model.one("", self.template.fill(self.fields(text or "", memory, item)),
                                       max_tokens=self.tokens * ex.model.max_tokens).text)
-        text = out if out is not None else text
+        return self.shown(out if out is not None else text, recs)
+
+    def shown(self, text, recs):
+        """Промпт из итогового текста; метод, которому нужен сам текст (DC-RS хранит синтез), переопределяет."""
         return Prompt("\n\n" + self.base.head + text, shown=[r.id for r in recs]) if text else Prompt()
 
 
