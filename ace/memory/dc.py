@@ -13,7 +13,7 @@ from .. import prompts
 from ..extract import INPUT, SHEET
 from ..model import Call, messages
 from ..upstream.dc import CHEATSHEET, MAX_TOKENS, TOKENS, dc_params
-from . import Document, Lessons, Operation, Record
+from . import Document, Lessons, Record
 
 CURATOR = prompts.load("dc_curator")
 DC = prompts.macros("dc_strings")
@@ -65,7 +65,7 @@ class Pairs(Lessons):
     """Пары прошлых вопросов; sheet — последний синтезированный cheatsheet (DC-RS): решатель показал его в попытке
     (добавка sheet), память сохраняет."""
     def __init__(self, sheet=False):
-        super().__init__("pair", record=Pair, ops=Operation.ADD)
+        super().__init__("pair", record=Pair)
         self.sheet = Sheet() if sheet else None
         self.requires = frozenset({SHEET}) if sheet else frozenset()
 
@@ -80,7 +80,7 @@ class Pairs(Lessons):
         return super().chars() + (self.sheet.chars() if self.sheet else 0)
 
     def key(self):
-        return super().key(), self.sheet.key() if self.sheet else None
+        return super().key(), (self.sheet.key() if self.sheet else None)
 
     def dump(self):
         return super().dump() + (self.sheet.dump() if self.sheet else [])

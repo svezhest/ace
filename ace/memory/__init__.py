@@ -7,9 +7,9 @@
 политики) — memory/<метод>.py, контейнеры наследует отсюда. Память объявляет requires — добавки, которые ей
 нужны от извлечения (ace/extract), learn(ex, extractions) и begin(k) — начало попытки k (срок жизни записей)."""
 from .documents import Document, Files
-from .lessons import ALL, Container, Ids, Lessons, Operation, Sections
+from .lessons import Container, Ids, Lessons, Sections
 from .counters import HARMFUL, HELPFUL, Counted
 from .record import HEAD_CHARS, Lesson, Record
 
-__all__ = ["ALL", "Container", "Counted", "Document", "Files", "HARMFUL", "HEAD_CHARS", "HELPFUL", "Ids", "Lesson",
-           "Lessons", "Operation", "Record", "Sections"]
+__all__ = ["Container", "Counted", "Document", "Files", "HARMFUL", "HEAD_CHARS", "HELPFUL", "Ids", "Lesson", "Lessons",
+           "Record", "Sections"]

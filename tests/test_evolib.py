@@ -9,10 +9,10 @@ from stub import TASK, Stub, episode
 from ace import verdict
 from ace.extract import ATTRIBUTION, BEST_ANSWER, IG, Extraction
 from ace.extract.evolib import Attribution, Best, Gains
-from ace.upstream.evolib import future_gains, log_gain
+from ace.upstream.evolib import log_gain
 from ace.learner import swap
 from ace.loop import Group, run
-from ace.memory.evolib import Library, Skill
+from ace.memory.evolib import Skill, SkillLibrary, future_gains
 from ace.methods.evolib import evolib, evolib_judge
 from ace.solver.evolib import SAMPLER, insight_weight, skill_weight
 
@@ -48,7 +48,7 @@ def test_unevaluated():
     """Без оценки: баллы по большинству, лучшая — первая из согласных; insight есть — баллы пополам; IG до деления;
     лучшего решения ещё нет — улучшает."""
     model = Stub(lambda call: "```insight\nIf units differ, then convert.\n```")
-    x = Gains()(Ex(model), group(["1", "2", "2"], shown=[["r1"], ["r2"], []]), Library())
+    x = Gains()(Ex(model), group(["1", "2", "2"], shown=[["r1"], ["r2"], []]), SkillLibrary())
     assert x.scores == [0, 0.5, 0.5] and math.isclose(x.extras[IG], math.log(1.5))
     assert x.lessons == ["If units differ, then convert."] and "solution 1" in model.calls[0]["user"]
     assert x.extras[BEST_ANSWER] == Best("solution 1\nFINAL ANSWER: 2", "2", 0.5)
@@ -56,7 +56,7 @@ def test_unevaluated():
 
 
 def test_no_insight_keeps_scores():
-    x = Gains()(Ex(Stub(lambda call: "N/A")), group(["1", "1", "2"]), Library())
+    x = Gains()(Ex(Stub(lambda call: "N/A")), group(["1", "1", "2"]), SkillLibrary())
     assert x.lessons == [] and x.scores == [1, 1, 0]
 
 
@@ -64,7 +64,7 @@ def test_improving_and_compare():
     """Память решает, улучшает ли лучшее решение: старого нет или новое строго лучше по баллу; старое не хуже и
     сходится с большинством — нет; не сходится — решает сравнение (после слияния insight)."""
     def learn(old, judgment):
-        memory = Library()
+        memory = SkillLibrary()
         memory.solutions["q"] = old
         model = Stub(lambda call: judgment if "two solutions" in call["user"] else "N/A")
         g = group(["2", "2", "3"])
@@ -82,9 +82,9 @@ def test_improving_and_compare():
 def test_evaluated():
     """С оценкой: баллы по вердикту попытки, insight только при неудаче лучшей и с её вердиктом, без деления."""
     model = Stub(lambda call: "<insight>If a, then b.</insight>")
-    x = Gains(evaluated=True)(Ex(model), group(["1", "2", "3"], vote=False, oks=[False, True, True]), Library())
+    x = Gains(evaluated=True)(Ex(model), group(["1", "2", "3"], vote=False, oks=[False, True, True]), SkillLibrary())
     assert model.calls == [] and x.scores == [0, 1, 1] and x.extras[ATTRIBUTION].best == 1
-    x = Gains(evaluated=True)(Ex(model), group(["1", "2", "3"], vote=False, oks=[False] * 3), Library())
+    x = Gains(evaluated=True)(Ex(model), group(["1", "2", "3"], vote=False, oks=[False] * 3), SkillLibrary())
     assert "Evaluation: wrong" in model.calls[0]["user"] and x.lessons == ["If a, then b."] and x.scores == [0, 0, 0]
 
 
@@ -100,7 +100,7 @@ def extraction(insight=None, best=None, ig=0.5, shown=([], [], []), scores=(1, 0
 def test_library_learn(monkeypatch):
     """insight, лучшее решение (скрыто) и skills из него с IG, Future IG в журнал записи из промпта лучшей."""
     fake_embed(monkeypatch, {"a": [1, 0], "<description>d1</description>": [0, 1], "<description>d2</description>": [1, 0]})
-    m = Library()
+    m = SkillLibrary()
     best = Best("Plan.\n" + SKILL.format("d1") + "\n" + SKILL.format("d2") + "\nFINAL ANSWER: 1", "1", 1.0)
     m.learn(Ex(Stub()), [extraction("If a, then b.", best, ig=0.4)])
     assert [(r.id, type(r).__name__) for r in m.records()] == [("r1", "Insight"), ("r2", "Skill"), ("r3", "Skill")]
@@ -116,7 +116,7 @@ def test_merge_insight(monkeypatch):
     """Похожий insight (косинус условий > 0.8) сливает модель: одна слитая запись наследует журнал, старая уходит;
     несколько — старая остаётся, новые делят один журнал."""
     fake_embed(monkeypatch, {"a": [1, 0], "a2": [0.9, 0.436], "a or a2": [1, 0]})
-    m = Library()
+    m = SkillLibrary()
     m.add(m.insights, "If a, then b.", [1, 0], outcomes=[0.3])
     one = Stub(lambda call: "```insights\nIf a or a2, then b.\n```")
     m.add_insight(Ex(one), "If a2, then c.")
@@ -133,7 +133,7 @@ def test_merge_insight(monkeypatch):
 def test_merge_skill(monkeypatch):
     """Слитый skill: IG — скользящее среднее с долей 0.5, журнал старого."""
     fake_embed(monkeypatch, {"d1": [1, 0], "d1b": [1, 0], "<description>d</description>": [1, 0]})
-    m = Library()
+    m = SkillLibrary()
     m.add(m.skills, SKILL.format("d1"), [1, 0], doc="d1", ig=1.0, outcomes=[0.2])
     m.add_skills(Ex(Stub(lambda call: SKILL.format("d"))), [(SKILL.format("d1b"), "d1b")], 0.0)
     [r] = m.records()
@@ -144,7 +144,7 @@ def test_weights_and_show():
     s = Skill("r1", "x", outcomes=[], ig=-1.0)
     assert math.isclose(skill_weight(s), 0.51) and skill_weight(Skill("r2", "x", outcomes=[-5.0], ig=-1.0)) == 0.01 - 5.0
     assert math.isclose(insight_weight(Skill("r3", "x", outcomes=[0.2, 0.4])), 0.3)
-    m = Library()
+    m = SkillLibrary()
     m.insights.add("If a, then b.")
     random.seed(1)                  # первое число 0.13: ветка skills пуста, ход переходит к insights
     p = SAMPLER.prompt(Ex(Stub()), m, {"question": "q"}, 0)

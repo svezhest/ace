@@ -14,7 +14,7 @@ import pytest
 from ace.extract import BEST_ANSWER, IG
 from ace.learner import swap
 from ace.loop import run
-from ace.memory.evolib import Library
+from ace.memory.evolib import SkillLibrary
 from ace.methods.evolib import evolib
 from ace.tasks import Task
 from tools.record.replay import Replayer
@@ -34,7 +34,7 @@ class Stream(Task):
         return [items[k % len(items)] for k in range(RUN["iterations"])]
 
 
-class Watched(Library):
+class Watched(SkillLibrary):
     def learn(self, ex, extractions):
         super().learn(ex, extractions)
         [x] = extractions

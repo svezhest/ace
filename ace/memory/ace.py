@@ -14,7 +14,7 @@ from .. import embed, parse, prompts, render
 from ..extract import LABELS
 from ..model import Call, Reader, messages, params
 from ..upstream.ace import ace_params, question_context
-from . import Ids, Lessons, Operation, Sections
+from . import Ids, Lessons, Sections
 from .counters import HARMFUL, HELPFUL, Counted, count, prune_harmful
 from .scope import CAP, compress, rule_optimizer, target_count
 
@@ -58,7 +58,7 @@ class Playbook(Lessons):
     """Пункты стенда: метки рефлектора -> журнал исходов, уроки -> куратор, затем отсев вредных.
     prune=None — без отсева; тогда и метки не нужны."""
     def __init__(self, curator=curate_ops, prune=PRUNE_HARMFUL):
-        super().__init__("bullet", Counted, Operation.ADD | Operation.UPDATE)
+        super().__init__("bullet", Counted)
         self.curator, self.prune_at = curator, prune
         self.requires = frozenset({LABELS}) if prune else frozenset()
 
@@ -143,7 +143,7 @@ class SectionedPlaybook(Sections):
     requires = frozenset({LABELS})
 
     def __init__(self, dedup=None, read=OPERATIONS):
-        super().__init__(list(TITLES), "bullet", Counted, Operation.ADD, SlugIds())
+        super().__init__(list(TITLES), "bullet", Counted, SlugIds())
         self.dedup, self.read = dedup, read
 
     def records(self):

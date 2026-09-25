@@ -27,9 +27,10 @@ class Counted(Lesson):
 def count(memory, helpful, harmful):
     """Метки извлечения — в журналы исходов записей памяти; чужие id пропускаются."""
     for ids, outcome in ((helpful, HELPFUL), (harmful, HARMFUL)):
-        for id in ids:
-            if memory.get(id):
-                memory.get(id).outcomes.append(outcome)
+        for rid in ids:
+            r = memory.get(rid)
+            if r:
+                r.outcomes.append(outcome)
 
 
 def prune_harmful(memory, at):

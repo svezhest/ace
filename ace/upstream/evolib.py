@@ -1,5 +1,5 @@
 """EvoLib апстрима (EvoLib/EvoLib: evolib_agent.py, llm_agent.py): параметры и поля промптов вызовов задачи,
-LLMAgent.generate, приросты IG и Future IG (compute_IG)."""
+LLMAgent.generate, прирост IG (compute_IG) — общее для решателя, извлечения и памяти EvoLib."""
 import math
 
 import numpy as np
@@ -37,18 +37,6 @@ def generate(model, call):
     return Reply(call.reader.read(text), text, reply.truncated, raw=text)
 
 
-def log_gain(best, scores, eps=EPS):
-    """log(best) - log(mean(scores)), оба снизу ограничены eps."""
-    return math.log(max(best, eps)) - math.log(max(np.mean(scores), eps))
-
-
-def future_gains(attribution, scores, eps=EPS):
-    """Future IG: каждой записи, бывшей в промпте лучшей попытки (с повторами), прирост лучшего балла над
-    средним по попыткам без этой записи; если таких попыток нет, записи ничего. -> [(id, прирост)]."""
-    shown, b = attribution.shown, attribution.best
-    out = []
-    for rid in shown[b]:
-        rest = [s for s, ids in zip(scores, shown) if rid not in ids]
-        if rest:
-            out.append((rid, log_gain(scores[b], rest, eps)))
-    return out
+def log_gain(best, scores):
+    """log(best) - log(mean(scores)), оба снизу ограничены EPS."""
+    return math.log(max(best, EPS)) - math.log(max(np.mean(scores), EPS))

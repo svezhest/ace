@@ -15,7 +15,8 @@ from ace import parse, prompts, verdict
 from ace.extract import ATTRIBUTION, BEST_ANSWER, IG
 from ace.extract.evolib import Attribution, Best, Gains, insight_of
 from ace.memory.evolib import second_better
-from ace.upstream.evolib import future_gains, log_gain
+from ace.memory.evolib import future_gains
+from ace.upstream.evolib import log_gain
 from ace.learner import swap
 from ace.loop import Episode, Group, Prompt, Protocol, run
 from ace.model import roles, text_reply
@@ -154,7 +155,7 @@ def solver_call(p):
 @pytest.mark.parametrize("name,skills,insights", [("solver_empty", 0, 0), ("solver_skills", 1, 0),
                                                    ("solver_insights", 0, 1), ("solver_both_skills_win", 1, 1)])
 def test_solver_section(monkeypatch, name, skills, insights):
-    m = MEM.Library()
+    m = MEM.SkillLibrary()
     if skills:
         m.skills.add(solution("Add two integers a and b.", "5", "5"), doc="d", ig=0.0)
     if insights:
@@ -240,7 +241,7 @@ def test_compute_ig():
 
 def test_future_ig():
     """Шаги update_future_IG_for_* подряд на одной библиотеке; лучшая попытка — первая в выборке."""
-    m = MEM.Library()
+    m = MEM.SkillLibrary()
     ids = {"s1": m.skills.add("s1", ig=0.1).id, "s2": m.skills.add("s2", ig=0.1, outcomes=[0.3]).id,
            "i1": m.insights.add("i1").id, "i2": m.insights.add("i2", outcomes=[0.2]).id, "gone": "gone"}
     for case in MEMORY["update_future_IG"].values():
@@ -263,7 +264,7 @@ SAMPLE_CASES = {"both": (1, 1, {}), "skills_only": (1, 0, {}), "insights_only": 
 def test_sample_from_library(monkeypatch, case):
     """Та же последовательность random: одно число на ветку, затем random.choices по весам."""
     skills, insights, kw = SAMPLE_CASES[case]
-    m = MEM.Library()
+    m = MEM.SkillLibrary()
     for text, ig, fig in SAMPLE_LIB[0] if skills else []:
         m.skills.add(text, ig=ig, outcomes=list(fig), doc="d")
     for text, fig in SAMPLE_LIB[1] if insights else []:
@@ -299,7 +300,7 @@ def test_add_new_insight(monkeypatch, case):
     want = MEMORY["add_new_insight"][case]
     table_embed(monkeypatch, INSIGHT_TABLE)
     model = Fake([("merge", "consolidate these insights", INSIGHT_REPLY.get(case, ""))], default="")
-    m = MEM.Library()
+    m = MEM.SkillLibrary()
     m.add_insight(Ex(model), "If base cond, then do x.")
     m.insights.records()[0].outcomes.extend([0.4, 0.2])
     if want["new"]:                 # пустой insight извлечение в память не отдаёт (add_new_insight апстрима: return)
@@ -325,7 +326,7 @@ def test_add_new_skills(monkeypatch, case):
     want = MEMORY["add_new_skills"][case]
     table_embed(monkeypatch, SKILL_TABLE)
     model = Fake([("merge", "consolidate these example problems", SKILL_REPLY.get(case, ""))], default="")
-    m = MEM.Library()
+    m = MEM.SkillLibrary()
     m.add_skills(Ex(model), parse.subtasks(solution("Base desc.", "1", "1")), 0.9)
     m.skills.records()[0].outcomes.append(0.5)
     m.add_skills(Ex(model), [tuple(x) for x in want["new"]], want["IG_score"])
@@ -376,7 +377,7 @@ def test_run_iteration(monkeypatch, case):
             verdict.golden(ex, e, "5")
     else:
         verdict.vote(ex, g)
-    m = MEM.Library()
+    m = MEM.SkillLibrary()
     if prev:
         m.solutions[g.question] = Best(prev, upstream_answer(prev), 1.0)
     x = Gains(evaluated=gold)(ex, g, m)
@@ -433,12 +434,12 @@ def test_loop(monkeypatch, mode):
     библиотека, лучшие баллы и вызовы модели после каждой итерации."""
     table_embed(monkeypatch, LOOP_TABLE)
     task, model, snaps = Task([(p, a) for p, a, _ in PROBLEMS]), loop_model(), []
-    learn = MEM.Library.learn
+    learn = MEM.SkillLibrary.learn
 
     def snapshot(self, ex, extractions):
         learn(self, ex, extractions)
         snaps.append((state(self), [self.best(p).score if self.best(p) else 0 for p, _, _ in PROBLEMS], len(model.calls)))
-    monkeypatch.setattr(MEM.Library, "learn", snapshot)
+    monkeypatch.setattr(MEM.SkillLibrary, "learn", snapshot)
     learner = E.evolib if mode == "nogold" else swap(E.evolib, "evolib_gold", extract=Gains(evaluated=True),
                                                     verdict=verdict.golden, group_verdict=verdict.none)
     run(task, swap(learner, protocol=Protocol(epochs=2)), model, n=len(PROBLEMS), split="train")     # с меткой — не по тесту

@@ -4,7 +4,7 @@ import dataclasses
 
 import pytest
 
-from ace.memory import Counted, Document, Files, Lesson, Lessons, Operation, Sections
+from ace.memory import Counted, Document, Files, Lesson, Lessons, Sections
 from ace.memory.counters import count, prune_harmful
 
 
@@ -37,11 +37,11 @@ def test_count_and_prune():
     assert [r.id for r in m.records()] == ["r1", "r3"]
 
 
-def test_apply_ops_and_rights():
-    m = Lessons(ops=Operation.ADD | Operation.UPDATE)
+def test_apply_ops():
+    m = Lessons()
     m.add("a")
     m.apply([dict(operation="ADD", content="b"), dict(operation="UPDATE", id="r1", content="a2"),
-             dict(operation="DELETE", id="r2", content="x"), dict(operation="NONE", content="y"),
+             dict(operation="DELETE", id="r9", content="x"), dict(operation="NONE", content="y"),
              dict(operation="ADD", content=""), dict(operation="UPDATE", id="r9", content="z")])
     assert [(r.id, r.text) for r in m.records()] == [("r3", "a2"), ("r2", "b")]
     m.apply([dict(operation="UPDATE", id="r9", content="z")], missing="add")

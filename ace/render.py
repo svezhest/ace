@@ -371,6 +371,11 @@ def signature_args(inputs):
     return ", ".join(f"{name}: {typ}" for name, typ, _ in inputs)
 
 
+def merge_input(old, new):
+    """Старая и новая запись EvoLib для промпта слияния — строками подряд."""
+    return f"{old}\n{new}"
+
+
 def train_json(summary, results):
     """data/train.json под-итерации: сводка батча и итоги его вопросов."""
     return json.dumps(dict(summary=summary, detailed_results=results), indent=2, ensure_ascii=False)

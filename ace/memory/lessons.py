@@ -3,30 +3,21 @@
     add(text)           ADD — новая запись
     update(id, text)    UPDATE — новая запись на месте старой: новый id, статистика с нуля
     delete(id)          DELETE
-    apply(ops)          операции, предложенные моделью; запрещённые контейнеру (ops) пропускаются
+    apply(ops)          операции, предложенные моделью (какие операции модель вообще может предложить, решает
+                        схема её ответа)
     replace(texts)      вся память заново: старые записи уходят со статистикой, новые с нуля
     prune(test)         отсев записей, для которых test(r)
 
-Контейнеры: Lessons — список записей; Sections — разделы (каждый Lessons) с общей нумерацией.
-Права (ops) ограничивают только операции модели; политики метода (отсев, слияние) — его код."""
-from enum import Flag, auto
-
+Контейнеры: Lessons — список записей; Sections — разделы (каждый Lessons) с общей нумерацией. Политики метода
+(отсев, слияние) — его код."""
 from .record import Lesson
-
-
-class Operation(Flag):
-    ADD = auto()
-    UPDATE = auto()
-    DELETE = auto()
-
-
-ALL = Operation.ADD | Operation.UPDATE | Operation.DELETE
 
 
 class Ids:
     """Нумерация записей r1, r2, ...: id не переиспользуются."""
     def __init__(self, prefix="r"):
-        self.prefix, self.n = prefix, 0
+        self.prefix = prefix
+        self.n = 0
 
     def next(self):
         self.n += 1
@@ -61,8 +52,9 @@ class Container:
 
 
 class Lessons(Container):
-    def __init__(self, kind="lesson", record=Lesson, ops=ALL, ids=None):
-        self.kind, self.record, self.ops = kind, record, ops
+    def __init__(self, kind="lesson", record=Lesson, ids=None):
+        self.kind = kind
+        self.record = record
         self.ids = ids or Ids()
         self.items = []
 
@@ -95,20 +87,19 @@ class Lessons(Container):
         """ops — словари operation / id / content (ADD / UPDATE / DELETE; прочее, например NONE, пропускается);
         без content операция пропускается. UPDATE несуществующего id: missing="add" добавляет запись, "skip" —
         пропускает."""
-        for p in ops:
-            op, content, id = p.get("operation", "ADD"), p.get("content", ""), str(p.get("id"))
+        for proposed in ops:
+            op = proposed.get("operation", "ADD")
+            content = proposed.get("content", "")
+            rid = str(proposed.get("id"))
             if not content:
                 continue
-            if op == "UPDATE" and not self.get(id) and missing == "add":
-                op = "ADD"
-            if op not in Operation.__members__ or Operation[op] not in self.ops:
-                continue
-            if op == "ADD":
+            exists = self.get(rid) is not None
+            if op == "ADD" or (op == "UPDATE" and not exists and missing == "add"):
                 self.add(content)
-            elif op == "UPDATE" and self.get(id):
-                self.update(id, content)
-            elif op == "DELETE" and self.get(id):
-                self.delete(id)
+            elif op == "UPDATE" and exists:
+                self.update(rid, content)
+            elif op == "DELETE" and exists:
+                self.delete(rid)
 
     def prune(self, test):
         self.items = [r for r in self.items if not test(r)]
@@ -119,9 +110,10 @@ class Lessons(Container):
 
 class Sections(Container):
     """Разделы — контейнеры уроков с общей нумерацией; records() — все записи в порядке появления."""
-    def __init__(self, names, kind="lesson", record=Lesson, ops=ALL, ids=None):
-        self.kind, self.ids = kind, ids or Ids()
-        self.sections = {n: Lessons(kind, record, ops, self.ids) for n in names}
+    def __init__(self, names, kind="lesson", record=Lesson, ids=None):
+        self.kind = kind
+        self.ids = ids or Ids()
+        self.sections = {name: Lessons(kind, record, self.ids) for name in names}
 
     def records(self):
         return sorted((r for s in self.sections.values() for r in s.items), key=lambda r: self.ids.order(r.id))
