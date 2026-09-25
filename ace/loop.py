@@ -18,6 +18,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 from . import config, render
+from .model import Call, messages, params
 from .tasks import accuracy, final_answer
 from .verdict import majority
 
@@ -138,11 +139,10 @@ class Experiment:
         a = Attempt(item["context"], k, self.training, prompt, self.task.system + env.hint + prompt.system)
         try:
             tools = env.tools + prompt.tools
-            reply = self.model.run(a.system,
-                                   render.user_message(self.task.instr, item["context"], prompt.note),
-                                   tools=tools, deps=prompt.deps, rounds=env.rounds + prompt.rounds,
-                                   temperature=prompt.temperature, top_p=prompt.top_p,
-                                   on_step=self.stepper(a) if tools and self.learner.watches_steps() else None)
+            reply = self.model.ask(Call(messages(render.user_message(self.task.instr, item["context"], prompt.note), a.system),
+                                        params(prompt.temperature, prompt.top_p), tools=tools, deps=prompt.deps,
+                                        rounds=env.rounds + prompt.rounds,
+                                        on_step=self.stepper(a) if tools and self.learner.watches_steps() else None))
         finally:
             env.close()
         final = reply.output or ""

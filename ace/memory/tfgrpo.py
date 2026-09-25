@@ -7,9 +7,11 @@
 from .. import parse, render
 from ..extract import OPERATIONS
 from ..extract.tfgrpo import ask
+from ..model import Reader
 from . import Lessons
 
 PLAN_RETRIES = 3            # повторы плана батча, пока JSON не разберётся
+PLAN = Reader(text=parse.json_block)
 
 
 class Library(Lessons):
@@ -22,8 +24,8 @@ class Library(Lessons):
         ops = [op for x in extractions for op in x.extras[OPERATIONS] if isinstance(op, dict)]
         plan = None
         for _ in range(PLAN_RETRIES):
-            plan = parse.json_block(ask(ex, "batch_experience_update_template",
-                                        experiences_and_operations=render.batch_table(self.records(), ops)))
+            plan = ask(ex, "batch_experience_update_template", PLAN,
+                       experiences_and_operations=render.batch_table(self.records(), ops))
             if plan is not None:
                 break
         ids = {render.label(i, r): r.id for i, r in enumerate(self.records())}

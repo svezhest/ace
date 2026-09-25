@@ -14,6 +14,7 @@ golden. Обучение видит только эпизод, поэтому м
 from collections import Counter
 
 from . import prompts
+from .model import Call, messages, params
 
 JUDGE = prompts.load("judge")
 
@@ -29,7 +30,8 @@ def yes_no(ex, episode, target):
 
 def judge(ex, episode, target):
     """Самопроверка с вердиктом в конце; голое число модель ставит наугад (14/20 против 17/20)."""
-    s = ex.model.one(prompts.text("judge_system"), JUDGE.fill(question=episode.question, output=episode.output)).output or ""
+    prompt = JUDGE.fill(question=episode.question, output=episode.output)
+    s = ex.model.ask(Call(messages(prompt, prompts.text("judge_system")), params())).output or ""
     episode.ok = "VERDICT:" in s and "correct" in s.split("VERDICT:")[-1].lower()
 
 

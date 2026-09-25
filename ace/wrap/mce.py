@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 
 from .. import fs, prompts, render
 from ..memory import Files
+from ..model import Call, messages, params
 from ..memory.mce import ROUNDS, SKILL, WORKSPACE, sub_folder
 from . import Wrapper, correct
 
@@ -123,7 +124,8 @@ def meta_agent(template):
                                  evaluations(history), skills(history), len(history) + 1))
         talk = None
         for _ in range(ATTEMPTS):
-            reply = ex.model.run("", user, tools=fs.TOOLS, deps=fs.FS(mounts, root=WORKSPACE), rounds=ROUNDS, history=talk)
+            reply = ex.model.ask(Call(messages(user), params(), tools=fs.TOOLS, deps=fs.FS(mounts, root=WORKSPACE), rounds=ROUNDS,
+                                      history=talk))
             if out.read(SKILL) is not None:
                 return out.read(SKILL)
             user, talk = MISSING.fill(expected_path=path), reply.messages

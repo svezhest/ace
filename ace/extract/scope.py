@@ -13,6 +13,7 @@ tactical правила (applied_rules и текущий системный пр
 from dataclasses import dataclass
 
 from .. import parse, prompts, render
+from ..model import Call, Reader, messages, params
 from ..show.scope import current_system, strategic_text
 from . import ATTEMPT, CONFIDENCE, DOMAIN, RATIONALE, Extraction, Extractor
 
@@ -79,7 +80,8 @@ class Rules(Extractor):
         prompt = (P["error"] if error else P[book.name]).fill(fields)
 
         def one(temperature, quality):
-            c = parse.scope_guideline(ex.model.run("", prompt, temperature=temperature).output, quality)
+            read = Reader(text=lambda text: parse.scope_guideline(text, quality))
+            c = ex.model.ask(Call(messages(prompt), params(temperature), read)).output
             return Proposal(**c) if c else None
         if self.n == 1:
             c = one(0, not error)
@@ -88,10 +90,10 @@ class Rules(Extractor):
         if len(cands) < 2:
             best = cands[0] if cands else None
         else:
-            out = ex.model.run("", P["selector"].fill(agent_context(ex, attempt, book), issue_type="error" if error else "quality",
-                                                      issue_details=render.issue(summary, error),
-                                                      candidates=render.candidates(cands))).output
-            best = cands[parse.scope_selection(out, len(cands))]
+            select = P["selector"].fill(agent_context(ex, attempt, book), issue_type="error" if error else "quality",
+                                        issue_details=render.issue(summary, error), candidates=render.candidates(cands))
+            read = Reader(text=lambda text: parse.scope_selection(text, len(cands)))
+            best = cands[ex.model.ask(Call(messages(select), params(), read)).output]
         return best if best and best.update_text else None
 
     def classify(self, ex, proposal, book, k=0, group=None):
@@ -99,10 +101,10 @@ class Rules(Extractor):
         confidence (parse.scope_classification)."""
         initial = proposal.initial()
         context = prompts.text("scope_rules_context", strategic=strategic_text(book), tactical=[r.text for r in book.tactical])
-        out = ex.model.run("", P["classify"].fill(allowed_domains=", ".join(DOMAINS), update_text=proposal.update_text,
-                                                  rationale=proposal.rationale, initial_confidence=initial,
-                                                  all_rules_context=context)).output
-        c = parse.scope_classification(out, initial, DOMAINS)
+        prompt = P["classify"].fill(allowed_domains=", ".join(DOMAINS), update_text=proposal.update_text,
+                                    rationale=proposal.rationale, initial_confidence=initial, all_rules_context=context)
+        read = Reader(text=lambda text: parse.scope_classification(text, initial, DOMAINS))
+        c = ex.model.ask(Call(messages(prompt), params(), read)).output
         if c["is_duplicate"]:
             return None
         domain = c["domain"] if c["scope"] == "strategic" else None

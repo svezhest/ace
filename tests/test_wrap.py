@@ -110,11 +110,10 @@ class FileAgent(Stub):
         super().__init__(answer, schemas)
         self.act = act
 
-    def run(self, system, user, output=str, tools=(), deps=None, **kw):
-        reply = super().run(system, user, output, tools, deps, **kw)
-        self.calls[-1]["deps"], self.calls[-1]["history"] = deps, kw.get("history")
-        if isinstance(deps, fs.FS):
-            self.act(self.calls[-1], deps)
+    def ask(self, call):
+        reply = super().ask(call)
+        if isinstance(call.deps, fs.FS):
+            self.act(self.calls[-1], call.deps)
         return reply
 
 

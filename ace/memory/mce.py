@@ -3,6 +3,7 @@
 (под-итерации) агент по навыку правит их файловыми инструментами, до 30 раундов; в папке под-итерации
 iter{k}_sub{j} — навык (.agent/, только чтение), context/ и data/train.json с итогами только текущего батча."""
 from .. import fs, prompts, render
+from ..model import Call, messages, params
 from . import Files
 
 BASE = prompts.load("mce_base")
@@ -38,7 +39,8 @@ class Context(Files):
             top, rest = SKILL.split("/", 1)
             mounts = {top: fs.Mount(Files.of({rest: ex.learner.skill}), "ro"), **mounts}
         prompt = BASE.fill(task_instruction=render.task_instruction(ex.task), iter_dir=f"{WORKSPACE}/{name}", iter_name=name)
-        ex.model.run("", prompt, tools=fs.TOOLS, deps=fs.FS(mounts, root=f"{WORKSPACE}/{name}"), rounds=self.rounds)
+        ex.model.ask(Call(messages(prompt), params(), tools=fs.TOOLS, deps=fs.FS(mounts, root=f"{WORKSPACE}/{name}"),
+                          rounds=self.rounds))
 
     def folder(self):
         """Папка под-итерации для мета-агента: context/ и data/train.json."""

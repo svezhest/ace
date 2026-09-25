@@ -12,6 +12,7 @@ from pydantic import BaseModel
 
 from .. import embed, parse, prompts, render
 from ..extract import LABELS
+from ..model import Call, Reader, messages, params
 from ..wrap import skilled
 from . import HARMFUL, HELPFUL, Ids, Lessons, Operation, Sections
 from .scope import CAP, TARGET, compress, rule_optimizer
@@ -39,14 +40,15 @@ def curator_prompt(template, memory, x):
 
 def curate_ops(ex, memory, x):
     """Все операции одной схемой; UPDATE несуществующего id пропускается."""
-    r = ex.model.run(skilled(CURATOR, ex), curator_prompt(CURATE["json"], memory, x), output=Ops).output
+    r = ex.model.ask(Call(messages(curator_prompt(CURATE["json"], memory, x), skilled(CURATOR, ex)), params(),
+                          Reader(schema=Ops))).output
     memory.apply([dict(operation=o.op, id=o.id, content=o.text) for o in (r.ops if r else [])])
 
 
 def curate_rewrite(ex, memory, x):
     """Вся память заново: промпт просит пункт на строку, каждая непустая строка — новая запись; пустой
     ответ — память как была."""
-    new = ex.model.run(skilled(CURATOR, ex), curator_prompt(CURATE["rewrite"], memory, x)).output
+    new = ex.model.ask(Call(messages(curator_prompt(CURATE["rewrite"], memory, x), skilled(CURATOR, ex)), params())).output
     if new and new.strip():
         memory.replace([line.strip() for line in new.splitlines() if line.strip()])
 
@@ -95,6 +97,7 @@ TOKEN_BUDGET = 80000
 HIGH_HELPFUL, HIGH_HARMFUL = 5, 2   # пункт «high performing»: helpful больше и harmful меньше этих
 DEDUP = 0.85                # порог косинуса слияния; у апстрима 0.90 под all-mpnet, у BGE-M3 косинусы ниже
 MERGE_TEMPERATURE = 0.3
+OPERATIONS = Reader(text=parse.ace_operations)      # _extract_and_validate_operations куратора апстрима
 
 
 def section_key(name):
@@ -146,9 +149,9 @@ class SectionedPlaybook(Sections):
     по разделам, внутри раздела по добавлению; пункт раздела general — в начало OTHERS."""
     requires = frozenset({LABELS})
 
-    def __init__(self, dedup=None):
+    def __init__(self, dedup=None, read=OPERATIONS):
         super().__init__(list(TITLES), "bullet", ops=Operation.ADD, ids=SlugIds())
-        self.dedup = dedup
+        self.dedup, self.read = dedup, read
 
     def records(self):
         return [r for s in self.sections.values() for r in s.items]
@@ -166,8 +169,8 @@ class SectionedPlaybook(Sections):
         fields = dict(token_budget=TOKEN_BUDGET, current_step=ex.i + 1, total_samples=ex.total,
                       playbook_stats=render.stats(self.stats()), recent_reflection=x.lessons[-1],
                       current_playbook=layout(self), question_context=question_context(ex.task.name, x.group.question))
-        out = ex.model.run("", P["curator" if x.group.target else "curator_nogt"].fill(fields)).output
-        self.apply(parse.ace_operations(out) or [])
+        prompt = P["curator" if x.group.target else "curator_nogt"].fill(fields)
+        self.apply(ex.model.ask(Call(messages(prompt), params(), self.read)).output or [])
 
     def apply(self, ops):
         """apply_curator_operations апстрима: только ADD; раздел без strip, неизвестный — OTHERS, general — в начало
@@ -243,6 +246,5 @@ class SectionedPlaybook(Sections):
     def merge(self, ex, group):
         first = group[0]
         helpful, harmful = sum(r.helpful for r in group), sum(r.harmful for r in group)
-        out = ex.model.one("", P["merge"].fill(bullets=render.merge_group(group), id=first.id, helpful=helpful,
-                                               harmful=harmful), temperature=MERGE_TEMPERATURE).output
-        return parse.counted_line(first.id)(out)
+        prompt = P["merge"].fill(bullets=render.merge_group(group), id=first.id, helpful=helpful, harmful=harmful)
+        return ex.model.ask(Call(messages(prompt), params(MERGE_TEMPERATURE), Reader(text=parse.counted_line(first.id)))).output

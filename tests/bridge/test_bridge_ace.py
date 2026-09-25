@@ -14,7 +14,7 @@ from ace.loop import run
 from ace.memory import HARMFUL, HELPFUL, Lesson
 from ace.memory.ace import SectionedPlaybook, SECTIONS, layout, question_context, section_slug
 from ace.methods.ace import ace_exact
-from ace.model import Reply
+from ace.model import roles, text_reply
 from ace.tasks import TASKS
 from ace.verdict import yes_no
 from upstream import deviation, fixture, messages
@@ -284,15 +284,15 @@ def generator_json(system, user):
 
 
 class Replay:
-    name, max_tokens = "replay", 4096
+    name = "replay"
 
     def __init__(self, upstream):
         self.replies = {m: iter([c["response"] for c in upstream if messages(c)[1].startswith(m)]) for m in (REF, CUR)}
         self.calls = []
 
-    def run(self, system, user, output=str, tools=(), deps=None, rounds=0, temperature=0, max_tokens=None, on_step=None,
-            top_p=None):
-        self.calls.append(dict(system=system, user=user, temperature=temperature))
+    def ask(self, call):
+        system, user = roles(call.messages)
+        self.calls.append(dict(system=system, user=user, temperature=call.params.get("temperature")))
         role = next((m for m in (REF, CUR) if user.startswith(m)), None)
         if role:
             text = next(self.replies[role])
@@ -301,10 +301,7 @@ class Replay:
             # FINAL ANSWER (ACE1)
             gen = generator_json(system, user)
             text = f"{gen}\nUSED: {', '.join(UPSTREAM_ID.findall(gen))}\nFINAL ANSWER: {json.loads(gen)['final_answer']}"
-        return Reply(text, text, False, [])
-
-    def one(self, system, user, temperature=0, max_tokens=None):
-        return self.run(system, user, temperature=temperature)
+        return text_reply(call, text)
 
     def usage(self):
         return dict(calls=len(self.calls), prompt_tokens=0, completion_tokens=0)

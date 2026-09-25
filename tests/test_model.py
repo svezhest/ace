@@ -1,17 +1,24 @@
-"""Прогон модели на модели-функции: исходы, отбивки инструментов, шаговый режим и Patch."""
+"""Доступ к модели: бэкенд pydantic-ai на модели-функции (исходы, отбивки инструментов, шаговый режим и Patch,
+история) и провод апстрима на заглушке клиента openai (ровно messages и params, разбор reader)."""
 import copy
+from types import SimpleNamespace
 
 from pydantic import BaseModel
 from pydantic_ai.messages import ModelRequest, ModelResponse, SystemPromptPart, TextPart, ToolCallPart, ToolReturnPart, UserPromptPart
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 
-from ace.model import EXTRA_REQUESTS, Model, Outcome, Patch, Step
+from ace.model import Call, Model, Outcome, Patch, Reader, Step, messages, params
+from ace.model.agent import EXTRA_REQUESTS
 
 
 def model_of(fn):
     m = Model()
-    m.llm = FunctionModel(fn)
+    m.agent.llm = FunctionModel(fn)
     return m
+
+
+def ask(m, user="q", system="sys", temperature=0, top_p=None, **call):
+    return m.ask(Call(messages(user, system), params(temperature, top_p), **call))
 
 
 def add(a: int, b: int) -> str:
@@ -24,14 +31,14 @@ def responses(messages):
 
 
 def test_answer():
-    r = model_of(lambda messages, info: ModelResponse(parts=[TextPart("FINAL ANSWER: 1")])).run("sys", "q")
+    r = ask(model_of(lambda messages, info: ModelResponse(parts=[TextPart("FINAL ANSWER: 1")])))
     assert (r.output, r.outcome, r.steps) == ("FINAL ANSWER: 1", Outcome.answer, [])
 
 
 def test_empty_system_not_sent():
     """Пустой системный промпт не уходит модели: у апстримов запрос — одно сообщение user."""
     seen = []
-    model_of(lambda messages, info: seen.append(messages) or ModelResponse(parts=[TextPart("x")])).run("", "q")
+    ask(model_of(lambda messages, info: seen.append(messages) or ModelResponse(parts=[TextPart("x")])), system="")
     assert [type(p) for m in seen[0] for p in m.parts] == [UserPromptPart]
 
 
@@ -39,9 +46,9 @@ def test_rounds_run_out():
     """Модель только вызывает инструмент: после rounds + EXTRA_REQUESTS запросов ответа нет."""
     fn = lambda messages, info: ModelResponse(parts=[ToolCallPart("add", {"a": 1, "b": responses(messages)})])
     m = model_of(fn)
-    r = m.run("sys", "q", tools=(add,), rounds=1)
+    r = ask(m, tools=(add,), rounds=1)
     assert r.output is None and r.outcome is Outcome.step
-    assert m.calls == 1 + EXTRA_REQUESTS
+    assert m.usage()["calls"] == 1 + EXTRA_REQUESTS
     assert [s[2] for s in r.steps] == ["1", "2", "3"]
 
 
@@ -52,7 +59,7 @@ class Answer(BaseModel):
 def test_broken_output():
     """Вывод ни разу не проходит схему: модель сломалась."""
     fn = lambda messages, info: ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, {"value": "x"})])
-    r = model_of(fn).run("sys", "q", output=Answer, rounds=10)
+    r = ask(model_of(fn), reader=Reader(schema=Answer), rounds=10)
     assert r.output is None and r.outcome is Outcome.broken
 
 
@@ -62,7 +69,7 @@ def test_all_validation_errors():
         if responses(messages) == 0:
             return ModelResponse(parts=[ToolCallPart("add", {"a": "x", "b": "y"})])
         return ModelResponse(parts=[TextPart("done")])
-    r = model_of(fn).run("sys", "q", tools=(add,), rounds=1)
+    r = ask(model_of(fn), tools=(add,), rounds=1)
     [(name, _, result)] = r.steps
     assert name == "add" and result.startswith("Error: ")
     assert result.count("valid integer") == 2
@@ -89,7 +96,7 @@ def test_patch_system():
     m, seen = stepping()
     got = []
     on_step = lambda new: got.append(new) or Patch(system=f"sys\n\nnote {len(got)}")
-    r = m.run("sys", "q", tools=(add,), rounds=3, on_step=on_step)
+    r = ask(m, tools=(add,), rounds=3, on_step=on_step)
     assert r.outcome is Outcome.answer and r.output == "FINAL ANSWER: 2"
     assert [system_of(s) for s in seen] == ["sys", "sys\n\nnote 1", "sys\n\nnote 2"]
     assert got == [[Step("add", '{"a":1,"b":1}', "2")]] * 2
@@ -98,7 +105,7 @@ def test_patch_system():
 def test_patch_append():
     """Patch(append): сообщение в конец истории после результата инструмента, системный промпт цел."""
     m, seen = stepping()
-    m.run("sys", "q", tools=(add,), rounds=3, on_step=lambda new: Patch(append="lesson"))
+    ask(m, tools=(add,), rounds=3, on_step=lambda new: Patch(append="lesson"))
     last = seen[1][-1]
     assert [type(p) for p in last.parts] == [ToolReturnPart, UserPromptPart] and last.parts[1].content == "lesson"
     assert [system_of(s) for s in seen] == ["sys"] * 3
@@ -106,7 +113,7 @@ def test_patch_append():
 
 def test_patch_tool_result():
     m, seen = stepping()
-    m.run("sys", "q", tools=(add,), rounds=3, on_step=lambda new: Patch(tool_result="lesson"))
+    ask(m, tools=(add,), rounds=3, on_step=lambda new: Patch(tool_result="lesson"))
     assert seen[1][-1].parts[0].content == "2\n\nlesson"
 
 
@@ -122,8 +129,8 @@ def test_top_p():
     def fn(messages, info):
         seen.append(dict(info.model_settings))
         return ModelResponse(parts=[TextPart("FINAL ANSWER: 1")])
-    model_of(fn).run("sys", "q", temperature=0.3, top_p=0.95)
-    model_of(fn).run("sys", "q")
+    ask(model_of(fn), temperature=0.3, top_p=0.95)
+    ask(model_of(fn))
     assert seen[0]["temperature"] == 0.3 and seen[0]["top_p"] == 0.95 and "top_p" not in seen[1]
 
 
@@ -135,7 +142,70 @@ def test_history_continues():
         seen.append([type(p).__name__ for m in messages for p in m.parts])
         return ModelResponse(parts=[TextPart(f"answer {len(seen)}")])
     m = model_of(fn)
-    first = m.run("sys", "q")
-    second = m.run("sys", "again", history=first.messages)
-    assert second.output == "answer 2" and m.calls == 2
+    first = ask(m)
+    second = ask(m, "again", history=first.messages)
+    assert second.output == "answer 2" and m.usage()["calls"] == 2
     assert seen[1] == ["SystemPromptPart", "UserPromptPart", "TextPart", "UserPromptPart"]
+
+
+def test_reader_text():
+    """Разбор ответа — reader вызова; сам ответ текстом остаётся в raw."""
+    r = ask(model_of(lambda messages, info: ModelResponse(parts=[TextPart("<a>x</a>")])), reader=Reader(text=str.upper))
+    assert (r.output, r.raw) == ("<A>X</A>", "<a>x</a>")
+
+
+def test_messages_history():
+    """Сообщения с историей: системный промпт в первом запросе, прошлые реплики — история, последнее — запрос."""
+    seen = []
+
+    def fn(messages, info):
+        seen.append([(type(p).__name__, p.content) for m in messages for p in m.parts])
+        return ModelResponse(parts=[TextPart("ok")])
+    history = [{"role": "system", "content": "s"}, {"role": "user", "content": "u1"}, {"role": "assistant", "content": "a1"},
+               {"role": "user", "content": "u2"}]
+    model_of(fn).ask(Call(history, params()))
+    assert seen[0] == [("SystemPromptPart", "s"), ("UserPromptPart", "u1"), ("TextPart", "a1"), ("UserPromptPart", "u2")]
+
+
+class Client:
+    """Заглушка клиента openai: пишет аргументы create и отвечает текстом."""
+    def __init__(self, text):
+        self.text, self.sent = text, []
+        self.chat = SimpleNamespace(completions=SimpleNamespace(create=self.create))
+
+    def create(self, **kw):
+        self.sent.append(kw)
+        message = SimpleNamespace(content=self.text)
+        usage = SimpleNamespace(prompt_tokens=3, completion_tokens=2)
+        return SimpleNamespace(choices=[SimpleNamespace(message=message, finish_reason="stop")], usage=usage)
+
+
+def wire(text):
+    m = Model(backend="wire")
+    m.wire.client = Client(text)
+    return m
+
+
+def test_wire_sends_exactly():
+    """Провод апстрима: create ровно с messages и params вызова, ответ текстом."""
+    m = wire("answer")
+    call = Call([{"role": "user", "content": "q"}], {"temperature": 0, "top_p": 0.5})
+    r = m.ask(call)
+    assert m.wire.client.sent == [dict(model=m.name, messages=call.messages, temperature=0, top_p=0.5)]
+    assert (r.output, r.raw, r.text, r.truncated) == ("answer", "answer", "answer", False)
+    assert m.usage() == dict(calls=1, prompt_tokens=3, completion_tokens=2)
+
+
+def test_wire_readers():
+    """Разборщик апстрима — reader.text; схема без разборщика — общий разбор JSON (последний блок)."""
+    assert wire("<a>x</a>").ask(Call(messages("q"), reader=Reader(text=str.upper))).output == "<A>X</A>"
+    text = 'draft {"value": 1}\n```json\n{"value": 2}\n```'
+    assert wire(text).ask(Call(messages("q"), reader=Reader(schema=Answer))).output == Answer(value=2)
+    assert wire("no json").ask(Call(messages("q"), reader=Reader(schema=Answer))).output is None
+
+
+def test_wire_tools_go_to_pydantic_ai():
+    """Вызов с инструментами на проводе идёт через pydantic-ai."""
+    m = wire("never")
+    m.agent.llm = FunctionModel(lambda messages, info: ModelResponse(parts=[TextPart("FINAL ANSWER: 1")]))
+    assert ask(m, tools=(add,), rounds=1).output == "FINAL ANSWER: 1" and not m.wire.client.sent

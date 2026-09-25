@@ -16,7 +16,7 @@ from ace.extract import ATTRIBUTION, BEST_ANSWER, IG
 from ace.extract.evolib import Attribution, Best, Gains, future_gains, insight_of, log_gain, second_better
 from ace.learner import swap
 from ace.loop import Episode, Group, Prompt, run
-from ace.model import Reply
+from ace.model import roles, text_reply
 
 E = importlib.import_module("ace.methods.evolib")      # модуль: имя в пакете занято самим методом
 MEM = importlib.import_module("ace.memory.evolib")
@@ -62,20 +62,17 @@ def table_embed(monkeypatch, table, default=(0.0, 0.0, 1.0)):
 
 class Fake:
     """Модель: rules — пары (имя, маркер или функция (system, user), ответ или функция от user)."""
-    name, max_tokens = "fake", 4096
+    name = "fake"
 
     def __init__(self, rules, default="N/A"):
         self.rules, self.default, self.calls = rules, default, []
 
-    def run(self, system, user, output=str, tools=(), deps=None, rounds=0, temperature=0, max_tokens=None,
-            on_step=None, top_p=None):
+    def ask(self, call):
+        system, user = roles(call.messages)
         name, text = next(((n, r(user) if callable(r) else r) for n, m, r in self.rules
                            if (m(system, user) if callable(m) else m in user)), ("default", self.default))
-        self.calls.append(dict(name=name, system=system, user=user))
-        return Reply(text, text, False, [])
-
-    def one(self, system, user, temperature=0, max_tokens=None):
-        return self.run(system, user, temperature=temperature, max_tokens=max_tokens)
+        self.calls.append(dict(name=name, system=system, user=user, params=call.params))
+        return text_reply(call, text)
 
     def usage(self):
         return dict(calls=len(self.calls), prompt_tokens=0, completion_tokens=0)

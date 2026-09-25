@@ -8,7 +8,7 @@ from ace import fs, parse, prompts
 from ace.learner import Learner
 from ace.loop import Attempt, Prompt
 from ace.memory import Lessons
-from ace.model import Patch, Step
+from ace.model import Patch, Reader, Step
 from ace.show import HEAD, AfterError, Catalog, Choose, Sample, Show, Synth, TopK, Whole
 
 ITEM = {"context": "What is 2 / 4?", "target": "0.5"}
@@ -59,7 +59,7 @@ def test_choose():
 
 def test_synth():
     fields = lambda text, memory, item: dict(PREVIOUS_INPUT_OUTPUT_PAIRS=text, NEXT_INPUT=item["context"], PREVIOUS_CHEATSHEET="")
-    show = Synth(Whole(empty="(empty)"), prompts.load("dc_synth"), fields, parse.opened("cheatsheet"), tokens=2)
+    show = Synth(Whole(empty="(empty)"), prompts.load("dc_synth"), fields, Reader(text=parse.opened("cheatsheet")), tokens=2)
     p = show.prompt(Ex, memory(), ITEM, 0)
     assert p.system == "\n\n" + HEAD + "short"
     assert ITEM["context"] in Ex.model.calls[-1]["user"]

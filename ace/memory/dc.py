@@ -7,11 +7,12 @@ dc_curator.j2 дословно). Вердикта и извлечения нет
                 синтезированный под вопрос cheatsheet (его показ оставляет в промпте попытки)"""
 from dataclasses import dataclass
 
-from .. import parse, prompts, render
+from .. import config, parse, prompts, render
+from ..model import Call, Reader, messages, params
 from . import Document, Lessons, Operation, Record
 
 CURATOR = prompts.load("dc_curator")
-CHEATSHEET = parse.opened("cheatsheet")
+CHEATSHEET = Reader(text=parse.opened("cheatsheet"))   # extract_cheatsheet апстрима
 TOKENS = 2                  # куратор и синтез пишут до 2 * max_tokens, как в апстриме
 
 
@@ -40,7 +41,8 @@ class Cheatsheet(Sheet):
         for x in extractions:
             ep = x.group.episodes[0]
             fields = {"QUESTION": ep.question, "MODEL_ANSWER": ep.output, "PREVIOUS_CHEATSHEET": self.current()}
-            new = CHEATSHEET(ex.model.run("", CURATOR.fill(fields), max_tokens=TOKENS * ex.model.max_tokens).output)
+            call = Call(messages(CURATOR.fill(fields)), params(max_tokens=TOKENS * config.MAX_TOKENS), CHEATSHEET)
+            new = ex.model.ask(call).output
             if new is not None:
                 self.rewrite(new)
 

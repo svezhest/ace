@@ -12,7 +12,9 @@
     ace_json            extract_json_from_text ACE: весь текст, ```json, первый объект {...} (ACE)
     bullet_tags         _extract_bullet_tags рефлектора ACE без json_mode: массив после "bullet_tags" (ACE)
     ace_operations      _extract_and_validate_operations куратора ACE: операции или None (ACE)
-    scope_*             ответы синтезатора, селектора, классификатора и оптимизатора SCOPE, с откатами апстрима"""
+    scope_*             ответы синтезатора, селектора, классификатора и оптимизатора SCOPE, с откатами апстрима
+    json_object         общий разбор JSON: весь текст, последний ```json, последний объект {...}; None
+    structured          общий разбор ответа в pydantic-схему (Reader(schema=...) на проводе); None"""
 import json
 import re
 
@@ -315,3 +317,31 @@ def scope_classification(text, initial, domains):
         return c
     except (ValueError, TypeError, AttributeError, KeyError):
         return fallback
+
+
+# общий разбор: свои промпты стенда со схемой ответа на проводе апстрима
+
+
+def json_object(text):
+    """Весь текст как JSON; иначе последний разобранный блок ```json; иначе последний разобранный объект {...}
+    (рассуждающая модель упоминает JSON раньше итогового); иначе None."""
+    if not text:
+        return None
+    try:
+        return json.loads(text.strip())
+    except json.JSONDecodeError:
+        pass
+    for candidate in reversed(re.findall(r"```json\s*(.*?)\s*```", text, re.DOTALL) + braced(text)):
+        try:
+            return json.loads(candidate)
+        except json.JSONDecodeError:
+            continue
+    return None
+
+
+def structured(text, schema):
+    """Ответ по pydantic-схеме из JSON в тексте (json_object); не разобралось или не та форма — None."""
+    try:
+        return schema.model_validate(json_object(text))
+    except ValueError:
+        return None

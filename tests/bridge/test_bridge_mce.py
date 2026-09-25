@@ -14,7 +14,7 @@ from ace.loop import run
 from ace.memory.mce import BASE, WORKSPACE
 from ace.methods.mce import mce
 from ace.wrap.mce import META, MISSING, evaluations
-from ace.model import Reply
+from ace.model import Reply, roles
 from ace.tasks import Task
 from ace.wrap.mce import Iteration, Meta, SKILL, best_iteration, sub_folder
 
@@ -202,12 +202,14 @@ class Agents:
     """Заготовки агентов capture_mce.py: мета-агент пишет навык поколения k; базовый дописывает урок на каждую ошибку
     батча к прежнему контексту, на iter2 пишет контекст заново. Решатель верен, если в контексте есть урок с его
     ответом (как diagnose() эталона)."""
-    name, max_tokens = "agents", 100
+    name = "agents"
 
     def __init__(self, targets):
         self.targets, self.calls = targets, []
 
-    def run(self, system, user, output=str, tools=(), deps=None, history=None, **kw):
+    def ask(self, call):
+        system, user = roles(call.messages)
+        deps = call.deps
         if user.startswith("# Meta-Level Agent"):
             it = int(re.search(r"iter(\d+)_sub0", user).group(1))
             self.calls.append(dict(agent="meta", iteration=it, user=user, files=visible(deps)))

@@ -12,6 +12,7 @@ import copy
 from pydantic import BaseModel
 
 from .. import parse, prompts, render
+from ..model import Call, Reader, messages, params
 from ..wrap import skilled
 from . import LABELS, Extraction, Extractor, Labels, scores
 
@@ -37,10 +38,12 @@ class Reflector(Extractor):
         ep = group.episodes[0]
         prompt = REFLECT.fill(question=ep.question, output=ep.output, verdict=render.verdict(ep.ok, ep.target),
                               form=FREE if self.free else "", memory=render.lines(memory.records()) or render.EMPTY)
+        call = Call(messages(prompt, skilled(REFLECTOR, ex)), params(self.temperature))
         if self.free:
-            text = ex.model.run(skilled(REFLECTOR, ex), prompt, temperature=self.temperature).output
+            text = ex.model.ask(call).output
             return Extraction(group, [text], scores(group)) if text else None
-        r = ex.model.run(skilled(REFLECTOR, ex), prompt, output=Reflection, temperature=self.temperature).output
+        call.reader = Reader(schema=Reflection)
+        r = ex.model.ask(call).output
         if not r:
             return None
         return Extraction(group, r.lessons, scores(group), {LABELS: Labels(r.helpful, r.harmful)})
@@ -82,22 +85,26 @@ def tag_map(tags):
     return out
 
 
+TAGS = Reader(text=parse.bullet_tags)     # _extract_bullet_tags апстрима без json_mode
+
+
 class Diagnose(Extractor):
-    """Рефлектор апстрима: ответ текстом, метки — разбор bullet_tags без json_mode (по умолчанию в апстриме),
+    """Рефлектор апстрима: ответ текстом, метки — разбор read (bullet_tags без json_mode, по умолчанию в апстриме),
     урок для куратора — весь ответ рефлектора, как recent_reflection апстрима."""
     gives = frozenset({LABELS})
 
-    def __init__(self, rounds=ROUNDS):
-        self.rounds = rounds
+    def __init__(self, rounds=ROUNDS, read=TAGS):
+        self.rounds, self.read = rounds, read
 
     def diagnose(self, ex, ep, memory):
-        """Поля рефлектора апстрима; без верного ответа — промпт _nogt."""
+        """Поля рефлектора апстрима; без верного ответа — промпт _nogt. -> (ответ текстом, метки)."""
         fields = dict(question=ep.question, reasoning_trace=ep.output, predicted_answer=ep.answer,
                       environment_feedback=prompts.text("ace_environment_feedback", correct=ep.ok),
                       bullets_used=bullets_used(memory, named(ep)))
         if ep.target:
             fields["ground_truth"] = ep.target
-        return ex.model.run("", P["reflector" if ep.target else "reflector_nogt"].fill(fields)).output or ""
+        reply = ex.model.ask(Call(messages(P["reflector" if ep.target else "reflector_nogt"].fill(fields)), params(), self.read))
+        return reply.raw or "", reply.output
 
     def __call__(self, ex, group, memory):
         """Метки каждого раунда сразу идут в копию памяти: следующую попытку решатель делает уже с ними.
@@ -105,8 +112,8 @@ class Diagnose(Extractor):
         ep = group.episodes[0]
         local, attempt, labels = copy.deepcopy(memory), ep, Labels()
         for _ in range(self.rounds if ep.ok is False else 1):
-            text = self.diagnose(ex, attempt, local)
-            tags = tag_map(parse.bullet_tags(text))
+            text, tags = self.diagnose(ex, attempt, local)
+            tags = tag_map(tags)
             helpful = [i for i, t in tags.items() if t == "helpful"]
             harmful = [i for i, t in tags.items() if t == "harmful"]
             local.count(helpful, harmful)

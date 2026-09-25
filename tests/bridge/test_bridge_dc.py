@@ -9,9 +9,9 @@ import numpy as np
 import pytest
 from upstream import deviation, fixture, messages
 
-from ace import prompts, render
+from ace import config, prompts, render
 from ace.loop import Episode, Group, Prompt, run
-from ace.model import Reply
+from ace.model import roles, text_reply
 from ace.show import HEAD, Scored
 
 DC = importlib.import_module("ace.methods.dc")       # модуль: имя в пакете занято самим методом
@@ -22,6 +22,12 @@ PROMPTS, PARSERS, MEMORY, LOOP = (fixture("dc", level) for level in ("prompts", 
 CU, RS = LOOP["DynamicCheatsheet_Cumulative"], LOOP["DynamicCheatsheet_RetrievalSynthesis"]
 GENERATOR = "# GENERATOR (PROBLEM SOLVER)"
 MAX_TOKENS = 2048           # run_benchmark.py по умолчанию; куратор и синтез — вдвое больше
+
+
+@pytest.fixture(autouse=True)
+def budget(monkeypatch):
+    """Предел генерации стенда — как у апстрима по умолчанию."""
+    monkeypatch.setattr(config, "MAX_TOKENS", MAX_TOKENS)
 
 
 def raw(step, i):
@@ -67,17 +73,15 @@ class Model:
     """Отвечает записанными ответами апстрима по порядку; запоминает, что спросили."""
     name = "replay"
 
-    def __init__(self, upstream_calls=(), max_tokens=MAX_TOKENS):
-        self.upstream, self.max_tokens, self.calls = list(upstream_calls), max_tokens, []
+    def __init__(self, upstream_calls=()):
+        self.upstream, self.calls = list(upstream_calls), []
 
-    def run(self, system, user, output=str, tools=(), deps=None, rounds=0, temperature=0, max_tokens=None, on_step=None,
-            top_p=None):
+    def ask(self, call):
         response = self.upstream[len(self.calls)]["response"] if len(self.calls) < len(self.upstream) else ""
-        self.calls.append(dict(system=system, user=user, temperature=temperature, max_tokens=max_tokens or self.max_tokens))
-        return Reply(response, response, False, [])
-
-    def one(self, system, user, temperature=0, max_tokens=None):
-        return self.run(system, user, temperature=temperature, max_tokens=max_tokens)
+        system, user = roles(call.messages)
+        self.calls.append(dict(system=system, user=user, temperature=call.params.get("temperature"),
+                               max_tokens=call.params.get("max_tokens")))
+        return text_reply(call, response)
 
     def usage(self):
         return dict(calls=len(self.calls), prompt_tokens=0, completion_tokens=0)
@@ -113,7 +117,7 @@ def test_synthesis_request(monkeypatch):
     pairs = render.pairs([Scored(MEM.Pair("r1", OUTPUTS[0], question=QUESTIONS[0]), sim)], True, SHOW.NOTE)
     first = PROMPTS["synthesis_first"]["calls"][0]["response"]
     memory = MEM.Pairs(sheet=True)
-    memory.sheet.rewrite(MEM.CHEATSHEET(first))
+    memory.sheet.rewrite(MEM.CHEATSHEET.read(first))
     fields = SHOW.pairs_and_sheet(pairs, memory, {"context": rec["input"]})
     assert ("", SHOW.SYNTH.fill(fields)) == messages(synth)
     model = Model([synth])
@@ -128,14 +132,14 @@ def test_synthesis_request(monkeypatch):
 def test_extract_cheatsheet(name):
     """extract_cheatsheet HEAD: None у нас — «оставить старый»."""
     row = PARSERS["extract_cheatsheet"][name]
-    got = MEM.CHEATSHEET(row["input"])
+    got = MEM.CHEATSHEET.read(row["input"])
     assert (row["old"] if got is None else got) == row["ok"]
 
 
 def test_extract_cheatsheet_compare():
     """Строки сравнения HEAD / repro-патч / наш: наш разбор теперь совпадает с HEAD везде."""
     for name, row in fixture("dc", "cheatsheet_compare")["rows"].items():
-        got = MEM.CHEATSHEET(row["input"])
+        got = MEM.CHEATSHEET.read(row["input"])
         assert {"ok": "OLD CHEATSHEET" if got is None else got} == row["head"], name
 
 # показ пар

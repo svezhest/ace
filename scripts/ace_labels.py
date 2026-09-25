@@ -16,7 +16,6 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from ace import config  # noqa: E402
-from ace import parse  # noqa: E402
 from ace.extract.ace import Diagnose, named, tag_map  # noqa: E402
 from ace.learner import swap  # noqa: E402
 from ace.loop import run  # noqa: E402
@@ -30,14 +29,14 @@ ROWS = []
 
 class Logged(Diagnose):
     def diagnose(self, ex, ep, memory):
-        text = super().diagnose(ex, ep, memory)
-        tags = list(tag_map(parse.bullet_tags(text)).items())
+        text, found = super().diagnose(ex, ep, memory)
+        tags = list(tag_map(found).items())
         ids = named(ep)
         ROWS.append(dict(epoch=ex.epoch, i=ex.i, ok=ep.ok, memory=len(memory), named=ids,
                          ours=[i for i in ids if memory.get(i)],
                          upstream=[i for i in ids if memory.get(i) and i in UPSTREAM.findall(ep.final)],
                          tags=tags, counted=[t for t in tags if t[1] in ("helpful", "harmful") and memory.get(t[0])]))
-        return text
+        return text, found
 
 
 def share(a, b):

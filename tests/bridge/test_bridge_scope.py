@@ -21,7 +21,7 @@ from ace.memory.scope import P as OPTIMIZER_P
 from ace.learner import Learner
 from ace.memory.scope import Book, PER_RUN, Perspectives, duplicate_words, rule_optimizer
 from ace.methods.scope import scope
-from ace.model import Reply
+from ace.model import roles, text_reply
 
 PROMPTS, PARSERS, MEMORY, LOOP = (fixture("scope", n) for n in ("prompts", "parsers", "memory", "loop"))
 AGENT, ROLE = "finer_agent", "Expert tagging financial entities with US GAAP XBRL tags"
@@ -36,16 +36,16 @@ TEMPLATES = {"ERROR_REFLECTION_PROMPT": EXTRACT_P["error"], "QUALITY_REFLECTION_
 
 class Model:
     """Модель-заглушка: текст ответа — reply(промпт); пишет промпты и температуру."""
-    name, max_tokens = "stub", 100
+    name = "stub"
 
     def __init__(self, reply):
         self.reply, self.calls = reply, []
 
-    def run(self, system, user, output=str, tools=(), deps=None, rounds=0, temperature=0, max_tokens=None, on_step=None,
-            top_p=None):
-        assert output is str
-        self.calls.append(dict(user=user, temperature=temperature))
-        return Reply(self.reply(user), "", False, [])
+    def ask(self, call):
+        assert call.reader.schema is None
+        _, user = roles(call.messages)
+        self.calls.append(dict(user=user, temperature=call.params.get("temperature")))
+        return text_reply(call, self.reply(user))
 
 
 def ex(model, name="finer"):

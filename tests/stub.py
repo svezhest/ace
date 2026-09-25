@@ -1,7 +1,7 @@
 """Модель-заглушка для тестов цикла и уровней: ответ решателя — функция от промпта, ответ по схеме — из словаря
 по имени схемы. Запоминает все вызовы."""
 from ace.loop import Episode, Prompt
-from ace.model import Reply
+from ace.model import Reply, roles, text_reply
 from ace.tasks import TASKS
 
 TASK = TASKS["formula"]
@@ -13,24 +13,22 @@ def target_of(user):
 
 
 class Stub:
-    name, max_tokens = "stub", 100
+    name = "stub"
 
     def __init__(self, answer=lambda call: "FINAL ANSWER: 0", schemas=None):
         self.answer, self.schemas, self.calls = answer, schemas or {}, []
 
-    def run(self, system, user, output=str, tools=(), deps=None, rounds=0, temperature=0, max_tokens=None, on_step=None,
-            top_p=None, history=None):
-        call = dict(system=system, user=user, output=output, tools=tools, temperature=temperature, top_p=top_p, n=len(self.calls))
+    def ask(self, c):
+        system, user = roles(c.messages)
+        output = c.reader.schema or str
+        call = dict(system=system, user=user, output=output, tools=c.tools, temperature=c.params.get("temperature"),
+                    top_p=c.params.get("top_p"), max_tokens=c.params.get("max_tokens"), deps=c.deps, history=c.history,
+                    n=len(self.calls))
         self.calls.append(call)
         if output is str:
-            text = self.answer(call)
-            return Reply(text, text, False, [])
+            return text_reply(c, self.answer(call))
         obj = self.schemas.get(output.__name__)
-        obj = obj(call) if callable(obj) else obj
-        return Reply(obj, "", False, [])
-
-    def one(self, system, user, temperature=0, max_tokens=None):
-        return self.run(system, user, temperature=temperature, max_tokens=max_tokens)
+        return Reply(obj(call) if callable(obj) else obj, "")
 
     def usage(self):
         return dict(calls=len(self.calls), prompt_tokens=0, completion_tokens=0)

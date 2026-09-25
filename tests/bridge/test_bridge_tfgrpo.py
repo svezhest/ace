@@ -14,6 +14,7 @@ from ace.extract import OPERATIONS, Extraction
 from ace.extract import tfgrpo as T
 from ace.loop import Episode, Group, Prompt
 from ace.memory import Lesson
+from ace.model import roles, text_reply
 
 M = importlib.import_module("ace.methods.tfgrpo")      # имя tfgrpo в пакете занято самим методом
 MEM = importlib.import_module("ace.memory.tfgrpo")
@@ -29,23 +30,20 @@ STAGES = ["single_rollout_summary_template", "single_query_group_advantage", "gr
 MARKERS = ["<Working Agent Input>", "<Agent Input>", "<Existing Experiences>", "<Experiences and Proposed Operations>"]
 
 
-class Reply:
-    def __init__(self, output):
-        self.output = output
-
-
 class Fake:
     """Отвечает по (системный, пользовательский) промпт из записанных запросов апстрима или заданной функцией."""
     def __init__(self, calls=(), answer=None):
         self.replies = {messages(c): c["response"] for c in calls}
         self.answer, self.calls = answer, []
 
-    def run(self, system, user, output=str, temperature=0, top_p=None, **_):
-        self.calls.append(dict(system=system, user=user, temperature=temperature, top_p=top_p))
+    def ask(self, call):
+        system, user = roles(call.messages)
+        self.calls.append(dict(system=system, user=user, temperature=call.params.get("temperature"),
+                               top_p=call.params.get("top_p")))
         if self.answer:
-            return Reply(self.answer(user))
+            return text_reply(call, self.answer(user))
         assert (system, user) in self.replies, f"запроса нет в эталоне:\n{user[:300]}"
-        return Reply(self.replies[system, user])
+        return text_reply(call, self.replies[system, user])
 
 
 class Task:
@@ -169,7 +167,7 @@ def test_batch_requests():
 def test_parse_advantage(name):
     """<Experiences> без учёта регистра, первый блок; без пары — пустая строка (группа всё равно идёт в сверку)."""
     case = PARSERS["advantage"][name]
-    assert [T.EXPERIENCES(case["response"])] == case["experiences"]
+    assert [T.EXPERIENCES.read(case["response"])] == case["experiences"]
 
 
 @pytest.mark.parametrize("name", PARSERS["group_update"])

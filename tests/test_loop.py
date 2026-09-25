@@ -222,7 +222,7 @@ def stepping():
             return ModelResponse(parts=[ToolCallPart("run_python", {"code": "1/0"})])
         return ModelResponse(parts=[TextPart("FINAL ANSWER: 1")])
     model = Model()
-    model.llm = FunctionModel(fn)
+    model.agent.llm = FunctionModel(fn)
     return model, seen
 
 

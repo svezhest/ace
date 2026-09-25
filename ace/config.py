@@ -6,6 +6,7 @@ from pathlib import Path
 OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "http://localhost:8080/v1")
 API_KEY = os.getenv("OPENAI_API_KEY", "local")
 MODEL = os.getenv("MODEL", "ornith15-9b")
+BACKEND = os.getenv("BACKEND", "pydantic-ai")     # доступ к модели: pydantic-ai | wire (ace/model)
 MAX_TOKENS = int(os.getenv("MAX_TOKENS", 4096))
 SEED = int(os.getenv("SEED", 0))
 

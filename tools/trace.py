@@ -13,7 +13,7 @@ from pathlib import Path
 out, names = sys.argv[1], sys.argv[2:]
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import pydantic  # noqa: E402
-from ace import model as M  # noqa: E402
+from ace.model import Reply, roles, text_reply  # noqa: E402
 from ace.loop import run  # noqa: E402
 from ace.learner import swap  # noqa: E402
 from ace.methods import METHODS  # noqa: E402
@@ -78,27 +78,24 @@ def fill(tp, seed):
 
 class Fake:
     """Модель без сети: инструменты не вызывает, ответ — функция от промпта."""
-    name, max_tokens = "fake", 4096
+    name = "fake"
 
     def __init__(self, targets):
         self.targets, self.log = targets, []
 
-    def run(self, system, user, output=str, tools=(), deps=None, rounds=0, temperature=0, max_tokens=None, on_step=None,
-            top_p=None, history=None):
-        self.log.append(dict(system=system, user=user, output=getattr(output, "__name__", str(output)),
-                             tools=[t.__name__ for t in tools], rounds=rounds, temperature=temperature, max_tokens=max_tokens,
-                             **({"top_p": top_p} if top_p is not None else {})))
-        seed = h(system, user, temperature, len(self.log) if temperature else "")
-        if output is str:
+    def ask(self, call):
+        system, user = roles(call.messages)
+        schema, p = call.reader.schema, call.params
+        self.log.append(dict(system=system, user=user, output=schema.__name__ if schema else "str",
+                             tools=[t.__name__ for t in call.tools], rounds=call.rounds, temperature=p.get("temperature"),
+                             max_tokens=p.get("max_tokens"), **({"top_p": p["top_p"]} if "top_p" in p else {})))
+        seed = h(system, user, p.get("temperature"), len(self.log) if p.get("temperature") else "")
+        if schema is None:
             target = next((t for q, t in self.targets.items() if q in user), None)
             answer = target if target and seed % 3 else "1.00"
-            text = BLOB + f"\nFINAL ANSWER: {answer}"
-            return M.Reply(text, text, False, [])
-        obj = fill(output, seed)
-        return M.Reply(obj, json.dumps(obj.model_dump()), False, [])
-
-    def one(self, system, user, temperature=0, max_tokens=None):
-        return self.run(system, user, temperature=temperature, max_tokens=max_tokens)
+            return text_reply(call, BLOB + f"\nFINAL ANSWER: {answer}")
+        obj = fill(schema, seed)
+        return Reply(obj, json.dumps(obj.model_dump()))
 
     def usage(self):
         return dict(calls=len(self.log), prompt_tokens=0, completion_tokens=0)

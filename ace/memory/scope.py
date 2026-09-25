@@ -10,6 +10,7 @@
 from dataclasses import dataclass
 
 from .. import parse, prompts, render
+from ..model import Call, Reader, messages, params
 from ..extract import ATTEMPT, CONFIDENCE, DOMAIN, RATIONALE
 from . import Container, Ids, Record
 
@@ -31,7 +32,8 @@ THOROUGHNESS, EFFICIENCY = "thoroughness", "efficiency"
 def rule_optimizer(passes=OPTIMIZER_PASSES):
     """-> optimize(model, rules, target): анализ, затем конфликты, поглощение, слияние, до passes проходов;
     номера правил стабильны между проходами. Модель отвечает текстом, разбор — parse.scope_* (как у апстрима)."""
-    llm = lambda model, name, fields: model.run("", P[name].fill(fields)).output
+    def llm(model, name, fields, read):
+        return model.ask(Call(messages(P[name].fill(fields)), params(), Reader(text=read))).output
 
     def resolve(model, rules, pairs):
         by_id, done, fixed = {x["id"]: x for x in rules}, set(), {}
@@ -39,8 +41,8 @@ def rule_optimizer(passes=OPTIMIZER_PASSES):
             if len(pair) < 2 or pair[0] not in by_id or pair[1] not in by_id or pair[0] in done or pair[1] in done:
                 continue
             a, b = by_id[pair[0]], by_id[pair[1]]
-            r = parse.scope_rule(llm(model, "conflict", dict(idx1=a["id"], rule1_text=a["rule"], rule1_rationale=a["rationale"],
-                                                             idx2=b["id"], rule2_text=b["rule"], rule2_rationale=b["rationale"])))
+            r = llm(model, "conflict", dict(idx1=a["id"], rule1_text=a["rule"], rule1_rationale=a["rationale"],
+                                            idx2=b["id"], rule2_text=b["rule"], rule2_rationale=b["rationale"]), parse.scope_rule)
             if r:
                 done |= {a["id"], b["id"]}
                 fixed[a["id"]] = dict(rule=r[0], rationale=r[1], id=a["id"],
@@ -51,8 +53,8 @@ def rule_optimizer(passes=OPTIMIZER_PASSES):
         by_id, gone = {x["id"]: x for x in rules}, set()
         for pair in pairs:
             if len(pair) >= 2 and pair[0] in by_id and pair[1] in by_id:
-                if parse.scope_subsumed(llm(model, "subsumed", dict(general_rule=by_id[pair[0]]["rule"],
-                                                                    specific_rule=by_id[pair[1]]["rule"]))):
+                if llm(model, "subsumed", dict(general_rule=by_id[pair[0]]["rule"], specific_rule=by_id[pair[1]]["rule"]),
+                       parse.scope_subsumed):
                     gone.add(pair[1])
         return [x for x in rules if x["id"] not in gone]
 
@@ -68,7 +70,7 @@ def rule_optimizer(passes=OPTIMIZER_PASSES):
             # номера в промпте — из группы по порядку, как в апстриме (_merge_rules: indices[i]), даже если
             # какого-то номера среди правил нет
             numbered = [dict(x, id=i) for i, x in zip(group, parts)]
-            r = parse.scope_rule(llm(model, "merge", dict(rules_text=render.rule_group(numbered))))
+            r = llm(model, "merge", dict(rules_text=render.rule_group(numbered)), parse.scope_rule)
             if r:
                 out.append(dict(rule=r[0], rationale=r[1], id=parts[0]["id"],
                                 confidence=max(x.get("confidence", RULE_CONFIDENCE) for x in parts)))
@@ -83,7 +85,7 @@ def rule_optimizer(passes=OPTIMIZER_PASSES):
             if len(rules) <= target:
                 break
             # с одним правилом апстрим модель не зовёт
-            a = (parse.scope_analysis(llm(model, "analyze", dict(num_rules=len(rules), rules_text=render.rule_list(rules))))
+            a = (llm(model, "analyze", dict(num_rules=len(rules), rules_text=render.rule_list(rules)), parse.scope_analysis)
                  if len(rules) > 1 else parse.scope_analysis(""))
             if not (a["conflicts"] or a["subsumption"] or a["consolidation"]):
                 break

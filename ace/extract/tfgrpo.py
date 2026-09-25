@@ -12,6 +12,7 @@ tfgrpo_*.j2 дословно, пара системный / пользовате
 Библиотека до конца батча не меняется, поэтому сверка идёт здесь, а план батча — в памяти метода
 (memory/tfgrpo.py). Группа без опыта даёт пустые операции: план батча апстрим строит всегда."""
 from .. import parse, prompts, render
+from ..model import TEXT, Call, Reader, messages, params
 from . import OPERATIONS, Extraction, Extractor, scores
 
 OBJECTIVE = {t: prompts.text(f"tfgrpo_objective_{t}") for t in ("formula", "finer", "meb", "gpqa")}
@@ -20,14 +21,14 @@ NUM = 1                     # num_experiences_per_query
 P = {n: (prompts.load(f"tfgrpo_{n}_sp"), prompts.load(f"tfgrpo_{n}_up"))
      for n in ("single_rollout_summary_template", "single_query_group_advantage", "group_experience_update_template",
                "batch_experience_update_template")}
-EXPERIENCES = parse.enclosed("Experiences")
+EXPERIENCES = Reader(text=parse.enclosed("Experiences"))
 
 
-def ask(ex, name, **fields):
-    """Пара промптов апстрима: системный с целями агента и обучения, пользовательский с полями."""
+def ask(ex, name, read=TEXT, **fields):
+    """Пара промптов апстрима: системный с целями агента и обучения, пользовательский с полями; без температуры."""
     sp, up = P[name]
     system = sp.fill(agent_objective=OBJECTIVE[ex.task.name], learning_objective=LEARNING, num_experiences=NUM)
-    return ex.model.run(system, up.fill(fields), temperature=None).output
+    return ex.model.ask(Call(messages(up.fill(fields), system), params(temperature=None), read)).output
 
 
 def partial(rollouts, labeled):
@@ -63,12 +64,12 @@ class Contrast(Extractor):
                                  answer=answer, critique=render.NO_CRITIQUE)) for e in eps]
             summaries = [(e, s) for e, s in summaries if s is not None]
             if partial([e for e, _ in summaries], labeled):
-                found = EXPERIENCES(ask(ex, "single_query_group_advantage", question=group.question, answer=answer,
-                                        trajectories=render.attempts(summaries, labeled)))
+                found = ask(ex, "single_query_group_advantage", EXPERIENCES, question=group.question, answer=answer,
+                            trajectories=render.attempts(summaries, labeled))
                 if found is not None and not self.library:
                     lessons = [found] if found else []
                 elif found is not None:
                     lessons = [found]
-                    ops = operations(ask(ex, "group_experience_update_template",
-                                         existing_experiences=render.experiences(memory.records()), new_experiences=found))
+                    ops = ask(ex, "group_experience_update_template", Reader(text=operations),
+                              existing_experiences=render.experiences(memory.records()), new_experiences=found)
         return Extraction(group, lessons, scores(group), {OPERATIONS: ops} if self.library else {})

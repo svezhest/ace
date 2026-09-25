@@ -16,6 +16,7 @@ import math
 from dataclasses import dataclass
 
 from .. import parse, prompts, render
+from ..model import Call, Reader, messages, params
 from . import ATTRIBUTION, BEST_ANSWER, IG, Extraction, Extractor
 
 EPS = 0.01                  # пол логарифма в IG
@@ -72,8 +73,8 @@ class Gains(Extractor):
         self.evaluated = evaluated
 
     def insight(self, ex, group, best, evaluation):
-        return insight_of(ex.model.run("", P["insight"].fill(question=group.question, solution=best.output,
-                                                            evaluation=evaluation)).output)
+        prompt = P["insight"].fill(question=group.question, solution=best.output, evaluation=evaluation)
+        return ex.model.ask(Call(messages(prompt), params(), Reader(text=insight_of))).output
 
     def __call__(self, ex, group, memory):
         eps = group.episodes
@@ -92,8 +93,8 @@ class Gains(Extractor):
         before = memory.best(group.question)
         improving = before is None or scores[b] > before.score
         if not improving and not self.evaluated and group.vote and not ex.task.check(before.answer, group.vote):
-            judgment = ex.model.run("", P["compare"].fill(question=group.question, a=before.output, b=best.output)).output
-            improving = second_better(judgment)
+            prompt = P["compare"].fill(question=group.question, a=before.output, b=best.output)
+            improving = ex.model.ask(Call(messages(prompt), params(), Reader(text=second_better))).output
         return Extraction(group, [insight] if insight else [], scores,
                           {IG: ig, BEST_ANSWER: Best(best.output, best.answer, scores[b]) if improving else None,
                            ATTRIBUTION: Attribution([e.shown for e in eps], b)})

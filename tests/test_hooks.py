@@ -123,7 +123,7 @@ def test_hooks_run(tmp_path):
             return ModelResponse(parts=[ToolCallPart("run_python", {"code": "1/0"})])
         return ModelResponse(parts=[TextPart("FINAL ANSWER: 1")])
     model = Model()
-    model.llm = FunctionModel(fn)
+    model.agent.llm = FunctionModel(fn)
     h = Hooks(Learner("x", env=Tool()), learn="raw", prune=3)
     h.hooks.add("Check the denominator.", trigger="ZeroDivisionError")
     run(TASK, h, model, 1, out=str(tmp_path))

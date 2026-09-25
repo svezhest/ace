@@ -10,6 +10,7 @@
 from dataclasses import dataclass, field
 
 from .. import embed, parse, prompts
+from ..model import Call, Reader, messages, params
 from ..extract import ATTRIBUTION, BEST_ANSWER, IG
 from ..extract.evolib import future_gains
 from . import Container, Ids, Lessons, Operation, Record
@@ -40,6 +41,9 @@ def condition(insight):
 def merged_insights(text):
     """Строки «If ...» из всех блоков ```insights ответа слияния (consolidate_insights апстрима)."""
     return [l.strip() for l in parse.fenced(text, "insights").split("\n") if l.strip().startswith("If ")]
+
+
+INSIGHTS, SKILLS = Reader(text=merged_insights), Reader(text=parse.subtasks)
 
 
 class Library(Container):
@@ -74,17 +78,17 @@ class Library(Container):
 
     def add_insight(self, ex, text):
         def merge(old):
-            out = ex.model.one("", P["merge_insights"].fill(insights=f"{old.text}\n{text}")).output or ""
+            prompt = P["merge_insights"].fill(insights=f"{old.text}\n{text}")
             fig = []
-            return [(t, dict(outcomes=fig)) for t in merged_insights(out)]
+            return [(t, dict(outcomes=fig)) for t in ex.model.ask(Call(messages(prompt), params(), INSIGHTS)).output]
         self.consolidate(self.insights, text, condition(text), lambda r: condition(r.text), dict(outcomes=[]), merge,
                          lambda old, born: dict(outcomes=old.outcomes))
 
     def add_skill(self, ex, block, doc, ig):
         def merge(old):
-            out = ex.model.one("", P["merge_skills"].fill(skills=f"{old.text}\n{block}")).output or ""
+            prompt = P["merge_skills"].fill(skills=f"{old.text}\n{block}")
             fig = []
-            return [(b, dict(doc=d, ig=ig, outcomes=fig)) for b, d in parse.subtasks(out)]
+            return [(b, dict(doc=d, ig=ig, outcomes=fig)) for b, d in ex.model.ask(Call(messages(prompt), params(), SKILLS)).output]
         self.consolidate(self.skills, block, doc, lambda r: r.doc, dict(doc=doc, ig=ig, outcomes=[]), merge,
                          lambda old, born: dict(born, ig=RATE * born["ig"] + (1 - RATE) * old.ig, outcomes=old.outcomes))
 

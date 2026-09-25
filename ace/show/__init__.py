@@ -21,9 +21,9 @@
 random — показ случаен (выборка): val такой памяти не кэшируется. watches_steps — показу нужны шаги попытки."""
 import random
 
-from .. import embed, fs, prompts, render
+from .. import config, embed, fs, prompts, render
 from ..loop import Prompt
-from ..model import Patch
+from ..model import Call, Patch, messages, params
 
 HEAD = prompts.text("memory_head")
 CATALOG = prompts.load("catalog")
@@ -122,14 +122,14 @@ class Choose(Show):
 
 class Synth(Show):
     """Модель переписывает показанное base под вопрос: fields(текст base, память, item) -> поля шаблона,
-    parse(ответ) -> текст или None (тогда решатель видит сам base). tokens — доля бюджета генерации."""
-    def __init__(self, base, template, fields, parse, tokens=1):
-        self.base, self.template, self.fields, self.parse, self.tokens = base, template, fields, parse, tokens
+    read(ответ) -> текст или None (тогда решатель видит сам base). tokens — доля бюджета генерации."""
+    def __init__(self, base, template, fields, read, tokens=1):
+        self.base, self.template, self.fields, self.read, self.tokens = base, template, fields, read, tokens
 
     def prompt(self, ex, memory, item, k):
         text, recs = self.base.text(ex, memory, item)
-        out = self.parse(ex.model.one("", self.template.fill(self.fields(text or "", memory, item)),
-                                      max_tokens=self.tokens * ex.model.max_tokens).text)
+        prompt = self.template.fill(self.fields(text or "", memory, item))
+        out = ex.model.ask(Call(messages(prompt), params(max_tokens=self.tokens * config.MAX_TOKENS), self.read)).output
         return self.shown(out if out is not None else text, recs)
 
     def shown(self, text, recs):

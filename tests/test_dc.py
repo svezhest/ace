@@ -3,7 +3,7 @@
 import numpy as np
 from stub import TASK, Stub, episode
 
-from ace import prompts
+from ace import config, prompts
 from ace.extract import Raw
 from ace.loop import Group, run
 from ace.memory.dc import Cheatsheet, Pairs
@@ -44,12 +44,12 @@ def test_curator_budget():
     seen = []
 
     class Budget(Stub):
-        def run(self, *args, max_tokens=None, **kw):
-            seen.append(max_tokens)
-            return super().run(*args, max_tokens=max_tokens, **kw)
+        def ask(self, call):
+            seen.append(call.params["max_tokens"])
+            return super().ask(call)
     model = Budget(lambda call: "<cheatsheet>v</cheatsheet>")
     Cheatsheet().learn(Ex(model), [extraction(episode())])
-    assert seen == [2 * model.max_tokens]
+    assert seen == [2 * config.MAX_TOKENS]
 
 
 def fake_embed(monkeypatch):
