@@ -118,6 +118,18 @@ def verdict(ok, target=""):
 def python_output(stdout, stderr):
     return f"[stdout]\n{stdout}\n[stderr]\n{stderr}".strip()
 
+
+NO_RESPONSE = "sandbox: the container did not respond"
+
+
+def omitted(n):
+    """Строка на месте вырезанной середины длинного вывода."""
+    return f"... {n} lines omitted ..."
+
+
+def time_limit(seconds):
+    return f"sandbox: time limit of {seconds} s exceeded"
+
 # рефлексия стенда и хуки
 
 
