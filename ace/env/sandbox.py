@@ -1,4 +1,6 @@
-"""Исполнение python-кода модели в одноразовом docker-контейнере без сети и без доступа к хосту."""
+"""Исполнение python-кода модели в docker-контейнере без сети и без доступа к хосту.
+Контейнер на вызов (run(code)) или на попытку (start -> run(code, container) ... -> stop): внутри попытки
+между вызовами живут файлы в /tmp, между попытками — ничего."""
 import subprocess
 
 from .. import render
@@ -10,8 +12,7 @@ HEAD_LINES, TAIL_LINES = 20, 20
 MAX_BYTES = 64_000
 TIMEOUT_RC = 124            # код возврата timeout(1)
 
-DOCKER_ARGS = [
-    "docker", "run", "--rm", "-i",
+ISOLATION = [
     "--network", "none",
     "--memory", "512m", "--memory-swap", "512m",
     "--cpus", "1",
@@ -19,8 +20,9 @@ DOCKER_ARGS = [
     "--read-only", "--tmpfs", "/tmp:size=64m,exec",
     "--security-opt", "no-new-privileges",
     "--cap-drop", "ALL",
-    IMAGE, "timeout", str(TIMEOUT), "python", "-I", "-",
 ]
+PYTHON = ["timeout", str(TIMEOUT), "python", "-I", "-"]
+DOCKER_ARGS = ["docker", "run", "--rm", "-i", *ISOLATION, IMAGE, *PYTHON]
 
 
 def trim(text, head=HEAD_LINES, tail=TAIL_LINES):
@@ -31,10 +33,12 @@ def trim(text, head=HEAD_LINES, tail=TAIL_LINES):
     return "\n".join(lines[:head] + [render.omitted(len(lines) - head - tail)] + lines[-tail:])
 
 
-def run(code):
-    """-> dict(stdout, stderr, rc, timeout). Код уходит через stdin, обратно только текст."""
+def run(code, container=None):
+    """-> dict(stdout, stderr, rc, timeout). Код уходит через stdin, обратно только текст.
+    container — id контейнера попытки (start); без него — одноразовый контейнер на этот вызов."""
+    args = ["docker", "exec", "-i", container, *PYTHON] if container else DOCKER_ARGS
     try:
-        p = subprocess.run(DOCKER_ARGS, input=code.encode(), capture_output=True, timeout=TIMEOUT + DOCKER_GRACE)
+        p = subprocess.run(args, input=code.encode(), capture_output=True, timeout=TIMEOUT + DOCKER_GRACE)
     except subprocess.TimeoutExpired:
         return {"stdout": "", "stderr": render.NO_RESPONSE, "rc": -1, "timeout": True}
     out, err = p.stdout.decode(errors="replace"), p.stderr.decode(errors="replace")
@@ -42,6 +46,17 @@ def run(code):
     if timed_out:
         err += "\n" + render.time_limit(TIMEOUT)
     return {"stdout": trim(out), "stderr": trim(err), "rc": p.returncode, "timeout": timed_out}
+
+
+def start():
+    """Контейнер на попытку с той же изоляцией; живёт до stop. -> id."""
+    p = subprocess.run(["docker", "run", "-d", "--rm", *ISOLATION, IMAGE, "sleep", "infinity"],
+                       capture_output=True, text=True, check=True, timeout=DOCKER_GRACE)
+    return p.stdout.strip()
+
+
+def stop(container):
+    subprocess.run(["docker", "rm", "-f", container], capture_output=True, timeout=DOCKER_GRACE)
 
 
 def build():

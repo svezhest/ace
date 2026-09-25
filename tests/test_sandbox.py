@@ -2,7 +2,7 @@
 cestand-sandbox (docker build -t cestand-sandbox ace/env)."""
 import pytest
 
-from ace.env import run_python, sandbox
+from ace.env import Sandbox, run_python, sandbox
 
 docker = pytest.mark.skipif(not sandbox.available(), reason="нет docker или образа песочницы")
 
@@ -63,3 +63,27 @@ def test_write_system():
 def test_memory_limit():
     r = sandbox.run("a=bytearray(2_000_000_000)")
     assert r["rc"] != 0
+
+
+@docker
+def test_attempt_container():
+    """Контейнер на попытку: файл из одного вызова виден в следующем, в другой попытке — нет; изоляция та же."""
+    first, second = Sandbox(per="attempt").open(), Sandbox(per="attempt").open()
+    try:
+        [run1] = first.tools
+        [run2] = second.tools
+        assert run1("open('/tmp/x', 'w').write('kept')").startswith("[stdout]")
+        assert "kept" in run1("print(open('/tmp/x').read())")
+        assert "FileNotFoundError" in run2("print(open('/tmp/x').read())")
+        assert "Read-only file system" in run1("open('/usr/bin/x','w').write('1')")
+        assert "URLError" in run1("import urllib.request; urllib.request.urlopen('http://example.com', timeout=3)")
+    finally:
+        first.close()
+        second.close()
+    assert sandbox.run("print(1)", first.container)["rc"] != 0     # контейнер убран
+
+
+def test_call_container_is_shared_env():
+    """Контейнер на вызов: среда попытки — сама песочница, без состояния."""
+    env = Sandbox()
+    assert env.open() is env and env.tools == (run_python,)
