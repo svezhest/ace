@@ -47,7 +47,7 @@ class FS:
 
 def listing(fs, name):
     m = fs.mounts[name]
-    return "\n".join(f"{name}/{r.id}  {r.when or r.text.splitlines()[0][:80]}" for r in m.memory.of(*m.kinds)) or "(empty)"
+    return "\n".join(f"{name}/{r.id}  {r.head()}" for r in m.memory.of(*m.kinds)) or "(empty)"
 
 
 def ls(ctx: RunContext[FS], path: str = "") -> str:
