@@ -65,32 +65,30 @@ class Meta(Wrapper):
     def __init__(self, inner, author, name=None):
         super().__init__(inner, name)
         self.author, self.history = author, []
-        self.fresh, self.right, self.seen, self.folders = True, 0, 0, {}
+        self.right, self.seen, self.folders = 0, 0, {}
 
     def check(self):
         offline_only(self)
 
-    def prompt(self, ex, item, k, memory=None):
-        """Первая попытка прохода при обучении открывает итерацию: навык до всего обучения прохода."""
-        if ex.training and self.fresh:
-            self.inner.skill = self.author(ex, self.history)
-            self.fresh = False
-        return self.inner.prompt(ex, item, k, memory)
+    def on_pass_start(self, ex):
+        """Начало прохода открывает итерацию: навык до всего обучения прохода."""
+        ex.skill = self.author(ex, self.history)
+        self.inner.on_pass_start(ex)
 
     def on_batch(self, ex, groups):
         self.right += sum(bool(g.episodes[g.chosen].ok) for g in groups)
         self.seen += len(groups)
         self.inner.on_batch(ex, groups)
         folder = getattr(self.inner.memory, "folder", dict)()
-        self.folders[sub_folder(ex)] = {SKILL: self.inner.skill, **folder} if self.inner.skill else folder
+        self.folders[sub_folder(ex)] = {SKILL: ex.skill, **folder} if ex.skill else folder
 
     def on_pass(self, ex):
         self.inner.on_pass(ex)
         val = ex.evaluate()
-        self.history.append(Iteration(self.inner.skill, self.right / self.seen if self.seen else 0.0, accuracy(val),
+        self.history.append(Iteration(ex.skill, self.right / self.seen if self.seen else 0.0, accuracy(val),
                                       self.inner.snapshot(), len(val), self.seen, self.folders))
         self.inner.restore(self.history[best_iteration([h.val for h in self.history])].memory)
-        self.fresh, self.right, self.seen, self.folders = True, 0, 0, {}
+        self.right, self.seen, self.folders = 0, 0, {}
 
     def dump(self):
         return self.inner.dump() + [dict(kind="iterations", id=f"iter{i}", text=h.text, train=h.train, val=h.val)
@@ -218,7 +216,7 @@ class Iterations(Wrapper):
     def __init__(self, inner, root=None, workspace=None, name=None):
         super().__init__(inner, name)
         self.root, self.workspace = root, workspace
-        self.ws, self.history, self.passed, self.subs = None, [], [], []
+        self.ws, self.history, self.subs = None, [], []
 
     def check(self):
         offline_only(self)
@@ -233,19 +231,15 @@ class Iterations(Wrapper):
         if n and len(samples) > n:
             samples = random.sample(samples, n)
         random.shuffle(samples)
-        self.passed = samples
         return samples
 
-    def prompt(self, ex, item, k, memory=None):
-        if ex.training and k == 0 and ex.i % ex.learner.every == 0:
-            self.sub_iteration(ex)
-        return self.inner.prompt(ex, item, k, memory)
-
-    def sub_iteration(self, ex):
-        iteration, sub = ex.epoch + 1, ex.i // ex.learner.every
+    def on_batch_start(self, ex):
+        """Батч — под-итерация: папка, у первой — мета-агент."""
+        self.inner.on_batch_start(ex)
+        iteration, sub = ex.epoch + 1, ex.batch
         folder = self.ws.create(iteration, sub)
         if sub == 0:
-            self.inner.skill = claude_meta(ex, self.ws, folder, iteration)
+            ex.skill = claude_meta(ex, self.ws, folder, iteration)
             best = best_iteration([h["val"] for h in self.history])
             source = self.ws.base / (self.history[best]["folder"] if self.history else folder_name(0))
         else:
@@ -265,7 +259,7 @@ class Iterations(Wrapper):
         metrics = {"accuracy": sum(1.0 if c else 0.0 for c, _ in val) / len(val)} if val else {}
         last = self.inner.memory.path
         self.ws.aggregate(ex.epoch + 1, self.subs, metrics, len(val), last)
-        self.history.append(dict(val=metrics.get("accuracy", 0.0), folder=last.name, skill=self.inner.skill,
+        self.history.append(dict(val=metrics.get("accuracy", 0.0), folder=last.name, skill=ex.skill,
                                  memory=self.inner.snapshot()))
         self.inner.restore(self.history[best_iteration([h["val"] for h in self.history])]["memory"])
         self.subs = []

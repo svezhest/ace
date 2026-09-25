@@ -4,8 +4,9 @@
     шаг       on_step(ex, attempt, step) -> Patch | None     при обучении и на val / тесте
     попытка   prompt(ex, item, k) -> Prompt до, on_attempt(ex, episode) после
     вопрос    on_question(ex, group)                        группа есть всегда, обычно из одной попытки
-    батч      on_batch(ex, groups) раз в learner.every вопросов; неполный в конце прохода — если learner.flush
-    проход    on_pass(ex); ex.evaluate() — точность на val
+    батч      on_batch_start(ex) перед первым вопросом батча (ex.batch — его номер в проходе); on_batch(ex, groups)
+              раз в learner.every вопросов; неполный в конце прохода — если learner.flush
+    проход    on_pass_start(ex) после выборки вопросов прохода; on_pass(ex) в конце; ex.evaluate() — точность на val
 
 На val и тесте (training = False) цикл зовёт только prompt и on_step. Сам цикл делает: среду попытки,
 вердикты (верный ответ в эпизоде только при golden), выбор ответа в зачёт, запись прочитанного
@@ -96,6 +97,7 @@ class Group:
     chosen: int = 0             # чья попытка в зачёт
     pick: str = "first"         # как она выбрана
     pass_at_k: bool = False     # выбрана по метке: зачёт — pass@k, а не точность
+    item: dict = None           # вопрос как в выборке (у MCE — с id выборки)
 
     @property
     def answer(self):
@@ -182,11 +184,12 @@ class Protocol:
 
 
 class Experiment:
-    """Метод × задача. Хукам ученика — как ex: модель, задача, флаг обучения, номер вопроса и их число,
-    evaluate() и retry()."""
+    """Метод × задача. Хукам ученика — как ex: модель, задача, флаг обучения, номер прохода, батча и вопроса и
+    число вопросов, навык меты (skill), evaluate() и retry()."""
     def __init__(self, task, learner, model):
         self.task, self.learner, self.model = task, learner, model
-        self.training, self.epoch, self.i, self.total, self.item = True, 0, 0, 0, None
+        self.training, self.epoch, self.batch, self.i, self.total, self.item = True, 0, 0, 0, 0, None
+        self.skill = ""         # навык от мета-уровня (MCE): уровни ученика подставляют его в промпты обучения
         self.scores = {}        # кэш val по ключу памяти
 
     def attempt(self, item, k, prompt):
@@ -240,7 +243,7 @@ class Experiment:
             eps.append(ep)
             if self.training:
                 learner.on_attempt(self, ep)
-        g = Group(item["context"], eps, target=eps[0].target)
+        g = Group(item["context"], eps, target=eps[0].target, item=item)
         learner.group_verdict(self, g)
         g.pick = learner.attempts.pick.__name__
         g.chosen = learner.attempts.pick(g, lambda answer: self.task.check(answer, item["target"]))
@@ -377,6 +380,9 @@ def run(task, learner, model, n=config.SIZE, out=None, split=""):
     def train(i, item, batch):
         t0, gates = time.time(), len(learner.gated)
         ex.i, ex.item = i, item
+        if i % learner.every == 0:
+            ex.batch = i // learner.every
+            learner.on_batch_start(ex)
         g = ex.question(item)
         batch.append(g)
         if len(batch) == learner.every:
@@ -402,7 +408,8 @@ def run(task, learner, model, n=config.SIZE, out=None, split=""):
         best = [learner.snapshot(), -1]
         for epoch in range(proto.epochs):
             items = learner.sample(ex, "train" if proto.offline else split, n)
-            ex.epoch, ex.total, batch = epoch, len(items), []
+            ex.epoch, ex.total, ex.batch, batch = epoch, len(items), 0, []
+            guarded("pass", 0, None, lambda: learner.on_pass_start(ex))
             for i, item in enumerate(items):
                 if proto.window and i % proto.window == 0:
                     for j in range(i, min(i + proto.window, len(items))):

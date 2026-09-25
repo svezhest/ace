@@ -140,7 +140,7 @@ def test_extract_skill_overview():
 
 def test_folder_names():
     """get_sub_iteration_folder_name для под-итераций: итерация = проход + 1, под-итерация = номер батча."""
-    ours = [sub_folder(SimpleNamespace(epoch=it - 1, i=sub * 5 + 4, learner=SimpleNamespace(every=5))) for it, sub in ((1, 0), (2, 3))]
+    ours = [sub_folder(SimpleNamespace(epoch=it - 1, batch=sub)) for it, sub in ((1, 0), (2, 3))]
     assert ours == PARSERS["folder_names"][2:]
 
 # выбор итерации и evaluations.json

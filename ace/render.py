@@ -362,6 +362,12 @@ def jsonl(rows):
     return "".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows)
 
 
+def skilled(system, ex):
+    """Системный промпт обучения с навыком от мета-уровня (ex.skill, MCE); без навыка — как был."""
+    skill = getattr(ex, "skill", "")
+    return system + "\n\n" + prompts.text("meta_skill", skill=skill) if skill else system
+
+
 def task_instruction(task):
     """Инструкция задачи агентам MCE: у бенчмарка апстрима — его get_task_instruction (mce_task_<задача>), у
     задач стенда — системный промпт и инструкция решателю (S2)."""

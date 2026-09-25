@@ -24,7 +24,7 @@ SKILL = ".agent/skills/learning-context/SKILL.md"      # навык в папк�
 
 def sub_folder(ex):
     """Папка под-итерации (get_sub_iteration_folder_name): итерация = проход, под-итерация = батч."""
-    return f"iter{ex.epoch + 1}_sub{ex.i // ex.learner.every}"
+    return f"iter{ex.epoch + 1}_sub{ex.batch}"
 
 
 class Context(Files):
@@ -41,13 +41,13 @@ class Context(Files):
         results = [dict(id=done - len(groups) + n, question=g.question, ground_truth=g.target, llm_prediction=e.answer,
                         is_correct=bool(e.ok)) for n, (g, e) in enumerate(zip(groups, eps))]
         self.train = render.train_json(dict(train_accuracy=acc, train_metrics=dict(accuracy=acc), train_total=len(eps),
-                                            train_errors=0, batch_idx=ex.i // ex.learner.every, cumulative_rollouts=done),
+                                            train_errors=0, batch_idx=ex.batch, cumulative_rollouts=done),
                                        results)
         name = sub_folder(ex)
         mounts = {"context": fs.Mount(self), "data": fs.Mount(Files.of({"train.json": self.train}), "ro")}
-        if ex.learner.skill:
+        if ex.skill:
             top, rest = SKILL.split("/", 1)
-            mounts = {top: fs.Mount(Files.of({rest: ex.learner.skill}), "ro"), **mounts}
+            mounts = {top: fs.Mount(Files.of({rest: ex.skill}), "ro"), **mounts}
         prompt = BASE.fill(task_instruction=render.task_instruction(ex.task), iter_dir=f"{WORKSPACE}/{name}", iter_name=name)
         ex.model.ask(Call(messages(prompt), params(), tools=fs.TOOLS, deps=fs.FS(mounts, root=f"{WORKSPACE}/{name}"),
                           rounds=self.rounds))
@@ -367,13 +367,12 @@ class Folder:
         """Под-итерация: train.json батча, затем базовый агент; не прошёл проверку — ошибка, как у апстрима."""
         groups = [x.group for x in extractions]
         eps = [g.episodes[g.chosen] for g in groups]
-        items = ex.learner.passed[ex.i + 1 - len(groups): ex.i + 1]
         acc = sum(1.0 if e.ok else 0.0 for e in eps) / len(eps) if eps else 0.0
         field = "symptoms" if variant("mce", ex.task) == "symptom" else "question"
-        results = [{"id": it["id"], field: g.question, "ground_truth": g.target, "llm_prediction": e.answer,
-                    "is_correct": bool(e.ok)} for it, g, e in zip(items, groups, eps)]
+        results = [{"id": g.item["id"], field: g.question, "ground_truth": g.target, "llm_prediction": e.answer,
+                    "is_correct": bool(e.ok)} for g, e in zip(groups, eps)]
         summary = {"train_accuracy": acc, "train_metrics": {"accuracy": acc} if eps else {}, "train_total": len(eps),
-                   "train_errors": 0, "batch_idx": ex.i // ex.learner.every, "cumulative_rollouts": ex.i + 1}
+                   "train_errors": 0, "batch_idx": ex.batch, "cumulative_rollouts": ex.i + 1}
         (self.path / "data").mkdir(exist_ok=True)
         with open(self.path / "data" / "train.json", "w", encoding="utf-8") as f:
             json.dump({"summary": summary, "detailed_results": results}, f, indent=2, ensure_ascii=False)

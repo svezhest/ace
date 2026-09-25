@@ -45,7 +45,6 @@ class Learner:
     flush: bool = False
     protocol: Protocol = Protocol()
     env: Env = field(default_factory=Env)
-    skill: str = ""             # навык от мета-уровня (MCE над учеником); сам ученик его не пишет
     needs_val = False           # val нужен и без офлайна (Gate)
     pending: list = field(default_factory=list, init=False, repr=False)    # извлечённое до батча
     gated: list = field(default_factory=list, init=False, repr=False)      # решения Gate (в лог по вопросу)
@@ -89,6 +88,12 @@ class Learner:
     def sample(self, ex, split, n):
         """Вопросы прохода: первые n (MCE апстрима — случайная выборка на каждой итерации, wrap/mce.py)."""
         return ex.task.load(split, n)
+
+    def on_pass_start(self, ex):
+        pass
+
+    def on_batch_start(self, ex):
+        pass
 
     def on_step(self, ex, attempt, step):
         if attempt.training and self.extract is not None:

@@ -14,7 +14,6 @@ from .. import embed, parse, prompts, render
 from ..extract import LABELS
 from ..model import Call, Reader, messages, params
 from ..tasks import variant
-from ..wrap import skilled
 from . import HARMFUL, HELPFUL, Ids, Lessons, Operation, Sections
 from .scope import CAP, TARGET, compress, rule_optimizer
 
@@ -41,7 +40,7 @@ def curator_prompt(template, memory, x):
 
 def curate_ops(ex, memory, x):
     """Все операции одной схемой; UPDATE несуществующего id пропускается."""
-    r = ex.model.ask(Call(messages(curator_prompt(CURATE["json"], memory, x), skilled(CURATOR, ex)), params(),
+    r = ex.model.ask(Call(messages(curator_prompt(CURATE["json"], memory, x), render.skilled(CURATOR, ex)), params(),
                           Reader(schema=Ops))).output
     memory.apply([dict(operation=o.op, id=o.id, content=o.text) for o in (r.ops if r else [])])
 
@@ -49,7 +48,7 @@ def curate_ops(ex, memory, x):
 def curate_rewrite(ex, memory, x):
     """Вся память заново: промпт просит пункт на строку, каждая непустая строка — новая запись; пустой
     ответ — память как была."""
-    new = ex.model.ask(Call(messages(curator_prompt(CURATE["rewrite"], memory, x), skilled(CURATOR, ex)), params())).output
+    new = ex.model.ask(Call(messages(curator_prompt(CURATE["rewrite"], memory, x), render.skilled(CURATOR, ex)), params())).output
     if new and new.strip():
         memory.replace([line.strip() for line in new.splitlines() if line.strip()])
 

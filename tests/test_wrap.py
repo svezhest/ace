@@ -20,7 +20,8 @@ from ace.memory.ace import Ops
 from ace.memory.mce import Context
 from ace.methods.mce import mce_ace_stand, mce_fs as mce
 from ace.wrap.mce import META, MISSING, meta_agent
-from ace.wrap import Gate, Wrapper, skilled
+from ace.render import skilled
+from ace.wrap import Gate, Wrapper
 from ace.wrap.mce import Meta
 
 OFFLINE2 = Protocol(offline=True, epochs=2)
@@ -137,10 +138,7 @@ def meta_writes(skill):
 
 
 class Ex:
-    task, epoch, i = TASK, 0, 1
-
-    class learner:
-        skill, every = "## Skill Overview\nCurate.", 2
+    task, epoch, batch, i, skill = TASK, 0, 0, 1, "## Skill Overview\nCurate."
 
 
 def test_mce_base_agent():
@@ -197,10 +195,7 @@ def test_mce_run():
 
 def test_skill_in_ace_prompts():
     class Ex:
-        task, i, total, training = TASK, 0, 1, True
-
-        class learner:
-            skill = "SKILL TEXT"
+        task, i, total, training, skill = TASK, 0, 1, True, "SKILL TEXT"
     model = Stub(schemas={"Reflection": Reflection(lessons=["l"]), "Ops": Ops(ops=[])})
     ex = Ex()
     ex.model = model

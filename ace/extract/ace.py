@@ -14,7 +14,6 @@ from pydantic import BaseModel
 from .. import parse, prompts, render
 from ..memory.ace import ace_input, ace_params
 from ..model import Call, Reader, messages, params
-from ..wrap import skilled
 from . import LABELS, Extraction, Extractor, Labels, scores
 
 # стенд
@@ -39,7 +38,7 @@ class Reflector(Extractor):
         ep = group.episodes[0]
         prompt = REFLECT.fill(question=ep.question, output=ep.output, verdict=render.verdict(ep.ok, ep.target),
                               form=FREE if self.free else "", memory=render.lines(memory.records()) or render.EMPTY)
-        call = Call(messages(prompt, skilled(REFLECTOR, ex)), params(self.temperature))
+        call = Call(messages(prompt, render.skilled(REFLECTOR, ex)), params(self.temperature))
         if self.free:
             text = ex.model.ask(call).output
             return Extraction(group, [text], scores(group)) if text else None
