@@ -93,7 +93,10 @@ class Model:
 
     def run(self, system, user, output=str, tools=(), deps=None, rounds=0, temperature=0, max_tokens=None, on_step=None,
             top_p=None):
-        settings = {"temperature": temperature, "max_tokens": max_tokens or self.max_tokens}
+        # temperature и top_p None — не передаются, по умолчанию сервера
+        settings = {"max_tokens": max_tokens or self.max_tokens}
+        if temperature is not None:
+            settings["temperature"] = temperature
         if top_p is not None:
             settings["top_p"] = top_p
         limit = rounds + EXTRA_REQUESTS
