@@ -193,7 +193,7 @@ def test_wire_sends_exactly():
     r = m.ask(call)
     assert m.wire.client.sent == [dict(model=m.name, messages=call.messages, temperature=0, top_p=0.5)]
     assert (r.output, r.raw, r.text, r.truncated) == ("answer", "answer", "answer", False)
-    assert m.usage() == dict(calls=1, prompt_tokens=3, completion_tokens=2)
+    assert m.usage() == dict(calls=1, prompt_tokens=3, completion_tokens=2, agent_calls=0, embedded=0)
 
 
 def test_wire_readers():
@@ -222,3 +222,20 @@ def test_tool_retries_do_not_end_talk():
                                  else ModelResponse(parts=[ToolCallPart("strict", {"x": 1})]))
     r = ask(model_of(fn), tools=(strict,), rounds=10)
     assert r.output == "done" and r.outcome is Outcome.answer and len(r.steps) == 6
+
+
+def test_usage_counts_agents_and_embeddings(monkeypatch):
+    """Расход полный: сессии агентов Claude SDK (ходы и токены из ResultMessage) и тексты эмбеддингов."""
+    import numpy as np
+    from claude_agent_sdk import ResultMessage
+
+    from ace.model import claude
+    m = Model()
+    used = dict(calls=0, prompt_tokens=0, completion_tokens=0)
+    claude.count(ResultMessage("success", 1, 1, False, 4, "s", usage={"input_tokens": 100, "output_tokens": 7}), used)
+    assert used == dict(calls=4, prompt_tokens=100, completion_tokens=7)
+    monkeypatch.setattr(claude, "session", lambda *a: (True, used))
+    assert m.session("p", None, lambda: None, 1, "/tmp/root")
+    monkeypatch.setattr("ace.embed.embed", lambda texts: np.zeros((len(texts), 2)))
+    m.embed(["a", "b"], "bge")
+    assert m.usage() == dict(calls=4, prompt_tokens=100, completion_tokens=7, agent_calls=4, embedded=2)

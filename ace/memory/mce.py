@@ -12,7 +12,7 @@ from functools import partial
 from pathlib import Path
 
 from .. import fs, prompts, render
-from ..model import Call, claude, messages, params
+from ..model import Call, messages, params
 from ..tasks import variant
 from . import Files, Record
 
@@ -396,6 +396,6 @@ def base_agent(ex, ws, folder):
             return None
         errors = validate(folder, sigs)
         return INVALID.fill(errors=errors) if errors else None
-    ok = claude.session(prompt, options, feedback, VALIDATION_ATTEMPTS if sigs else 1, claude.env(ws.root, ex.model.base_url))
+    ok = ex.model.session(prompt, options, feedback, VALIDATION_ATTEMPTS if sigs else 1, ws.root)
     cleanup(folder, "base")
     return ok

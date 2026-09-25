@@ -146,7 +146,7 @@ def test_best_and_test(replayed):
 
 def test_env():
     """Окружение CLI стенда — то же, что у записи (bridge/live/mce/env.txt), с адресами прокси и модели."""
-    ours = claude.env(ROOT, "http://127.0.0.1:8090/v1")
+    ours = claude.env(ROOT, RUN["model"], "http://127.0.0.1:8090/v1")
     ours["ANTHROPIC_BASE_URL"] = "http://127.0.0.1:4000"
     theirs = dict(line.split("=", 1) for line in (LIVE / "env.txt").read_text().replace("@ROOT@", str(ROOT)).splitlines())
     assert ours == theirs

@@ -10,7 +10,7 @@
 
 | уровень | что решает | интерфейс | где |
 |---|---|---|---|
-| доступ к модели | как вызов уходит модели и как читается ответ | `model.ask(Call(messages, params, reader)) -> Reply` | `model/` |
+| доступ к модели | как вызов уходит модели и как читается ответ | `model.ask(Call(messages, params, reader)) -> Reply`; `model.message` (агентный цикл TF-GRPO), `model.session` (агенты Claude SDK MCE), `model.embed`; расход всех — `model.usage()` | `model/` |
 | попытки | сколько попыток и чем они различаются | `Attempts(n, temperature(k), top_p(k), pick)` | `loop.py` |
 | в зачёт | чей ответ считается | `first` / `vote` / `best` (pass@k) | `loop.py` |
 | вердикт | что обучение знает о правильности попытки и группы | `golden` / `yes_no` / `judge` / `none`; `vote` / `none` | `verdict.py` |
@@ -41,9 +41,12 @@
 - `wire` — провод апстрима: официальный клиент openai, `chat.completions.create` ровно с `messages` и `params`
   вызова, без своей логики; ответ текстом -> `reader` (схема — общий разбор JSON).
 
-Агенты mce — Claude Agent SDK апстрима на модели стенда через LiteLLM proxy (`model/claude.py`). Вызовы с
-инструментами (решатель с `run_python`, агенты mce_fs) и продолжение разговора с ними (`Call.history`) идут
-только через pydantic-ai.
+Вызовы с инструментами (решатель с `run_python`, агенты mce_fs) и продолжение разговора с ними (`Call.history`)
+идут только через pydantic-ai. Другие входы той же модели: `model.message(messages, params)` — агентный цикл
+TF-GRPO апстрима, проводом при любом бэкенде, ответ как есть (с `tool_calls`); `model.session(...)` — агенты mce,
+Claude Agent SDK апстрима на модели стенда через LiteLLM proxy (`model/claude.py`); `model.embed(texts, name)`.
+`model.usage()` — вызовы и токены всех входов (у агентов Claude SDK — ходы и токены из итогового сообщения SDK,
+ещё и отдельно `agent_calls`) и число текстов эмбеддингов (`embedded`); это итог прогона в `summary.json`.
 
 ## Решатель
 

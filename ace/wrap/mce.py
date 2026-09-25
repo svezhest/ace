@@ -200,8 +200,8 @@ def claude_meta(ex, ws, folder, iteration):
                               skill_database=render.skill_database(ws.evaluations(), ws.skills(), iteration))
     options = ClaudeAgentOptions(cwd=str(ws.base), allowed_tools=META_TOOLS,
                                  can_use_tool=partial(meta_permission, iter_dir=folder))
-    ok = claude.session(prompt, options, lambda: None if skill.exists() else CLAUDE_MISSING.fill(expected_path=skill),
-                        ATTEMPTS, claude.env(ws.root, ex.model.base_url))
+    ok = ex.model.session(prompt, options, lambda: None if skill.exists() else CLAUDE_MISSING.fill(expected_path=skill),
+                          ATTEMPTS, ws.root)
     cleanup(folder, "meta")
     if not ok:
         raise RuntimeError(f"Meta-agent failed to generate SKILL.md after {ATTEMPTS} attempts")

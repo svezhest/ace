@@ -11,16 +11,20 @@
                     (agent.py)
     wire            «провод апстрима»: официальный клиент openai, chat.completions.create ровно с messages и params
                     вызова, без своей логики; ответ текстом -> reader (wire.py)
-Вызов с инструментами (решатель с run_python, агенты mce_fs) идёт только через pydantic-ai; агенты mce — Claude
-Agent SDK (claude.py). Агентный цикл апстрима
-(TF-GRPO: openai-agents) идёт проводом при любом бэкенде: model.message(messages, params) -> ответ как есть.
-Эмбеддинги — model.embed(texts, name): провод — /v1/embeddings сервера с моделью name, как у апстрима (EvoLib),
-pydantic-ai — BGE-M3 стенда (ace.embed); сервер эмбеддингов стенда — тот же BGE-M3 (tools/record/embeddings.py)."""
+Входы Model — все вызовы идут через них и все в расходе (usage):
+    ask(Call) -> Reply          вызов; с инструментами — только через pydantic-ai
+    message(messages, params)   агентный цикл апстрима (TF-GRPO: openai-agents) — проводом при любом бэкенде, ответ
+                                как есть (сообщение с tool_calls)
+    session(...)                агент Claude Agent SDK на этой модели (MCE апстрима, claude.py): ходы и токены — из
+                                итогового сообщения SDK
+    embed(texts, name)          эмбеддинги: провод — /v1/embeddings сервера с моделью name, как у апстрима (EvoLib),
+                                pydantic-ai — BGE-M3 стенда (ace.embed); в расходе — число текстов"""
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Callable, NamedTuple
 
 from .. import config, embed, parse
+from . import claude
 
 
 @dataclass(frozen=True)
@@ -136,7 +140,8 @@ def text_reply(call, text, truncated=False):
 
 
 class Model:
-    """Модель стенда: вызовы идут в выбранный бэкенд, вызовы с инструментами — в pydantic-ai."""
+    """Модель стенда: вызовы идут в выбранный бэкенд, вызовы с инструментами — в pydantic-ai; агенты Claude SDK и
+    эмбеддинги — тоже здесь, чтобы расход был полным."""
     def __init__(self, name=None, base_url=None, backend=None):
         from .agent import PydanticAI
         from .wire import Wire
@@ -148,6 +153,8 @@ class Model:
         self.agent = PydanticAI(self.name, base_url)
         self.wire = Wire(self.name, base_url) if self.backend == "wire" else None
         self.direct = self.wire or Wire(self.name, base_url)    # model.message: провод при любом бэкенде
+        self.agents = dict(calls=0, prompt_tokens=0, completion_tokens=0)     # агенты Claude SDK
+        self.embedded = 0
 
     def ask(self, call):
         if self.wire is None or call.tools or call.history is not None:
@@ -158,11 +165,22 @@ class Model:
         """(сообщение assistant dict, finish_reason): запрос ровно с messages и params (с tools), ответ с tool_calls."""
         return self.direct.message(messages, params)
 
+    def session(self, prompt, options, feedback, attempts, root):
+        """Разговор агента Claude SDK на этой модели (claude.session), CLI с окружением корня root; -> готово ли."""
+        ok, used = claude.session(prompt, options, feedback, attempts, claude.env(root, self.name, self.base_url))
+        for k, v in used.items():
+            self.agents[k] += v
+        return ok
+
     def embed(self, texts, name):
         """Векторы texts списками: провод — запрос /v1/embeddings с моделью name, иначе BGE-M3 стенда."""
+        self.embedded += len(texts)
         if self.wire is not None:
             return self.wire.embed(texts, name)
         return embed.embed(texts).tolist()
 
     def usage(self):
-        return {k: sum(getattr(b, k) for b in (self.agent, self.direct)) for k in ("calls", "prompt_tokens", "completion_tokens")}
+        """Расход: вызовы и токены всех входов (агенты Claude SDK — отдельно и в сумме), тексты эмбеддингов."""
+        out = {k: sum(getattr(b, k) for b in (self.agent, self.direct)) + self.agents[k]
+               for k in ("calls", "prompt_tokens", "completion_tokens")}
+        return dict(out, agent_calls=self.agents["calls"], embedded=self.embedded)
