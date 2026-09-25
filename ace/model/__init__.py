@@ -11,7 +11,8 @@
                     (agent.py)
     wire            «провод апстрима»: официальный клиент openai, chat.completions.create ровно с messages и params
                     вызова, без своей логики; ответ текстом -> reader (wire.py)
-Вызов с инструментами (решатель с run_python, агенты MCE) идёт только через pydantic-ai."""
+Вызов с инструментами (решатель с run_python, агенты MCE) идёт только через pydantic-ai. Агентный цикл апстрима
+(TF-GRPO: openai-agents) идёт проводом при любом бэкенде: model.message(messages, params) -> ответ как есть."""
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Callable, NamedTuple
@@ -143,12 +144,16 @@ class Model:
             raise ValueError(f"неизвестный бэкенд модели: {self.backend}")
         self.agent = PydanticAI(self.name, base_url)
         self.wire = Wire(self.name, base_url) if self.backend == "wire" else None
+        self.direct = self.wire or Wire(self.name, base_url)    # model.message: провод при любом бэкенде
 
     def ask(self, call):
         if self.wire is None or call.tools or call.history is not None:
             return self.agent.ask(call)
         return self.wire.ask(call)
 
+    def message(self, messages, params):
+        """(сообщение assistant dict, finish_reason): запрос ровно с messages и params (с tools), ответ с tool_calls."""
+        return self.direct.message(messages, params)
+
     def usage(self):
-        backends = [b for b in (self.agent, self.wire) if b is not None]
-        return {k: sum(getattr(b, k) for b in backends) for k in ("calls", "prompt_tokens", "completion_tokens")}
+        return {k: sum(getattr(b, k) for b in (self.agent, self.direct)) for k in ("calls", "prompt_tokens", "completion_tokens")}

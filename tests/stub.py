@@ -30,6 +30,15 @@ class Stub:
         obj = self.schemas.get(output.__name__)
         return Reply(obj(call) if callable(obj) else obj, "")
 
+    def message(self, messages, params):
+        """Агентный цикл метода (TF-GRPO): ответ без вызовов инструментов."""
+        system, user = roles(messages)
+        call = dict(system=system, user=user, output=str, tools=params.get("tools"), temperature=params.get("temperature"),
+                    top_p=params.get("top_p"), max_tokens=params.get("max_tokens"), deps=None, history=None,
+                    n=len(self.calls))
+        self.calls.append(call)
+        return {"role": "assistant", "content": self.answer(call)}, "stop"
+
     def usage(self):
         return dict(calls=len(self.calls), prompt_tokens=0, completion_tokens=0)
 

@@ -1,6 +1,8 @@
 """Исполнение python-кода модели в docker-контейнере без сети и без доступа к хосту.
 Контейнер на вызов (run(code)) или на попытку (start -> run(code, container) ... -> stop): внутри попытки
 между вызовами живут файлы в /tmp, между попытками — ничего."""
+import json
+import os
 import subprocess
 
 from .. import render
@@ -71,7 +73,6 @@ def stop(container):
 
 def build():
     """Образ песочницы из Dockerfile рядом."""
-    import os
     d = os.path.dirname(os.path.abspath(__file__))
     subprocess.run(["docker", "build", "-t", IMAGE, d], check=True)
 
@@ -82,3 +83,34 @@ def available():
         return subprocess.run(["docker", "image", "inspect", IMAGE], capture_output=True).returncode == 0
     except FileNotFoundError:
         return False
+
+
+class Kernel:
+    """Живой процесс kernel.py в контейнере на попытку (инструмент агента TF-GRPO): один IPython, переменные между
+    вызовами. call(аргументы JSON-строкой) -> текст для модели. Ядро, завершившееся по пределу времени, заменяется
+    новым при следующем вызове. Код ядра уходит через -c: контейнер только на чтение."""
+    ENV = ["-e", "HOME=/tmp", "-e", "MPLCONFIGDIR=/tmp/mpl", "-e", "IPYTHONDIR=/tmp/ipython"]
+
+    def __init__(self):
+        self.code = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "kernel.py")).read()
+        self.proc = None
+
+    def call(self, arguments):
+        if self.proc is None or self.proc.poll() is not None:
+            self.proc = subprocess.Popen(["docker", "run", "--rm", "-i", *ISOLATION, *self.ENV, IMAGE, "python", "-c", self.code],
+                                         stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+        self.proc.stdin.write(json.dumps({"arguments": arguments}) + "\n")
+        self.proc.stdin.flush()
+        line = self.proc.stdout.readline()
+        if not line:
+            raise RuntimeError("ядро песочницы завершилось без ответа")
+        return json.loads(line)["output"]
+
+    def close(self):
+        if self.proc is not None:
+            self.proc.stdin.close()
+            try:
+                self.proc.wait(timeout=DOCKER_GRACE)
+            except subprocess.TimeoutExpired:
+                self.proc.kill()
+            self.proc = None
