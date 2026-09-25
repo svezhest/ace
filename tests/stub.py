@@ -19,7 +19,7 @@ class Stub:
         self.answer, self.schemas, self.calls = answer, schemas or {}, []
 
     def run(self, system, user, output=str, tools=(), deps=None, rounds=0, temperature=0, max_tokens=None, on_step=None,
-            top_p=None):
+            top_p=None, history=None):
         call = dict(system=system, user=user, output=output, tools=tools, temperature=temperature, top_p=top_p, n=len(self.calls))
         self.calls.append(call)
         if output is str:

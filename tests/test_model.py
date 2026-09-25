@@ -118,3 +118,17 @@ def test_top_p():
     model_of(fn).run("sys", "q", temperature=0.3, top_p=0.95)
     model_of(fn).run("sys", "q")
     assert seen[0]["temperature"] == 0.3 and seen[0]["top_p"] == 0.95 and "top_p" not in seen[1]
+
+
+def test_history_continues():
+    """history — продолжение того же разговора: новое сообщение после прошлой истории, системный промпт не повторяется."""
+    seen = []
+
+    def fn(messages, info):
+        seen.append([type(p).__name__ for m in messages for p in m.parts])
+        return ModelResponse(parts=[TextPart(f"answer {len(seen)}")])
+    m = model_of(fn)
+    first = m.run("sys", "q")
+    second = m.run("sys", "again", history=first.messages)
+    assert second.output == "answer 2" and m.calls == 2
+    assert seen[1] == ["SystemPromptPart", "UserPromptPart", "TextPart", "UserPromptPart"]
