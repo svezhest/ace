@@ -141,6 +141,17 @@ def test_step_patch_rewrites_system():
     assert p.system.startswith("\n\n## Strategic Guidelines") and "### General:\n- Guard division." in p.system
 
 
+def test_step_patch_append():
+    """Абляция: новое правило сообщением в конец истории, системный промпт цел."""
+    model = Stub(schemas={"Proposal": Proposal(update_text="Guard division.", confidence="high"),
+                          "Classification": Classification(scope="tactical", confidence=0.6)})
+    s = swap(scope, patch="append", memory=Perspectives())
+    a = attempt()
+    assert s.on_step(Ex(model), a, ERROR) == Patch(append="## Learned Guideline:\nGuard division.")
+    model.schemas["Proposal"] = Proposal(update_text="Print intermediate values.", confidence="high")
+    assert s.on_step(Ex(model), a, FINE) == Patch(append="## Learned Guideline:\nPrint intermediate values.")
+
+
 def test_k2_own_memory_per_perspective():
     model = Stub(lambda call: right(call) if "## Strategic" not in call["system"] else "FINAL ANSWER: 0",
                  schemas={"Proposal": Proposal(update_text="u", confidence="high"),
