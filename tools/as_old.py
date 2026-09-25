@@ -6,7 +6,8 @@
                    опыты помечены id записей, а не местом G0, G1, ...
     evolib         ответ первой попытки подменён ответом большинства до вердикта группы (так делал старый
                    решатель с vote=True): её балл всегда 1, лучшая — всегда первая
-    evolib_judge   то же; судья после всех попыток группы, а не после каждой"""
+    evolib_judge   то же; судья после всех попыток группы, а не после каждой
+    ace_bo2        кандидаты рефлектора при T = 0, а не 0.7 (сравнивать с tools/ref_variants.json)"""
 import importlib
 import runpy
 import sys
@@ -21,6 +22,7 @@ from ace.methods import METHODS  # noqa: E402
 
 tfgrpo = importlib.import_module("ace.methods.tfgrpo")     # модуль: имя в пакете занято самим методом
 evolib = importlib.import_module("ace.methods.evolib")
+hybrids = importlib.import_module("ace.methods.hybrids")
 
 
 def old_tfgrpo():
@@ -46,7 +48,8 @@ def old_judge(ex, group):
 
 OLD = {"tfgrpo": old_tfgrpo,
        "evolib": lambda: swap(evolib.evolib, group_verdict=old_vote),
-       "evolib_judge": lambda: swap(evolib.evolib_judge, verdict=verdict.none, group_verdict=old_judge)}
+       "evolib_judge": lambda: swap(evolib.evolib_judge, verdict=verdict.none, group_verdict=old_judge),
+       "ace_bo2": lambda: swap(hybrids.ace_bo2, extract=hybrids.BestOf(hybrids.Reflector(), 2, hybrids.one_of_two))}
 
 out, names = sys.argv[1], sys.argv[2:] or list(OLD)
 for name in names:

@@ -1,7 +1,7 @@
 """Гибриды: деталь одного метода внутри другого, замена на одном уровне ace.
 
-ace_bo2     извлечение: рефлектор ACE дважды и селектор выбирает один набор уроков (Best-of-N из SCOPE). Оба
-            кандидата при температуре 0, как в старом коде.
+ace_bo2     извлечение: рефлектор ACE дважды и селектор выбирает один набор уроков (Best-of-N из SCOPE). Кандидаты
+            при температуре 0.7, как у scope_bo2 (в старом коде 0: два почти одинаковых кандидата).
 ace_opt     память: пункты ACE с пределом SCOPE вместо отсева вредных — сверх 10 пунктов оптимизатор правил
             (конфликты, поглощение, слияние) сжимает до 8, остаток обрезается до 10; нетронутые пункты остаются
             со своими счётчиками, исправленные и слитые — новые пункты с нуля
@@ -12,6 +12,7 @@ from .. import prompts, render
 from ..env import Sandbox
 from ..extract.ace import Reflector
 from ..extract.best import BestOf
+from ..extract.scope import BEST_OF_TEMPERATURE
 from ..hooks import Hooks
 from ..learner import swap
 from .ace import Playbook, ace
@@ -39,6 +40,6 @@ class CappedPlaybook(Playbook):
                               lambda x: self.record(self.ids.next(), x["rule"]))
 
 
-ace_bo2 = swap(ace, "ace_bo2", extract=BestOf(Reflector(), 2, one_of_two))
+ace_bo2 = swap(ace, "ace_bo2", extract=BestOf(Reflector(temperature=BEST_OF_TEMPERATURE), 2, one_of_two))
 ace_opt = swap(ace, "ace_opt", memory=CappedPlaybook())
 ace_hooks = Hooks(swap(ace, env=Sandbox()), "ace_hooks")

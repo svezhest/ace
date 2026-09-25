@@ -1,6 +1,7 @@
 """Извлечение ACE: по первой попытке группы уроки и метки записей памяти (labels).
 
-    Reflector   рефлектор стенда: уроки и метки одной схемой; free — свободным текстом, без меток
+    Reflector   рефлектор стенда: уроки и метки одной схемой; free — свободным текстом, без меток;
+                temperature — для кандидатов Best-of-N (ace_bo2)
     Diagnose    рефлектор апстрима (ace/core/reflector.py; промпты ace_reflector*.j2 дословно): диагноз с
                 метками пунктов; при неверном ответе до rounds раундов «диагноз -> метки в копию памяти ->
                 новая попытка с диагнозом как заметкой» (ex.retry: стрелка извлечение -> попытки).
@@ -27,8 +28,8 @@ class Reflection(BaseModel):
 
 
 class Reflector(Extractor):
-    def __init__(self, free=False):
-        self.free = free
+    def __init__(self, free=False, temperature=0):
+        self.free, self.temperature = free, temperature
         self.gives = frozenset() if free else frozenset({LABELS})
 
     def __call__(self, ex, group, memory):
@@ -36,9 +37,9 @@ class Reflector(Extractor):
         prompt = REFLECT.fill(question=ep.question, output=ep.output, verdict=render.verdict(ep.ok, ep.target),
                               form=FREE if self.free else "", memory=render.lines(memory.records()) or render.EMPTY)
         if self.free:
-            text = ex.model.run(skilled(REFLECTOR, ex), prompt).output
+            text = ex.model.run(skilled(REFLECTOR, ex), prompt, temperature=self.temperature).output
             return Extraction(group, [text], scores(group)) if text else None
-        r = ex.model.run(skilled(REFLECTOR, ex), prompt, output=Reflection).output
+        r = ex.model.run(skilled(REFLECTOR, ex), prompt, output=Reflection, temperature=self.temperature).output
         if not r:
             return None
         return Extraction(group, r.lessons, scores(group), {LABELS: Labels(r.helpful, r.harmful)})

@@ -142,7 +142,7 @@ def test_ace_bo2_selects():
     ep = episode("1", ok=True, target="1")
     x = ace_bo2.extract(Ex(model), Group("q", [ep], target="1"), ace_bo2.memory)
     assert x.lessons == ["second"] and "## 1\n- first\n\n## 2\n- second" in model.calls[2]["user"]
-    assert [c["temperature"] for c in model.calls] == [0, 0, 0]
+    assert [c["temperature"] for c in model.calls] == [0.7, 0.7, 0]
 
 
 def test_ace_opt_caps_playbook():
