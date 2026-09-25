@@ -14,22 +14,27 @@ tfgrpo_*.j2 дословно, пара системный / пользовате
 параметров запроса, как у апстрима (model_params = {}: температура и предел генерации — сервера)."""
 from .. import parse, prompts, render
 from ..model import Reader
-from ..upstream.tfgrpo import EXPERIENCES, ask
+from ..upstream.tfgrpo import ADVANTAGE, GROUP_UPDATE, SUMMARY, ask
 from . import OPERATIONS, Extraction, Extractor, scores
 
 TFGRPO = prompts.macros("tfgrpo_strings")
+EXPERIENCES = Reader(text=parse.enclosed("Experiences"))
 
 
 def partial(rollouts, labeled):
     """С меткой в работу идут только группы, где верна часть попыток."""
     if not labeled:
         return bool(rollouts)
-    mean = sum(bool(e.ok) for e in rollouts) / len(rollouts) if rollouts else 0
+    if not rollouts:
+        return False
+    mean = sum(bool(e.ok) for e in rollouts) / len(rollouts)
     return 0 < mean < 1
 
 
 def rollouts(group, scored):
-    return [e for i, e in enumerate(group.episodes) if not (scored and i == group.chosen) and e.output]
+    """Попытки группы в работу: с траекторией; scored — без той, что в зачёт."""
+    skip = group.chosen if scored else None
+    return [e for i, e in enumerate(group.episodes) if i != skip and e.output]
 
 
 def operations(text):
@@ -54,27 +59,36 @@ class Contrast(Extractor):
         if not partial(eps, bool(group.target)):
             return None
         answer = group.target or TFGRPO.redacted()
-        out = [(e, ask(ex, "single_rollout_summary_template", question=e.question, trajectory=e.output, answer=answer,
-                       critique=TFGRPO.no_critique())) for e in eps]
-        return [(e, s) for e, s in out if s is not None]
+        out = []
+        for e in eps:
+            summary = ask(ex, SUMMARY, question=e.question, trajectory=e.output, answer=answer,
+                          critique=TFGRPO.no_critique())
+            if summary is not None:
+                out.append((e, summary))
+        return out
 
     def advantage(self, ex, group, summaries):
         """Опыт в <Experiences> ("" — пары тегов нет); None — группа выпала или модель не ответила."""
         labeled = bool(group.target)
         if summaries is None or not partial([e for e, _ in summaries], labeled):
             return None
-        return ask(ex, "single_query_group_advantage", EXPERIENCES, question=group.question,
+        return ask(ex, ADVANTAGE, EXPERIENCES, question=group.question,
                    answer=group.target or TFGRPO.redacted(), trajectories=render.attempts(summaries, labeled))
 
     def update(self, ex, memory, found):
-        return ask(ex, "group_experience_update_template", Reader(text=operations),
+        return ask(ex, GROUP_UPDATE, Reader(text=operations),
                    existing_experiences=render.experiences(memory.records()), new_experiences=found)
 
     def batch(self, ex, groups, memory):
+        """Стадии по всему батчу: все сводки, затем все преимущества, затем все сверки."""
         summaries = [self.summaries(ex, g) for g in groups]
         found = [self.advantage(ex, g, s) for g, s in zip(groups, summaries)]
         ops = [self.update(ex, memory, f) if f is not None else [] for f in found]
-        return [Extraction(g, [f] if f is not None else [], scores(g), {OPERATIONS: o}) for g, f, o in zip(groups, found, ops)]
+        out = []
+        for group, experience, group_ops in zip(groups, found, ops):
+            lessons = [experience] if experience is not None else []
+            out.append(Extraction(group, lessons, scores(group), {OPERATIONS: group_ops}))
+        return out
 
     def __call__(self, ex, group, memory):
         found = self.advantage(ex, group, self.summaries(ex, group))

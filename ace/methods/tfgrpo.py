@@ -14,12 +14,12 @@ configs/practice/math_reasoning.yaml и configs/agents/practice/math_agent.yaml.
 from ..extract.tfgrpo import Contrast
 from ..learner import Learner
 from ..loop import Attempts, Protocol, first
-from ..memory.tfgrpo import Library
+from ..memory.tfgrpo import Experiences
 from ..solver.tfgrpo import AGENT
 
 GROUP = 5                   # grpo_n
 BATCH = 20
 
-tfgrpo = Learner("tfgrpo", memory=Library(), solver=AGENT, extract=Contrast(),
+tfgrpo = Learner("tfgrpo", memory=Experiences(), solver=AGENT, extract=Contrast(),
                  attempts=Attempts(GROUP, pick=first), every=BATCH,
                  protocol=Protocol(offline=True, final=True))

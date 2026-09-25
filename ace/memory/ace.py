@@ -12,15 +12,16 @@ from pydantic import BaseModel
 
 from .. import embed, parse, prompts, render
 from ..extract import LABELS
-from ..model import Call, Reader, messages, params
-from ..upstream.ace import ace_params, question_context
+from ..model import TEXT, Call, Reader, messages, params
+from ..upstream.ace import ace_input, ace_params
 from . import Ids, Lessons, Sections
 from .counters import HARMFUL, HELPFUL, Counted, count, prune_harmful
 from .scope import CAP, compress, optimize, target_count
 
 # стенд
 
-CURATE = {n: prompts.load(f"ace_stand_curate_{n}") for n in ("json", "rewrite")}
+CURATE_JSON = prompts.load("ace_stand_curate_json")
+CURATE_REWRITE = prompts.load("ace_stand_curate_rewrite")
 CURATOR = prompts.text("curator_system")
 PRUNE_HARMFUL = 3           # пункт уходит, когда вредных меток не меньше и больше, чем полезных
 
@@ -35,21 +36,23 @@ class Ops(BaseModel):
     ops: list[Op]
 
 
-def curator_prompt(template, memory, x):
-    return template.fill(lessons=render.bullets(x.lessons), memory=render.lines(memory.records()) or render.EMPTY)
+def ask_curator(ex, template, memory, x, reader=TEXT):
+    """Куратор стенда: уроки дельты и память строками, системный промпт — с навыком меты."""
+    prompt = template.fill(lessons=render.bullets(x.lessons), memory=render.lines(memory.records()) or render.EMPTY)
+    return ex.model.ask(Call(messages(prompt, render.skilled(CURATOR, ex)), params(), reader)).output
 
 
 def curate_ops(ex, memory, x):
     """Все операции одной схемой; UPDATE несуществующего id пропускается."""
-    r = ex.model.ask(Call(messages(curator_prompt(CURATE["json"], memory, x), render.skilled(CURATOR, ex)), params(),
-                          Reader(schema=Ops))).output
-    memory.apply([dict(operation=o.op, id=o.id, content=o.text) for o in (r.ops if r else [])])
+    reply = ask_curator(ex, CURATE_JSON, memory, x, Reader(schema=Ops))
+    ops = reply.ops if reply else []
+    memory.apply([dict(operation=o.op, id=o.id, content=o.text) for o in ops])
 
 
 def curate_rewrite(ex, memory, x):
     """Вся память заново: промпт просит пункт на строку, каждая непустая строка — новая запись; пустой
     ответ — память как была."""
-    new = ex.model.ask(Call(messages(curator_prompt(CURATE["rewrite"], memory, x), render.skilled(CURATOR, ex)), params())).output
+    new = ask_curator(ex, CURATE_REWRITE, memory, x)
     if new and new.strip():
         memory.replace([line.strip() for line in new.splitlines() if line.strip()])
 
@@ -83,23 +86,35 @@ class CappedPlaybook(Playbook):
 
     def learn(self, ex, extractions):
         super().learn(ex, extractions)
-        self.items = compress(ex.model, self.items, self.optimizer, self.target, self.cap,
-                              lambda x: self.record(self.ids.next(), x["rule"]))
+        self.items = compress(ex.model, self.items, self.optimizer, self.target, self.cap, self.new_record)
+
+    def new_record(self, rule):
+        """Исправленное или слитое оптимизатором правило — новый пункт со счётчиками с нуля."""
+        return self.record(self.ids.next(), rule["rule"])
 
 # апстрим
 
 
-P = {n: prompts.load(f"ace_{n}") for n in ("curator", "curator_nogt", "merge")}
+CURATOR_GT = prompts.load("ace_curator")
+CURATOR_NOGT = prompts.load("ace_curator_nogt")
+MERGE = prompts.load("ace_merge")
 SECTIONS = prompts.text("ace_sections").splitlines()
-OTHERS, GENERAL = "others", "general"
+OTHERS = "others"
+GENERAL = "general"         # раздел, которого нет: пункт встаёт в начало OTHERS
 SLUGS = {"financial_strategies_and_insights": "fin", "formulas_and_calculations": "calc", "code_snippets_and_templates": "code",
          "common_mistakes_to_avoid": "err", "problem_solving_heuristics": "prob", "context_clues_and_indicators": "ctx",
          "others": "misc", "meta_strategies": "meta"}
 TOKEN_BUDGET = 80000
-HIGH_HELPFUL, HIGH_HARMFUL = 5, 2   # пункт «high performing»: helpful больше и harmful меньше этих
+HIGH_HELPFUL = 5            # пункт «high performing»: helpful больше и harmful меньше этих
+HIGH_HARMFUL = 2
 DEDUP = 0.85                # порог косинуса слияния; у апстрима 0.90 под all-mpnet, у BGE-M3 косинусы ниже
 MERGE_TEMPERATURE = 0.3
 OPERATIONS = Reader(text=parse.ace_operations)      # _extract_and_validate_operations куратора апстрима
+
+
+def question_context(task, text):
+    """Question Context куратора — context из DataProcessor апстрима (отдельной функцией ради сверки с апстримом)."""
+    return ace_input(task, text)[0]
 
 
 def section_key(name):
@@ -166,7 +181,8 @@ class SectionedPlaybook(Sections):
         fields = dict(token_budget=TOKEN_BUDGET, current_step=ex.i + 1, total_samples=ex.total,
                       playbook_stats=render.pretty_json(self.stats()), recent_reflection=x.lessons[-1],
                       current_playbook=layout(self), question_context=question_context(ex.task.name, x.group.question))
-        prompt = P["curator" if x.group.target else "curator_nogt"].fill(**fields)
+        template = CURATOR_GT if x.group.target else CURATOR_NOGT
+        prompt = template.fill(**fields)
         self.apply(ex.model.ask(Call(messages(prompt), ace_params(), self.read)).output or [])
 
     def apply(self, ops):
@@ -176,6 +192,7 @@ class SectionedPlaybook(Sections):
         try:
             for op in ops:
                 if op["type"] == "ADD":
+                    # f-строка, как в апстриме: содержимое любого типа — строкой
                     adds.append((self.place(op.get("section", GENERAL)), f"{op.get('content', '')}"))
         except Exception:
             return
@@ -225,7 +242,8 @@ class SectionedPlaybook(Sections):
         if len(recs) < 2:
             return
         vecs = embed.embed([r.text for r in recs])
-        sims, seen = vecs @ vecs.T, set()
+        sims = vecs @ vecs.T
+        seen = set()
         for i in range(len(recs)):
             if i in seen:
                 continue
@@ -243,6 +261,8 @@ class SectionedPlaybook(Sections):
 
     def merge(self, ex, group):
         first = group[0]
-        helpful, harmful = sum(r.helpful for r in group), sum(r.harmful for r in group)
-        prompt = P["merge"].fill(bullets=render.merge_group(group), id=first.id, helpful=helpful, harmful=harmful)
-        return ex.model.ask(Call(messages(prompt), params(MERGE_TEMPERATURE), Reader(text=parse.counted_line(first.id)))).output
+        helpful = sum(r.helpful for r in group)
+        harmful = sum(r.harmful for r in group)
+        prompt = MERGE.fill(bullets=render.merge_group(group), id=first.id, helpful=helpful, harmful=harmful)
+        reader = Reader(text=parse.counted_line(first.id))
+        return ex.model.ask(Call(messages(prompt), params(MERGE_TEMPERATURE), reader)).output

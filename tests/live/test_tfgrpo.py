@@ -19,7 +19,7 @@ from ace.env import sandbox
 from ace.env.tfgrpo import Kernel
 from ace.learner import swap
 from ace.loop import run
-from ace.memory.tfgrpo import Library
+from ace.memory.tfgrpo import Experiences
 from ace.methods.tfgrpo import tfgrpo
 from ace.solver import tfgrpo as show
 from ace.tasks import TASKS
@@ -33,7 +33,7 @@ N, GROUP, BATCH = RUN["tasks"], RUN["grpo_n"], RUN["batch_size"]
 STEPS = []                  # библиотека после каждого батча
 
 
-class Watched(Library):
+class Watched(Experiences):
     def learn(self, ex, extractions):
         super().learn(ex, extractions)
         STEPS.append([r.text for r in self.records()])

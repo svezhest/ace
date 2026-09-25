@@ -31,8 +31,3 @@ def ace_input(task, text):
         return "", text
     instruction = text.split("Input: ")[0].strip().split("Instruction: ")[1].strip()
     return text.split("Input: ")[1].split("Answer: ")[0].strip(), instruction
-
-
-def question_context(task, text):
-    """Question Context куратора — context из DataProcessor апстрима."""
-    return ace_input(task, text)[0]

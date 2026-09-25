@@ -20,7 +20,7 @@ from . import LABELS, Extraction, Extractor, Labels, scores
 # стенд
 
 REFLECT = prompts.load("ace_stand_reflect")
-REFLECTOR = prompts.text("reflector_system")
+REFLECTOR_SYSTEM = prompts.text("reflector_system")
 FREE = prompts.text("reflect_free_form")
 
 
@@ -32,14 +32,15 @@ class Reflection(BaseModel):
 
 class Reflector(Extractor):
     def __init__(self, free=False, temperature=0):
-        self.free, self.temperature = free, temperature
+        self.free = free
+        self.temperature = temperature
         self.gives = frozenset() if free else frozenset({LABELS})
 
     def __call__(self, ex, group, memory):
         ep = group.episodes[0]
         prompt = REFLECT.fill(question=ep.question, output=ep.output, verdict=render.verdict(ep.ok, ep.target),
                               form=FREE if self.free else "", memory=render.lines(memory.records()) or render.EMPTY)
-        call = Call(messages(prompt, render.skilled(REFLECTOR, ex)), params(self.temperature))
+        call = Call(messages(prompt, render.skilled(REFLECTOR_SYSTEM, ex)), params(self.temperature))
         if self.free:
             text = ex.model.ask(call).output
             return Extraction(group, [text], scores(group)) if text else None
@@ -52,14 +53,18 @@ class Reflector(Extractor):
 # апстрим
 
 
-P = {n: prompts.load(f"ace_{n}") for n in ("reflector", "reflector_nogt")}
-ROUNDS = 3
+REFLECTOR_GT = prompts.load("ace_reflector")
+REFLECTOR_NOGT = prompts.load("ace_reflector_nogt")
+ROUNDS = 3                  # --max_num_rounds апстрима: раундов рефлексии на неверном ответе
 
 
 def used_line(text):
     """Самоотчёт вместо bullet_ids: последняя строка «USED: r1, r3» в обычном ответе решателя."""
-    lines = [l for l in text.splitlines() if l.strip().upper().startswith("USED:")]
-    return [i.strip(" []") for i in lines[-1].split(":", 1)[1].split(",")] if lines else []
+    lines = [line for line in text.splitlines() if line.strip().upper().startswith("USED:")]
+    if not lines:
+        return []
+    listed = lines[-1].split(":", 1)[1]
+    return [rid.strip(" []") for rid in listed.split(",")]
 
 
 def named(ep):
@@ -84,10 +89,15 @@ def bullets_used(memory, ids):
 def tag_map(tags):
     """Метки рефлектора, как их применяет update_bullet_counts апстрима: id (или bullet) -> tag, при повторе id
     побеждает последняя; не список и не словари — ничего."""
+    if not isinstance(tags, list):
+        return {}
     out = {}
-    for t in tags if isinstance(tags, list) else []:
-        if isinstance(t, dict) and (t.get("id") or t.get("bullet", "")):
-            out[t.get("id") or t.get("bullet", "")] = t.get("tag", "neutral")
+    for tag in tags:
+        if not isinstance(tag, dict):
+            continue
+        rid = tag.get("id") or tag.get("bullet", "")
+        if rid:
+            out[rid] = tag.get("tag", "neutral")
     return out
 
 
@@ -101,34 +111,43 @@ class Diagnose(Extractor):
     gives = frozenset({LABELS})
 
     def __init__(self, rounds=ROUNDS, read=TAGS, ids=cited):
-        self.rounds, self.read, self.ids = rounds, read, ids
+        self.rounds = rounds
+        self.read = read
+        self.ids = ids
 
     def diagnose(self, ex, ep, memory):
         """Поля рефлектора апстрима; без верного ответа — промпт _nogt. -> (ответ текстом, метки)."""
+        feedback = prompts.text("ace_environment_feedback", correct=ep.ok)
         fields = dict(question=ace_input(ex.task.name, ep.question)[1], reasoning_trace=ep.output,
-                      predicted_answer=ep.answer, environment_feedback=prompts.text("ace_environment_feedback", correct=ep.ok),
+                      predicted_answer=ep.answer, environment_feedback=feedback,
                       bullets_used=bullets_used(memory, self.ids(ep)))
         if ep.target:
-            fields["ground_truth"] = ep.target
-        reply = ex.model.ask(Call(messages(P["reflector" if ep.target else "reflector_nogt"].fill(**fields)), ace_params(), self.read))
+            prompt = REFLECTOR_GT.fill(**fields, ground_truth=ep.target)
+        else:
+            prompt = REFLECTOR_NOGT.fill(**fields)
+        reply = ex.model.ask(Call(messages(prompt), ace_params(), self.read))
         return reply.raw or "", reply.output
 
     def __call__(self, ex, group, memory):
         """Метки каждого раунда сразу идут в копию памяти: следующую попытку решатель делает уже с ними.
         В извлечении метки всех раундов и ответ рефлектора последнего раунда."""
         ep = group.episodes[0]
-        local, attempt, labels = copy.deepcopy(memory), ep, Labels()
+        local = copy.deepcopy(memory)
+        current = ep            # попытка, по которой идёт диагноз этого раунда
+        labels = Labels()
+        # как в апстриме: после диагноза неверного ответа — новая попытка с ним; верная — стоп; последняя новая
+        # попытка раундов делается, даже если диагноза по ней уже не будет
         for _ in range(self.rounds if ep.ok is False else 1):
-            text, tags = self.diagnose(ex, attempt, local)
+            text, tags = self.diagnose(ex, current, local)
             tags = tag_map(tags)
-            helpful = [i for i, t in tags.items() if t == "helpful"]
-            harmful = [i for i, t in tags.items() if t == "harmful"]
+            helpful = [rid for rid, tag in tags.items() if tag == "helpful"]
+            harmful = [rid for rid, tag in tags.items() if tag == "harmful"]
             count(local, helpful, harmful)
             labels.helpful += helpful
             labels.harmful += harmful
-            if attempt.ok:
+            if current.ok:
                 break
-            attempt = ex.retry(local, text)
-            if attempt.ok:
+            current = ex.retry(local, text)
+            if current.ok:
                 break
         return Extraction(group, [text], scores(group), {LABELS: labels})

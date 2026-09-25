@@ -6,7 +6,7 @@
 метки, память переводит их в свои id."""
 from .. import parse, render
 from ..extract import OPERATIONS
-from ..upstream.tfgrpo import ask
+from ..upstream.tfgrpo import BATCH_UPDATE, ask
 from ..model import Reader
 from . import Lessons
 
@@ -14,7 +14,7 @@ PLAN_RETRIES = 3            # повторы плана батча, пока JSO
 PLAN = Reader(text=parse.json_block)
 
 
-class Library(Lessons):
+class Experiences(Lessons):
     requires = frozenset({OPERATIONS})
 
     def __init__(self):
@@ -24,11 +24,12 @@ class Library(Lessons):
         ops = [op for x in extractions for op in x.extras[OPERATIONS] if isinstance(op, dict)]
         plan = None
         for _ in range(PLAN_RETRIES):
-            plan = ask(ex, "batch_experience_update_template", PLAN,
+            plan = ask(ex, BATCH_UPDATE, PLAN,
                        experiences_and_operations=render.batch_table(self.records(), ops))
             if plan is not None:
                 break
         ids = {render.label(i): r.id for i, r in enumerate(self.records())}
         # метки модели -> id памяти; чужая метка не находит записи: UPDATE по ней добавляет опыт, DELETE пропускается
-        self.apply([dict(p, id=ids.get(str(p.get("id")), "")) for p in plan if isinstance(p, dict)]
-                   if isinstance(plan, list) else [], missing="add")
+        steps = plan if isinstance(plan, list) else []
+        ops = [dict(op, id=ids.get(str(op.get("id")), "")) for op in steps if isinstance(op, dict)]
+        self.apply(ops, missing="add")

@@ -8,7 +8,7 @@ from ace import render
 from ace.extract import OPERATIONS, Extraction
 from ace.extract.tfgrpo import Contrast
 from ace.loop import Group, run
-from ace.memory.tfgrpo import Library
+from ace.memory.tfgrpo import Experiences
 from ace.methods.tfgrpo import GROUP, tfgrpo
 from ace.solver.tfgrpo import AGENT
 
@@ -42,7 +42,7 @@ def group(oks, target="0.5"):
 
 
 def library(*texts):
-    m = Library()
+    m = Experiences()
     for t in texts:
         m.add(t)
     return m

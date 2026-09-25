@@ -27,8 +27,7 @@ LOOP, CONFIG = fixture("tfgrpo", "loop"), fixture("tfgrpo", "config")
 # цели, с которыми снят эталон (bridge/capture_tfgrpo.py: AGENT_OBJ, LEARN_OBJ)
 AGENT_OBJ = "input: A math question\noutput: A step-by-step reasoning process that leads to the final answer\n"
 LEARN_OBJ = "Help the agent to improve the solving capability on math questions by extracting general and concise guidelines.\n"
-STAGES = ["single_rollout_summary_template", "single_query_group_advantage", "group_experience_update_template",
-          "batch_experience_update_template"]
+STAGES = [U.SUMMARY, U.ADVANTAGE, U.GROUP_UPDATE, U.BATCH_UPDATE]
 MARKERS = ["<Working Agent Input>", "<Agent Input>", "<Existing Experiences>", "<Experiences and Proposed Operations>"]
 
 
@@ -84,7 +83,7 @@ def group(case, rewards, target="42", output=trajectory):
 
 
 def library(texts):
-    m = MEM.Library()
+    m = MEM.Experiences()
     for t in texts:
         m.add(t)
     return m
@@ -99,7 +98,8 @@ def test_templates(key):
     values = dict(agent_objective=AGENT_OBJ, learning_objective=LEARN_OBJ, num_experiences=2, question="Q", trajectory="T",
                   answer="A", critique="C", trajectories="TS", existing_experiences="E", new_experiences="N",
                   experiences_and_operations="EO")
-    ours = U.P[name][part == "up"]
+    stage = next(s for s in STAGES if s.name == name)
+    ours = stage.user if part == "up" else stage.system
     assert ours.fill(**values) == jinja2.Template(PROMPTS["templates"][key]).render(**values)
 
 
@@ -129,7 +129,7 @@ def test_advantage_requests():
     for case, labeled in (("advantage_gt", True), ("advantage_no_gt", False)):
         call = PROMPTS["requests"][case][0]
         g = group("A", [1, 0], target="42" if labeled else "")
-        user = U.P[STAGES[1]][1].fill(question=g.question, answer=g.target or render.TFGRPO.redacted(),
+        user = STAGES[1].user.fill(question=g.question, answer=g.target or render.TFGRPO.redacted(),
                                       trajectories=render.attempts(list(zip(T.rollouts(g, False), ["S0", "S1"])), labeled))
         assert user == messages(call)[1]
 
@@ -254,7 +254,7 @@ def test_empty_summary_kept():
 def test_loop():
     """ExperienceUpdater.run на двух батчах: те же запросы в том же порядке (стадии по всему батчу), те же ответы, те
     же опыты G0, G1, ...; все вызовы без параметров запроса (model_params = {})."""
-    m = MEM.Library()
+    m = MEM.Experiences()
     for run in LOOP:
         assert [r.text for r in m.records()] == list(run["before"].values())
         model = Fake(run["requests"])

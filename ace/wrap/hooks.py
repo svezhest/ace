@@ -10,7 +10,7 @@
                     его ошибки в ней не было
 Исходы показа (fired) — метки хуков. Учатся хуки только на ошибках исполнения (traceback), не на отбивках вызова
 инструмента. Ошибки шага бывают только у решателя с инструментами: ученику нужна среда с исполнением кода."""
-from ..extract.hooks import LEARN, FromErrors, failures
+from ..extract.hooks import LEARN, FromErrors, error_steps
 from ..learner import Learner
 from ..memory.hooks import PRUNE, HookBook
 from ..show.hooks import AFTER, SYSTEM, fired
@@ -65,7 +65,7 @@ class Hooks(Wrapper):
     def on_attempt(self, ex, episode):
         self.inner.on_attempt(ex, episode)
         if self.show_at == "system":
-            errors = [s.result for s in failures(episode)]
+            errors = [s.result for s in error_steps(episode)]
             episode.fired += [(id, not any(self.hooks.get(id).fires(e) for e in errors))
                               for id in episode.shown if self.hooks.get(id)]
 
