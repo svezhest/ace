@@ -24,6 +24,14 @@ from .verdict import majority
 
 
 @dataclass
+class Solver:
+    """Решатель метода вместо общего (генератор ACE): call(заметка) -> Call — запрос целиком, заметка рефлектора
+    внутри него; answer(ответ текстом) -> ответ в зачёт."""
+    call: callable
+    answer: callable
+
+
+@dataclass
 class Prompt:
     """Что ученик даёт попытке."""
     system: str = ""            # добавка к системному промпту решателя; роль задачи и подсказку среды ставит цикл
@@ -34,6 +42,7 @@ class Prompt:
     temperature: float = 0
     top_p: float = None         # None — по умолчанию сервера (TF-GRPO: итоговый агент апстрима с top_p 0.95)
     note: str = ""              # заметка к сообщению решателю (раунды рефлексии ACE)
+    solver: Solver = None       # свой решатель метода; тогда системного промпта задачи и среды нет
 
 
 @dataclass
@@ -140,6 +149,8 @@ class Experiment:
         self.scores = {}        # кэш val по ключу памяти
 
     def attempt(self, item, k, prompt):
+        if prompt.solver is not None:
+            return self.solved(item, k, prompt)
         env = self.learner.env.open()
         a = Attempt(item["context"], k, self.training, prompt, self.task.system + env.hint + prompt.system)
         try:
@@ -153,6 +164,15 @@ class Experiment:
         final = reply.output or ""
         ep = Episode(a.question, k, prompt, reply.text, final, final_answer(final), reply.steps, reply.truncated,
                      list(prompt.deps.reads) if prompt.deps is not None else [], a.fired, a.patches, system=a.system)
+        self.learner.verdict(self, ep, item["target"])
+        return ep
+
+    def solved(self, item, k, prompt):
+        """Попытка своим решателем метода: один вызов без инструментов."""
+        reply = self.model.ask(prompt.solver.call(prompt.note))
+        final = reply.output or ""
+        ep = Episode(item["context"], k, prompt, reply.text, final, prompt.solver.answer(final), [], reply.truncated,
+                     [], [], [])
         self.learner.verdict(self, ep, item["target"])
         return ep
 
@@ -231,9 +251,12 @@ def entry(phase, epoch, i, g, item, correct, gated, memory_chars, sec):
 
 
 def run(task, learner, model, n=config.SIZE, out=None, split="", epochs=None, offline=False):
-    """Онлайн: поток split, память учится по ходу, epochs проходов, в зачёт последний.
+    """Онлайн: поток split, память учится по ходу, epochs проходов, в зачёт последний. В зачёт первая попытка
+    обучения, а с learner.window (ACE online) — тест окна: перед обучением на каждых window вопросах они решаются
+    текущей памятью без обучения; до первого прохода — начальный тест всего потока (в лог).
     Офлайн (ACE offline, MCE): обучение на train, после каждого прохода val; тест на split с лучшей по val
-    версией памяти (строго больше, при равенстве ранняя), без обучения."""
+    версией памяти (строго больше, при равенстве ранняя), без обучения.
+    learner.recheck — после обучения на вопросе ещё попытка новой памятью, только в лог (ACE post_train)."""
     random.seed(config.SEED)
     learner = copy.deepcopy(learner)        # в реестре память ученика пуста: каждый прогон с чистой
     ex = Experiment(task, learner, model)
@@ -247,11 +270,26 @@ def run(task, learner, model, n=config.SIZE, out=None, split="", epochs=None, of
         print(f"{task.name} {learner.name} {phase}{ex.epoch} {i:3} {'+' if correct else '-'} "
               f"{sum(r['correct'] for r in done)}/{len(done)} mem={learner.memory.chars()}", flush=True)
 
+    def test(phase, i, item):
+        t0, training = time.time(), ex.training
+        ex.i, ex.item, ex.training = i, item, False
+        try:
+            record(phase, i, ex.question(item), item, t0, [])
+        finally:
+            ex.training = training
+
+    window = 0 if offline else learner.window
+    if window:
+        for i, item in enumerate(task.load(split)[:n]):
+            test("initial", i, item)
     best, best_val = learner.snapshot(), -1
     for epoch in range(epochs):
         items = task.load("train" if offline else split)[:n]
         ex.epoch, ex.total, batch = epoch, len(items), []
         for i, item in enumerate(items):
+            if window and i % window == 0:
+                for j in range(i, min(i + window, len(items))):
+                    test("online", j, items[j])
             t0, gates = time.time(), len(learner.gated)
             ex.i, ex.item = i, item
             g = ex.question(item)
@@ -259,7 +297,9 @@ def run(task, learner, model, n=config.SIZE, out=None, split="", epochs=None, of
             if len(batch) == learner.every:
                 learner.on_batch(ex, batch)
                 batch = []
-            record("train" if offline else "online", i, g, item, t0, learner.gated[gates:])
+            record("train" if offline or window else "online", i, g, item, t0, learner.gated[gates:])
+            if learner.recheck:
+                test("post", i, item)
         if batch and learner.flush:
             learner.on_batch(ex, batch)
         learner.on_pass(ex)

@@ -7,6 +7,7 @@
     память              контейнер + learn(ex, extractions); requires            memory/
     показ               show.prompt -> Prompt, show.on_step -> Patch            show/
     когда учится        every (раз в сколько вопросов), flush (неполный батч в конце прохода)
+    протокол            window (тест окна в зачёт), recheck (попытка после обучения)   loop.py: run
     среда попытки       env: Env | Sandbox(per="call" | "attempt")              env/
 
 Хуки: перед попыткой память узнаёт о новой попытке (begin: срок жизни «попытка»), показ даёт промпт; на шаге
@@ -39,6 +40,8 @@ class Learner:
     every: int = 1
     flush: bool = False
     epochs: int = 1             # проходов по train по умолчанию, как в апстриме
+    window: int = 0             # онлайн: тест окна из window вопросов до обучения на нём (в зачёт); 0 — первая попытка
+    recheck: bool = False       # после обучения на вопросе — попытка новой памятью, только в лог
     env: Env = field(default_factory=Env)
     skill: str = ""             # навык от мета-уровня (MCE над учеником); сам ученик его не пишет
     pending: list = field(default_factory=list, init=False, repr=False)    # извлечённое до батча
