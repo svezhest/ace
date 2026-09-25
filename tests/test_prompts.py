@@ -21,9 +21,13 @@ def old_file(name):
         pytest.skip(f"нет тега {OLD}")
 
 
+# сверяются уже с апстримом (tests/bridge, DEVIATIONS MCE1)
+UPSTREAM = ("mce_base.txt", "mce_meta.txt")
+
+
 def old_files():
     out = subprocess.run(["git", "ls-tree", "--name-only", f"{OLD}:{OLD_DIR}"], capture_output=True, text=True).stdout
-    return [f for f in out.split() if f.endswith(".txt")]
+    return [f for f in out.split() if f.endswith(".txt") and f not in UPSTREAM]
 
 
 def fields(name):
@@ -78,7 +82,6 @@ INLINE = {
     "reflector_system": "You are a reflector.",
     "curator_system": "You are a curator.",
     "selector_system": "You are a selector.",
-    "mce_base_system": "You are a context engineer working with file tools.",
     "reflect_free_form": "Write freely.",
     "memory_head": "What you learned so far:\n",
     "hook_intro": "Known fix for this error:\n",

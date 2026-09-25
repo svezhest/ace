@@ -10,31 +10,40 @@ No specific interfaces required.
 
 ## Working Directory
 
+**Working Directory**: `{{ iter_dir }}`
+
 Your directory contains:
 ```
-context/                                   # Write static resources here (knowledge, rules, etc.)
-data/                                      # Training results to learn from, one file per rollout (read-only)
+{{ iter_name }}/
+  .claude/skills/learning-context/SKILL.md  # Your skill guidance (MUST READ THIS)
+  context/                                   # Write static resources here (knowledge, rules, etc.)
+  data/
+    train.json                               # Training results to learn from
 ```
 
 **NOTE**: This task has NO interface requirements. Focus on curating high-quality context files in `context/`.
 
+**File Access**:
+- Read/Write: Only files within `{{ iter_dir }}/`
+- You CANNOT access other directories
+
 ## Skill Guidance
 
-**IMPORTANT**: Follow this skill as your learning methodology:
-
-{{ skill }}
+**IMPORTANT**: Read `.claude/skills/learning-context/SKILL.md` for your learning methodology.
 
 ## Core Objective: Learn from Training Data
 
-**CRITICAL**: Analyze the files in `data/` and curate context to fix incorrect predictions.
+**CRITICAL**: Analyze `data/train.json` and curate context to fix incorrect predictions.
+
+**IMPORTANT**: In most cases, high-quality context files are MORE impactful than complex interface logic.
 
 - **Context files** (`context/`) provide knowledge, patterns, and guidelines that directly improve LLM reasoning
 
 ### Training Data Analysis
 
-1. **Load and inspect** `data/`:
-    - Summary: {{ summary }}
-    - One file per rollout: question, llm_answer, target, is_correct
+1. **Load and inspect** `data/train.json`:
+    - `summary`: Overall metrics
+    - `detailed_results`: List of rollouts
 
 2. **Analyze predictions**:
    - **Incorrect**: Why did it fail? What knowledge/pattern was missing?
@@ -43,4 +52,4 @@ data/                                      # Training results to learn from, one
 3. **Curate context**:
    - Write context files in `context/` directory
 
-Work efficiently: focus on impactful changes, avoid over-analysis, finish promptly. When done, reply "done".
+Work efficiently: focus on impactful changes, avoid over-analysis, finish promptly.

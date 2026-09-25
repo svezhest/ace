@@ -42,15 +42,23 @@ class Mount:
 class FS:
     mounts: dict                                # имя -> Mount
     seen: set = field(default_factory=set)      # прочитанные пути: без этого edit запрещён
+    root: str = ""                              # абсолютный путь корня, как его видит агент (MCE: /workspace/...)
 
     @property
     def reads(self):
         """id записей, прочитанных из каталогов (что решатель прочёл: episode.used)."""
         return [id for m in self.mounts.values() if isinstance(m.store, Catalog) for id in m.store.reads]
 
+    def norm(self, path):
+        """Путь без корня root и крайних слешей: «/workspace/iter1_sub0/context/a.md» -> «context/a.md»."""
+        path, root = path.strip("/"), self.root.strip("/")
+        if root and (path + "/").startswith(root + "/"):
+            path = path[len(root):]
+        return path.strip("/")
+
     def split(self, path):
         """Путь -> (точка монтирования, её Mount, путь внутри)."""
-        name, _, rest = path.strip("/").partition("/")
+        name, _, rest = self.norm(path).partition("/")
         if name not in self.mounts:
             raise ModelRetry(f"no such directory: {name}. Available: {', '.join(self.mounts)}")
         return name, self.mounts[name], rest.strip("/")
@@ -86,7 +94,7 @@ def ls(ctx: RunContext[FS], path: str = "") -> str:
     """List a directory. Without a path lists the top-level directories; with a directory lists its
     subdirectories and files, each file with its first line."""
     fs = ctx.deps
-    if not path.strip("/"):
+    if not fs.norm(path):
         return "\n".join(f"{n}/  ({m.mode})" for n, m in fs.mounts.items())
     return listing(fs, path)
 
@@ -98,7 +106,7 @@ def read(ctx: RunContext[FS], path: str, offset: int = 1, limit: int = READ_LIMI
     if is_folder(fs, path):
         return listing(fs, path)
     lines = fs.text(path).splitlines()
-    fs.seen.add(path.strip("/"))
+    fs.seen.add(fs.norm(path))
     start = max(offset, 1)
     shown = lines[start - 1:start - 1 + limit]
     out = "\n".join(f"{i}: {l}" for i, l in enumerate(shown, start))
@@ -130,7 +138,7 @@ def edit(ctx: RunContext[FS], path: str, old_string: str, new_string: str, repla
     An empty new_string deletes the fragment. Read the file before editing it."""
     m, rest = ctx.deps.writable(path)
     text = ctx.deps.text(path)
-    if path.strip("/") not in ctx.deps.seen:
+    if ctx.deps.norm(path) not in ctx.deps.seen:
         raise ModelRetry(f"read {path} before editing it")
     n = text.count(old_string)
     if n == 0:

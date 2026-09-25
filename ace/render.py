@@ -3,6 +3,7 @@ ace/prompts/, здесь только сборка: строки записей 
 вердикт, поля промптов SCOPE, TF-GRPO, EvoLib, MCE, хуков, вывод песочницы.
 Каждую сериализацию, взятую у апстрима, сверяют с ним по этому модулю."""
 import json
+import re
 
 from pydantic_ai.messages import TextPart, ToolCallPart, ToolReturnPart
 
@@ -302,49 +303,62 @@ def batch_table(records, ops):
 def evaluation(verdict):
     return f"\nEvaluation: {verdict}\n"
 
-# MCE
+# MCE (mce/prompts/meta_agent.py, utils.py, main.py): строки и json — как у апстрима
+
+OVERVIEW = re.compile(r"^##\s*Skill\s+Overview\s*$", re.MULTILINE | re.IGNORECASE)
+NEXT_SECTION = re.compile(r"\n##\s+[^#]")
 
 
 def overview(skill):
-    """Раздел «## Skill Overview» навыка с отступом."""
-    out, inside = [], False
-    for l in skill.splitlines():
-        if l.strip().lower().replace(" ", "") == "##skilloverview":
-            inside = True
-            continue
-        if inside and l.startswith("## "):
-            break
-        if inside:
-            out.append(l)
-    text = "\n".join(out).strip()
-    return "\n".join(f"  {l}" if l.strip() else "" for l in text.splitlines()) if text else "  (no '## Skill Overview' section found)"
+    """_extract_skill_overview: раздел «## Skill Overview» навыка с отступом; None — SKILL.md нет."""
+    if skill is None:
+        return "  (SKILL.md not found)"
+    match = OVERVIEW.search(skill)
+    if not match:
+        return "  (no '## Skill Overview' section found)"
+    rest = skill[match.end():]
+    end = NEXT_SECTION.search(rest)
+    text = (rest[:end.start()] if end else rest).strip()
+    if not text:
+        return "  (Skill Overview section is empty)"
+    return "\n".join(f"  {l}" if l.strip() else "" for l in text.split("\n"))
 
 
-def skill_database(done):
-    """Прошлые итерации (без нулевой): точность и обзор навыка."""
-    if not done:
+def skill_database(evaluations, skills, current):
+    """_build_skill_database: прошлые итерации из evaluations.json (без записи — пропуск), метрика — первый ключ
+    val_metrics; skills — iter{i} -> текст SKILL.md; current — номер текущей итерации."""
+    if current == 0:
+        return prompts.text("mce_no_iterations_iter0")
+    if current == 1:
         return prompts.text("mce_no_iterations")
-    return "\n\n".join(f"### Iteration {i}\n- **Train**: {h.train:.2%} | **Val**: {h.val:.2%}\n"
-                       f"- **Skill Overview**:\n{overview(h.text)}" for i, h in enumerate(done, 1))
+    entries = []
+    for i in range(1, current):
+        data = evaluations.get(f"iter{i}")
+        if data is None:
+            continue
+        metric = next(iter(data.get("val_metrics") or {}), "accuracy")
+        subs = data.get("num_sub_iters", 1)
+        entries.append(f"### Iteration {i}\n- **Train**: {data[f'train_{metric}']:.2%} | **Val**: {data[f'val_{metric}']:.2%}\n"
+                       f"- **Rollouts**: {data.get('total_rollouts', 0)} ({subs} sub-iteration{'s' if subs > 1 else ''})\n"
+                       f"- **Skill Overview**:\n{overview(skills.get(f'iter{i}'))}\n"
+                       f"- **Files**: `meta_agent/skills/iter{i}/SKILL.md`, `{data.get('last_sub_folder', f'iter{i}')}/`")
+    return "\n\n".join(entries) or prompts.text("mce_only_baseline")
 
 
-def evaluations(history):
-    """evaluations.json: итерации с первой (нулевая туда не пишется, mce/main.py:115)."""
-    return json.dumps({f"iter{i}": dict(val_accuracy=h.val, train_accuracy=h.train) for i, h in enumerate(history, 1)}, indent=2)
+def evaluations(values):
+    """meta_agent/evaluations.json."""
+    return json.dumps(values, indent=2)
 
 
-def skills(done):
-    return "\n\n".join(f"### iter{i}/SKILL.md\n{h.text}" for i, h in enumerate(done, 1)) or NONE
+def train_json(summary, results):
+    """data/train.json под-итерации: сводка батча и итоги его задач."""
+    return json.dumps(dict(summary=summary, detailed_results=results), indent=2, ensure_ascii=False)
+
+
+def jsonl(rows):
+    """meta_agent/train.jsonl."""
+    return "".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows)
 
 
 def task_instruction(task):
     return f"{task.system} {task.instr}"
-
-
-def train_summary(correct, total):
-    return f"train_accuracy {correct}/{total}"
-
-
-def result(ok, answer, target, question):
-    """Итог задачи батча для базового агента (data/)."""
-    return f"is_correct: {bool(ok)}\nllm_answer: {answer}\ntarget: {target}\nquestion:\n{question}"

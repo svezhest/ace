@@ -91,7 +91,7 @@ class Fake:
         self.targets, self.log = targets, []
 
     def run(self, system, user, output=str, tools=(), deps=None, rounds=0, temperature=0, max_tokens=None, on_step=None,
-            top_p=None):
+            top_p=None, history=None):
         self.log.append(dict(system=system, user=user, output=getattr(output, "__name__", str(output)),
                              tools=[t.__name__ for t in tools], rounds=rounds, temperature=temperature, max_tokens=max_tokens,
                              **({"top_p": top_p} if top_p is not None else {})))

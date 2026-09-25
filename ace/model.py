@@ -81,6 +81,7 @@ class Reply:
     truncated: bool
     steps: list             # шаги: Step(имя, аргументы, результат)
     outcome: Outcome = Outcome.answer
+    messages: list = None   # вся история: продолжить разговор (run(history=...))
 
 
 class Model:
@@ -92,7 +93,9 @@ class Model:
         self.calls = self.prompt_tokens = self.completion_tokens = 0
 
     def run(self, system, user, output=str, tools=(), deps=None, rounds=0, temperature=0, max_tokens=None, on_step=None,
-            top_p=None):
+            top_p=None, history=None):
+        """history — сообщения прошлого прогона (Reply.messages): user продолжает тот же разговор (MCE: просьба
+        мета-агенту дописать SKILL.md)."""
         # temperature и top_p None — не передаются, по умолчанию сервера
         settings = {"max_tokens": max_tokens or self.max_tokens}
         if temperature is not None:
@@ -101,7 +104,7 @@ class Model:
             settings["top_p"] = top_p
         limit = rounds + EXTRA_REQUESTS
         if on_step is None:
-            result, messages, outcome = self.request(system, user, None, output, tools, deps, limit, settings)
+            result, messages, outcome = self.request(system, user, history, output, tools, deps, limit, settings)
         else:
             # ШАГОВЫЙ РЕЖИМ. Нужен тем, кто вмешивается посреди попытки: показу после ошибки (урок в конец истории)
             # и SCOPE (правило, выученное на шаге, переписывает системный промпт). Прогон идёт по одному запросу;
@@ -110,7 +113,8 @@ class Model:
             result, messages = None, None
             for _ in range(limit):
                 before = steps(messages or [])
-                result, messages, outcome = self.request(system, user, messages, output, tools, deps, 1, settings)
+                result, messages, outcome = self.request(system, None if messages else user, messages, output, tools, deps, 1,
+                                                         settings)
                 new = steps(messages)[len(before):]
                 if outcome is not Outcome.step:
                     break
@@ -121,17 +125,17 @@ class Model:
                         system = patch.system
         responses = [m for m in messages if isinstance(m, ModelResponse)]
         return Reply(result, render.transcript(messages), any(m.finish_reason == "length" for m in responses), steps(messages),
-                     outcome)
+                     outcome, messages)
 
     def request(self, system, user, history, output, tools, deps, limit, settings):
-        """До limit запросов; -> (ответ или None, все сообщения, Outcome). Сообщения сохраняются
-        и при сбое: траектория и токены не теряются. Пустой системный промпт не отправляется: апстримы
-        шлют промпт одним сообщением user."""
+        """До limit запросов; -> (ответ или None, все сообщения, Outcome). user — новое сообщение после history
+        (None: история уже кончается запросом). Сообщения сохраняются и при сбое: траектория и токены не теряются.
+        Пустой системный промпт не отправляется: апстримы шлют промпт одним сообщением user."""
         agent = Agent(self.llm, system_prompt=system or (), output_type=output, tools=tools, retries=RETRIES)
         result, outcome = None, Outcome.answer
         with capture_run_messages() as messages:
             try:
-                result = agent.run_sync(None if history else user, message_history=history, deps=deps,
+                result = agent.run_sync(user, message_history=history, deps=deps,
                                         usage_limits=UsageLimits(request_limit=limit), model_settings=settings).output
             except UsageLimitExceeded:
                 outcome = Outcome.step
