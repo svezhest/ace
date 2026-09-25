@@ -35,7 +35,25 @@ class Fake(BaseHTTPRequestHandler):
             out = {"id": f"x{len(srv.got)}", "object": "chat.completion", "created": 1, "model": body["model"],
                    "choices": [{"index": 0, "message": {"role": "assistant", "content": text}, "finish_reason": "stop"}],
                    "usage": {"prompt_tokens": 3, "completion_tokens": 4, "total_tokens": 7}}
+            if body.get("stream"):
+                return self.frames(out, body)
         self.send(200, out)
+
+    def frames(self, out, body):
+        """stream: текст двумя кадрами, конец, usage (если просили), как у шлюза."""
+        text, base = out["choices"][0]["message"]["content"], {k: out[k] for k in ("id", "created", "model")}
+        base["object"] = "chat.completion.chunk"
+        parts = [{"role": "assistant", "content": text[:4]}, {"content": text[4:]}]
+        frames = [dict(base, choices=[{"index": 0, "delta": d, "finish_reason": None}]) for d in parts]
+        frames.append(dict(base, choices=[{"index": 0, "delta": {}, "finish_reason": "stop"}]))
+        if (body.get("stream_options") or {}).get("include_usage"):
+            frames.append(dict(base, choices=[], usage=out["usage"]))
+        data = b"".join(b"data: " + json.dumps(f).encode() + b"\n\n" for f in frames) + b"data: [DONE]\n\n"
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream")
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
 
     def send(self, status, out):
         data = json.dumps(out).encode()
@@ -101,7 +119,9 @@ def test_record_pairs_and_repeats(fake, tmp_path):
     r = lines(tmp_path / "rec.jsonl")
     assert [x["n"] for x in r] == [0, 1, 0]
     assert r[0]["request"] == r[1]["request"] == '{"messages":[{"content":"hi","role":"user"}],"model":"m"}'
-    assert all("stream" not in body for _, body in fake.got)
+    assert ["stream" in body for _, body in fake.got] == [False, True, False]     # stream клиента — stream наверх
+    assert r[1]["response"]["choices"][0]["message"] == {"role": "assistant", "content": "call 2 seed None"}
+    assert r[1]["response"]["usage"]["total_tokens"] == 7                        # usage наверху просит прокси
     assert r[2]["response"]["choices"][0]["message"]["content"] == "call 3 seed None"
 
 
@@ -215,3 +235,14 @@ def test_record_cache(fake, tmp_path):
     r = lines(tmp_path / "again.jsonl")
     assert [x.get("cached", False) for x in r] == [True, True, False] and len(fake.got) == 3
     assert json.loads(r[0]["request"])["messages"][0]["content"] == "a 2" and [x["n"] for x in r] == [0, 1, 2]
+
+
+def test_assemble_tool_calls():
+    frames = [{"id": "i", "created": 1, "model": "m", "choices": [{"index": 0, "delta": {"role": "assistant", "tool_calls": [
+                  {"index": 0, "id": "c1", "type": "function", "function": {"name": "w", "arguments": '{"a"'}}]}}]},
+              {"choices": [{"index": 0, "delta": {"tool_calls": [{"index": 0, "function": {"arguments": ": 1}"}}]},
+                            "finish_reason": "tool_calls"}]}]
+    out = wire.assemble(frames)
+    assert out["choices"][0]["message"] == {"role": "assistant", "content": None, "tool_calls": [
+        {"function": {"arguments": '{"a": 1}', "name": "w"}, "id": "c1", "type": "function", "index": 0}]}
+    assert out["choices"][0]["finish_reason"] == "tool_calls" and out["object"] == "chat.completion"

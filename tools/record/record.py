@@ -4,7 +4,8 @@
 Клиенту — base_url http://127.0.0.1:PORT/v1. Каждая пара пишется строкой JSONL:
 {"path", "request": канонический JSON, "n": номер повтора такого же запроса, "seed", "status", "response"}.
 --seed: если в запросе chat/completions нет seed, подставить seed_for(запрос, n).
-Наверх всегда уходит запрос без stream; клиенту, просившему stream, ответ отдаётся кадрами SSE.
+Клиенту, просившему stream, ответ идёт кадрами SSE по мере генерации (наверх тоже stream), в запись — ответ,
+собранный из кадров (wire.assemble); остальные запросы уходят наверх без stream.
 --cache: ответ прошлой записи на запрос, совпавший с её запросом после normalize (k-й такой же запрос — её k-й
 ответ, как у replay), в модель не идёт, но пишется в новую запись как есть; остальное — как обычно. Так запись
 переснимается без повторных вызовов модели (MCE: вывод Bash хоста меняется от прогона к прогону, DEVIATIONS MCE7)."""
@@ -52,35 +53,89 @@ class Recorder(wire.Server):
             except ValueError:
                 return e.code, {"error": {"message": data.decode(errors="replace"), "type": "upstream"}}
 
+    def write(self, path, c, n, seed, status, resp, **more):
+        rec = {"path": path, "request": c, "n": n, "seed": seed, "status": status, "response": resp, **more}
+        with self.out.open("a") as f:
+            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+        self.count[wire.key(path, c)] += 1
+
+    def cached(self, path, c, n):
+        """Ответ прошлой записи (--cache) на этот запрос; есть — он же пишется в новую запись."""
+        ck = wire.key(path, self.normalize(c))
+        if self.hits[ck] >= len(self.cache[ck]):
+            return None
+        old = self.cache[ck][self.hits[ck]]
+        self.hits[ck] += 1
+        self.write(path, c, n, old["seed"], old["status"], old["response"], cached=True)
+        return old["status"], old["response"]
+
+    def prepare(self, path, body, c, n):
+        """Запрос наверх: без stream, с seed_for, если просили --seed. -> (запрос, seed)."""
+        sent = {x: v for x, v in body.items() if x not in ("stream", "stream_options")}
+        seed = None
+        if self.seed and path == wire.PATHS[0] and "seed" not in body:
+            seed = sent["seed"] = wire.seed_for(c, n)
+        return sent, seed
+
     def handle(self, path: str, body: dict, headers):
         c = wire.canon(body)
         k = wire.key(path, c)
         # весь запрос под замком: номер повтора и порядок строк в файле совпадают с порядком вызовов
         with self.lock:
             n = self.count[k]
-            ck = wire.key(path, self.normalize(c))
-            if self.hits[ck] < len(self.cache[ck]):
-                old = self.cache[ck][self.hits[ck]]
-                self.hits[ck] += 1
-                rec = {"path": path, "request": c, "n": n, "seed": old["seed"], "status": old["status"],
-                       "response": old["response"], "cached": True}
-                with self.out.open("a") as f:
-                    f.write(json.dumps(rec, ensure_ascii=False) + "\n")
-                self.count[k] += 1
-                return old["status"], old["response"]
-            sent = {x: v for x, v in body.items() if x not in ("stream", "stream_options")}
-            seed = None
-            if self.seed and path == wire.PATHS[0] and "seed" not in body:
-                seed = sent["seed"] = wire.seed_for(c, n)
+            hit = self.cached(path, c, n)
+            if hit:
+                return hit
+            sent, seed = self.prepare(path, body, c, n)
             try:
                 status, resp = self.forward(path, sent, headers.get("Authorization") or "Bearer none")
             except urllib.error.URLError as e:     # шлюз недоступен: не пишем, номер повтора не тратим
                 return 502, f"upstream unreachable: {e}"
-            rec = {"path": path, "request": c, "n": n, "seed": seed, "status": status, "response": resp}
-            with self.out.open("a") as f:
-                f.write(json.dumps(rec, ensure_ascii=False) + "\n")
-            self.count[k] += 1
+            self.write(path, c, n, seed, status, resp)
         return status, resp
+
+    def stream(self, path: str, body: dict, headers, out: wire.Handler):
+        """Клиент просит stream: наверх тоже stream, кадры идут клиенту по мере генерации (долгий ответ не
+        упирается в таймауты клиента), в запись — ответ, собранный из кадров, как без stream."""
+        c = wire.canon(body)
+        with self.lock:
+            n = self.count[wire.key(path, c)]
+            hit = self.cached(path, c, n)
+            if hit:
+                return out.reply(hit[0], wire.sse(hit[1], body) if hit[0] == 200 else json.dumps(hit[1]).encode(),
+                                 "text/event-stream" if hit[0] == 200 else "application/json")
+            sent, seed = self.prepare(path, body, c, n)
+            sent.update(stream=True, stream_options={"include_usage": True})
+            usage = (body.get("stream_options") or {}).get("include_usage")
+            req = urllib.request.Request(self.upstream + path, json.dumps(sent).encode(), method="POST",
+                                         headers={"Content-Type": "application/json",
+                                                  "Authorization": headers.get("Authorization") or "Bearer none"})
+            try:
+                up = urllib.request.urlopen(req, timeout=3600)
+            except urllib.error.HTTPError as e:
+                data = e.read()
+                try:
+                    resp = json.loads(data)
+                except ValueError:
+                    resp = {"error": {"message": data.decode(errors="replace"), "type": "upstream"}}
+                self.write(path, c, n, seed, e.code, resp)
+                return out.reply(e.code, json.dumps(resp).encode())
+            except urllib.error.URLError as e:
+                return out.error(502, f"upstream unreachable: {e}", "upstream")
+            out.start_stream()
+            frames = []
+            with up:
+                for line in up:
+                    line = line.strip()
+                    if not line.startswith(b"data: ") or line == b"data: [DONE]":
+                        continue
+                    frame = json.loads(line[6:])
+                    frames.append(frame)
+                    if frame.get("choices") or usage:
+                        out.send(line + b"\n\n")
+            out.send(b"data: [DONE]\n\n")
+            out.end_stream()
+            self.write(path, c, n, seed, 200, wire.assemble(frames))
 
 
 class RecordHandler(wire.Handler):

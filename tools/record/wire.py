@@ -53,6 +53,37 @@ def sse(resp: dict, body: dict) -> bytes:
     return out + b"data: [DONE]\n\n"
 
 
+def assemble(frames: list[dict]) -> dict:
+    """Кадры chat.completion.chunk -> chat.completion, как его отдаёт сервер без stream: текст и аргументы
+    инструментов подряд, tool_calls с index, finish_reason, usage (кадр без choices)."""
+    msg, calls, finish, usage = {"role": "assistant", "content": None}, {}, None, None
+    for f in frames:
+        usage = f.get("usage") or usage
+        for ch in f.get("choices") or []:
+            delta = ch.get("delta") or {}
+            msg["role"] = delta.get("role") or msg["role"]
+            for k in ("content", "reasoning_content"):
+                if delta.get(k) is not None:
+                    msg[k] = (msg.get(k) or "") + delta[k]
+            for tc in delta.get("tool_calls") or []:
+                call = calls.setdefault(tc.get("index", 0), {"function": {"arguments": "", "name": ""}, "id": None,
+                                                             "type": "function"})
+                call["id"] = tc.get("id") or call["id"]
+                call["type"] = tc.get("type") or call["type"]
+                fn = tc.get("function") or {}
+                call["function"]["name"] += fn.get("name") or ""
+                call["function"]["arguments"] += fn.get("arguments") or ""
+            finish = ch.get("finish_reason") or finish
+    if calls:
+        msg["tool_calls"] = [dict(calls[i], index=i) for i in sorted(calls)]
+    first = frames[0] if frames else {}
+    out = {"choices": [{"finish_reason": finish, "index": 0, "message": msg}], "created": first.get("created"),
+           "id": first.get("id"), "model": first.get("model"), "object": "chat.completion"}
+    if usage:
+        out["usage"] = usage
+    return out
+
+
 def render(c: str) -> list[str]:
     """Канонический запрос построчно для diff: длинные строки (промпты) разворачиваются по \\n."""
     lines = []
@@ -106,6 +137,21 @@ class Handler(BaseHTTPRequestHandler):
     def error(self, status: int, msg: str, kind="replay_mismatch"):
         self.reply(status, json.dumps({"error": {"message": msg, "type": kind}}, ensure_ascii=False).encode())
 
+    def start_stream(self):
+        """Ответ потоком SSE: заголовки сразу, дальше кадры send()."""
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream")
+        self.send_header("Transfer-Encoding", "chunked")
+        self.end_headers()
+        self.wfile.flush()
+
+    def send(self, data: bytes):
+        self.wfile.write(b"%x\r\n%s\r\n" % (len(data), data))
+        self.wfile.flush()
+
+    def end_stream(self):
+        self.send(b"")
+
     def do_POST(self):
         raw = self.rfile.read(int(self.headers.get("Content-Length") or 0))
         path = self.path.split("?")[0]
@@ -115,6 +161,8 @@ class Handler(BaseHTTPRequestHandler):
             body = json.loads(raw)
         except ValueError as e:
             return self.error(400, f"bad json: {e}", "invalid_request")
+        if path == PATHS[0] and wants_stream(body) and hasattr(self.server, "stream"):
+            return self.server.stream(path, body, self.headers, self)
         status, resp = self.server.handle(path, body, self.headers)
         if isinstance(resp, str):
             return self.error(status, resp, "upstream" if status == 502 else "replay_mismatch")
