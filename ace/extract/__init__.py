@@ -11,11 +11,14 @@
     attribution   какие записи были в промпте каких попыток (EvoLib, Future IG)
     ig            прирост лучшей попытки группы (EvoLib)
     best_answer   лучшее решение вопроса (EvoLib)
+    rationale     обоснование урока (SCOPE)
+    trigger       фрагмент ошибки, по которому урок показывается (хуки по ошибкам)
 
 Реализации: ace.py — рефлектор стенда и диагноз ACE апстрима с раундами повторной попытки."""
 from dataclasses import dataclass, field
 
 LABELS, CONFIDENCE, DOMAIN, ATTRIBUTION, IG, BEST_ANSWER = "labels", "confidence", "domain", "attribution", "ig", "best_answer"
+RATIONALE, TRIGGER = "rationale", "trigger"
 
 
 @dataclass
