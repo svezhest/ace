@@ -1,44 +1,34 @@
 # ace
 
-Стенд для сравнения методов агентного контекст-инжиниринга (ACE, Dynamic Cheatsheet, SCOPE, TF-GRPO, EvoLib, MCE) на одном цикле.
-Метод — ученик, собранный из уровней; цикл один на все методы и зовёт хуки ученика на своих масштабах
+Стенд для сравнения методов агентного контекст-инжиниринга (ACE, Dynamic Cheatsheet, SCOPE, TF-GRPO, EvoLib, MCE) на
+одном цикле. Метод — ученик, собранный из уровней; цикл один на все методы и зовёт хуки ученика на своих масштабах
 (шаг / попытка / вопрос / батч / проход). Устройство — [docs/architecture.md](docs/architecture.md).
 
-| уровень | что решает | модуль |
-|---|---|---|
-| попытки и в зачёт | сколько попыток, чем различаются, чей ответ считается (first / greedy / vote / best = pass@k) | `ace/loop.py` |
-| вердикт попытки / группы | golden / yes_no / judge / none; vote / none; верный ответ в эпизоде только при golden | `ace/verdict.py` |
-| извлечение | группа попыток -> уроки, баллы и объявленные добавки (labels, confidence, ...) | `ace/extract/` |
-| память | уроки (записи со статистикой, операции ADD / UPDATE = новая запись / DELETE) или документы (файлы, `ace/fs.py`) | `ace/memory/` |
-| показ | что видит решатель: весь текст, каталог с read, top-k, выборка по весу, ветки, синтез, урок после ошибки (`Patch`) | `ace/show.py` |
-| когда учится | раз в `every` вопросов, `flush` неполного батча | `ace/learner.py` |
-| среда попытки | песочница: контейнер на вызов или на попытку | `ace/env/` |
+| уровень | модуль |
+|---|---|
+| доступ к модели: `Call(messages, params, reader)`, бэкенды pydantic-ai и провод апстрима (openai) | `ace/model/` |
+| попытки и в зачёт (first / vote / best = pass@k) | `ace/loop.py` |
+| вердикт попытки и группы | `ace/verdict.py` |
+| извлечение | `ace/extract/<метод>.py` |
+| память | `ace/memory/<метод>.py` (контейнеры — `lessons.py`, `documents.py`) |
+| показ | `ace/show/<метод>.py` (общие варианты — `ace/show/__init__.py`) |
+| когда учится, сборка (`Learner`, `swap`) | `ace/learner.py` |
+| среда попытки (песочница) | `ace/env/` |
+| мета: Gate, Meta (MCE), Hooks | `ace/wrap/` |
 
-Сборка — `ace/learner.py` (`Learner`, `swap`); единственный проверяемый стык: память требует добавки от
-извлечения (`requires`), извлечение их даёт (`gives`). Абляция — замена уровня: `swap(ace, "ace_text",
-extract=Reflector(free=True), memory=Playbook(prune=None))`. Вмешательство посреди попытки — `Patch` из
-`on_step` (`ace/model.py`): переписать системный промпт, дописать сообщение в конец истории или к результату
-инструмента. Промпты — шаблоны Jinja2 в `ace/prompts/`, сериализации для модели — `ace/render.py`,
-разбор ответов — `ace/parse.py`, настройки — `ace/config.py`.
-
-Методы (`ace/methods/`): baseline; ace (стенд: рефлектор с метками, куратор операциями, отсев), ace_text,
-ace_rewrite; ace_exact и ace_exact_dedup (как в апстриме). В docstring метода — что взято из апстрима и где
-расходимся; все отклонения — в [DEVIATIONS.md](DEVIATIONS.md).
-DC (`ace/methods/dc.py`): dc (DC-Cu: cheatsheet целиком, куратор переписывает), dc_code (с песочницей,
-контейнер на вызов), dc_rs (пары и синтез cheatsheet под вопрос), контроли dc_retrieval и dc_history.
-TF-GRPO (`ace/methods/tfgrpo.py`, извлечение `ace/extract/tfgrpo.py`):
-в зачёт итоговый агент (T = 0.3, top_p 0.95), группа из 5 при T = 0.7, контраст попыток, план батча раз в 20.
-EvoLib (`ace/methods/evolib.py`, извлечение `ace/extract/evolib.py`): evolib (3 попытки, различие — выборка
-памяти по весу, в зачёт и вердикт группы — голосование; библиотека skills / insights с IG и Future IG,
-слиянием похожих и скрытым лучшим решением вопроса) и evolib_judge (баллы от судьи).
-
-Прототип отложен: его старый код — в теге `pre-rewrite` (`git show pre-rewrite:ace/methods/proto.py`).
+Методы (`ace/methods/<метод>.py` — только сборка, в docstring — что метод берёт на каждом уровне): baseline;
+ace, ace_text, ace_rewrite (стенд), ace_exact и ace_exact_dedup (как в апстриме); dc, dc_code, dc_rs, dc_retrieval,
+dc_history; scope, scope_bo2, scope_code, scope_k2; tfgrpo; evolib, evolib_judge; mce, mce_ace; гибриды ace_bo2,
+ace_opt, ace_hooks, ace_group. По умолчанию уровни ведут себя как апстрим; неустранимые отличия —
+[DEVIATIONS.md](DEVIATIONS.md), верность — тесты-мостик `tests/bridge/` (эталоны сняты с апстримов, `bridge/`).
+Прототип отложен: его код — в теге `pre-rewrite` (`git show pre-rewrite:ace/methods/proto.py`).
 
 ```
 uv sync                                   # окружение с зависимостями для разработки (pytest)
 docker build -t cestand-sandbox ace/env   # образ docker для исполнения кода
 uv run python run.py formula ace 40       # результаты в results/formula40/ace/
 EPOCHS=3 OFFLINE=1 uv run python run.py formula ace 40   # офлайн: обучение на train, тест с лучшей по val памятью
+BACKEND=wire uv run python run.py formula dc 40          # вызовы без инструментов — клиентом openai как есть
 uv run python ablate.py formula 40        # цепочка абляций; ступени по именам: ablate.py formula 40 ace ace_opt
 uv run python report.py                   # таблица по results/
 uv run pytest -q                          # тесты, в том числе мостик к апстримам (tests/bridge)
@@ -46,14 +36,9 @@ uv run python tools/trace.py /tmp/a.json   # снимок запросов вс�
 uv run python tools/compare.py /tmp/a.json /tmp/b.json   # два снимка: что поменяла правка
 ```
 
-Настройки (`ace/config.py`, из окружения): `OPENAI_BASE_URL` (по умолчанию `http://localhost:8080/v1`; старое
-`LOCAL_BASE_URL` тоже читается), `OPENAI_API_KEY` (`local`), `MODEL`, `MAX_TOKENS` (MEB: 8192), `SEED`, размеры
+Настройки (`ace/config.py`, из окружения): `OPENAI_BASE_URL` (по умолчанию `http://localhost:8080/v1`),
+`OPENAI_API_KEY` (`local`), `MODEL`, `BACKEND` (`pydantic-ai` или `wire`), `MAX_TOKENS` (MEB: 8192), `SEED`, размеры
 выборок `SIZE` и `VAL_SIZE` (40 и 10, входят в имя файла данных), `EPOCHS`, `OFFLINE`, `RESULTS`.
-
-Перенесены на уровни (поток B): scope, scope_bo2, scope_code, scope_k2 (`ace/methods/scope.py`, правило на шаг —
-`ace/extract/scope.py`); mce = Meta(базовый агент с файлами) и mce_ace = Meta(ACE) (`ace/methods/mce.py`);
-обёртки Meta и Gate (`ace/wrap.py`), Hooks — хуки по ошибкам (`ace/hooks.py`); гибриды ace_bo2, ace_opt, ace_hooks,
-ace_group (`ace/methods/hybrids.py`).
 
 ## Абляции и замеры
 
