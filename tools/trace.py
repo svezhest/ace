@@ -18,7 +18,11 @@ out, names = args[0], args[1:]
 sys.path.insert(0, str(root))
 import pydantic  # noqa: E402
 from ace import model as M  # noqa: E402
-from ace.loop import run, swap  # noqa: E402
+from ace.loop import run  # noqa: E402
+try:
+    from ace.learner import swap  # noqa: E402
+except ImportError:             # старый код (эталон с тега)
+    from ace.loop import swap  # noqa: E402
 from ace.methods import METHODS  # noqa: E402
 from ace.tasks import TASKS  # noqa: E402
 
@@ -107,6 +111,7 @@ class Fake:
 
 task = TASKS["formula"]
 targets = {r["context"]: r["target"] for s in ("", "train", "val") for r in task.load(s)}
+# батч 2 и офлайн, чтобы на 4 задачах сработали события батча и прохода
 special = {"tfgrpo": (dict(every=2), {}), "mce": (dict(every=2), dict(epochs=2, offline=True))}
 traces = {}
 tmp = Path(tempfile.mkdtemp(prefix="trace-"))

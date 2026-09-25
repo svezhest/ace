@@ -34,6 +34,11 @@ class Step(NamedTuple):
     args: str
     result: str
 
+    @property
+    def failed(self):
+        """Отбивка: traceback исполнения или ошибка вызова (ModelRetry, аргументы не той формы)."""
+        return "Traceback" in self.result or self.result.startswith("Error")
+
 
 @dataclass
 class Patch:

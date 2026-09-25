@@ -186,8 +186,8 @@ OPS = [dict(operation="UPDATE", id="r1", content="new"), dict(operation="ADD", i
 @pytest.mark.parametrize("records", [[], [("r1", "one")], [("r1", "one"), ("r2", "two")]])
 @pytest.mark.parametrize("ops", [[], OPS[:1], OPS[1:2], OPS])
 def test_batch_table(records, ops):
-    from ace.memory import Kind, Memory
-    memory = Memory({"experience": Kind()})
+    from ace.memory import Lessons
+    memory = Lessons()
     for _, text in records:
         memory.add(text)
-    assert render.batch_table(memory.of(), ops) == old_batch_table(records, ops)
+    assert render.batch_table(memory.records(), ops) == old_batch_table(records, ops)

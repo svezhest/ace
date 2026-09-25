@@ -45,7 +45,12 @@ def lines(records, line=numbered, sep="\n"):
 
 def grouped(records, line, group, groups, header, sep):
     """Записи под заголовками: groups — пары (группа, заголовок), group(r) — группа записи."""
-    return sep.join("\n".join([header.format(t)] + [line(r) for r in records if group(r) == g]) for g, t in groups)
+    return titled([(t, [r for r in records if group(r) == g]) for g, t in groups], line, header, sep)
+
+
+def titled(groups, line, header="## {}", sep="\n\n"):
+    """Группы записей под заголовками: groups — пары (заголовок, записи); пустые группы тоже показываются."""
+    return sep.join("\n".join([header.format(t)] + [line(r) for r in records]) for t, records in groups)
 
 
 def pairs(records, scored, note=""):
@@ -125,6 +130,11 @@ NO_RESPONSE = "sandbox: the container did not respond"
 def omitted(n):
     """Строка на месте вырезанной середины длинного вывода."""
     return f"... {n} lines omitted ..."
+
+
+def more_lines(left, offset):
+    """Хвост постраничного read: сколько строк осталось и откуда читать дальше."""
+    return f"... {left} more lines; read with offset={offset}"
 
 
 def time_limit(seconds):

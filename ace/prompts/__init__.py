@@ -14,6 +14,10 @@ class Prompt:
         self.name = name
         self.template = ENV.get_template(f"{name}.j2")
 
+    def __deepcopy__(self, memo):
+        """Шаблон неизменяем: копия ученика (снимок, прогон) делит его с оригиналом."""
+        return self
+
     def fill(self, values=None, /, **more):
         """values: dict полей."""
         return self.template.render({**(values or {}), **more})
