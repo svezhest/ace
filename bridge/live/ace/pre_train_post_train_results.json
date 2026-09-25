@@ -1,0 +1,87 @@
+[
+  {
+    "window": 1,
+    "global_step": 1,
+    "target": "15.0",
+    "pre_train_result": {
+      "final_answer": "15.00",
+      "is_correct": true,
+      "playbook_num_tokens": 61,
+      "playbook_length": 184
+    },
+    "post_train_result": {
+      "final_answer": "15.00",
+      "is_correct": true,
+      "playbook_num_tokens": 302,
+      "playbook_length": 1450
+    }
+  },
+  {
+    "window": 1,
+    "global_step": 2,
+    "target": "40.0",
+    "pre_train_result": {
+      "final_answer": "40.00",
+      "is_correct": true,
+      "playbook_num_tokens": 302,
+      "playbook_length": 1450
+    },
+    "post_train_result": {
+      "final_answer": "40.00",
+      "is_correct": true,
+      "playbook_num_tokens": 302,
+      "playbook_length": 1450
+    }
+  },
+  {
+    "window": 1,
+    "global_step": 3,
+    "target": "0.05",
+    "pre_train_result": {
+      "final_answer": "5.00",
+      "is_correct": false,
+      "playbook_num_tokens": 302,
+      "playbook_length": 1450
+    },
+    "post_train_result": {
+      "final_answer": "0.05",
+      "is_correct": true,
+      "playbook_num_tokens": 803,
+      "playbook_length": 3666
+    }
+  },
+  {
+    "window": 2,
+    "global_step": 4,
+    "target": "18.45",
+    "pre_train_result": {
+      "final_answer": "18.45",
+      "is_correct": true,
+      "playbook_num_tokens": 803,
+      "playbook_length": 3666
+    },
+    "post_train_result": {
+      "final_answer": "18.45",
+      "is_correct": true,
+      "playbook_num_tokens": 803,
+      "playbook_length": 3666
+    }
+  },
+  {
+    "window": 2,
+    "global_step": 5,
+    "target": "5.0",
+    "pre_train_result": {
+      "final_answer": "5.00",
+      "is_correct": true,
+      "playbook_num_tokens": 803,
+      "playbook_length": 3666
+    },
+    "post_train_result": {
+      "final_answer": "5.00",
+      "is_correct": true,
+      "playbook_num_tokens": 803,
+      "playbook_length": 3666
+    }
+  }
+]

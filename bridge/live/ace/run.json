@@ -1,0 +1,12 @@
+{
+  "upstream": "ace",
+  "commit": "82709de050e1db6e6ef2f07bcb0393560b94992a",
+  "date": "2026-09-25",
+  "model": "ornith15-9b (ornith15-9b-mlx-8bit через шлюз :8080)",
+  "slice": "eval/finance/data/formula_test.jsonl, первые 5 строк; sample_config.json в cwd: {\"formula\": {\"test_data\": \"./eval/finance/data/formula_test5.jsonl\"}}",
+  "env": "PYTHONPATH=<каталог с sitecustomize.py>:<upstream> ACE_BASE_URL=http://127.0.0.1:8093/v1 OPENAI_API_KEY=x TIKTOKEN_CACHE_DIR HF_HUB_OFFLINE=1",
+  "record": "uv run python -m tools.record.record rec.jsonl --port 8093 --upstream http://localhost:8080 --seed",
+  "command": "python -m eval.finance.run --task_name formula --mode online --save_path <OUT> --api_provider openai --generator_model ornith15-9b --reflector_model ornith15-9b --curator_model ornith15-9b --test_workers 1 --online_eval_frequency 3 --save_steps 1",
+  "calls": 31,
+  "accuracy": {"initial": 0.8, "online": 0.8}
+}

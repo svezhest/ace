@@ -1,0 +1,37 @@
+{
+  "test_accuracy": 0.8,
+  "test_results": {
+    "accuracy": 0.8,
+    "correct": 4,
+    "total": 5,
+    "window_results": [
+      {
+        "window": 1,
+        "start_idx": 0,
+        "end_idx": 3,
+        "window_accuracy": 0.6666666666666666,
+        "window_correct": 2,
+        "window_total": 3
+      },
+      {
+        "window": 2,
+        "start_idx": 3,
+        "end_idx": 5,
+        "window_accuracy": 1.0,
+        "window_correct": 2,
+        "window_total": 2
+      }
+    ]
+  },
+  "test_error_log": {
+    "accuracy": 0.8,
+    "errors": [
+      {
+        "window": 1,
+        "global_index": 2,
+        "prediction": "5.00",
+        "ground_truth": "0.05"
+      }
+    ]
+  }
+}
