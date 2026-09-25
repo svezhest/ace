@@ -1,0 +1,41 @@
+#!/bin/sh
+# Окружения для снятия эталонов: чистые worktree апстримов на зафиксированных коммитах и venv через uv.
+# usage: bridge/setup_envs.sh [ace|mce|youtu|light ...]   (без аргументов — все)
+set -e
+REPRO=${REPRO:-/Users/user/Projects/itmo/cs-masters/thesis/repro}
+UP=${UPSTREAMS:-/Users/user/Projects/upstreams}
+V=$UP/.venvs
+mkdir -p "$V"
+
+tree() {  # name commit
+  [ -d "$UP/$1" ] || git -C "$REPRO/$1" worktree add --detach "$UP/$1" "$2"
+  test "$(git -C "$UP/$1" rev-parse --short=7 HEAD)" = "$2"
+}
+tree ace 82709de
+tree dynamic-cheatsheet 5cfe3c3
+tree SCOPE 4dc0da5
+tree EvoLib 98266b2
+tree meta-context-engineering c4b7a7c
+tree youtu-agent c2caa53
+
+# зависимости из uv.lock апстрима, сам проект не ставим (иначе в worktree появятся egg-info)
+locked() {  # venv project python [extra index args]
+  uv venv -q --allow-existing -p "$3" "$V/$1"
+  uv export -q --frozen --no-hashes --no-emit-project --project "$UP/$2" > "$V/$1.req.txt"
+  uv pip install -q -p "$V/$1" --index-url https://pypi.org/simple -r "$V/$1.req.txt"
+}
+
+want() { [ -z "$ARGS" ] || echo " $ARGS " | grep -q " $1 "; }
+ARGS="$*"
+
+want ace && locked ace ace 3.11
+want mce && locked mce meta-context-engineering 3.11
+want youtu && locked youtu youtu-agent 3.12
+if want light; then
+  # SCOPE + DC + EvoLib: у DC и EvoLib нет lock-файла, ставим по импортам
+  uv venv -q --allow-existing -p 3.11 "$V/light"
+  uv pip install -q -p "$V/light" -r "$UP/EvoLib/EvoLib/requirements.txt" \
+    "openai>=1.0.0" "anthropic>=0.18.0" "litellm>=1.0.0" python-dotenv \
+    numpy tiktoken scikit-learn
+fi
+echo ok
