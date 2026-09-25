@@ -1,16 +1,18 @@
 """Задачи: данные, инструкция решателю и проверка ответа. Проверки finer и formula — как в ACE, meb — как в DC
-(сверка с эталонами: tests/bridge/test_bridge_tasks.py), dapo — как в TF-GRPO, gpqa — наша.
+(сверка с эталонами: tests/bridge/test_bridge_tasks.py), dapo — как в TF-GRPO, hmmt — как в EvoLib, gpqa — наша.
 
 dapo — DAPO-Math-17k в порядке апстрима TF-GRPO (scripts/data/process_training_free_GRPO_data.py: без дублей,
 shuffle Random(42)), задачи на английском с условием короче 160 символов: train — первые 40, val — следующие 10,
-тест — ещё 40."""
+тест — ещё 40.
+hmmt — бенчмарк EvoLib (eval_main.py _build_hmmt_task): MathArena/hmmt_feb_2025, hmmt_nov_2025, hmmt_feb_2026 подряд
+(93 задачи, в hmmt40 — первые 40), ответ — answer без пробелов по краям; только онлайн, без train и val."""
 import json
 from dataclasses import dataclass, field
 
 from math_verify.metric import math_metric
 from math_verify.parser import ExprExtractionConfig, LatexExtractionConfig
 
-from . import config, prompts
+from . import config, matharena, prompts
 
 
 @dataclass
@@ -104,15 +106,20 @@ def dapo_ok(pred, tgt):
     return float(score) == 1.0
 
 
+def hmmt_ok(pred, tgt):
+    """eval_function HMMT апстрима EvoLib: extract_and_grade MathArena по тексту решения (ace/matharena)."""
+    return matharena.grade(pred, tgt)
+
+
 def gpqa_ok(pred, tgt):
     """Наша: буква варианта в начале ответа. Не eval_for_multiple_choice DC (тот принимает и текст варианта из
     вопроса): GPQA в стенде — наша задача, не из статей методов."""
     return pred.strip("()`*. ").upper()[:1] == tgt.strip("()").upper()[:1]
 
 
-CHECK = {"finer": finer_ok, "formula": formula_ok, "meb": meb_ok, "gpqa": gpqa_ok, "dapo": dapo_ok}
+CHECK = {"finer": finer_ok, "formula": formula_ok, "meb": meb_ok, "gpqa": gpqa_ok, "dapo": dapo_ok, "hmmt": hmmt_ok}
 
-TASKS = {name: Task(name) for name in ("finer", "formula", "meb", "gpqa", "dapo")}
+TASKS = {name: Task(name) for name in ("finer", "formula", "meb", "gpqa", "dapo", "hmmt")}
 
 
 def accuracy(task, answers, targets):

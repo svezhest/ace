@@ -14,7 +14,8 @@ version = "0.1"
 source = { virtual = "." }
 dependencies = [
     { name = "jinja2", marker = "python_full_version < '3.15' or platform_system != 'Linux' or sys_platform == 'emscripten'" },
-    { name = "math-verify", extra = ["antlr4-13-2"], marker = "python_full_version < '3.15' or platform_system != 'Linux' or sys_platform == 'emscripten'" },
+    { name = "loguru", marker = "python_full_version < '3.15' or platform_system != 'Linux' or sys_platform == 'emscripten'" },
+    { name = "math-verify", extra = ["antlr4-11-0"], marker = "python_full_version < '3.15' or platform_system != 'Linux' or sys_platform == 'emscripten'" },
     { name = "pydantic-ai-slim", extra = ["openai"], marker = "python_full_version < '3.15' or platform_system != 'Linux' or sys_platform == 'emscripten'" },
     { name = "sentence-transformers", marker = "python_full_version < '3.15' or platform_system != 'Linux' or sys_platform == 'emscripten'" },
 ]
@@ -28,7 +29,8 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "jinja2", specifier = ">=3.1.6" },
-    { name = "math-verify", extras = ["antlr4-13-2"], specifier = "==0.9.0" },
+    { name = "loguru", specifier = ">=0.7.3" },
+    { name = "math-verify", extras = ["antlr4-11-0"], specifier = "==0.9.0" },
     { name = "pydantic-ai-slim", extras = ["openai"], specifier = ">=2.46" },
     { name = "sentence-transformers", specifier = ">=3.0" },
 ]
@@ -59,11 +61,11 @@ wheels = [
 
 [[package]]
 name = "antlr4-python3-runtime"
-version = "4.13.2"
+version = "4.11.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/33/5f/2cdf6f7aca3b20d3f316e9f505292e1f256a32089bd702034c29ebde6242/antlr4_python3_runtime-4.13.2.tar.gz", hash = "sha256:909b647e1d2fc2b70180ac586df3933e38919c85f98ccc656a96cd3f25ef3916", size = 117467 }
+sdist = { url = "https://files.pythonhosted.org/packages/a4/1b/59dc12d9816edee8be6a166be7c220910ff18cce2ded9877a08b27396a83/antlr4-python3-runtime-4.11.0.tar.gz", hash = "sha256:6a46d4f6033c8d7e53c8975cee5d83b3ba1b48157f6beb09a4965062dacfe2e0", size = 116951 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/89/03/a851e84fcbb85214dc637b6378121ef9a0dd61b4c65264675d8a5c9b1ae7/antlr4_python3_runtime-4.13.2-py3-none-any.whl", hash = "sha256:fe3835eb8d33daece0e799090eda89719dbccee7aa39ef94eed3818cafa5a7e8", size = 144462 },
+    { url = "https://files.pythonhosted.org/packages/37/f3/2cab1ffe441ffcc4605bf638f524fed86db6699a25d04bbecb5bfdde372b/antlr4_python3_runtime-4.11.0-py3-none-any.whl", hash = "sha256:f523f91387283045f129c343b363a8dda3a07eea62721b8eda95f2d8b817b656", size = 144189 },
 ]
 
 [[package]]
@@ -668,7 +670,7 @@ wheels = [
 ]
 
 [package.optional-dependencies]
-antlr4-13-2 = [
+antlr4-11-0 = [
     { name = "antlr4-python3-runtime", marker = "python_full_version < '3.15' or platform_system != 'Linux' or sys_platform == 'emscripten'" },
 ]
 
@@ -679,6 +681,19 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/50/8a/3d108abf3ad67166fa22742b414ec386de042e5762de3e7b0c644cd6f359/logfire_api-5.1.0.tar.gz", hash = "sha256:16abf9d7d35e08cda2dab66fd0883cabaa4d4206f3dcea0f5967dbc823f01d6d", size = 96091 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/2d/51/123dab197fb08c0892e3bea1c2266bff159aa2ee82ad43bef93505859705/logfire_api-5.1.0-py3-none-any.whl", hash = "sha256:f3ad92eed63f7fce45580bf92ff85367c695c4a5bfee52241d71a8bacd3e3697", size = 146617 },
+]
+
+[[package]]
+name = "loguru"
+version = "0.7.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "colorama", marker = "platform_system != 'Linux' and sys_platform == 'win32'" },
+    { name = "win32-setctime", marker = "platform_system != 'Linux' and sys_platform == 'win32'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/3a/05/a1dae3dffd1116099471c643b8924f5aa6524411dc6c63fdae648c4f1aca/loguru-0.7.3.tar.gz", hash = "sha256:19480589e77d47b8d85b2c827ad95d49bf31b0dcde16593892eb51dd18706eb6", size = 63559 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/0c/29/0348de65b8cc732daa3e33e67806420b2ae89bdce2b04af740289c5c6c8c/loguru-0.7.3-py3-none-any.whl", hash = "sha256:31a33c10c8e1e10422bfd431aeb5d351c7cf7fa671e3c4df004162264b28220c", size = 61595 },
 ]
 
 [[package]]
@@ -780,8 +795,8 @@ wheels = [
 ]
 
 [package.optional-dependencies]
-antlr4-13-2 = [
-    { name = "latex2sympy2-extended", extra = ["antlr4-13-2"], marker = "python_full_version < '3.15' or platform_system != 'Linux' or sys_platform == 'emscripten'" },
+antlr4-11-0 = [
+    { name = "latex2sympy2-extended", extra = ["antlr4-11-0"], marker = "python_full_version < '3.15' or platform_system != 'Linux' or sys_platform == 'emscripten'" },
 ]
 
 [[package]]
@@ -1935,4 +1950,13 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/e3/05/b17359e1cefb4f909b5e40b1b90a496d987258916dbbf88e842c729f510e/urllib3-2.8.0.tar.gz", hash = "sha256:63bf2ead4c879426ebf22ef2a781eeb4aa3b4ae798a0435506f8687fd5bb9b63", size = 458972 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/92/9d/c4e665119135114480843e7ab388fa94d8480650450e6f8e26b70d323a4c/urllib3-2.8.0-py3-none-any.whl", hash = "sha256:0cf3cae568d36aa9576b28dfb35f11328f1cb974ca7647d9475ebb86c75ac6e3", size = 135717 },
+]
+
+[[package]]
+name = "win32-setctime"
+version = "1.2.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/b3/8f/705086c9d734d3b663af0e9bb3d4de6578d08f46b1b101c2442fd9aecaa2/win32_setctime-1.2.0.tar.gz", hash = "sha256:ae1fdf948f5640aae05c511ade119313fb6a30d7eabe25fef9764dca5873c4c0", size = 4867 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e1/07/c6fe3ad3e685340704d314d765b7912993bcb8dc198f0e7a89382d37974b/win32_setctime-1.2.0-py3-none-any.whl", hash = "sha256:95d644c4e708aba81dc3704a116d8cbc974d70b3bdb8be1d150e36be6e9d1390", size = 4083 },
 ]

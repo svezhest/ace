@@ -45,3 +45,13 @@ def test_gpqa():
     assert TASKS["gpqa"].check("(B).", "(B)")
     assert not TASKS["gpqa"].check("C", "(B)")
 
+
+
+def test_hmmt():
+    """extract_and_grade MathArena: ответ из текста решения (последний \\boxed), эталон разбирается; эталон в \\boxed{}
+    (так EvoLib сверяет старое решение с ответом большинства) не разбирается — неверно."""
+    t = TASKS["hmmt"]
+    assert t.check("so <answer>\\boxed{103}</answer>", "103")
+    assert t.check("<answer>\\boxed{\\frac{9\\sqrt{23}}{23}}</answer>", "\\frac{9 \\sqrt{23}}{23}")
+    assert not t.check("x \\boxed{3375}", "\\boxed{3375}") and not t.check("\\boxed{3375}", "3376")
+    assert len(t.load()) == 40 and t.load()[0]["target"] == "103"
