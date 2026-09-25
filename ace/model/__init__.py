@@ -88,7 +88,8 @@ def params(temperature=0, top_p=None, max_tokens=None):
 
 
 class Outcome(Enum):
-    """Чем кончился вызов."""
+    """Чем кончился вызов. Запросов модели — rounds раундов инструментов и ещё EXTRA_REQUESTS (ответ и одно
+    исправление вывода, agent.py): кто их все потратил на вызовы, остаётся без ответа (step)."""
     answer = "answer"       # модель ответила
     step = "step"           # кончился лимит запросов: шаг сделан, ответа ещё нет
     broken = "broken"       # модель сломалась: вывод не прошёл схему после всех попыток (UnexpectedModelBehavior)
@@ -101,9 +102,20 @@ class Step(NamedTuple):
     result: str
 
     @property
+    def call_error(self):
+        """Ошибка вызова: отбивка инструмента (ModelRetry, аргументы не той формы) — код не исполнялся; учит скорее
+        тому, что инструмент неудобен."""
+        return self.result.startswith("Error")
+
+    @property
+    def exec_error(self):
+        """Ошибка исполнения: traceback кода — на ней учатся хуки по ошибкам."""
+        return "Traceback" in self.result
+
+    @property
     def failed(self):
-        """Отбивка: traceback исполнения или ошибка вызова (ModelRetry, аргументы не той формы)."""
-        return "Traceback" in self.result or self.result.startswith("Error")
+        """Любая ошибка шага (SCOPE учится на обеих, как апстрим)."""
+        return self.call_error or self.exec_error
 
 
 @dataclass

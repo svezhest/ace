@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, ToolCallPart, UserPromptPart
 from pydantic_ai.models.function import AgentInfo, FunctionModel
-from stub import TASK, Stub, right
+from stub import TASK, Stub, episode, right
 
 from ace import verdict
 from ace.env import Env
@@ -365,3 +365,14 @@ def test_own_solver_dead_levels():
     model = Stub()
     run(TASK, t07, model, 1)
     assert [c["temperature"] for c in model.calls[:3]] == [0, 0.7, 0.7]
+
+
+def test_finish_by_outcome():
+    from ace.loop import finish
+    from ace.model import Outcome
+    ep = episode()
+    assert finish(ep) == "stop"
+    ep.outcome = Outcome.step
+    assert finish(ep) == "rounds"
+    ep.outcome, ep.truncated = Outcome.broken, True
+    assert finish(ep) == "length"

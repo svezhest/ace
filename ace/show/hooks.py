@@ -6,8 +6,8 @@ from . import AfterError, Show, Whole
 
 
 def fired(records, step):
-    """Хуки, показанные после шага step."""
-    return [r for r in records if r.fires(step.result)] if step.failed else []
+    """Хуки, показанные после шага step: только после ошибки исполнения (ошибка вызова инструмента — не урок кода)."""
+    return [r for r in records if r.fires(step.result)] if step.exec_error else []
 
 
 AFTER = AfterError(Show(), lambda memory: memory.records(), trigger=lambda r: r.trigger)

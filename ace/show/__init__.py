@@ -9,7 +9,7 @@
     TopK        k ближайших к вопросу по эмбеддингу
     Catalog     в промпте строки каталога (id и head()), тела — инструментом read, только чтение;
                 прочитанное цикл пишет в episode.used
-    AfterError  после шага с ошибкой — записи, чей триггер есть в тексте ошибки, сообщением в конец истории
+    AfterError  после шага с ошибкой исполнения — записи, чей триггер есть в тексте ошибки, сообщением в конец истории
                 (Patch(append)); исходы показа и сами хуки — у обёртки Hooks
 Переписать системный промпт посреди попытки (SCOPE) — Patch(system) из on_step показа.
 
@@ -111,7 +111,7 @@ class AfterError(Show):
 
     def on_step(self, ex, memory, attempt, step):
         patch = self.base.on_step(ex, memory, attempt, step)
-        if not step.failed:
+        if not step.exec_error:
             return patch
         hit = [r for r in self.records(memory) if self.trigger(r).lower() in step.result.lower()]
         if not hit:

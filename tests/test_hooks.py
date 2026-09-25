@@ -77,17 +77,36 @@ def test_hook_book():
     assert HookBook(prune=None).requires == frozenset({TRIGGER})
 
 
+def step(h, a, s, turn):
+    """Шаг s из ответа модели номер turn, как его отдаёт цикл."""
+    a.steps.append(s)
+    a.turns.append(turn)
+    return h.on_step(Ex(), a, s)
+
+
 def test_after_error_patch_and_outcome():
     h = Hooks(Learner("x"), learn="raw")
     h.hooks.add("Check the denominator.", trigger="ZeroDivisionError")
     a = Attempt("q", 0, True, Prompt(), "SYS")
-    a.steps.append(FAIL)
-    assert h.on_step(Ex(), a, FAIL) == Patch(append="Known fix for this error:\n- Check the denominator.")
-    a.steps.append(FINE)
-    assert h.on_step(Ex(), a, FINE) is None and a.fired == [("h1", True)]
-    a.steps += [FAIL, FAIL]
-    h.on_step(Ex(), a, FAIL)
+    assert step(h, a, FAIL, 0) == Patch(append="Known fix for this error:\n- Check the denominator.")
+    assert step(h, a, FINE, 1) is None and a.fired == [("h1", True)]
+    step(h, a, FAIL, 2)
+    step(h, a, FAIL, 3)
     assert a.fired == [("h1", True), ("h1", False)]
+
+
+def test_outcome_by_next_response():
+    """Хук показан после всех шагов ответа: второй шаг того же ответа его не видел, исход — по первому шагу
+    следующего ответа; ошибка вызова инструмента хук не показывает."""
+    h = Hooks(Learner("x"), learn="raw")
+    h.hooks.add("Check the denominator.", trigger="ZeroDivisionError")
+    a = Attempt("q", 0, True, Prompt(), "SYS")
+    step(h, a, FAIL, 0)
+    step(h, a, FINE, 0)
+    assert a.fired == []
+    step(h, a, FAIL, 1)
+    assert a.fired == [("h1", False)]
+    assert step(h, Attempt("q", 0, True, Prompt(), "SYS"), Step("run_python", "{}", "Error: ZeroDivisionError"), 0) is None
 
 
 def test_system_variant():

@@ -20,7 +20,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 from . import config, render
-from .model import Call, messages, params
+from .model import Call, Outcome, messages, params
 from .tasks import accuracy, final_answer
 from .extract import Contract
 from .verdict import LABELED, majority
@@ -59,6 +59,7 @@ class Attempt:
     prompt: Prompt
     system: str = ""            # системный промпт попытки целиком (Patch(system) пишет новый на его основе)
     steps: list = field(default_factory=list)       # model.Step до текущего включительно
+    turns: list = field(default_factory=list)       # номер ответа модели у каждого шага (шаги одного ответа — вместе)
     patches: list = field(default_factory=list)     # model.Patch, применённые после шагов
     shown: list = field(default_factory=list)       # id записей, показанных посреди попытки (Patch)
     fired: list = field(default_factory=list)       # (id показанного урока, помог ли) — исходы показа после ошибки
@@ -81,6 +82,7 @@ class Episode:
     ok: bool = None             # вердикт попытки; None — его нет
     target: str = ""            # верный ответ — только при golden
     system: str = ""            # системный промпт при запуске попытки (роль задачи, подсказка среды, показ)
+    outcome: Outcome = Outcome.answer   # чем кончился вызов модели: ответ, кончились запросы, вывод не прошёл схему
 
     @property
     def shown(self):
@@ -207,7 +209,8 @@ class Experiment:
             env.close()
         final = reply.output or ""
         ep = Episode(a.question, k, prompt, reply.text, final, final_answer(final), reply.steps, reply.truncated,
-                     list(prompt.deps.reads) if prompt.deps is not None else [], a.fired, a.patches, system=a.system)
+                     list(prompt.deps.reads) if prompt.deps is not None else [], a.fired, a.patches, system=a.system,
+                     outcome=reply.outcome)
         self.learner.verdict(self, ep, item["target"])
         return ep
 
@@ -218,16 +221,17 @@ class Experiment:
         reply = solver.talk(self.model, call) if solver.talk else self.model.ask(call)
         final = reply.output or ""
         ep = Episode(item["context"], k, prompt, reply.text, final, solver.answer(final), [], reply.truncated,
-                     [], [], [])
+                     [], [], [], outcome=reply.outcome)
         self.learner.verdict(self, ep, item["target"])
         return ep
 
     def stepper(self, a):
         """on_step для модели: каждый новый шаг — ученику; его Patch-и одного запроса сливаются."""
         def on_step(new):
-            patch = None
+            patch, turn = None, (a.turns[-1] + 1 if a.turns else 0)
             for step in new:
                 a.steps.append(step)
+                a.turns.append(turn)
                 p = self.learner.on_step(self, a, step)
                 if p:
                     a.patches.append(p)
@@ -284,7 +288,11 @@ class Experiment:
 
 
 def finish(ep):
-    return "length" if ep.truncated else "stop"
+    """Чем кончилась попытка: length — обрыв по длине, rounds — запросы кончились без ответа, broken — вывод так и не
+    прошёл схему, stop — ответ."""
+    if ep.truncated:
+        return "length"
+    return {Outcome.step: "rounds", Outcome.broken: "broken"}.get(ep.outcome, "stop")
 
 
 def entry(phase, epoch, i, g, item, correct, gated, memory_chars, sec):

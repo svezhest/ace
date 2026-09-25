@@ -27,7 +27,8 @@ class HookLessons(BaseModel):
 
 
 def failures(ep):
-    return [s for s in ep.steps if s.failed]
+    """Шаги с ошибкой исполнения; ошибка вызова инструмента — не урок кода."""
+    return [s for s in ep.steps if s.exec_error]
 
 
 def outcomes(group):
@@ -73,7 +74,7 @@ def error_kind(result):
 def by_trajectory(ex, ep, memory):
     """Ошибка и следующий вызов, который прошёл без ошибки."""
     return [(error_kind(s.result), render.raw_hook(nxt.tool, nxt.args))
-            for s, nxt in zip(ep.steps, ep.steps[1:]) if s.failed and not nxt.failed]
+            for s, nxt in zip(ep.steps, ep.steps[1:]) if s.exec_error and not nxt.failed]
 
 
 LEARN = {"model": by_model, "raw": by_trajectory}

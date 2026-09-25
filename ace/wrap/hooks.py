@@ -2,12 +2,13 @@
 показ (show/hooks.py) поверх любого ученика.
 
     learn="model"   уроки по ошибкам попытки выводит модель; learn="raw" — ошибка и следующий вызов, который прошёл
-    show="after"    после шага с ошибкой хуки с её trigger — сообщением в конец истории (Patch(append)): исправление.
-                    Исход — по следующему шагу: помог, если его ошибка не повторилась; без следующего шага исхода нет
+    show="after"    после шага с ошибкой исполнения хуки с её trigger — сообщением в конец истории (Patch(append)):
+                    исправление. Исход — по первому шагу следующего ответа модели (Patch встаёт после всех шагов
+                    ответа): помог, если его ошибка не повторилась; без следующего шага исхода нет
     show="system"   все хуки в системном промпте с начала попытки: предотвращение. Исход — по попытке: помог, если
                     его ошибки в ней не было
-Исходы показа (fired) — метки хуков. Ошибки шага бывают только у решателя с инструментами: ученику нужна среда
-с исполнением кода."""
+Исходы показа (fired) — метки хуков. Учатся хуки только на ошибках исполнения (traceback), не на отбивках вызова
+инструмента. Ошибки шага бывают только у решателя с инструментами: ученику нужна среда с исполнением кода."""
 import copy
 
 from ..extract import missing
@@ -22,6 +23,7 @@ class Hooks(Wrapper):
         super().__init__(inner, name)
         self.hooks, self.extract_hooks, self.show_at = HookBook(prune), FromErrors(LEARN[learn]), show
         self.pending_hooks = []
+        self.waiting = None         # (попытка, ответ, id хуков, показанных после него) — ждут исхода
         lack = missing(self.hooks, self.extract_hooks)
         if lack:
             raise ValueError(f"{self.name}: память хуков требует {', '.join(sorted(lack))}")
@@ -45,9 +47,17 @@ class Hooks(Wrapper):
         patch = self.inner.on_step(ex, attempt, step)
         if self.show_at != "after":
             return patch
-        if len(attempt.steps) > 1:
-            attempt.fired += [(r.id, not (step.failed and r.fires(step.result)))
-                              for r in fired(self.hooks.records(), attempt.steps[-2])]
+        turn = attempt.turns[-1] if attempt.turns else len(attempt.steps)
+        if self.waiting and self.waiting[0] is attempt and self.waiting[1] < turn:
+            attempt.fired += [(id, not (step.exec_error and self.hooks.get(id).fires(step.result)))
+                              for id in self.waiting[2] if self.hooks.get(id)]
+            self.waiting = None
+        shown = [r.id for r in fired(self.hooks.records(), step)]
+        if shown:
+            if self.waiting and self.waiting[0] is attempt:
+                self.waiting[2].extend(shown)
+            else:
+                self.waiting = (attempt, turn, shown)
         mine = AFTER.on_step(ex, self.hooks, attempt, step)
         return mine if patch is None else patch.merge(mine) if mine else patch
 
