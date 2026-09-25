@@ -13,9 +13,10 @@ from ace.learner import swap
 from ace.loop import run
 from ace.memory.ace import SectionedPlaybook, layout
 from ace.methods.ace import ace
-from ace.model import Model
 from ace.tasks import TASKS
 from tools.record.replay import Replayer
+
+from . import replaying
 
 LIVE = Path(__file__).resolve().parents[2] / "bridge" / "live" / "ace"
 N, WINDOW = 5, 3
@@ -35,7 +36,7 @@ def replayed(tmp_path_factory):
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     STEPS.clear()
     try:
-        model = Model("ornith15-9b", f"http://127.0.0.1:{srv.server_address[1]}/v1", backend="wire")
+        model = replaying(srv)
         run(TASKS["formula"], swap(ace, protocol=replace(ace.protocol, window=WINDOW), memory=Watched()), model, N, str(out))
     finally:
         srv.shutdown()

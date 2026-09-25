@@ -20,10 +20,11 @@ from ace.learner import swap
 from ace.loop import run
 from ace.memory.dc import Cheatsheet, Pairs
 from ace.methods.dc import dc, dc_code, dc_history, dc_retrieval, dc_rs
-from ace.model import Model
 from ace.solver import dc as show
 from ace.tasks import TASKS
 from tools.record.replay import Replayer
+
+from . import replaying
 
 LIVE = Path(__file__).resolve().parents[2] / "bridge" / "live"
 N = 5
@@ -69,7 +70,7 @@ def replayed(request, tmp_path_factory):
     patch = pytest.MonkeyPatch()
     try:
         patch.setattr(show, "run_block", executed(name).__getitem__)
-        model = Model("ornith15-9b", f"http://127.0.0.1:{srv.server_address[1]}/v1", backend="wire")
+        model = replaying(srv)
         run(TASKS["meb"], METHODS[name], model, N, str(out))
     finally:
         patch.undo()

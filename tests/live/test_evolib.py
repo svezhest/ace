@@ -16,9 +16,10 @@ from ace.learner import swap
 from ace.loop import run
 from ace.memory.evolib import Library
 from ace.methods.evolib import evolib
-from ace.model import Model
 from ace.tasks import Task
 from tools.record.replay import Replayer
+
+from . import replaying
 
 LIVE = Path(__file__).resolve().parents[2] / "bridge" / "live" / "evolib"
 RUN = json.load(open(LIVE / "run.json"))
@@ -51,7 +52,7 @@ def replayed(tmp_path_factory):
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     STEPS.clear()
     try:
-        model = Model("ornith15-9b", f"http://127.0.0.1:{srv.server_address[1]}/v1", backend="wire")
+        model = replaying(srv)
         task = Stream("hmmt")
         run(task, swap(evolib, memory=Watched()), model, RUN["iterations"], str(out))
     finally:

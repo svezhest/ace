@@ -22,9 +22,10 @@ from ace.learner import swap
 from ace.loop import run
 from ace.memory.scope import Book, Perspectives, Strategic
 from ace.methods.scope import scope, scope_bo2, scope_code, scope_k2
-from ace.model import Model
 from ace.tasks import TASKS
 from tools.record.replay import Replayer
+
+from . import replaying
 
 LIVE = Path(__file__).resolve().parents[2] / "bridge" / "live"
 AGENT = "formula_agent"
@@ -116,7 +117,7 @@ def replayed(request, tmp_path_factory):
     try:
         patch.setattr(sandbox, "run", recorded_run(executed(name)))
         watch_history(patch)
-        model = Model("ornith15-9b", f"http://127.0.0.1:{srv.server_address[1]}/v1", backend="wire")
+        model = replaying(srv)
         learner = METHODS[name]()
         run(TASKS["formula"], learner, model, json.load(open(LIVE / name / "run.json"))["n"], str(out))
     finally:
