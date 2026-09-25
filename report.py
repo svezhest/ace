@@ -10,8 +10,8 @@ from pathlib import Path
 
 from ace.loop import in_score
 
-HEADER = (f"{'run':64} {'ok':>6} {'acc':>5} {'trunc':>5} {'err':>4} {'calls':>6} {'tok':>9} {'read%':>6} {'ok|read':>8} "
-          f"{'ok|none':>8} {'fired':>6} {'helped':>6}")
+HEADER = (f"{'run':64} {'ok':>6} {'acc':>5} {'trunc':>5} {'err':>4} {'calls':>6} {'tok':>9} {'read%':>6} "
+          f"{'ok|read':>8} {'ok|none':>8} {'fired':>6} {'helped':>6}")
 
 
 def final(log):

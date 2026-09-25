@@ -147,7 +147,8 @@ def history(ex, memory, item, question):
 
 def synthesis(ex, memory, item, question):
     pairs, recs = RETRIEVAL.text(ex, memory, item)
-    prompt = SYNTH.fill(PREVIOUS_INPUT_OUTPUT_PAIRS=pairs, NEXT_INPUT=question, PREVIOUS_CHEATSHEET=memory.sheet.current())
+    prompt = SYNTH.fill(PREVIOUS_INPUT_OUTPUT_PAIRS=pairs, NEXT_INPUT=question,
+                        PREVIOUS_CHEATSHEET=memory.sheet.current())
     out = ex.model.ask(Call(messages(prompt), dc_params(TOKENS * MAX_TOKENS), CHEATSHEET)).output
     return (pairs if out is None else out), recs
 

@@ -36,8 +36,9 @@ class Kernel:
 
     def start(self):
         self.name = f"tfgrpo-kernel-{uuid.uuid4().hex[:12]}"
-        self.proc = subprocess.Popen(["docker", "run", "--rm", "-i", "--name", self.name, *ISOLATION, *ENV, IMAGE, "python",
-                                      "-c", self.code], stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+        command = ["docker", "run", "--rm", "-i", "--name", self.name, *ISOLATION, *ENV, IMAGE,
+                   "python", "-c", self.code]
+        self.proc = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
 
     def call(self, arguments):
         if self.proc is None or self.proc.poll() is not None:

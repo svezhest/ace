@@ -101,9 +101,9 @@ MERGE = prompts.load("ace_merge")
 SECTIONS = prompts.text("ace_sections").splitlines()
 OTHERS = "others"
 GENERAL = "general"         # раздел, которого нет: пункт встаёт в начало OTHERS
-SLUGS = {"financial_strategies_and_insights": "fin", "formulas_and_calculations": "calc", "code_snippets_and_templates": "code",
-         "common_mistakes_to_avoid": "err", "problem_solving_heuristics": "prob", "context_clues_and_indicators": "ctx",
-         "others": "misc", "meta_strategies": "meta"}
+SLUGS = {"financial_strategies_and_insights": "fin", "formulas_and_calculations": "calc",
+         "code_snippets_and_templates": "code", "common_mistakes_to_avoid": "err", "problem_solving_heuristics": "prob",
+         "context_clues_and_indicators": "ctx", "others": "misc", "meta_strategies": "meta"}
 TOKEN_BUDGET = 80000
 HIGH_HELPFUL = 5            # пункт «high performing»: helpful больше и harmful меньше этих
 HIGH_HARMFUL = 2

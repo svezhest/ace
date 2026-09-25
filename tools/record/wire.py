@@ -65,7 +65,10 @@ def sse(resp: dict, body: dict) -> bytes:
 def assemble(frames: list[dict]) -> dict:
     """Кадры chat.completion.chunk -> chat.completion, как его отдаёт сервер без stream: текст и аргументы
     инструментов подряд, tool_calls с index, finish_reason, usage (кадр без choices)."""
-    msg, calls, finish, usage = {"role": "assistant", "content": None}, {}, None, None
+    msg = {"role": "assistant", "content": None}
+    calls = {}              # номер вызова -> собранный вызов инструмента
+    finish = None
+    usage = None
     for f in frames:
         usage = f.get("usage") or usage
         for ch in f.get("choices") or []:

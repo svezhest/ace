@@ -14,8 +14,9 @@ from ace.tasks import TASKS
 task, method = TASKS[sys.argv[1]], METHODS[sys.argv[2]]
 if config.EPOCHS or config.OFFLINE:
     offline = config.OFFLINE or method.protocol.offline
-    method = swap(method, protocol=replace(method.protocol, epochs=config.EPOCHS or method.protocol.epochs, offline=offline,
-                                           window=0 if offline else method.protocol.window))
+    epochs = config.EPOCHS or method.protocol.epochs
+    window = 0 if offline else method.protocol.window
+    method = swap(method, protocol=replace(method.protocol, epochs=epochs, offline=offline, window=window))
 n = int(sys.argv[3]) if len(sys.argv) > 3 else config.SIZE
 model = Model()
 out = sys.argv[4] if len(sys.argv) > 4 else folder(task, n, method, model)

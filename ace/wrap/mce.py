@@ -42,7 +42,8 @@ class Iteration:
     folder: str = ""            # MCE апстрима: последняя папка под-итерации на диске
 
     def dump(self, i):
-        return dict(kind="iterations", id=f"iter{i}", text=self.text, train=self.train, val=self.val, folder=self.folder)
+        return dict(kind="iterations", id=f"iter{i}", text=self.text, train=self.train, val=self.val,
+                    folder=self.folder)
 
 
 def offline_only(wrapper):
@@ -152,8 +153,8 @@ class MetaAgent:
         mounts[name] = fs.Mount(out)
         path = f"{WORKSPACE}/{name}/{SKILL}"
         database = render.skill_database(evaluations(history), skills(history), len(history) + 1)
-        user = self.template.fill(task_instruction=render.task_instruction(ex.task), workspace=WORKSPACE, iter_name=name,
-                                  skill_output_path=path, skill_database=database)
+        user = self.template.fill(task_instruction=render.task_instruction(ex.task), workspace=WORKSPACE,
+                                  iter_name=name, skill_output_path=path, skill_database=database)
         conversation = None     # история разговора: просьба записать идёт в тот же разговор
         for _ in range(SKILL_TRIES):
             call = Call(messages(user), params(), tools=fs.TOOLS, deps=fs.FS(mounts, root=WORKSPACE), rounds=ROUNDS,

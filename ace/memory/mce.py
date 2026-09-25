@@ -28,8 +28,10 @@ def train_json(ex, groups, ids, field="question"):
     acc = sum(bool(e.ok) for e in eps) / len(eps) if eps else 0.0
     summary = dict(train_accuracy=acc, train_metrics=dict(accuracy=acc) if eps else {}, train_total=len(eps),
                    train_errors=0, batch_idx=ex.batch, cumulative_rollouts=ex.i + 1)
-    results = [{"id": rid, field: g.question, "ground_truth": g.target, "llm_prediction": e.answer, "is_correct": bool(e.ok)}
-               for rid, g, e in zip(ids, groups, eps)]
+    results = []
+    for rid, g, e in zip(ids, groups, eps):
+        results.append({"id": rid, field: g.question, "ground_truth": g.target, "llm_prediction": e.answer,
+                        "is_correct": bool(e.ok)})
     return render.train_json(summary, results)
 
 
@@ -54,7 +56,8 @@ class Context(Files):
         if ex.skill:
             top, rest = SKILL.split("/", 1)
             mounts = {top: fs.Mount(Files.of({rest: ex.skill}), "ro"), **mounts}
-        prompt = BASE.fill(task_instruction=render.task_instruction(ex.task), iter_dir=f"{WORKSPACE}/{name}", iter_name=name)
+        prompt = BASE.fill(task_instruction=render.task_instruction(ex.task), iter_dir=f"{WORKSPACE}/{name}",
+                           iter_name=name)
         ex.model.ask(Call(messages(prompt), params(), tools=fs.TOOLS, deps=fs.FS(mounts, root=f"{WORKSPACE}/{name}"),
                           rounds=self.rounds))
 
@@ -68,8 +71,8 @@ class Context(Files):
 # базовый агент — Claude SDK (model/claude.py) с интерфейсами задачи (get_context у symptom), навык в .claude/.
 
 CLAUDE_SKILL = ".claude/skills/learning-context/SKILL.md"
-BASE_TOOLS = ["Skill", "Read", "Write", "Edit", "Bash", "Glob", "Grep", "Task", "TaskOutput", "ExitPlanMode", "TodoWrite",
-              "KillShell", "EnterPlanMode"]
+BASE_TOOLS = ["Skill", "Read", "Write", "Edit", "Bash", "Glob", "Grep", "Task", "TaskOutput", "ExitPlanMode",
+              "TodoWrite", "KillShell", "EnterPlanMode"]
 VALIDATION_TRIES = 3        # max_validation_attempts run_base_agent: ответов, пока проверка не прошла
 UTILS = Path(__file__).parent / "mce_utils"     # mce/workspace_utils апстрима дословно: копия в utils/ под-итерации
 CLAUDE_BASE = prompts.load("mce_claude_base")

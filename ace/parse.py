@@ -304,7 +304,8 @@ def scope_guideline(text, quality=False):
             update = update.strip()
             if update.lower() in NO_IMPROVEMENT:
                 return None
-        return dict(update_text=update, rationale=data.get("rationale", ""), confidence=data.get("confidence", "medium"))
+        return dict(update_text=update, rationale=data.get("rationale", ""),
+                    confidence=data.get("confidence", "medium"))
     except (AttributeError, TypeError):
         return None
 

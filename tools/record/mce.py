@@ -25,4 +25,5 @@ def normalize(c):
                 text = part.get("text", "")
                 if text.startswith("Command: ") and "\nOutput: " in text:
                     part["text"] = text.split("\nOutput: ", 1)[0] + "\nOutput: " + BASH
-    return TODAY.sub("Today's date is DATE", json.dumps(body, sort_keys=True, ensure_ascii=False, separators=(",", ":")))
+    text = json.dumps(body, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+    return TODAY.sub("Today's date is DATE", text)

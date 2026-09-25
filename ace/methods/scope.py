@@ -9,9 +9,10 @@ tests/bridge/test_bridge_scope.py и записи живой модели tests/
     показ       strategic при запуске; принятое на шаге правило переписывает системный промпт (show/scope.py)
     вердикт     верный ответ: неверный итог — ошибка шага
 
-scope_bo2 — Best-of-2 с селектором: кандидат основной модели и candidate_models — та же модель при T = 0.7. scope_code — решатель с исполнением python (как агенты апстрима с
-инструментами). scope_k2 — две перспективы по статье (efficiency и thoroughness), у каждой своя память, в зачёт
-лучшая по метке: это pass@k, в логе помечено."""
+scope_bo2 — Best-of-2 с селектором: кандидат основной модели и candidate_models — та же модель при T = 0.7.
+scope_code — решатель с исполнением python (как агенты апстрима с инструментами).
+scope_k2 — две перспективы по статье (efficiency и thoroughness), у каждой своя память, в зачёт лучшая по метке: это
+pass@k, в логе помечено."""
 from ..env import Sandbox
 from ..extract.scope import Rules
 from ..learner import Learner, swap

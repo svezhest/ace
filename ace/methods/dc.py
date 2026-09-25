@@ -1,6 +1,7 @@
 """Dynamic Cheatsheet (dynamic-cheatsheet: dynamic_cheatsheet/language_model.py, run_benchmark.py; сверка —
 tests/bridge/test_bridge_dc.py и записи живой модели tests/live/test_dc.py). Вердикта и извлечения нет: память
-читает сырое (весь ответ генератора) и то, что показал решатель (вход задачи, cheatsheet: extract.Seen). Решатель у всех — генератор апстрима (solver/dc.py: Generator).
+читает сырое (весь ответ генератора) и то, что показал решатель (вход задачи, cheatsheet: extract.Seen). Решатель у
+всех — генератор апстрима (solver/dc.py: Generator).
 
 dc (DC-Cu, DynamicCheatsheet_Cumulative) — мир документов:
     память      один текст целиком; куратор после каждого вопроса пишет новый (memory/dc.py: Cheatsheet)
@@ -22,5 +23,6 @@ dc = Learner("dc", memory=Cheatsheet(), solver=Generator(cumulative), extract=Se
 dc_code = swap(dc, "dc_code", solver=Generator(cumulative, code=True))
 
 dc_rs = Learner("dc_rs", memory=Pairs(sheet=True), solver=Generator(synthesis), extract=Seen(), verdict=verdict.none)
-dc_retrieval = Learner("dc_retrieval", memory=Pairs(), solver=Generator(retrieval), extract=Seen(), verdict=verdict.none)
+dc_retrieval = Learner("dc_retrieval", memory=Pairs(), solver=Generator(retrieval), extract=Seen(),
+                       verdict=verdict.none)
 dc_history = swap(dc_retrieval, "dc_history", solver=Generator(history))

@@ -23,6 +23,8 @@ from ..solver.evolib import SAMPLER
 
 ATTEMPTS = 3                # k_q_per_problem
 
-evolib = Learner("evolib", memory=SkillLibrary(), solver=SAMPLER, extract=Gains(), attempts=Attempts(ATTEMPTS, pick=vote),
+evolib = Learner("evolib", memory=SkillLibrary(), solver=SAMPLER, extract=Gains(),
+                 attempts=Attempts(ATTEMPTS, pick=vote),
                  verdict=verdict.none, group_verdict=verdict.vote)
-evolib_judge = swap(evolib, "evolib_judge", extract=Gains(evaluated=True), verdict=verdict.judge, group_verdict=verdict.none)
+evolib_judge = swap(evolib, "evolib_judge", extract=Gains(evaluated=True), verdict=verdict.judge,
+                    group_verdict=verdict.none)

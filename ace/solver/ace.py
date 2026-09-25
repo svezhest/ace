@@ -20,7 +20,8 @@ class Generator(OwnSolver):
         playbook = layout(memory)
 
         def call(note):
-            prompt = TEMPLATE.fill(playbook=playbook, reflection=note or NO_REFLECTION, question=question, context=context)
+            prompt = TEMPLATE.fill(playbook=playbook, reflection=note or NO_REFLECTION, question=question,
+                                   context=context)
             return Call(messages(prompt), ace_params())
         return Prompt(shown=[r.id for r in memory.records()], solver=Solver(call, parse.ace_answer))
 

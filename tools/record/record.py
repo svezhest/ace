@@ -170,7 +170,9 @@ def main():
     normalize = None
     if a.normalize == "mce":
         from tools.record.mce import normalize
-    wire.serve(Recorder, a.port, a.out, a.upstream, a.embeddings_upstream, a.seed, a.cache, normalize, a.seed_salt).serve_forever()
+    server = wire.serve(Recorder, a.port, a.out, a.upstream, a.embeddings_upstream, a.seed, a.cache, normalize,
+                        a.seed_salt)
+    server.serve_forever()
 
 
 if __name__ == "__main__":

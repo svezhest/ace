@@ -52,8 +52,9 @@ def resolve(model, rules, pairs):
         if len(pair) < 2 or pair[0] not in by_id or pair[1] not in by_id or pair[0] in done or pair[1] in done:
             continue
         a, b = by_id[pair[0]], by_id[pair[1]]
-        r = ask_optimizer(model, CONFLICT, parse.scope_rule, idx1=a["id"], rule1_text=a["rule"],
-                          rule1_rationale=a["rationale"], idx2=b["id"], rule2_text=b["rule"], rule2_rationale=b["rationale"])
+        r = ask_optimizer(model, CONFLICT, parse.scope_rule,
+                          idx1=a["id"], rule1_text=a["rule"], rule1_rationale=a["rationale"],
+                          idx2=b["id"], rule2_text=b["rule"], rule2_rationale=b["rationale"])
         if r:
             done |= {a["id"], b["id"]}
             fixed[a["id"]] = dict(rule=r[0], rationale=r[1], id=a["id"], confidence=max(confidence(a), confidence(b)))
@@ -126,8 +127,10 @@ def compress(model, records, optimizer, target, cap, new):
     rationale и confidence — берутся пустое и RULE_CONFIDENCE."""
     if len(records) <= cap:
         return records
-    rules = [dict(rule=r.text, rationale=getattr(r, "rationale", ""), confidence=getattr(r, "confidence", RULE_CONFIDENCE),
-                  record=r) for r in records]
+    rules = []
+    for r in records:
+        rules.append(dict(rule=r.text, rationale=getattr(r, "rationale", ""),
+                          confidence=getattr(r, "confidence", RULE_CONFIDENCE), record=r))
     try:
         rules = optimizer(model, rules, target)
     except Exception:           # апстрим ловит любое исключение оптимизатора

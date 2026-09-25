@@ -43,7 +43,7 @@ class Prompt:
     temperature: float = 0
     note: str = ""              # заметка к сообщению решателю (раунды рефлексии ACE)
     solver: Solver = None       # свой решатель метода; тогда системного промпта задачи и среды нет
-    seen: dict = field(default_factory=dict)    # что ещё решатель показал (DC: вход задачи, cheatsheet) — для извлечения
+    seen: dict = field(default_factory=dict)    # что ещё показал решатель (DC: вход и cheatsheet) — для извлечения
 
 
 @dataclass
@@ -188,8 +188,8 @@ class Protocol:
         if self.window and self.offline:
             raise ValueError(f"{name}: тест окна — только онлайн")
         if not self.offline and self.epochs > 1 and verdict in LABELED and split != "train":
-            raise ValueError(f"{name}: онлайн с {self.epochs} проходами по тестовому потоку при вердикте, который видит "
-                             "метку, — утечка ответов; нужен офлайн")
+            raise ValueError(f"{name}: онлайн с {self.epochs} проходами по тестовому потоку при вердикте, который "
+                             "видит метку, — утечка ответов; нужен офлайн")
 
 
 class Experiment:
@@ -355,8 +355,8 @@ def in_score(row, last_epoch):
 
 
 def attempt_entry(ep):
-    return dict(k=ep.k, answer=ep.answer, ok=ep.ok, temperature=ep.prompt.temperature, finish=finish(ep), shown=ep.shown,
-                read=ep.used, fired=ep.fired, patches=[asdict(p) for p in ep.patches])
+    return dict(k=ep.k, answer=ep.answer, ok=ep.ok, temperature=ep.prompt.temperature, finish=finish(ep),
+                shown=ep.shown, read=ep.used, fired=ep.fired, patches=[asdict(p) for p in ep.patches])
 
 
 def retry_entry(ep):
@@ -411,7 +411,8 @@ def run(task, learner, model, n=config.SIZE, out=None, split=""):
         try:
             task.load(part)
         except (FileNotFoundError, ValueError) as error:
-            raise ValueError(f"{learner.name}: протоколу {proto.name} нужна выборка {part} задачи {task.name} — {error}")
+            raise ValueError(f"{learner.name}: протоколу {proto.name} нужна выборка {part} задачи {task.name} — "
+                             f"{error}")
     return Run(task, learner, model, n, out, split).everything()
 
 
@@ -448,7 +449,9 @@ class Run:
             self.test("initial", i, item)
 
     def train_pass(self, epoch):
-        ex, learner, proto = self.ex, self.learner, self.proto
+        ex = self.ex
+        learner = self.learner
+        proto = self.proto
         items = learner.sample(ex, "train" if proto.offline else self.split, self.n)
         ex.epoch = epoch
         ex.total = len(items)

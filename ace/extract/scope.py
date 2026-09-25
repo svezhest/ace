@@ -123,7 +123,8 @@ class Rules(Extractor):
         """Классификатор -> Extraction с одним уроком попытки k или None (дубль); сбой разбора — tactical с исходной
         confidence (parse.scope_classification)."""
         initial = proposal.initial()
-        rules = prompts.text("scope_rules_context", strategic=strategic_text(book), tactical=[r.text for r in book.tactical])
+        tactical = [r.text for r in book.tactical]
+        rules = prompts.text("scope_rules_context", strategic=strategic_text(book), tactical=tactical)
         prompt = CLASSIFY.fill(allowed_domains=render.allowed_domains(DOMAINS), update_text=proposal.update_text,
                                rationale=proposal.rationale, initial_confidence=initial, all_rules_context=rules)
         read = Reader(text=partial(parse.scope_classification, initial=initial, domains=DOMAINS))

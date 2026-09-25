@@ -132,7 +132,8 @@ def python_output(stdout, stderr):
 
 
 def kernel_failed(error):
-    return str({"success": False, "stdout": "", "stderr": "", "status": False, "output": "", "files": [], "error": error})
+    result = {"success": False, "stdout": "", "stderr": "", "status": False, "output": "", "files": [], "error": error}
+    return str(result)
 
 
 def kernel_timeout(seconds):

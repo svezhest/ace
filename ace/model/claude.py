@@ -1,9 +1,9 @@
 """Агент Claude Agent SDK на модели стенда — агенты MCE апстрима (claude_agent_sdk 0.1.23, CLI 2.1.20 из пакета).
 
 CLI шлёт Anthropic /v1/messages на ANTHROPIC_BASE_URL (config.CLAUDE_BASE_URL) — прокси LiteLLM
-(bridge/live/mce/litellm.yaml: любое имя -> chat/completions сервера модели, use_chat_completions_url_for_anthropic_messages
-обязателен), тот — на сервер модели (шлюз, запись или воспроизведение). Фоновые вызовы малой модели CLI (разбор
-команд Bash, пути файлов из вывода) идут туда же.
+(bridge/live/mce/litellm.yaml: любое имя -> chat/completions сервера модели,
+use_chat_completions_url_for_anthropic_messages обязателен), тот — на сервер модели (шлюз, запись или
+воспроизведение). Фоновые вызовы малой модели CLI (разбор команд Bash, пути файлов из вывода) идут туда же.
 
 Окружение CLI задаётся целиком (env), а не наследуется от процесса стенда: от него зависят инструменты агента
 (Bash: python3 и uv из .venv корня, оболочка, HOME) и значит его запросы. Корень (root) — папка над workspace/,

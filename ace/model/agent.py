@@ -4,8 +4,8 @@
 import pydantic_ai
 from pydantic_ai import Agent, Tool, UsageLimits, capture_run_messages
 from pydantic_ai.exceptions import UnexpectedModelBehavior, UsageLimitExceeded
-from pydantic_ai.messages import (ModelRequest, ModelResponse, RetryPromptPart, SystemPromptPart, TextPart, ToolCallPart,
-                                  ToolReturnPart, UserPromptPart)
+from pydantic_ai.messages import (ModelRequest, ModelResponse, RetryPromptPart, SystemPromptPart, TextPart,
+                                  ToolCallPart, ToolReturnPart, UserPromptPart)
 from pydantic_ai.models.openai import OpenAIChatModel, OpenAIChatModelSettings
 from pydantic_ai.providers.openai import OpenAIProvider
 
@@ -110,8 +110,9 @@ class PydanticAI:
         result, outcome = None, Outcome.answer
         with capture_run_messages() as messages:
             try:
-                result = agent.run_sync(user, message_history=history, deps=call.deps,
-                                        usage_limits=UsageLimits(request_limit=limit), model_settings=settings(call.params)).output
+                run = agent.run_sync(user, message_history=history, deps=call.deps, model_settings=settings(call.params),
+                                     usage_limits=UsageLimits(request_limit=limit))
+                result = run.output
             except UsageLimitExceeded:
                 outcome = Outcome.step
             except UnexpectedModelBehavior:
@@ -124,7 +125,9 @@ class PydanticAI:
         return result, messages, outcome
 
 
-SETTINGS = {"max_completion_tokens": "max_tokens", "reasoning_effort": "openai_reasoning_effort", "stop": "stop_sequences"}
+# параметр вызова -> настройка pydantic-ai, где имена расходятся
+SETTINGS = {"max_completion_tokens": "max_tokens", "reasoning_effort": "openai_reasoning_effort",
+            "stop": "stop_sequences"}
 KNOWN = set(OpenAIChatModelSettings.__annotations__)
 
 

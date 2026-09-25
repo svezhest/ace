@@ -132,7 +132,8 @@ def main():
     targets = {r["question"]: r["target"] for s in ("", "train", "val") for r in task.load(s)}
     traces = {}
     tmp = Path(tempfile.mkdtemp(prefix="trace-"))
-    # mce — агенты Claude SDK через LiteLLM (model/claude.py): на фиктивной модели не идёт, его сверка — tests/live/test_mce.py
+    # mce — агенты Claude SDK через LiteLLM (model/claude.py): на фиктивной модели не идёт, его сверка —
+    # tests/live/test_mce.py
     for name in names or sorted(set(METHODS) - {"mce"}):
         levels = SPECIAL.get(name, {})
         learner = swap(METHODS[name], **levels) if levels else METHODS[name]

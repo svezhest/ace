@@ -195,7 +195,8 @@ class SkillLibrary(Container):
             if old is None:
                 self.add(self.skills, block, vec, doc=doc, ig=ig, outcomes=[])
                 continue
-            merged = self.merge(ex, MERGE_SKILLS, Reader(text=parse.subtasks), skills=render.merge_input(old.text, block))
+            merged = self.merge(ex, MERGE_SKILLS, Reader(text=parse.subtasks),
+                                skills=render.merge_input(old.text, block))
             new_ig = RATE * ig + (1 - RATE) * old.ig if len(merged) == 1 else ig
             outcomes = self.inherit(self.skills, old, len(merged))
             for new_block, new_doc in merged:
