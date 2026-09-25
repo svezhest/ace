@@ -15,6 +15,9 @@ from ace.model import Reply
 from ace.show import HEAD, Scored
 
 DC = importlib.import_module("ace.methods.dc")       # модуль: имя в пакете занято самим методом
+MEM = importlib.import_module("ace.memory.dc")
+SHOW = importlib.import_module("ace.show.dc")
+EXTRACT = importlib.import_module("ace.extract")
 PROMPTS, PARSERS, MEMORY, LOOP = (fixture("dc", level) for level in ("prompts", "parsers", "memory", "loop"))
 CU, RS = LOOP["DynamicCheatsheet_Cumulative"], LOOP["DynamicCheatsheet_RetrievalSynthesis"]
 GENERATOR = "# GENERATOR (PROBLEM SOLVER)"
@@ -89,7 +92,7 @@ def test_cumulative_curator_request():
     """Куратор DC-Cu: тот же запрос посимвольно, T = 0, до 2 * max_tokens; пустой cheatsheet — "(empty)"."""
     rec = PROMPTS["cumulative"]
     model = Model([rec["curator"]])
-    DC.Cheatsheet().learn(Ex(model), [DC.Raw()(None, group(rec["input"], rec["generator"]["response"]), None)])
+    MEM.Cheatsheet().learn(Ex(model), [EXTRACT.Raw()(None, group(rec["input"], rec["generator"]["response"]), None)])
     call = model.calls[0]
     assert (call["system"], call["user"]) == messages(rec["curator"])
     assert call["temperature"] == rec["curator"]["temperature"] and call["max_tokens"] == rec["curator"]["max_completion_tokens"]
@@ -107,14 +110,14 @@ def test_synthesis_request(monkeypatch):
     synth = rec["calls"][0]
     vecs = np.array(MEMORY["embeddings"], dtype=float)
     sim = vecs[1] @ vecs[0] / np.linalg.norm(vecs[1]) / np.linalg.norm(vecs[0])
-    pairs = render.pairs([Scored(DC.Pair("r1", OUTPUTS[0], question=QUESTIONS[0]), sim)], True, DC.NOTE)
+    pairs = render.pairs([Scored(MEM.Pair("r1", OUTPUTS[0], question=QUESTIONS[0]), sim)], True, SHOW.NOTE)
     first = PROMPTS["synthesis_first"]["calls"][0]["response"]
-    memory = DC.Pairs(sheet=True)
-    memory.sheet.rewrite(DC.CHEATSHEET(first))
-    fields = DC.pairs_and_sheet(pairs, memory, {"context": rec["input"]})
-    assert ("", DC.SYNTH.fill(fields)) == messages(synth)
+    memory = MEM.Pairs(sheet=True)
+    memory.sheet.rewrite(MEM.CHEATSHEET(first))
+    fields = SHOW.pairs_and_sheet(pairs, memory, {"context": rec["input"]})
+    assert ("", SHOW.SYNTH.fill(fields)) == messages(synth)
     model = Model([synth])
-    DC.Synthesis(DC.retrieval, DC.SYNTH, lambda *a: fields, DC.CHEATSHEET, DC.TOKENS).prompt(Ex(model), DC.Pairs(), {}, 0)
+    SHOW.Synthesis(SHOW.retrieval, SHOW.SYNTH, lambda *a: fields, MEM.CHEATSHEET, MEM.TOKENS).prompt(Ex(model), MEM.Pairs(), {}, 0)
     assert model.calls[0]["max_tokens"] == synth["max_completion_tokens"] and model.calls[0]["temperature"] == synth["temperature"]
 
 
@@ -125,34 +128,34 @@ def test_synthesis_request(monkeypatch):
 def test_extract_cheatsheet(name):
     """extract_cheatsheet HEAD: None у нас — «оставить старый»."""
     row = PARSERS["extract_cheatsheet"][name]
-    got = DC.CHEATSHEET(row["input"])
+    got = MEM.CHEATSHEET(row["input"])
     assert (row["old"] if got is None else got) == row["ok"]
 
 
 def test_extract_cheatsheet_compare():
     """Строки сравнения HEAD / repro-патч / наш: наш разбор теперь совпадает с HEAD везде."""
     for name, row in fixture("dc", "cheatsheet_compare")["rows"].items():
-        got = DC.CHEATSHEET(row["input"])
+        got = MEM.CHEATSHEET(row["input"])
         assert {"ok": "OLD CHEATSHEET" if got is None else got} == row["head"], name
 
 # показ пар
 
 
 def pairs_memory(n):
-    m = DC.Pairs()
+    m = MEM.Pairs()
     for q, out in zip(QUESTIONS[:n], OUTPUTS[:n]):
         m.add(out, question=q)
     return m
 
 
 def top(k):
-    show = copy.copy(DC.retrieval)
+    show = copy.copy(SHOW.retrieval)
     show.k = k
     return show
 
 
 @pytest.mark.parametrize("name, show", [("Dynamic_Retrieval_top3", top(3)), ("Dynamic_Retrieval_top2", top(2)),
-                                        ("FullHistoryAppending", DC.history)])
+                                        ("FullHistoryAppending", SHOW.history)])
 def test_shown_pairs(monkeypatch, name, show):
     """Что видит решатель: отбор top-k по близости (самая похожая последней) или все пары подряд, оформление
     как у апстрима, "(empty)" без пар."""

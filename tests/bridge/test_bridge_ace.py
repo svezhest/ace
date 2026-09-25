@@ -12,7 +12,8 @@ from ace.extract.ace import bullets_used, tag_map
 from ace.learner import swap
 from ace.loop import run
 from ace.memory import HARMFUL, HELPFUL, Lesson
-from ace.methods.ace import SECTIONS, SectionedPlaybook, ace_exact, layout, question_context, section_slug
+from ace.memory.ace import SectionedPlaybook, SECTIONS, layout, question_context, section_slug
+from ace.methods.ace import ace_exact
 from ace.model import Reply
 from ace.tasks import TASKS
 from ace.verdict import yes_no
@@ -52,7 +53,7 @@ def test_template(ours, theirs, names):
 
 
 def test_empty_playbook():
-    assert layout(None, SectionedPlaybook()) == PROMPTS["empty_playbook"]
+    assert layout(SectionedPlaybook()) == PROMPTS["empty_playbook"]
 
 
 def section(text, name, nxt):
@@ -193,7 +194,7 @@ def test_apply_curator_operations(name):
     m = SectionedPlaybook()
     m.ids.n = 3
     m.apply(OPS[name])
-    assert layout(None, m) == text and m.ids.n + 1 == next_id
+    assert layout(m) == text and m.ids.n + 1 == next_id
 
 
 def test_no_section_rejected_before_apply():
@@ -207,7 +208,7 @@ def test_general_goes_on_top_of_others():
     m.apply([dict(type="ADD", section="OTHERS", content="a")])
     m.apply([dict(type="ADD", section="general", content="b"), dict(type="ADD", section="general", content="c"),
              dict(type="ADD", section="OTHERS", content="d")])
-    assert layout(None, m).endswith("## OTHERS\n[gene-00002] helpful=0 harmful=0 :: b\n[gene-00003] helpful=0 harmful=0 :: c\n"
+    assert layout(m).endswith("## OTHERS\n[gene-00002] helpful=0 harmful=0 :: b\n[gene-00003] helpful=0 harmful=0 :: c\n"
                                      "[misc-00001] helpful=0 harmful=0 :: a\n[misc-00004] helpful=0 harmful=0 :: d")
 
 
@@ -332,7 +333,7 @@ def test_online_loop(tmp_path, key):
     final = SectionedPlaybook()
     for r in memory:
         final.sections[r["section"]].items.append(Lesson(r["id"], r["text"], r["outcomes"]))
-    assert layout(None, final) == up["final_playbook"]
+    assert layout(final) == up["final_playbook"]
     assert max(int(r["id"].rsplit("-", 1)[1]) for r in memory) + 1 == up["next_global_id"]
 
 

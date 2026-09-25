@@ -19,6 +19,8 @@ from ace.loop import Episode, Group, Prompt, run
 from ace.model import Reply
 
 E = importlib.import_module("ace.methods.evolib")      # модуль: имя в пакете занято самим методом
+MEM = importlib.import_module("ace.memory.evolib")
+SHOW = importlib.import_module("ace.show.evolib")
 
 PROMPTS, PARSERS, MEMORY, LOOP = (fixture("evolib", n) for n in ("prompts", "parsers", "memory", "loop"))
 HINT = prompts.text("evolib_subtasks")
@@ -151,13 +153,13 @@ def shown(system):
 @pytest.mark.parametrize("name,skills,insights", [("solver_empty", 0, 0), ("solver_skills", 1, 0),
                                                    ("solver_insights", 0, 1), ("solver_both_skills_win", 1, 1)])
 def test_solver_section(monkeypatch, name, skills, insights):
-    m = E.Library()
+    m = MEM.Library()
     if skills:
         m.skills.add(solution("Add two integers a and b.", "5", "5"), doc="d", ig=0.0)
     if insights:
         m.insights.add("If adding integers, then do check the carry.")
     monkeypatch.setattr(random, "random", lambda: 0.1 if skills else 0.5)
-    p = E.SHOW.prompt(None, m, {"context": "Compute 2+3."}, 0)
+    p = SHOW.SHOW.prompt(None, m, {"context": "Compute 2+3."}, 0)
     assert shown(p.system) == section(PROMPTS["filled"][name], "Compute 2+3.")
 
 # разборщики
@@ -222,9 +224,9 @@ def test_parsers():
     first = {k: parse.first_fenced(v, "insights") for k, v in FENCED.items()}
     first["judgment"] = parse.first_fenced("```judgment\nSolution 2 is better.\n```", "judgment")
     assert first == {k: v["ok"] for k, v in p["extract_first_fenced_block"].items()}
-    assert {k: E.condition(v) for k, v in CONDITIONS.items()} == {k: v["ok"] for k, v in p["extract_if_condition"].items()}
+    assert {k: MEM.condition(v) for k, v in CONDITIONS.items()} == {k: v["ok"] for k, v in p["extract_if_condition"].items()}
     assert {k: insight_of(v) for k, v in INSIGHT_REPLIES.items()} == {k: v["ok"] for k, v in p["EvoLibAgent.generate_insight"].items()}
-    assert {k: E.merged_insights(v) for k, v in MERGE_REPLIES.items()} == {k: v["ok"] for k, v in p["EvoLibAgent.consolidate_insights"].items()}
+    assert {k: MEM.merged_insights(v) for k, v in MERGE_REPLIES.items()} == {k: v["ok"] for k, v in p["EvoLibAgent.consolidate_insights"].items()}
     assert {k: second_better(v) for k, v in JUDGMENTS.items()} == {k: v["ok"] for k, v in p["EvoLibAgent.is_better_solution"].items()}
 
 # память
@@ -237,7 +239,7 @@ def test_compute_ig():
 
 def test_future_ig():
     """Шаги update_future_IG_for_* подряд на одной библиотеке; лучшая попытка — первая в выборке."""
-    m = E.Library()
+    m = MEM.Library()
     ids = {"s1": m.skills.add("s1", ig=0.1).id, "s2": m.skills.add("s2", ig=0.1, outcomes=[0.3]).id,
            "i1": m.insights.add("i1").id, "i2": m.insights.add("i2", outcomes=[0.2]).id, "gone": "gone"}
     for case in MEMORY["update_future_IG"].values():
@@ -260,12 +262,12 @@ SAMPLE_CASES = {"both": (1, 1, {}), "skills_only": (1, 0, {}), "insights_only": 
 def test_sample_from_library(monkeypatch, case):
     """Та же последовательность random: одно число на ветку, затем random.choices по весам."""
     skills, insights, kw = SAMPLE_CASES[case]
-    m = E.Library()
+    m = MEM.Library()
     for text, ig, fig in SAMPLE_LIB[0] if skills else []:
         m.skills.add(text, ig=ig, outcomes=list(fig), doc="d")
     for text, fig in SAMPLE_LIB[1] if insights else []:
         m.insights.add(text, outcomes=list(fig))
-    show, choices, log = E.show(**kw), random.choices, []
+    show, choices, log = SHOW.show(**kw), random.choices, []
     monkeypatch.setattr(random, "choices", lambda pop, weights, k: log.append((pop, weights, k)) or choices(pop, weights, k=k))
     for run_ in MEMORY["sample_from_library"][case]:
         random.seed(run_["seed"])
@@ -296,7 +298,7 @@ def test_add_new_insight(monkeypatch, case):
     want = MEMORY["add_new_insight"][case]
     table_embed(monkeypatch, INSIGHT_TABLE)
     model = Fake([("merge", "consolidate these insights", INSIGHT_REPLY.get(case, ""))], default="")
-    m = E.Library()
+    m = MEM.Library()
     m.add_insight(Ex(model), "If base cond, then do x.")
     m.insights.records()[0].outcomes.extend([0.4, 0.2])
     if want["new"]:                 # пустой insight извлечение в память не отдаёт (add_new_insight апстрима: return)
@@ -322,7 +324,7 @@ def test_add_new_skills(monkeypatch, case):
     want = MEMORY["add_new_skills"][case]
     table_embed(monkeypatch, SKILL_TABLE)
     model = Fake([("merge", "consolidate these example problems", SKILL_REPLY.get(case, ""))], default="")
-    m = E.Library()
+    m = MEM.Library()
     for block, doc in parse.subtasks(solution("Base desc.", "1", "1")):
         m.add_skill(Ex(model), block, doc, 0.9)
     m.skills.records()[0].outcomes.append(0.5)
@@ -375,7 +377,7 @@ def test_run_iteration(monkeypatch, case):
             verdict.golden(ex, e, "5")
     else:
         verdict.vote(ex, g)
-    m = E.Library()
+    m = MEM.Library()
     if prev:
         m.solutions[g.question] = Best(prev, upstream_answer(prev), 1.0)
     x = Gains(evaluated=gold)(ex, g, m)
@@ -440,12 +442,12 @@ def test_loop(monkeypatch, mode):
     table_embed(monkeypatch, LOOP_TABLE)
     monkeypatch.setattr("ace.loop.final_answer", upstream_answer)
     task, model, snaps = Task([(p, a) for p, a, _ in PROBLEMS]), loop_model(), []
-    learn = E.Library.learn
+    learn = MEM.Library.learn
 
     def snapshot(self, ex, extractions):
         learn(self, ex, extractions)
         snaps.append((state(self), [self.best(p).score if self.best(p) else 0 for p, _, _ in PROBLEMS], len(model.calls)))
-    monkeypatch.setattr(E.Library, "learn", snapshot)
+    monkeypatch.setattr(MEM.Library, "learn", snapshot)
     learner = E.evolib if mode == "nogold" else swap(E.evolib, "evolib_gold", extract=Gains(evaluated=True),
                                                     verdict=verdict.golden, group_verdict=verdict.none)
     run(task, learner, model, n=len(PROBLEMS), epochs=2)

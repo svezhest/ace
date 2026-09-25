@@ -5,7 +5,7 @@
                 efficiency); n > 1 — Best-of-N: n кандидатов при BEST_OF_TEMPERATURE и селектор (в апстриме
                 кандидаты от разных моделей). Пустой кандидат и «no improvement needed» без ошибки отбрасываются.
     classify    классификатор: дубль — урока нет; уточнённая confidence; домен strategic-правила
-Добавки: confidence, domain (None — правило тактическое), rationale.
+Добавки: confidence, domain (None — правило тактическое), rationale, attempt (память перспективы попытки).
 
 Что правило видит о памяти, берёт у памяти перспективы попытки (book): её имя (промпт качества),
 tactical правила (applied_rules и текущий системный промпт) и текст strategic для классификатора.
@@ -13,11 +13,10 @@ tactical правила (applied_rules и текущий системный пр
 from dataclasses import dataclass
 
 from .. import parse, prompts, render
-from . import CONFIDENCE, DOMAIN, RATIONALE, Extraction, Extractor
+from ..show.scope import current_system, strategic_text
+from . import ATTEMPT, CONFIDENCE, DOMAIN, RATIONALE, Extraction, Extractor
 
 P = {n: prompts.load(f"scope_{n}") for n in ("error", "efficiency", "thoroughness", "selector", "classify")}
-INTRO = prompts.text("scope_strategic_intro")
-GUIDELINE = prompts.text("scope_guideline")
 
 DOMAINS = ["tool_usage", "data_validation", "error_handling", "efficiency", "analysis_methodology", "safety", "general"]
 LEVEL = {"low": 0.3, "medium": 0.6, "high": 0.9}    # метка кандидата -> начальная confidence
@@ -55,16 +54,6 @@ def answer_step(ep):
     return render.step_summary(ep.output, observations=render.answer_seen(ep.ok)), error
 
 
-def guidelines(book):
-    """Правила попытки в конце системного промпта: «## Learned Guideline:» на каждое."""
-    return render.lines(book.tactical, render.prefixed(GUIDELINE), "\n\n")
-
-
-def current_system(system, book):
-    """Системный промпт решателя сейчас: как при запуске попытки и tactical правила, принятые в ней."""
-    return system + "\n\n" + guidelines(book) if book.tactical else system
-
-
 def agent_context(ex, attempt, book):
     """Агент глазами SCOPE: роль задачи, вопрос и текущий системный промпт."""
     return dict(agent_name=f"{ex.task.name}_agent", agent_role=ex.task.system, task=attempt.question,
@@ -75,13 +64,8 @@ def meaningful(c):
     return c.update_text.strip().lower() not in NO_IMPROVEMENT
 
 
-def strategic_text(book):
-    """get_strategic_rules_text апстрима; пусто без правил."""
-    return render.strategic(INTRO, render.domains(book.domains.items()) if book.records() else "")
-
-
 class Rules(Extractor):
-    gives = frozenset({CONFIDENCE, DOMAIN, RATIONALE})
+    gives = frozenset({CONFIDENCE, DOMAIN, RATIONALE, ATTEMPT})
 
     def __init__(self, n=1):
         self.n = n
@@ -110,8 +94,8 @@ class Rules(Extractor):
             best = cands[parse.scope_selection(out, len(cands))]
         return best if best and best.update_text else None
 
-    def classify(self, ex, proposal, book, group=None):
-        """Классификатор -> Extraction с одним уроком или None (дубль); сбой разбора — tactical с исходной
+    def classify(self, ex, proposal, book, k=0, group=None):
+        """Классификатор -> Extraction с одним уроком попытки k или None (дубль); сбой разбора — tactical с исходной
         confidence (parse.scope_classification)."""
         initial = proposal.initial()
         context = prompts.text("scope_rules_context", strategic=strategic_text(book), tactical=[r.text for r in book.tactical])
@@ -122,27 +106,22 @@ class Rules(Extractor):
         if c["is_duplicate"]:
             return None
         domain = c["domain"] if c["scope"] == "strategic" else None
-        return Extraction(group, [proposal.update_text], [],
-                          {CONFIDENCE: [c["confidence"]], DOMAIN: [domain], RATIONALE: [proposal.rationale]})
+        return Extraction(group, [proposal.update_text], [], {CONFIDENCE: [c["confidence"]], DOMAIN: [domain],
+                                                              RATIONALE: [proposal.rationale], ATTEMPT: [k]})
 
-    def step(self, ex, attempt, step, book):
-        """Событие шага с инструментом: правило сразу."""
+    def step(self, ex, attempt, step, memory):
+        """Событие шага с инструментом: правило сразу, посреди попытки."""
+        book = memory.book(attempt.k)
         p = self.propose(ex, attempt, book, *tool_step(step))
-        return self.classify(ex, p, book) if p else None
-
-    def answers(self, ex, group, memory):
-        """Событие ответа: попытка в зачёт, затем остальные (перспективы); сначала кандидаты всех попыток, потом
-        классификация. -> [(номер попытки, Extraction)]."""
-        eps = [group.episodes[group.chosen]] + [e for i, e in enumerate(group.episodes) if i != group.chosen]
-        proposals = [(e, self.propose(ex, e, memory.book(e.k), *answer_step(e))) for e in eps]
-        out = []
-        for e, p in proposals:
-            x = self.classify(ex, p, memory.book(e.k), group) if p else None
-            if x:
-                out.append((e.k, x))
-        return out
+        return self.classify(ex, p, book, attempt.k) if p else None
 
     def __call__(self, ex, group, memory):
-        """Одна попытка в группе: её правило."""
-        out = self.answers(ex, group, memory)
-        return out[0][1] if out else None
+        """Событие ответа: попытка в зачёт, затем остальные (перспективы); сначала кандидаты всех попыток, потом
+        классификация. Правила всех попыток — одно извлечение, в порядке попыток."""
+        eps = [group.episodes[group.chosen]] + [e for i, e in enumerate(group.episodes) if i != group.chosen]
+        proposals = [(e, self.propose(ex, e, memory.book(e.k), *answer_step(e))) for e in eps]
+        xs = [x for x in (self.classify(ex, p, memory.book(e.k), e.k, group) if p else None for e, p in proposals) if x]
+        if not xs:
+            return None
+        return Extraction(group, [t for x in xs for t in x.lessons], [],
+                          {name: [v for x in xs for v in x.extras[name]] for name in self.gives})

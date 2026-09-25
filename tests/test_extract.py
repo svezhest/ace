@@ -10,7 +10,8 @@ from ace.extract import LABELS, Extraction, Labels
 from ace.extract.ace import Diagnose, Reflection, Reflector, used_line
 from ace.learner import swap
 from ace.loop import Group
-from ace.methods.ace import Op, Ops, Playbook, SectionedPlaybook, ace, curate_rewrite
+from ace.memory.ace import Op, Ops, Playbook, SectionedPlaybook, curate_rewrite
+from ace.methods.ace import ace
 
 
 class Ex:

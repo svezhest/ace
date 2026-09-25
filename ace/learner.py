@@ -4,13 +4,15 @@
     вердикт попытки     verdict: golden | yes_no | judge | none                 verdict.py
     вердикт группы      group_verdict: vote | none                              verdict.py
     извлечение          extract(ex, group, memory) -> Extraction; gives         extract/
-    память              контейнер + learn(ex, extractions); requires            memory/, методы
-    показ               show.prompt -> Prompt, show.on_step -> Patch            show.py
+    память              контейнер + learn(ex, extractions); requires            memory/
+    показ               show.prompt -> Prompt, show.on_step -> Patch            show/
     когда учится        every (раз в сколько вопросов), flush (неполный батч в конце прохода)
     среда попытки       env: Env | Sandbox(per="call" | "attempt")              env/
 
-Хуки по умолчанию: показ даёт промпт и вмешивается на шаге; извлечение — на конце вопроса, память
-принимает извлечённое на батче. Метод со своей логикой на масштабе переопределяет хук в подклассе.
+Хуки: перед попыткой память узнаёт о новой попытке (begin: срок жизни «попытка»), показ даёт промпт; на шаге
+при обучении извлечение может дать урок сразу (extract.step, SCOPE) — память принимает его тут же, затем показ
+может вмешаться (Patch); извлечение — на конце вопроса, память принимает извлечённое на батче. Обёртки
+(ace/wrap/) перехватывают хуки поверх ученика.
 Стык с проверкой один: память требует добавки (requires), извлечение их даёт (gives); сверка при сборке.
 Абляция — swap(ученик, name, уровень=замена)."""
 import copy
@@ -50,11 +52,17 @@ class Learner:
 
     def prompt(self, ex, item, k, memory=None):
         """Промпт попытки k; memory — показать другую версию памяти (новая попытка из извлечения)."""
-        p = self.show.prompt(ex, self.memory if memory is None else memory, item, k)
+        memory = self.memory if memory is None else memory
+        memory.begin(k)
+        p = self.show.prompt(ex, memory, item, k)
         p.temperature, p.top_p = self.attempts.temperature(k), self.attempts.top_p(k)
         return p
 
     def on_step(self, ex, attempt, step):
+        if attempt.training and self.extract is not None:
+            x = self.extract.step(ex, attempt, step, self.memory)
+            if x:
+                self.memory.learn(ex, [x])
         return self.show.on_step(ex, self.memory, attempt, step)
 
     def on_attempt(self, ex, episode):
@@ -100,7 +108,7 @@ class Learner:
 
 
 def swap(learner, name=None, **levels):
-    """Ученик с заменёнными уровнями; проверка стыка идёт заново. Обёртка (ace/wrap.py) меняет уровни своего
+    """Ученик с заменёнными уровнями; проверка стыка идёт заново. Обёртка (ace/wrap/) меняет уровни своего
     ученика."""
     if not isinstance(learner, Learner):
         return learner.swap(name, **levels)

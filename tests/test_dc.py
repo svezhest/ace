@@ -6,7 +6,10 @@ from stub import TASK, Stub, episode
 from ace import prompts
 from ace.extract import Raw
 from ace.loop import Group, run
-from ace.methods.dc import EMPTY, Cheatsheet, Pairs, SheetPrompt, dc, dc_history, dc_retrieval, dc_rs
+from ace.memory.dc import Cheatsheet, Pairs
+from ace.methods.dc import dc, dc_history, dc_retrieval, dc_rs
+from ace.render import EMPTY
+from ace.show.dc import SheetPrompt
 from ace.show import HEAD
 
 ITEM = {"context": "What is 2 / 4?", "target": "0.5"}

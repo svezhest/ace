@@ -12,12 +12,15 @@ from upstream import deviation, fixture, messages
 
 from ace import parse, render
 from ace.extract import CONFIDENCE, DOMAIN
-from ace.extract.scope import DOMAINS, Proposal, Rules, answer_step, strategic_text
+from ace.extract.scope import DOMAINS, Proposal, Rules, answer_step
+from ace.show.scope import strategic_text
 from ace.extract.scope import P as EXTRACT_P
 from ace.loop import Episode, Group, Prompt
 from ace.memory import Record
-from ace.methods.scope import P as OPTIMIZER_P
-from ace.methods.scope import PER_RUN, Book, Perspectives, Scope, duplicate_words, rule_optimizer, scope
+from ace.memory.scope import P as OPTIMIZER_P
+from ace.learner import Learner
+from ace.memory.scope import Book, PER_RUN, Perspectives, duplicate_words, rule_optimizer
+from ace.methods.scope import scope
 from ace.model import Reply
 
 PROMPTS, PARSERS, MEMORY, LOOP = (fixture("scope", n) for n in ("prompts", "parsers", "memory", "loop"))
@@ -377,7 +380,7 @@ def test_limit_per_agent_across_tasks():
     classify = js(dict(is_duplicate=False, scope="tactical", confidence=0.6, domain="general", reason="r"))
     model = Model(lambda prompt: classify if kind(prompt) == "classify" else synth.replace("task N", "task " + task_of.search(prompt)[1]))
     memory = Perspectives(("thoroughness", "other"))
-    learner = Scope("scope", memory=memory, show=scope.show, extract=Rules())
+    learner = Learner("scope", memory=memory, show=scope.show, extract=Rules())
     got = []
     for i, k in [(i, 0) for i in range(22)] + [(99, 1)]:
         learner.prompt(ex(model), {"context": TASK}, k)
@@ -463,7 +466,7 @@ def test_loop():
                                target="GainLossOnSale"))[1][1] == LOOP["run1"]["steps"][0]["error"]
     model = loop_model()
     memory = Perspectives()
-    learner = Scope("scope", memory=memory, show=scope.show, extract=Rules())
+    learner = Learner("scope", memory=memory, show=scope.show, extract=Rules())
     done = run_steps(learner, model, LOOP["run1"]["steps"])
     check_steps(done, model)
     book = memory.book(0)
@@ -472,5 +475,5 @@ def test_loop():
     assert BASE + learner.prompt(ex(model), {"context": TASK}, 0).system == LOOP["run2"]["initial_prompt"]
     fresh = Perspectives()
     fresh.book(0).domains = book.domains
-    learner2 = Scope("scope", memory=fresh, show=scope.show, extract=Rules())
+    learner2 = Learner("scope", memory=fresh, show=scope.show, extract=Rules())
     check_steps(run_steps(learner2, model, LOOP["run2"]["steps"]), model)

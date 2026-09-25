@@ -44,6 +44,9 @@ class Container:
     def records(self):
         raise NotImplementedError
 
+    def begin(self, k):
+        """Новая попытка k: здесь уходят записи со сроком жизни «попытка» (tactical SCOPE)."""
+
     def get(self, id):
         return next((r for r in self.records() if r.id == id), None)
 

@@ -13,9 +13,12 @@ from ace.extract.ace import Reflection
 from ace.learner import Learner, swap
 from ace.loop import Group, run
 from ace.memory import Lessons
-from ace.methods.ace import Ops
-from ace.methods.mce import META, MISSING, Context, mce, mce_ace, meta_agent
-from ace.wrap import Gate, Meta, Wrapper, skilled
+from ace.memory.ace import Ops
+from ace.memory.mce import Context
+from ace.methods.mce import mce, mce_ace
+from ace.wrap.mce import META, MISSING, meta_agent
+from ace.wrap import Gate, Wrapper, skilled
+from ace.wrap.mce import Meta
 
 
 class Source(list):

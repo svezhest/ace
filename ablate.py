@@ -5,7 +5,6 @@ import sys
 
 from ace import config, prompts, verdict
 from ace.env import Sandbox
-from ace.hooks import Hooks
 from ace.learner import swap
 from ace.loop import Attempts, run, vote
 from ace.methods import METHODS
@@ -13,7 +12,9 @@ from ace.methods.evolib import ATTEMPTS
 from ace.methods.mce import ITERATIONS
 from ace.model import Model
 from ace.show import Catalog, Whole
+from ace.show.scope import StrategicRules
 from ace.tasks import TASKS
+from ace.wrap.hooks import Hooks
 
 SPREAD = 0.7                # температура попыток после первой (self-consistency)
 
@@ -72,7 +73,7 @@ CHAIN = {
 
     # показ посреди попытки (SCOPE; правило на шаге бывает только у решателя с инструментами)
     "scope_code": scope_code,       # от scope: исполнение python
-    "scope_append": swap(scope_code, "scope_append", patch="append"),  # от scope_code: правило в конец истории вместо перезаписи системного промпта
+    "scope_append": swap(scope_code, "scope_append", show=StrategicRules("append")),  # от scope_code: правило в конец истории вместо перезаписи системного промпта
 }
 
 if __name__ == "__main__":

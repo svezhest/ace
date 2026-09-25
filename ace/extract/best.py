@@ -1,5 +1,6 @@
 """Best-of-N над любым извлечением: n извлечений одной группы и выбор одного (SCOPE: synthesizer.py, Best-of-N).
-Добавки — те же, что у внутреннего извлечения."""
+Добавки — те же, что у внутреннего извлечения. one_of_two — селектор наборов уроков (ace_bo2)."""
+from .. import prompts, render
 from . import Extractor
 
 
@@ -16,3 +17,14 @@ class BestOf(Extractor):
             return cands[0] if cands else None
         i = self.select(ex, group, cands)
         return cands[i] if i is not None and 0 <= i < len(cands) else cands[0]
+
+
+SELECT = prompts.load("hybrid_select")
+SELECTOR = prompts.text("selector_system")
+
+
+def one_of_two(ex, group, candidates):
+    """Модель выбирает набор уроков: ответ «1» или «2»; без ответа первый."""
+    a, b = (render.lessons(x.lessons) for x in candidates[:2])
+    out = ex.model.run(SELECTOR, SELECT.fill(a=a, b=b)).output
+    return 1 if (out or "1").strip().startswith("2") else 0

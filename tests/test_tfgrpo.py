@@ -8,7 +8,9 @@ from ace import render
 from ace.extract import OPERATIONS, Extraction
 from ace.extract.tfgrpo import Contrast
 from ace.loop import Group, run
-from ace.methods.tfgrpo import EXPERIENCES, GROUP, Library, tfgrpo
+from ace.memory.tfgrpo import Library
+from ace.methods.tfgrpo import GROUP, tfgrpo
+from ace.show.tfgrpo import EXPERIENCES
 
 
 class Ex:

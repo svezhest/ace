@@ -1,4 +1,5 @@
-"""Показ: что из памяти видит решатель и когда. Память показ не меняет.
+"""Показ: что из памяти видит решатель и когда. Память показ не меняет. Здесь общие варианты, показ методов —
+в show/<метод>.py.
 
     prompt(ex, memory, item, k) -> Prompt           перед попыткой k
     on_step(ex, memory, attempt, step) -> Patch      после шага; None — не вмешиваться
@@ -12,15 +13,17 @@
     Catalog     в промпте строки каталога (id и head()), тела — инструментом read, только чтение;
                 прочитанное цикл пишет в episode.used
     AfterError  после шага с ошибкой — записи, чей триггер есть в тексте ошибки, сообщением в конец истории
-                (Patch(append)); исходы показа и сами хуки — позже, с обёрткой Hooks
-Переписать системный промпт посреди попытки (SCOPE) — Patch(system) из on_step метода.
+                (Patch(append)); исходы показа и сами хуки — у обёртки Hooks
+    Part        показ над частью памяти
+    Hint        добавка к системному промпту перед показом
+Переписать системный промпт посреди попытки (SCOPE) — Patch(system) из on_step показа.
 
 random — показ случаен (выборка): val такой памяти не кэшируется. watches_steps — показу нужны шаги попытки."""
 import random
 
-from . import embed, fs, prompts, render
-from .loop import Prompt
-from .model import Patch
+from .. import embed, fs, prompts, render
+from ..loop import Prompt
+from ..model import Patch
 
 HEAD = prompts.text("memory_head")
 CATALOG = prompts.load("catalog")
@@ -168,3 +171,23 @@ class AfterError(Show):
             return patch
         mine = Patch(append=self.intro + render.lines(hit, self.line))
         return mine if patch is None else patch.merge(mine)
+
+
+class Part(Show):
+    """Показ над частью памяти part(память)."""
+    def __init__(self, part, show):
+        self.part, self.show, self.random = part, show, show.random
+
+    def prompt(self, ex, memory, item, k):
+        return self.show.prompt(ex, self.part(memory), item, k)
+
+
+class Hint(Show):
+    """Добавка к системному промпту решателя перед показом."""
+    def __init__(self, hint, show):
+        self.hint, self.show, self.random = hint, show, show.random
+
+    def prompt(self, ex, memory, item, k):
+        p = self.show.prompt(ex, memory, item, k)
+        p.system = self.hint + p.system
+        return p

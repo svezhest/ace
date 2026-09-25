@@ -14,6 +14,9 @@ class Document:
     def rewrite(self, text):
         self.text = text
 
+    def begin(self, k):
+        pass
+
     def records(self):
         return [Record(self.kind, self.text)] if self.text else []
 
@@ -33,6 +36,16 @@ class Files:
 
     def __init__(self, kind="file"):
         self.kind, self.files = kind, {}
+
+    @classmethod
+    def of(cls, files, kind="folder"):
+        """Папка из словаря путь -> текст (монтируется только на чтение)."""
+        out = cls(kind)
+        out.files = dict(files)
+        return out
+
+    def begin(self, k):
+        pass
 
     def read(self, path):
         return self.files.get(path)

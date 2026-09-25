@@ -16,6 +16,8 @@ from ace.loop import Episode, Group, Prompt
 from ace.memory import Lesson
 
 M = importlib.import_module("ace.methods.tfgrpo")      # имя tfgrpo в пакете занято самим методом
+MEM = importlib.import_module("ace.memory.tfgrpo")
+SHOW = importlib.import_module("ace.show.tfgrpo")
 
 PROMPTS, PARSERS, MEMORY = fixture("tfgrpo", "prompts"), fixture("tfgrpo", "parsers"), fixture("tfgrpo", "memory")
 LOOP, CONFIG = fixture("tfgrpo", "loop"), fixture("tfgrpo", "config")
@@ -84,7 +86,7 @@ def group(case, rewards, target="42", output=trajectory):
 
 
 def library(texts):
-    m = M.Library()
+    m = MEM.Library()
     for t in texts:
         m.add(t)
     return m
@@ -254,7 +256,7 @@ def test_empty_summary_kept():
 def test_loop():
     """ExperienceUpdater.run на двух батчах: те же запросы (по стадиям), те же ответы, те же опыты G0, G1, ...;
     все вызовы без температуры (model_params = {})."""
-    m = M.Library()
+    m = MEM.Library()
     for run in LOOP:
         assert [r.text for r in m.records()] == list(run["before"].values())
         model = Fake(run["requests"])
@@ -274,7 +276,7 @@ def test_show():
     """Показ опытов — хвост инструкций итогового агента апстрима (_create_agent_config_with_experiences)."""
     deviation("TF2")            # начало инструкций — задача стенда
     instructions = yaml.safe_load(CONFIG["math_reasoning"]["final_agent_yaml"])["agent"]["instructions"]
-    shown = M.EXPERIENCES.prompt(Ex(None), library(["Units: check units.", "Verify: recompute."]), {}, 0).system
+    shown = SHOW.EXPERIENCES.prompt(Ex(None), library(["Units: check units.", "Verify: recompute."]), {}, 0).system
     assert instructions.endswith(shown) and shown.startswith("\n\nWhen solving problems")
 
 

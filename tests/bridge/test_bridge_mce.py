@@ -11,10 +11,12 @@ from upstream import deviation, fixture
 from ace import fs, render
 from ace.learner import swap
 from ace.loop import run
-from ace.methods.mce import BASE, META, MISSING, WORKSPACE, evaluations, mce
+from ace.memory.mce import BASE, WORKSPACE
+from ace.methods.mce import mce
+from ace.wrap.mce import META, MISSING, evaluations
 from ace.model import Reply
 from ace.tasks import Task
-from ace.wrap import SKILL, Iteration, Meta, best_iteration, sub_folder
+from ace.wrap.mce import Iteration, Meta, SKILL, best_iteration, sub_folder
 
 PROMPTS, PARSERS, MEMORY, LOOP = (fixture("mce", level) for level in ("prompts", "parsers", "memory", "loop"))
 

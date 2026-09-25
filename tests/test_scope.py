@@ -5,12 +5,14 @@ import json
 
 from stub import TASK, Stub, episode, right
 
-from ace.extract import CONFIDENCE, DOMAIN, RATIONALE, Extraction
+from ace.extract import ATTEMPT, CONFIDENCE, DOMAIN, RATIONALE, Extraction
 from ace.extract.scope import Proposal, Rules, answer_step, tool_step
 from ace.learner import swap
 from ace.loop import Attempt, Group, Prompt, run
-from ace.methods.scope import CAP, PER_RUN, TARGET, Book, Perspectives, Strategic, compress, duplicate_words, scope, scope_k2
+from ace.memory.scope import Book, CAP, PER_RUN, Perspectives, Strategic, TARGET, compress, duplicate_words
+from ace.methods.scope import scope, scope_k2
 from ace.model import Patch, Step
+from ace.show.scope import StrategicRules
 
 MARK = dict(error="analyzing agent execution errors", quality="analyzing agent execution quality",
             select="evaluating multiple candidate", classify="You are a rule classifier", analyze="rule optimization analyzer",
@@ -85,7 +87,7 @@ def test_classify():
     reply = {"text": js(scope="strategic", confidence=0.95, domain="made_up")}
     model = Stub(lambda call: reply["text"])
     x = Rules().classify(Ex(model), Proposal(update_text="Always check units.", rationale="r", confidence="low"), Book())
-    assert x.lessons == ["Always check units."] and x.extras == {CONFIDENCE: [0.95], DOMAIN: ["general"], RATIONALE: ["r"]}
+    assert x.lessons == ["Always check units."] and x.extras == {CONFIDENCE: [0.95], DOMAIN: ["general"], RATIONALE: ["r"], ATTEMPT: [0]}
     assert "Initial Confidence: 0.30" in model.calls[0]["user"]
     reply["text"] = js(scope="tactical")
     assert Rules().classify(Ex(model), Proposal(update_text="x", confidence="high"), Book()).extras[DOMAIN] == [None]
@@ -169,7 +171,7 @@ def test_step_patch_append():
     model = Stub(texts(error=lambda call: js(update_text=update["text"], confidence="high"),
                        quality=lambda call: js(update_text=update["text"], confidence="high"),
                        classify=js(scope="tactical", confidence=0.6)))
-    s = swap(scope, patch="append", memory=Perspectives())
+    s = swap(scope, show=StrategicRules("append"), memory=Perspectives())
     a = attempt()
     assert s.on_step(Ex(model), a, ERROR) == Patch(append="## Learned Guideline:\nGuard division.")
     update["text"] = "Print intermediate values."
@@ -192,7 +194,7 @@ def test_answer_order_chosen_first():
                        quality=lambda call: js(update_text=f"u{len(model.calls)}"), classify=js(scope="tactical", confidence=0.9)))
     memory = Perspectives(("efficiency", "thoroughness"))
     g = Group("q", [episode("1", ok=False, k=0), episode("2", ok=True, k=1)], chosen=1)
-    out = Rules().answers(Ex(model), g, memory)
-    assert [k for k, _ in out] == [1, 0]
+    x = Rules()(Ex(model), g, memory)
+    assert x.extras[ATTEMPT] == [1, 0]
     kinds = ["classify" if MARK["classify"] in c["user"] else "propose" for c in model.calls]
     assert kinds == ["propose", "propose", "classify", "classify"]

@@ -10,7 +10,9 @@ from ace import prompts, verdict
 from ace.extract import ATTRIBUTION, BEST_ANSWER, IG, Extraction
 from ace.extract.evolib import Attribution, Best, Gains, future_gains, log_gain
 from ace.loop import Group, run
-from ace.methods.evolib import SHOW, Library, Skill, evolib_judge, insight_weight, skill_weight
+from ace.memory.evolib import Library, Skill
+from ace.methods.evolib import evolib_judge
+from ace.show.evolib import SHOW, insight_weight, skill_weight
 
 SKILL = "<subtask>\n<description>{}</description>\n<solution>s</solution>\n<result>r</result>\n</subtask>"
 

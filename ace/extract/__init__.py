@@ -14,14 +14,15 @@
     operations    операции над библиотекой, предложенные по вопросу: словари operation / id / content (TF-GRPO)
     rationale     обоснование урока (SCOPE)
     trigger       фрагмент ошибки, по которому урок показывается (хуки по ошибкам)
+    attempt       номер попытки, на которой урок извлечён (SCOPE: урок — в память перспективы попытки)
 
-Реализации: ace.py — рефлектор стенда и диагноз ACE апстрима с раундами повторной попытки; tfgrpo.py —
-контраст попыток TF-GRPO; evolib.py — баллы, IG, insight и улучшение EvoLib."""
+Извлечение на шаге (SCOPE: правило посреди попытки) — step(ex, attempt, шаг, memory) -> Extraction | None; у
+остальных его нет. Реализации — extract/<метод>.py."""
 from dataclasses import dataclass, field
 
 LABELS, CONFIDENCE, DOMAIN, ATTRIBUTION, IG, BEST_ANSWER = "labels", "confidence", "domain", "attribution", "ig", "best_answer"
 OPERATIONS = "operations"
-RATIONALE, TRIGGER = "rationale", "trigger"
+RATIONALE, TRIGGER, ATTEMPT = "rationale", "trigger", "attempt"
 
 
 @dataclass
@@ -43,6 +44,9 @@ class Extractor:
 
     def __call__(self, ex, group, memory):
         raise NotImplementedError
+
+    def step(self, ex, attempt, step, memory):
+        return None
 
 
 class Raw(Extractor):

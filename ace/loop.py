@@ -45,6 +45,7 @@ class Attempt:
     system: str = ""            # системный промпт попытки целиком (Patch(system) пишет новый на его основе)
     steps: list = field(default_factory=list)       # model.Step до текущего включительно
     patches: list = field(default_factory=list)     # model.Patch, применённые после шагов
+    shown: list = field(default_factory=list)       # id записей, показанных посреди попытки (Patch)
     fired: list = field(default_factory=list)       # (id показанного урока, помог ли) — исходы показа после ошибки
 
 

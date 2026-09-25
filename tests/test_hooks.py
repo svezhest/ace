@@ -11,11 +11,14 @@ from stub import TASK, Stub, episode, right
 from ace.env import Env
 from ace.extract import LABELS, TRIGGER, Extraction, Labels
 from ace.extract.ace import Reflection
-from ace.hooks import HookBook, HookLesson, HookLessons, Hooks, by_model, by_trajectory, error_kind
+from ace.extract.hooks import HookLesson, HookLessons, by_model, by_trajectory, error_kind
+from ace.memory.hooks import HookBook
+from ace.wrap.hooks import Hooks
 from ace.learner import Learner
 from ace.loop import Attempt, Group, Prompt, run
-from ace.methods.ace import Ops
-from ace.methods.hybrids import CappedPlaybook, ace_bo2, ace_group, ace_hooks, ace_opt
+from ace.memory.ace import Ops
+from ace.memory.ace import CappedPlaybook
+from ace.methods.hybrids import ace_bo2, ace_group, ace_hooks, ace_opt
 from ace.model import Model, Patch, Step
 
 ERROR = "Traceback (most recent call last):\nZeroDivisionError: division by zero"
