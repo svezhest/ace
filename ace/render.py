@@ -305,7 +305,8 @@ def skill_database(done):
 
 
 def evaluations(history):
-    return json.dumps({f"iter{i}": dict(val_accuracy=h.val, train_accuracy=h.train) for i, h in enumerate(history)}, indent=2)
+    """evaluations.json: итерации с первой (нулевая туда не пишется, mce/main.py:115)."""
+    return json.dumps({f"iter{i}": dict(val_accuracy=h.val, train_accuracy=h.train) for i, h in enumerate(history, 1)}, indent=2)
 
 
 def skills(done):

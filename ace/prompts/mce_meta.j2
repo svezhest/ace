@@ -21,13 +21,13 @@ Each skill you create should be a complete learning procedure that can be unders
 - Perform agentic crossover to evolve better skills
 - Output: the new SKILL.md
 
-**Base-Level (Context Engineer)**:
+{% block base %}**Base-Level (Context Engineer)**:
 - Receives your skill + training data + prior best context
 - Executes the skill with file tools over `context/` and `data/`
 - Output: `context/` files
 
 **Key Flow**: Base-agent starts with the BEST context from previous iterations and UPDATES it based on your skill's instructions.
-
+{% endblock %}
 ## Skill Database (Iteration History)
 
 {{ skill_database }}
@@ -55,7 +55,7 @@ Each skill you create should be a complete learning procedure that can be unders
 
 ## Skill Examples
 
-### Example Skill A: Direct Agentic Curation
+{% block example %}### Example Skill A: Direct Agentic Curation
 
 ```markdown
 ## Skill Overview
@@ -73,7 +73,7 @@ Directly analyze training data and curate context in a fully agentic manner.
 - Focus on generalizable patterns
 ```
 
-## Output Requirements
+{% endblock %}## Output Requirements
 
 Reply with the full content of the new SKILL.md and nothing else.
 

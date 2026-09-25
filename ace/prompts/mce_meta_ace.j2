@@ -1,0 +1,26 @@
+{% extends "mce_meta.j2" %}{% block base %}**Base-Level (Reflector and Curator)**:
+- Receive your skill in their system prompts
+- The reflector analyzes each solved question (trajectory, outcome, correct answer) and labels the playbook bullets it relied on as helpful or harmful
+- The curator turns the reflector's lessons into ADD/UPDATE operations on the playbook; bullets with mostly harmful labels are removed
+- Output: the playbook of bullets that the solver sees
+
+**Key Flow**: The playbook starts from the BEST version of previous iterations and is UPDATED question by question following your skill's instructions.
+{% endblock %}{% block example %}### Example Skill A: Error-Driven Playbook Curation
+
+```markdown
+## Skill Overview
+Turn every mistake into a short, reusable bullet and keep the playbook small.
+
+## Methodology
+1. **Diagnose**: Name the root cause of a wrong answer, not its symptoms
+2. **Label**: Mark bullets that led to the mistake as harmful, bullets that helped as helpful
+3. **Generalize**: Write lessons that apply to a whole class of questions
+4. **Curate**: UPDATE an existing bullet instead of adding a near-duplicate
+
+## Key Principles
+- Prefer specific, checkable rules
+- One idea per bullet
+- Remove what does not help
+```
+
+{% endblock %}
