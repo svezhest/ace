@@ -28,6 +28,13 @@ def test_answer():
     assert (r.output, r.outcome, r.steps) == ("FINAL ANSWER: 1", Outcome.answer, [])
 
 
+def test_empty_system_not_sent():
+    """Пустой системный промпт не уходит модели: у апстримов запрос — одно сообщение user."""
+    seen = []
+    model_of(lambda messages, info: seen.append(messages) or ModelResponse(parts=[TextPart("x")])).run("", "q")
+    assert [type(p) for m in seen[0] for p in m.parts] == [UserPromptPart]
+
+
 def test_rounds_run_out():
     """Модель только вызывает инструмент: после rounds + EXTRA_REQUESTS запросов ответа нет."""
     fn = lambda messages, info: ModelResponse(parts=[ToolCallPart("add", {"a": 1, "b": responses(messages)})])

@@ -122,8 +122,9 @@ class Model:
 
     def request(self, system, user, history, output, tools, deps, limit, settings):
         """До limit запросов; -> (ответ или None, все сообщения, Outcome). Сообщения сохраняются
-        и при сбое: траектория и токены не теряются."""
-        agent = Agent(self.llm, system_prompt=system, output_type=output, tools=tools, retries=RETRIES)
+        и при сбое: траектория и токены не теряются. Пустой системный промпт не отправляется: апстримы
+        шлют промпт одним сообщением user."""
+        agent = Agent(self.llm, system_prompt=system or (), output_type=output, tools=tools, retries=RETRIES)
         result, outcome = None, Outcome.answer
         with capture_run_messages() as messages:
             try:
