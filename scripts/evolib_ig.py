@@ -62,7 +62,6 @@ if __name__ == "__main__":
         learner = CHAIN[variant]
         out = f"{config.RESULTS}/{task.name}{n}/ig_{variant}"
         start = len(ROWS)
-        print(run(task, swap(learner, "ig_" + variant, extract=Logged(learner.extract, variant)), Model(), n, out,
-                  epochs=config.EPOCHS))
+        print(run(task, swap(learner, "ig_" + variant, extract=Logged(learner.extract, variant)), Model(), n, out))
         json.dump(ROWS[start:], open(f"{out}/ig.json", "w"), ensure_ascii=False, indent=1)
     table(ROWS)

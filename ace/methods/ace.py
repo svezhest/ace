@@ -26,6 +26,7 @@ ace_used — общий решатель стенда (S1) с playbook в сис
 ace_dedup — после куратора похожие пункты сливаются моделью (BulletpointAnalyzer; в апстриме выключен)."""
 from ..extract.ace import Diagnose, Reflector, named
 from ..learner import Learner, swap
+from ..loop import Protocol
 from ..memory.ace import DEDUP, Playbook, SectionedPlaybook, curate_rewrite
 from ..show.ace import GENERATOR, PLAYBOOK
 
@@ -35,6 +36,7 @@ ace_stand_rewrite = swap(ace_stand, "ace_stand_rewrite", memory=Playbook(curate_
 
 WINDOW = 15                 # --online_eval_frequency апстрима
 
-ace = Learner("ace", memory=SectionedPlaybook(), show=GENERATOR, extract=Diagnose(), window=WINDOW, recheck=True)
-ace_used = swap(ace, "ace_used", show=PLAYBOOK, extract=Diagnose(ids=named), window=0, recheck=False)
+ace = Learner("ace", memory=SectionedPlaybook(), show=GENERATOR, extract=Diagnose(),
+              protocol=Protocol(window=WINDOW, recheck=True))
+ace_used = swap(ace, "ace_used", show=PLAYBOOK, extract=Diagnose(ids=named), protocol=Protocol())
 ace_dedup = swap(ace, "ace_dedup", memory=SectionedPlaybook(dedup=DEDUP))

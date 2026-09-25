@@ -15,7 +15,7 @@ from ace import parse, prompts, verdict
 from ace.extract import ATTRIBUTION, BEST_ANSWER, IG
 from ace.extract.evolib import Attribution, Best, Gains, future_gains, insight_of, log_gain, second_better
 from ace.learner import swap
-from ace.loop import Episode, Group, Prompt, run
+from ace.loop import Episode, Group, Prompt, Protocol, run
 from ace.model import roles, text_reply
 from ace.tasks import TASKS
 
@@ -439,7 +439,7 @@ def test_loop(monkeypatch, mode):
     monkeypatch.setattr(MEM.Library, "learn", snapshot)
     learner = E.evolib if mode == "nogold" else swap(E.evolib, "evolib_gold", extract=Gains(evaluated=True),
                                                     verdict=verdict.golden, group_verdict=verdict.none)
-    run(task, learner, model, n=len(PROBLEMS), epochs=2)
+    run(task, swap(learner, protocol=Protocol(epochs=2)), model, n=len(PROBLEMS), split="train")     # с меткой — не по тесту
     want, start = LOOP[mode]["iterations"], 0
     assert len(snaps) == len(want)
     for (lib, best, end), it in zip(snaps, want):

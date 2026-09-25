@@ -4,6 +4,7 @@
 import json
 import re
 import string
+from dataclasses import replace
 
 import pytest
 
@@ -312,7 +313,7 @@ def test_online_loop(tmp_path, key):
     up = LOOP[key]
     assert up["config"]["json_mode"] is False and up["config"]["max_num_rounds"] == 3
     model = Replay(up["calls"])
-    learner = swap(ace, window=up["config"]["online_eval_frequency"])
+    learner = swap(ace, protocol=replace(ace.protocol, window=up["config"]["online_eval_frequency"]))
     if key == "online_nogt":
         learner = swap(learner, verdict=yes_no)
     run(Task(up["samples"]), learner, model, len(up["samples"]), str(tmp_path))

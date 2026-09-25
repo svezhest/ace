@@ -295,7 +295,7 @@ def test_settings():
     assert built["original_temperature"] == final["temperature"] == SHOW.TEMPERATURE and final["top_p"] == SHOW.TOP_P
     assert T.NUM == practice["num_experiences_per_query"]
     assert practice["given_ground_truth"] and M.tfgrpo.verdict is verdict.golden
-    assert M.tfgrpo.epochs == practice["epochs"] and not M.tfgrpo.flush and M.tfgrpo.final
+    assert M.tfgrpo.protocol.epochs == practice["epochs"] and not M.tfgrpo.flush and M.tfgrpo.protocol.final
     assert cfg["updater_query_params"] == {}            # обновление без температуры: test_loop
     # eval при обучении делит агента с rollout (T = 0.7): отсюда и итоговый агент без опытов при 0.7 (test_show)
     assert built["practice_and_eval_share_agent"] and built["eval_rollout_temperature"] == SHOW.ROLLOUT_TEMPERATURE

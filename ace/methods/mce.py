@@ -11,6 +11,7 @@ mce = Iterations(базовый агент апстрима) — метод ап
                 (show/mce.py)
     извлечение  нет: память читает сырое
     когда учится  батч 20; неполный батч применяется в конце прохода
+    протокол    офлайн: 3 итерации по train, val после каждой, тест памятью лучшей по val итерации
 Параметры scripts/train_symptom_diagnosis.sh: 3 итерации, train 50 батчами по 25, val 20; у нас 40 батчами
 по 20 и val 10.
 
@@ -22,6 +23,7 @@ mce_ace_stand = Meta(ACE): тот же мета-агент mce_fs (промпт 
 from .. import render
 from ..extract import Raw
 from ..learner import Learner, swap
+from ..loop import Protocol
 from ..memory.mce import Context, Folder
 from ..show import Whole
 from ..show.mce import Environment
@@ -30,9 +32,11 @@ from .ace import ace_stand
 
 BATCH, ITERATIONS = 20, 3
 
+PROTOCOL = Protocol(offline=True, epochs=ITERATIONS)     # итерация = проход по train, val после неё
+
 mce = Iterations(Learner("mce", memory=Folder(), show=Environment(), extract=Raw(), every=BATCH, flush=True,
-                         epochs=ITERATIONS))
+                         protocol=PROTOCOL))
 base = Learner("mce_base", memory=Context(), show=Whole(line=render.plain, sep="\n\n"), extract=Raw(), every=BATCH,
-               flush=True, epochs=ITERATIONS)
+               flush=True, protocol=PROTOCOL)
 mce_fs = Meta(base, meta_agent(META), "mce_fs")
-mce_ace_stand = Meta(swap(ace_stand, epochs=ITERATIONS), meta_agent(META_ACE), "mce_ace_stand")
+mce_ace_stand = Meta(swap(ace_stand, protocol=PROTOCOL), meta_agent(META_ACE), "mce_ace_stand")

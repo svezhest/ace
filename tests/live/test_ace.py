@@ -4,6 +4,7 @@
 ответы до и после обучения и число верных в тесте окон — тоже."""
 import json
 import threading
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -35,7 +36,7 @@ def replayed(tmp_path_factory):
     STEPS.clear()
     try:
         model = Model("ornith15-9b", f"http://127.0.0.1:{srv.server_address[1]}/v1", backend="wire")
-        run(TASKS["formula"], swap(ace, window=WINDOW, memory=Watched()), model, N, str(out))
+        run(TASKS["formula"], swap(ace, protocol=replace(ace.protocol, window=WINDOW), memory=Watched()), model, N, str(out))
     finally:
         srv.shutdown()
     return srv.status(), json.load(open(out / "log.json"))

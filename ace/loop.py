@@ -9,7 +9,7 @@
 
 На val и тесте (training = False) цикл зовёт только prompt и on_step. Сам цикл делает: среду попытки,
 вердикты (верный ответ в эпизоде только при golden), выбор ответа в зачёт, запись прочитанного
-инструментами (episode.used), протокол (онлайн; офлайн с выбором лучшей по val версии) и лог."""
+инструментами (episode.used), протокол метода (Protocol: онлайн; офлайн с выбором лучшей по val версии) и лог."""
 import copy
 import json
 import random
@@ -20,7 +20,7 @@ from pathlib import Path
 from . import config, render
 from .model import Call, messages, params
 from .tasks import accuracy, final_answer
-from .verdict import majority
+from .verdict import LABELED, majority
 
 
 @dataclass
@@ -142,6 +142,42 @@ class Attempts:
         return self.n if training or self.pick is not first else 1
 
 
+@dataclass(frozen=True)
+class Protocol:
+    """Протокол метода — как у его апстрима: на чём память учится и что идёт в зачёт.
+    offline   обучение на train, после каждого прохода val; тест на потоке с лучшей по val версией памяти
+    epochs    проходов обучения; онлайн — по тестовому потоку, в зачёт последний
+    window    онлайн: тест окна — перед обучением на каждых window вопросах они решаются текущей памятью без
+              обучения, это и в зачёт (ACE online); 0 — в зачёт первая попытка обучения
+    recheck   после обучения на вопросе — попытка новой памятью, только в лог (ACE post_train)
+    final     офлайн без val: проход по train только учит, в зачёт — тест памятью после обучения (TF-GRPO)"""
+    offline: bool = False
+    epochs: int = 1
+    window: int = 0
+    recheck: bool = False
+    final: bool = False
+
+    @property
+    def val(self):
+        return self.offline and not self.final
+
+    @property
+    def name(self):
+        return f"{'final' if self.final else 'offline' if self.offline else 'online'}-e{self.epochs}"
+
+    def check(self, name, verdict=None, split=""):
+        """Ошибка сборки: несовместимые части. С вердиктом — ошибка запуска при утечке метки: онлайн с несколькими
+        проходами по тестовому потоку, а вердикт попытки видит метку (память выучит ответы тех же вопросов, в зачёт —
+        последний проход). Поток train (split) — не тест."""
+        if self.final and not self.offline:
+            raise ValueError(f"{name}: протокол final — только офлайн")
+        if self.window and self.offline:
+            raise ValueError(f"{name}: тест окна — только онлайн")
+        if not self.offline and self.epochs > 1 and verdict in LABELED and split != "train":
+            raise ValueError(f"{name}: онлайн с {self.epochs} проходами по тестовому потоку при вердикте, который видит "
+                             "метку, — утечка ответов; нужен офлайн")
+
+
 class Experiment:
     """Метод × задача. Хукам ученика — как ex: модель, задача, флаг обучения, номер вопроса и их число,
     evaluate() и retry()."""
@@ -254,19 +290,18 @@ def entry(phase, epoch, i, g, item, correct, gated, memory_chars, sec):
                        for e in g.episodes])
 
 
-def run(task, learner, model, n=config.SIZE, out=None, split="", epochs=None, offline=False):
-    """Онлайн: поток split, память учится по ходу, epochs проходов, в зачёт последний. В зачёт первая попытка
-    обучения, а с learner.window (ACE online) — тест окна: перед обучением на каждых window вопросах они решаются
-    текущей памятью без обучения; до первого прохода — начальный тест всего потока (в лог).
-    Офлайн (ACE offline, MCE): обучение на train, после каждого прохода val; тест на split с лучшей по val
-    версией памяти (строго больше, при равенстве ранняя), без обучения. learner.final (TF-GRPO) — всегда офлайн
-    и без val: тест памятью после последнего прохода, как итоговый агент апстрима.
-    learner.recheck — после обучения на вопросе ещё попытка новой памятью, только в лог (ACE post_train)."""
+def run(task, learner, model, n=config.SIZE, out=None, split=""):
+    """Прогон метода на задаче по протоколу ученика (learner.protocol). Онлайн: поток split, память учится по ходу,
+    epochs проходов, в зачёт последний: первая попытка обучения, а с window — тест окна; до первого прохода —
+    начальный тест всего потока (в лог). Офлайн: обучение на train, после каждого прохода val; тест на split с
+    лучшей по val версией памяти (строго больше, при равенстве ранняя), без обучения. final — офлайн без val: тест
+    памятью после последнего прохода, как итоговый агент апстрима. recheck — после обучения на вопросе ещё
+    попытка новой памятью, только в лог."""
     random.seed(config.SEED)
     learner = copy.deepcopy(learner)        # в реестре память ученика пуста: каждый прогон с чистой
-    offline = offline or learner.final
+    proto = learner.protocol
+    proto.check(learner.name, learner.verdict, split)
     ex = Experiment(task, learner, model)
-    epochs = epochs or learner.epochs
     log = []
 
     def record(phase, i, g, item, t0, gated):
@@ -284,17 +319,16 @@ def run(task, learner, model, n=config.SIZE, out=None, split="", epochs=None, of
         finally:
             ex.training = training
 
-    window = 0 if offline else learner.window
-    if window:
+    if proto.window:
         for i, item in enumerate(task.load(split)[:n]):
             test("initial", i, item)
     best, best_val = learner.snapshot(), -1
-    for epoch in range(epochs):
-        items = learner.sample(ex, "train" if offline else split, n)
+    for epoch in range(proto.epochs):
+        items = learner.sample(ex, "train" if proto.offline else split, n)
         ex.epoch, ex.total, batch = epoch, len(items), []
         for i, item in enumerate(items):
-            if window and i % window == 0:
-                for j in range(i, min(i + window, len(items))):
+            if proto.window and i % proto.window == 0:
+                for j in range(i, min(i + proto.window, len(items))):
                     test("online", j, items[j])
             t0, gates = time.time(), len(learner.gated)
             ex.i, ex.item = i, item
@@ -303,28 +337,29 @@ def run(task, learner, model, n=config.SIZE, out=None, split="", epochs=None, of
             if len(batch) == learner.every:
                 learner.on_batch(ex, batch)
                 batch = []
-            record("train" if offline or window else "online", i, g, item, t0, learner.gated[gates:])
-            if learner.recheck:
+            record("train" if proto.offline or proto.window else "online", i, g, item, t0, learner.gated[gates:])
+            if proto.recheck:
                 test("post", i, item)
         if batch and learner.flush:
             learner.on_batch(ex, batch)
         learner.on_pass(ex)
-        if offline and not learner.final:
+        if proto.val:
             score = sum(c for c, _ in ex.evaluate())
             print(f"val after epoch {epoch}: {score}", flush=True)
             if score > best_val:
                 best, best_val = learner.snapshot(), score
-    if offline:
-        if not learner.final:
+    if proto.offline:
+        if proto.val:
             learner.restore(best)
         ex.training, ex.epoch = False, 0
         for i, item in enumerate(task.load(split)[:n]):
             t0 = time.time()
             ex.i, ex.item = i, item
             record("test", i, ex.question(item), item, t0, [])
-    final = [r for r in log if r["phase"] == "test" or r["phase"] == "online" and r["epoch"] == epochs - 1]
-    summary = dict(task=task.name, method=learner.name, model=model.name, n=len(final), epochs=epochs, offline=offline,
-                   correct=sum(r["correct"] for r in final), truncated=sum(r["finish"] == "length" for r in final),
+    final = [r for r in log if r["phase"] == "test" or r["phase"] == "online" and r["epoch"] == proto.epochs - 1]
+    summary = dict(task=task.name, method=learner.name, model=model.name, n=len(final), protocol=proto.name,
+                   epochs=proto.epochs, offline=proto.offline, correct=sum(r["correct"] for r in final),
+                   truncated=sum(r["finish"] == "length" for r in final),
                    accuracy=accuracy(task, [r["answer"] for r in final], [r["target"] for r in final]), **model.usage())
     if out:
         Path(out).mkdir(parents=True, exist_ok=True)

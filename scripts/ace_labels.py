@@ -49,8 +49,7 @@ if __name__ == "__main__":
     n = int(sys.argv[2]) if len(sys.argv) > 2 else config.SIZE
     out = f"{config.RESULTS}/{task.name}{n}/labels_ace_used"
     base = METHODS["ace_used"]
-    print(run(task, swap(base, "labels_ace_used", extract=Logged(base.extract.rounds, ids=named)), Model(), n, out,
-              epochs=config.EPOCHS))
+    print(run(task, swap(base, "labels_ace_used", extract=Logged(base.extract.rounds, ids=named)), Model(), n, out))
     json.dump(ROWS, open(f"{out}/labels.json", "w"), ensure_ascii=False, indent=1)
     rows = [r for r in ROWS if r["memory"]]         # пока память пуста, называть нечего
     named = sum(len(r["named"]) for r in rows)

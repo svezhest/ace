@@ -13,11 +13,14 @@ from stub import TASK, Stub, right
 from ace import verdict
 from ace.env import Env
 from ace.extract import Extraction, Extractor, Raw
-from ace.learner import Learner
-from ace.loop import Attempts, Experiment, best, first, run, vote
+from ace.learner import Learner, swap
+from ace.loop import Attempts, Experiment, Protocol, best, first, run, vote
 from ace.memory import Lessons
 from ace.model import Model, Patch
 from ace.show import Show, Whole
+
+
+OFFLINE2 = Protocol(offline=True, epochs=2)
 
 
 class Journal(list):
@@ -134,7 +137,7 @@ def test_offline_best_by_val_and_training(tmp_path):
     """Решатель верен только при версии 0; после второго прохода val хуже — на тесте версия 0, без обучения."""
     model = Stub(lambda call: right(call) if "version 0" in call["system"] else "FINAL ANSWER: 0")
     learner = spy(memory=Versions(), extract=Raw())
-    _, learner = run_spy(learner, model, n=2, epochs=2, offline=True, split="val", out=str(tmp_path))
+    _, learner = run_spy(swap(learner, protocol=OFFLINE2), model, n=2, split="val", out=str(tmp_path))
     assert learner.memory.records()[0].text == "version 0"
     assert all(e[1] for e in learner.of("question")) and all(e[1] for e in learner.of("attempt"))
     log = json.load(open(tmp_path / "log.json"))
@@ -152,7 +155,7 @@ def test_val_cache():
     val = len(TASK.load("val"))
     for show, solves in ((Whole(), 2 + val), (Random(), 2 + 2 * val)):
         model = Stub()
-        run(TASK, Learner("x", show=show), model, 1, epochs=2, offline=True)
+        run(TASK, Learner("x", show=show, protocol=OFFLINE2), model, 1)
         assert len(model.solver_calls()) == solves + 1
 
 
@@ -281,5 +284,17 @@ def test_judge_parse(text, word):
 def test_judge_not_on_test():
     """Вне обучения судья не зовётся: на тесте его вердикт никто не читает."""
     model = Stub(lambda call: "VERDICT: correct" if call["system"] == "You are a strict grader." else "FINAL ANSWER: 0")
-    run(TASK, spy(verdict=verdict.judge), model, 1, offline=True)
+    run(TASK, spy(verdict=verdict.judge, protocol=Protocol(offline=True)), model, 1)
     assert sum(c["system"] == "You are a strict grader." for c in model.calls) == 1
+
+
+def test_leak_is_error():
+    """Онлайн с несколькими проходами по тесту при вердикте с меткой — ошибка запуска; без метки или по train — можно."""
+    with pytest.raises(ValueError, match="утечка"):
+        run(TASK, spy(protocol=Protocol(epochs=2)), Stub(), 1)
+    run(TASK, spy(protocol=Protocol(epochs=2), verdict=verdict.none), Stub(), 1)
+    run(TASK, spy(protocol=Protocol(epochs=2)), Stub(), 1, split="train")
+    with pytest.raises(ValueError):
+        Protocol(final=True).check("x")
+    with pytest.raises(ValueError):
+        Protocol(offline=True, window=3).check("x")

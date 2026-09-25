@@ -28,7 +28,7 @@ ace_stand_opt, ace_stand_hooks, ace_stand_group. По умолчанию уро�
 uv sync                                   # окружение с зависимостями для разработки (pytest)
 docker build -t cestand-sandbox ace/env   # образ docker для исполнения кода
 uv run python run.py formula ace 40       # результаты в results/formula40/ace/
-EPOCHS=3 OFFLINE=1 uv run python run.py formula ace 40   # офлайн: обучение на train, тест с лучшей по val памятью
+EPOCHS=3 OFFLINE=1 uv run python run.py formula ace_stand 40   # другой протокол в этом прогоне: офлайн, 3 прохода
 BACKEND=wire uv run python run.py formula dc 40          # вызовы без инструментов — клиентом openai как есть
 uv run python ablate.py formula 40        # цепочка абляций; ступени по именам: ablate.py formula 40 ace_stand ace_stand_opt
 uv run python report.py                   # таблица по results/
@@ -39,7 +39,9 @@ uv run python tools/compare.py /tmp/a.json /tmp/b.json   # два снимка: 
 
 Настройки (`ace/config.py`, из окружения): `OPENAI_BASE_URL` (по умолчанию `http://localhost:8080/v1`),
 `OPENAI_API_KEY` (`local`), `MODEL`, `BACKEND` (`pydantic-ai` или `wire`), `MAX_TOKENS` (MEB: 8192), `SEED`, размеры
-выборок `SIZE` и `VAL_SIZE` (40 и 10, входят в имя файла данных), `EPOCHS`, `OFFLINE`, `RESULTS`.
+выборок `SIZE` и `VAL_SIZE` (40 и 10, входят в имя файла данных), `RESULTS`. Протокол (онлайн / офлайн, проходы,
+окно ACE) задаёт метод по своему апстриму (`learner.protocol`); `EPOCHS` и `OFFLINE` меняют его только в одном
+прогоне `run.py`, `ablate.py` гоняет каждую ступень по её протоколу.
 
 ## Абляции и замеры
 

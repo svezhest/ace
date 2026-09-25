@@ -54,6 +54,9 @@ def none(*_):
     """Нет вердикта: и для попытки, и для группы."""
 
 
+LABELED = (golden, yes_no)      # вердикты, которые видят метку
+
+
 def vote(ex, group):
     group.vote = majority(e.answer for e in group.episodes)
 

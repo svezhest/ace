@@ -28,7 +28,7 @@ if __name__ == "__main__":
     for variant in VARIANTS:
         out = Path(f"{config.RESULTS}/{task.name}{n}/{variant}")
         if not (out / "summary.json").exists():
-            run(task, CHAIN[variant], Model(), n, str(out), epochs=config.EPOCHS)
+            run(task, CHAIN[variant], Model(), n, str(out))
         summary, log = json.load((out / "summary.json").open()), json.load((out / "log.json").open())
         # попытка в зачёт: у scope она одна
         patched = [r for r in log if r["group"][0]["patches"]]

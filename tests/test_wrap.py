@@ -3,6 +3,9 @@ train за проход, откат к лучшей по val, при равен�
 базовый агент MCE (context/ на запись, итоги только текущего батча в data/ на чтение), навык в промптах ACE."""
 import copy
 import json
+from dataclasses import replace
+
+import pytest
 from types import SimpleNamespace
 
 from stub import TASK, Stub, episode, right
@@ -11,7 +14,7 @@ from ace import fs
 from ace.extract import Raw
 from ace.extract.ace import Reflection
 from ace.learner import Learner, swap
-from ace.loop import Group, run
+from ace.loop import Group, Protocol, run
 from ace.memory import Lessons
 from ace.memory.ace import Ops
 from ace.memory.mce import Context
@@ -19,6 +22,8 @@ from ace.methods.mce import mce_ace_stand, mce_fs as mce
 from ace.wrap.mce import META, MISSING, meta_agent
 from ace.wrap import Gate, Wrapper, skilled
 from ace.wrap.mce import Meta
+
+OFFLINE2 = Protocol(offline=True, epochs=2)
 
 
 class Source(list):
@@ -71,7 +76,7 @@ def test_meta(tmp_path):
         seen.append([(h.text, h.train, h.val) for h in history])
         return f"skill {len(history)}"
     model = Stub(good_only)
-    meta = Meta(notes("good", "x", "bad", "y", every=2, flush=True, epochs=2), author, "meta")
+    meta = Meta(notes("good", "x", "bad", "y", every=2, flush=True, protocol=OFFLINE2), author, "meta")
     run(TASK, meta, model, 3, out=str(tmp_path))
     # навык пишется раз за проход, по истории прошлых итераций; нулевой итерации нет
     assert seen == [[], [("skill 0", 1 / 3, 1.0)]]
@@ -85,7 +90,7 @@ def test_meta(tmp_path):
 
 def test_meta_tie_keeps_first():
     model = Stub(good_only)
-    meta = Meta(notes("good", "x", "good 2", "y", every=3, flush=True, epochs=2), lambda ex, h: "s", "meta")
+    meta = Meta(notes("good", "x", "good 2", "y", every=3, flush=True, protocol=OFFLINE2), lambda ex, h: "s", "meta")
     ex_learner = []
 
     class Spy(Meta):
@@ -93,14 +98,14 @@ def test_meta_tie_keeps_first():
             super().on_pass(ex)
             ex_learner.append([r.text for r in self.inner.memory.records()])
     spy = Spy(meta.inner, meta.author, "meta")
-    run(TASK, spy, model, 3, epochs=2)
+    run(TASK, spy, model, 3)
     assert ex_learner == [["good"], ["good"]]       # у второй итерации тот же val — следующая начнётся с первой
 
 
 def test_swap_wrapper():
     w = swap(mce, "mce2", every=2)
     assert isinstance(w, Meta) and w.name == "mce2" and w.every == 2 and mce.every == 20
-    assert w.inner is not mce.inner and w.flush and w.epochs == 3
+    assert w.inner is not mce.inner and w.flush and w.protocol.epochs == 3
     assert isinstance(Wrapper(mce.inner).inner, Learner)
 
 
@@ -182,7 +187,7 @@ def test_meta_agent_asks_for_skill():
 def test_mce_run():
     model = FileAgent(meta_writes("## Skill Overview\nS"), lambda call: right(call) if call["system"].startswith(TASK.system)
                       else "done")
-    run(TASK, swap(mce, every=2), model, 3, epochs=1, offline=True)
+    run(TASK, swap(mce, every=2, protocol=replace(mce.protocol, epochs=1)), model, 3)
     base = [c for c in model.calls if c["user"].startswith("# Context Engineer")]
     assert len(base) == 2                                   # батч из двух и неполный в конце прохода
     summaries = [json.loads(c["deps"].mounts["data"].store.files["train.json"])["summary"] for c in base]
@@ -210,8 +215,16 @@ def test_skill_in_ace_prompts():
 def test_mce_ace_run():
     model = FileAgent(meta_writes("SKILL"), lambda call: right(call) if call["system"].startswith(TASK.system) else "done",
                       schemas={"Reflection": Reflection(lessons=["l"]), "Ops": Ops(ops=[])})
-    run(TASK, mce_ace_stand, model, 2, epochs=2, offline=True)
+    run(TASK, swap(mce_ace_stand, protocol=OFFLINE2), model, 2)
     metas = [c for c in model.calls if "Meta-Level Agent" in c["user"]]
     assert len(metas) == 2 and "Base-Level (Reflector and Curator)" in metas[0]["user"]
     learning = [c for c in model.calls if c["output"] in (Reflection, Ops)]
     assert len(learning) == 8 and all(c["system"].endswith("\n\nSKILL") for c in learning)
+
+
+def test_meta_offline_only():
+    """MCE учится только на train: онлайн-протокол — ошибка сборки, и при замене тоже."""
+    with pytest.raises(ValueError, match="офлайн"):
+        Meta(notes(), lambda ex, h: "", "meta")
+    with pytest.raises(ValueError, match="офлайн"):
+        swap(mce, protocol=Protocol())

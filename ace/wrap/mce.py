@@ -36,6 +36,12 @@ class Iteration:
     folders: dict = field(default_factory=dict)
 
 
+def offline_only(wrapper):
+    """MCE учится только на train: итерация — проход по train, выбор — по val."""
+    if not wrapper.inner.protocol.val:
+        raise ValueError(f"{wrapper.name}: MCE — только офлайн с val (итерация — проход по train)")
+
+
 def accuracy(results):
     return correct(results) / len(results) if results else 0.0
 
@@ -60,6 +66,9 @@ class Meta(Wrapper):
         super().__init__(inner, name)
         self.author, self.history = author, []
         self.fresh, self.right, self.seen, self.folders = True, 0, 0, {}
+
+    def check(self):
+        offline_only(self)
 
     def prompt(self, ex, item, k, memory=None):
         """Первая попытка прохода при обучении открывает итерацию: навык до всего обучения прохода."""
@@ -210,6 +219,9 @@ class Iterations(Wrapper):
         super().__init__(inner, name)
         self.root, self.workspace = root, workspace
         self.ws, self.history, self.passed, self.subs = None, [], [], []
+
+    def check(self):
+        offline_only(self)
 
     def sample(self, ex, split, n):
         if self.ws is None:

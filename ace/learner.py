@@ -7,8 +7,7 @@
     память              контейнер + learn(ex, extractions); requires            memory/
     показ               show.prompt -> Prompt, show.on_step -> Patch            show/
     когда учится        every (раз в сколько вопросов), flush (неполный батч в конце прохода)
-    протокол            window (тест окна в зачёт), recheck (попытка после обучения), final (обучение, затем
-                        тест итоговой памятью)                                  loop.py: run
+    протокол            protocol: Protocol(offline, epochs, window, recheck, final) — по апстриму метода  loop.py
     среда попытки       env: Env | Sandbox(per="call" | "attempt")              env/
 
 Хуки: перед попыткой память узнаёт о новой попытке (begin: срок жизни «попытка»), показ даёт промпт; на шаге
@@ -24,7 +23,7 @@ from dataclasses import dataclass, field, replace
 from . import verdict as verdicts
 from .env import Env
 from .extract import missing
-from .loop import Attempts
+from .loop import Attempts, Protocol
 from .memory import Lessons
 from .show import Show, Whole
 
@@ -40,16 +39,14 @@ class Learner:
     group_verdict: callable = verdicts.none
     every: int = 1
     flush: bool = False
-    epochs: int = 1             # проходов по train по умолчанию, как в апстриме
-    window: int = 0             # онлайн: тест окна из window вопросов до обучения на нём (в зачёт); 0 — первая попытка
-    recheck: bool = False       # после обучения на вопросе — попытка новой памятью, только в лог
-    final: bool = False         # протокол TF-GRPO: проход по train без зачёта, в зачёт — тест памятью после обучения
+    protocol: Protocol = Protocol()
     env: Env = field(default_factory=Env)
     skill: str = ""             # навык от мета-уровня (MCE над учеником); сам ученик его не пишет
     pending: list = field(default_factory=list, init=False, repr=False)    # извлечённое до батча
     gated: list = field(default_factory=list, init=False, repr=False)      # решения Gate (в лог по вопросу)
 
     def __post_init__(self):
+        self.protocol.check(self.name)
         lack = missing(self.memory, self.extract)
         if lack:
             raise ValueError(f"{self.name}: память требует от извлечения {', '.join(sorted(lack))}, а оно этого не даёт")

@@ -10,7 +10,7 @@ from upstream import deviation, fixture
 
 from ace import fs, render
 from ace.learner import swap
-from ace.loop import run
+from ace.loop import Protocol, run
 from ace.memory.mce import BASE, WORKSPACE
 from ace.methods.mce import mce_fs as mce
 from ace.wrap.mce import META, MISSING, evaluations
@@ -252,8 +252,8 @@ def test_loop(tmp_path):
         def on_pass(self, ex):
             super().on_pass(ex)
             history[:] = self.history
-    learner = swap(mce, every=4)
-    run(task, Spy(learner.inner, learner.author, "mce"), model, 6, str(tmp_path), epochs=3, offline=True)
+    learner = swap(mce, every=4, protocol=Protocol(offline=True, epochs=3))
+    run(task, Spy(learner.inner, learner.author, "mce"), model, 6, str(tmp_path))
     want = [c for c in LOOP["agent_calls"] if c["iteration"] >= 1]
     got = model.calls
     assert [(c["agent"], c["iteration"] if c["agent"] == "meta" else c["folder"]) for c in got] == \

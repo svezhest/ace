@@ -1,12 +1,12 @@
 """Цепочка абляций по уровням: каждая ступень — одна замена уровня относительно предыдущей ступени или базы
 своего блока (она указана в комментарии). Шесть методов — отдельными строками для сравнения.
-python ablate.py TASK [N] [STEP ...]; EPOCHS и OFFLINE — как у run.py (ace/config.py)."""
+python ablate.py TASK [N] [STEP ...]; каждая ступень идёт по своему протоколу (learner.protocol)."""
 import sys
 
 from ace import config, prompts, verdict
 from ace.env import Sandbox
 from ace.learner import swap
-from ace.loop import Attempts, run, vote
+from ace.loop import Attempts, Protocol, run, vote
 from ace.methods import METHODS
 from ace.methods.mce import ITERATIONS
 from ace.model import Model
@@ -61,7 +61,7 @@ CHAIN = {
     "ace_stand_hooks": Hooks(ace_stand_code, "ace_stand_hooks"),                 # от ace_stand_code: урок после ошибки в конец истории
     "ace_stand_hooks_system": Hooks(ace_stand_code, "ace_stand_hooks_system", show="system"),   # от ace_stand_code: хуки в системном промпте с начала
     # мета (от ace_stand)
-    "ace_stand_e3": swap(ace_stand, "ace_stand_e3", epochs=ITERATIONS),          # протокол: 3 прохода, как у меты
+    "ace_stand_e3": swap(ace_stand, "ace_stand_e3", protocol=Protocol(offline=True, epochs=ITERATIONS)),   # протокол меты: офлайн, 3 прохода
     "mce_ace_stand": m["mce_ace_stand"],        # от ace_stand_e3: MCE над ACE — навык рефлектору и куратору, откат к лучшей по val
 
     # вердикт (на EvoLib; evolib — голосование группы)
@@ -80,5 +80,4 @@ if __name__ == "__main__":
     task = TASKS[sys.argv[1]]
     n = int(sys.argv[2]) if len(sys.argv) > 2 else config.SIZE
     for name in sys.argv[3:] or CHAIN:
-        print(run(task, CHAIN[name], Model(), n, f"{config.RESULTS}/{task.name}{n}/{name}",
-                  epochs=config.EPOCHS, offline=config.OFFLINE))
+        print(run(task, CHAIN[name], Model(), n, f"{config.RESULTS}/{task.name}{n}/{name}"))

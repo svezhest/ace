@@ -13,6 +13,7 @@ import socket
 import subprocess
 import threading
 import time
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -95,11 +96,10 @@ def replayed(tmp_path_factory):
         patch.setattr(config, "SEED", RUN["seed"])
         ROOT.mkdir(parents=True)
         patch.chdir(ROOT)               # cwd процесса апстрима — корень (относительные пути в коде интерфейсов)
-        learner = swap(mce, every=RUN["train_batch_size"])
+        learner = swap(mce, every=RUN["train_batch_size"], protocol=replace(mce.protocol, epochs=RUN["iterations"]))
         learner.root, learner.workspace = ROOT, RUN["workspace"]
         model = Model(RUN["model"], url, backend="wire")
-        run(TASKS["symptom"], learner, model, RUN["train_limit"], str(tmp / "out"), epochs=RUN["iterations"],
-            offline=True)
+        run(TASKS["symptom"], learner, model, RUN["train_limit"], str(tmp / "out"))
     finally:
         patch.undo()
         proc.kill()

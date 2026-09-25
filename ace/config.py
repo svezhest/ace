@@ -14,7 +14,8 @@ SEED = int(os.getenv("SEED", 0))
 SIZE = int(os.getenv("SIZE", 40))
 VAL_SIZE = int(os.getenv("VAL_SIZE", 10))
 
-# протокол run.py: проходов по train и офлайн-режим (обучение на train, тест с лучшей по val памятью)
+# протокол задаёт метод; run.py может заменить число проходов и включить офлайн (обучение на train, тест с лучшей по
+# val памятью) в одном прогоне
 EPOCHS = int(os.getenv("EPOCHS", 0)) or None
 OFFLINE = bool(os.getenv("OFFLINE"))
 

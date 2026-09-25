@@ -23,6 +23,10 @@ def skilled(system, ex):
 class Wrapper:
     def __init__(self, inner, name=None):
         self.inner, self.name = inner, name or inner.name
+        self.check()
+
+    def check(self):
+        """Ошибка сборки, если ученик обёртке не подходит."""
 
     def __getattr__(self, attr):
         if attr.startswith("__") or attr == "inner":
@@ -33,6 +37,7 @@ class Wrapper:
         """Та же обёртка над учеником с заменёнными уровнями."""
         out = copy.deepcopy(self)
         out.inner, out.name = swap(self.inner, **levels), name or self.name
+        out.check()
         return out
 
 

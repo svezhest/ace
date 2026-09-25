@@ -13,7 +13,7 @@ configs/practice/math_reasoning.yaml и configs/agents/practice/math_agent.yaml.
 Батч в апстриме 50 из 100 задач, 2 шага за эпоху; у нас 20 из 40."""
 from ..extract.tfgrpo import Contrast
 from ..learner import Learner
-from ..loop import Attempts, first
+from ..loop import Attempts, Protocol, first
 from ..memory.tfgrpo import Library
 from ..show.tfgrpo import AGENT, ROLLOUT_TEMPERATURE, TOP_P
 
@@ -21,4 +21,5 @@ GROUP = 5                   # grpo_n
 BATCH = 20
 
 tfgrpo = Learner("tfgrpo", memory=Library(), show=AGENT, extract=Contrast(),
-                 attempts=Attempts(GROUP, lambda k: ROLLOUT_TEMPERATURE, lambda k: TOP_P, first), every=BATCH, final=True)
+                 attempts=Attempts(GROUP, lambda k: ROLLOUT_TEMPERATURE, lambda k: TOP_P, first), every=BATCH,
+                 protocol=Protocol(offline=True, final=True))
