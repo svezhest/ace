@@ -80,3 +80,14 @@ def test_catalog_read_only_and_tracked():
 def test_empty_listing():
     ctx = Ctx(fs.FS({"skills": fs.Mount(fs.Catalog([]), "ro")}))
     assert fs.listing(ctx.deps, "skills") == "(empty)"
+
+
+def test_root_paths():
+    """Пути от корня root (агенты MCE видят /workspace/...) и относительные — одно и то же, в том числе для edit."""
+    ctx, store = files()
+    ctx.deps.root = "/workspace/iter1_sub0"
+    assert fs.ls(ctx, "/workspace/iter1_sub0") == fs.ls(ctx)
+    fs.read(ctx, "/workspace/iter1_sub0/context/notes.md")
+    assert fs.edit(ctx, "context/notes.md", "units", "signs") == "ok"
+    fs.create(ctx, "/workspace/iter1_sub0/context/new.md", "x")
+    assert store.read("new.md") == "x"
