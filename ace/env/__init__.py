@@ -1,4 +1,5 @@
 """Среда задачи: инструменты решателя, не связанные с памятью. Чтение памяти даёт инжект."""
+from .. import prompts
 from . import sandbox
 
 
@@ -17,5 +18,5 @@ def run_python(code: str) -> str:
 
 class Sandbox(Env):
     rounds = 3
-    hint = "\nYou may run Python with run_python before giving the final answer."
+    hint = "\n" + prompts.text("sandbox_hint")
     tools = (run_python,)

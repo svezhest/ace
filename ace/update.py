@@ -24,6 +24,7 @@ from dataclasses import dataclass, field
 
 from pydantic import BaseModel
 
+from . import prompts
 from .memory import needs
 
 
@@ -111,11 +112,10 @@ def ask(prompt, fields, output=str, then=None, system="", temperature=0, tokens=
     return block
 
 
-def paired(prompts, name, fields, system_fields, then=None, parse=None):
-    """Пара промптов апстрима: prompts[name_SP] — системный с полями system_fields(ctx),
-    prompts[name_UP] — пользовательский (TF-GRPO)."""
-    return ask(prompts[f"{name}_UP"], fields, system=lambda ctx: prompts[f"{name}_SP"].fill(system_fields(ctx)),
-               then=then, parse=parse)
+def paired(name, fields, system_fields, then=None, parse=None):
+    """Пара промптов апстрима: name_sp — системный с полями system_fields(ctx), name_up — пользовательский (TF-GRPO)."""
+    system = prompts.load(f"{name}_sp")
+    return ask(prompts.load(f"{name}_up"), fields, system=lambda ctx: system.fill(system_fields(ctx)), then=then, parse=parse)
 
 
 def objectives(agent, learning, num):

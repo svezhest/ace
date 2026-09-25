@@ -1,5 +1,5 @@
 """MCE (meta-context-engineering: mce/main.py, utils.py, prompts/meta_agent.py, prompts/base_agent.py).
-Промпты prompts/mce_*.txt: апстрим без кодовых интерфейсов, утилит и записи навыка в файл.
+Промпты ace/prompts/mce_*.j2: апстрим без кодовых интерфейсов, утилит и записи навыка в файл.
 
     1 память      файлы context/, их заводит и правит базовый агент; скрыто от решателя — история итераций
                   (навык, точность на train и val, память после итерации)
@@ -21,7 +21,7 @@ from ..loop import Method
 from ..memory import Iteration, Kind, Note
 from ..update import Update, ask
 
-META, BASE = prompts.load("mce_meta.txt"), prompts.load("mce_base.txt")
+META, BASE = prompts.load("mce_meta"), prompts.load("mce_base")
 
 # 1. память
 
@@ -33,7 +33,7 @@ BATCH, ROUNDS = 20, 30
 
 meta = ask(META, curate.meta_fields, then=curate.new_skill)
 base = curate.tools(BASE, curate.skill_fields, curate.context_and_results, rounds=ROUNDS,
-                    system="You are a context engineer working with file tools.")
+                    system=prompts.text("mce_base_system"))
 
 mce = Method("mce", MEMORY, inject.full(inject.plain, sep="\n\n"), Feedback("golden"),
              Update(reflect.keep, curate.chain(curate.iteration(meta), base), every=BATCH,

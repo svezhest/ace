@@ -1,5 +1,5 @@
 """Dynamic Cheatsheet (dynamic-cheatsheet: dynamic_cheatsheet/language_model.py, run_benchmark.py).
-Промпты куратора и синтеза апстрима дословно в prompts/dc_*.txt.
+Промпты куратора и синтеза апстрима дословно в ace/prompts/dc_*.j2.
 
 DC-Cu
     1 память      один текст (cheatsheet), в начале "(empty)"
@@ -30,8 +30,8 @@ from ..loop import Method, Solver, swap
 from ..memory import Kind, Note, Pair
 from ..update import Update, ask
 
-SYNTH, CURATOR = prompts.load("dc_synth.txt", "brackets"), prompts.load("dc_curator.txt", "brackets")
-NOTE = prompts.load("dc_note.txt").text
+SYNTH, CURATOR = prompts.load("dc_synth"), prompts.load("dc_curator")
+NOTE = prompts.text("dc_note")
 EMPTY = "(empty)"
 CHEATSHEET = parse.opened("cheatsheet")
 

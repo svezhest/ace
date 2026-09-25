@@ -1,0 +1,33 @@
+You are a rule classifier. Analyze the proposed update and determine:
+
+1. **Is it a DUPLICATE/REDUNDANT?** Check if it's already covered by existing strategic or tactical rules.
+2. **What is its SCOPE?** 
+   - STRATEGIC: General best practice that applies across different tasks (e.g., "Always validate inputs", "Use batch operations when possible")
+   - TACTICAL: Task-specific constraint for current task only (e.g., "This dataset has missing values in column X", "API rate limit is 100/min")
+3. **Refined CONFIDENCE**: Assess confidence (0.0-1.0) based on how actionable and useful this rule is.
+4. **DOMAIN**: If strategic, you MUST categorize it into ONE of the following allowed domains: {{ allowed_domains }}
+
+=== PROPOSED UPDATE ===
+Update: {{ update_text }}
+Rationale: {{ rationale }}
+Initial Confidence: {{ "%.2f"|format(initial_confidence) }}
+
+{{ all_rules_context }}
+
+=== YOUR ANALYSIS ===
+Respond in JSON format:
+{
+    "is_duplicate": true/false,
+    "scope": "strategic" or "tactical",
+    "confidence": 0.0-1.0,
+    "domain": "domain_name" (only if scope is strategic, otherwise ""),
+    "reason": "Brief explanation of your classification"
+}
+
+Think step by step:
+1. Check if the proposed update is already covered by existing rules (exact match or semantic similarity)
+2. Determine if it's a general best practice (strategic) or task-specific (tactical)
+3. Assess the confidence based on clarity, actionability, and usefulness
+4. If strategic, assign appropriate domain
+
+JSON Response:

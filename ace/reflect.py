@@ -36,7 +36,7 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-from . import parse
+from . import parse, prompts
 from .feedback import failed
 from .inject import counted, text_of
 from .memory import needs, perspective_kind
@@ -219,13 +219,12 @@ class Diagnosis(BaseModel):
 
 @needs("helpful", "harmful")
 def diagnosis_fields(ctx, ep, memory, **extra):
-    """Позиционные поля рефлектора ACE; без метки нет верного ответа."""
+    """Поля рефлектора ACE; без метки нет верного ответа."""
     used = [counted(memory.get(i)) for i in ep.used if memory.get(i)]
-    bullets = "\n".join(used) if ep.used else "(No bullets used by generator)"
-    feedback = "Predicted answer matches ground truth" if ep.ok else "Predicted answer does not match ground truth"
-    if ep.target:
-        return ep.question, ep.output, ep.answer, ep.target, feedback, bullets
-    return ep.question, ep.output, ep.answer, feedback, bullets
+    fields = dict(question=ep.question, reasoning_trace=ep.output, predicted_answer=ep.answer,
+                  environment_feedback=prompts.text("ace_environment_feedback", correct=ep.ok),
+                  bullets_used="\n".join(used) if ep.used else prompts.text("ace_no_bullets"))
+    return dict(fields, ground_truth=ep.target) if ep.target else fields
 
 
 def diagnosis_delta(d, ctx, ep, memory, **extra):
@@ -533,5 +532,5 @@ def raw_hooks(ctx, ep, memory, **extra):
     out = []
     for (name, args, result), nxt in zip(ep.steps, ep.steps[1:]):
         if failed(result) and not failed(nxt[2]):
-            out.append(dict(trigger=error_kind(result), text=f"Earlier the same error was followed by a call that worked:\n{nxt[0]} {nxt[1][:500]}"))
+            out.append(dict(trigger=error_kind(result), text=prompts.text("hook_raw", name=nxt[0], args=nxt[1][:500])))
     return out or None

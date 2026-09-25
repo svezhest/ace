@@ -13,14 +13,9 @@
 from collections import Counter
 from dataclasses import dataclass, field
 
-JUDGE = """Check the solution below. Recompute the key quantities yourself and compare with the solution's final answer.
-End with one line: VERDICT: correct  or  VERDICT: wrong
+from . import prompts
 
-## Task
-{question}
-
-## Solution
-{output}"""
+JUDGE = prompts.load("judge")
 
 
 @dataclass
@@ -73,7 +68,7 @@ class Feedback:
 
 def judge(model, attempt):
     """Самопроверка с вердиктом в конце; голое число модель ставит наугад (14/20 против 17/20)."""
-    s = model.one("You are a strict grader.", JUDGE.format(question=attempt.question, output=attempt.output)).output or ""
+    s = model.one(prompts.text("judge_system"), JUDGE.fill(question=attempt.question, output=attempt.output)).output or ""
     return "VERDICT:" in s and "correct" in s.split("VERDICT:")[-1].lower()
 
 

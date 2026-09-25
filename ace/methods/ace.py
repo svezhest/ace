@@ -7,7 +7,7 @@ ace — вариант стенда, основа цепочки абляций:
     4 обновление  reflect: ask -> уроки и метки пунктов; curate: счётчики, затем пункты правит агент файловыми
                   инструментами (или одной схемой операций, или перезаписью); bound: prune вредных
 
-ace_exact — как в апстриме (ace/ace/ace.py, core/, playbook_utils.py; промпты prompts/ace_*.txt дословно):
+ace_exact — как в апстриме (ace/ace/ace.py, core/, playbook_utils.py; промпты ace/prompts/ace_*.j2 дословно):
     1 память      playbook: пункты по 7 разделам (поле section), только добавляются
     2 инжект      весь playbook по разделам, строка «[id] helpful=X harmful=Y :: текст»
     3 сигнал      верный ответ и id пунктов, названных решателем (строка USED вместо bullet_ids)
@@ -27,18 +27,19 @@ from ..update import Update, ask
 
 MEMORY = {"bullet": Kind(Bullet)}
 
-REFLECT = prompts.load("ace_stand_reflect.txt")
-CURATE = {m: prompts.load(f"ace_stand_curate{s}.txt") for m, s in (("tools", ""), ("json", "_json"), ("rewrite", "_rewrite"))}
+REFLECT = prompts.load("ace_stand_reflect")
+CURATE = {m: prompts.load(f"ace_stand_curate{s}") for m, s in (("tools", ""), ("json", "_json"), ("rewrite", "_rewrite"))}
+REFLECTOR, CURATOR = prompts.text("reflector_system"), prompts.text("curator_system")
 
-reflect_json = ask(REFLECT, reflect.lesson_fields(""), reflect.Reflection, system="You are a reflector.",
+reflect_json = ask(REFLECT, reflect.lesson_fields(""), reflect.Reflection, system=REFLECTOR,
                    then=reflect.labeled_lessons())
-reflect_text = ask(REFLECT, reflect.lesson_fields("Write freely."), system="You are a reflector.", then=reflect.free_lessons())
+reflect_text = ask(REFLECT, reflect.lesson_fields(prompts.text("reflect_free_form")), system=REFLECTOR, then=reflect.free_lessons())
 
 # куратор: файловые инструменты по одной операции, все операции одной схемой или вся память заново
 merge_tools = curate.tools(CURATE["tools"], curate.lessons_fields(curate.files_view), curate.memory_files, rounds=6)
-merge_json = ask(CURATE["json"], curate.lessons_fields(curate.text_view), curate.Ops, system="You are a curator.",
+merge_json = ask(CURATE["json"], curate.lessons_fields(curate.text_view), curate.Ops, system=CURATOR,
                  then=curate.apply_ops(curate.op_dicts, missing="skip"))
-merge_rewrite = ask(CURATE["rewrite"], curate.lessons_fields(curate.text_view), system="You are a curator.",
+merge_rewrite = ask(CURATE["rewrite"], curate.lessons_fields(curate.text_view), system=CURATOR,
                     then=curate.rewrite_first)
 curate_tools, curate_json, curate_rewrite = (curate.each(curate.count, curate.admit(curate.has_lessons, m))
                                              for m in (merge_tools, merge_json, merge_rewrite))
@@ -48,8 +49,7 @@ ace = Method("ace", MEMORY, inject.full(), Feedback("golden"),
 
 # ace_exact
 
-P = {n: prompts.load(f"ace_{n}.txt", "positional" if n.startswith("reflector") else "format")
-     for n in ("reflector", "reflector_nogt", "curator", "curator_nogt", "merge")}
+P = {n: prompts.load(f"ace_{n}") for n in ("reflector", "reflector_nogt", "curator", "curator_nogt", "merge")}
 SECTIONS = ["STRATEGIES & INSIGHTS", "FORMULAS & CALCULATIONS", "CODE SNIPPETS & TEMPLATES", "COMMON MISTAKES TO AVOID",
             "PROBLEM-SOLVING HEURISTICS", "CONTEXT CLUES & INDICATORS", "OTHERS"]
 ROUNDS, TOKEN_BUDGET = 3, 80000

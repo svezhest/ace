@@ -27,19 +27,20 @@ INJECT = inject.catalog(always=("constraint",), listed=("procedure", "insight"))
 
 # 4. обновление
 
-REFLECT = prompts.load("proto_reflect.txt")
-CURATE = {m: prompts.load(f"proto_curate{s}.txt") for m, s in (("tools", ""), ("json", "_json"), ("rewrite", "_rewrite"))}
+REFLECT = prompts.load("proto_reflect")
+CURATE = {m: prompts.load(f"proto_curate{s}") for m, s in (("tools", ""), ("json", "_json"), ("rewrite", "_rewrite"))}
+REFLECTOR, CURATOR = prompts.text("reflector_system"), prompts.text("curator_system")
 
-reflect_json = ask(REFLECT, reflect.lesson_fields("", sees="used"), reflect.TypedReflection, system="You are a reflector.",
+reflect_json = ask(REFLECT, reflect.lesson_fields("", sees="used"), reflect.TypedReflection, system=REFLECTOR,
                    then=reflect.labeled_lessons(episode=True))
-reflect_text = ask(REFLECT, reflect.lesson_fields("Write freely.", sees="used"), system="You are a reflector.",
+reflect_text = ask(REFLECT, reflect.lesson_fields(prompts.text("reflect_free_form"), sees="used"), system=REFLECTOR,
                    then=reflect.free_lessons(episode=True))
 
 # куратор: по одной операции за вызов, все операции одной схемой или все записи заново; эпизоды не трогает никто
 FIELDS = curate.lessons_fields(curate.entries_view)
 merge_tools = curate.tools(CURATE["tools"], FIELDS, curate.memory_itself, rounds=4, toolset=curate.TYPED_TOOLS)
-merge_json = ask(CURATE["json"], FIELDS, curate.TypedOps, system="You are a curator.", then=curate.apply_typed)
-merge_rewrite = ask(CURATE["rewrite"], FIELDS, curate.Entries, system="You are a curator.", then=curate.replace_entries)
+merge_json = ask(CURATE["json"], FIELDS, curate.TypedOps, system=CURATOR, then=curate.apply_typed)
+merge_rewrite = ask(CURATE["rewrite"], FIELDS, curate.Entries, system=CURATOR, then=curate.replace_entries)
 curate_tools, curate_json, curate_rewrite = (curate.each(curate.add_episode, curate.count, curate.admit(curate.has_lessons, m))
                                              for m in (merge_tools, merge_json, merge_rewrite))
 

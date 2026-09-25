@@ -1,5 +1,5 @@
 """EvoLib (EvoLib/EvoLib/evolib_agent.py, вариант HMMT из eval_main.py: без синтетических тестов).
-Промпты prompts/evolib_*.txt: апстрим, из которого убрано только «math».
+Промпты ace/prompts/evolib_*.j2: апстрим, из которого убрано только «math».
 
     1 память      skills (Skill): подзадача целиком (<subtask> с description, solution, result), ig, список fig
                   и doc; insights (Insight) «If ..., then ...», список fig; скрыто от решателя — лучшее решение
@@ -21,7 +21,7 @@ from ..loop import Method, Solver, swap
 from ..memory import Insight, Kind, Skill, Solution
 from ..update import Update, ask, maybe, seq
 
-P = {n: prompts.load(f"evolib_{n}.txt") for n in ("insight", "merge_skills", "merge_insights", "compare")}
+P = {n: prompts.load(f"evolib_{n}") for n in ("insight", "merge_skills", "merge_insights", "compare")}
 
 # 1. память
 
@@ -35,9 +35,9 @@ WEIGHT = inject.gain_weight(W_IG, EPS)
 
 sample = inject.choose(
     (0.4, inject.show(("skill",), pick=inject.sample(K, WEIGHT), line=inject.plain, head="",
-                      before="Here are some subtask solutions which you may reuse or adapt for the problem:\n")),
+                      before=prompts.text("evolib_skills_intro"))),
     (0.7, inject.show(("insight",), pick=inject.sample(K, WEIGHT), line=inject.plain, head="",
-                      before="Here are some insights that may help you solve the problem:\n")))
+                      before=prompts.text("evolib_insights_intro"))))
 
 # 4. обновление
 
@@ -58,7 +58,7 @@ library = curate.each(curate.gains(curate.add_insight(P["merge_insights"], SIM),
 
 # решатель
 
-SUBTASKS = prompts.load("evolib_subtasks.txt").text
+SUBTASKS = prompts.text("evolib_subtasks")
 
 evolib = Method("evolib", MEMORY, sample, Feedback("majority"), Update(attempts(), library),
                 Solver(samples=2, temperature=0, vote=True, hint=SUBTASKS))

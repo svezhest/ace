@@ -1,9 +1,0 @@
-You are an expert. Your task is to help students consolidate example problems and solutions into fewer, more generalizable ones to help them solve future problems.
-Here are the example problems and solutions:
-{skills}
-
-Please consolidate these example problems and solutions by merging the ones that solve (almost) identical tasks into a single one that can be referenced for solving future problems.
-If there are example problems that solve different tasks or the same tasks but with different goals, please keep them as separate examples.
-If there are example problems with identical tasks and similar solution approaches, merge them into a single example by keeping the most accurate parts of the solutions.
-NOTE: Please preserve the original logic and reasoning of the solutions, and do not change any existing solution logic unless it is incorrect.
-Output the consolidated example problems and solutions in the same format as the input.

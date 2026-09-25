@@ -1,0 +1,17 @@
+Verify if the general rule subsumes the specific rule.
+
+General Rule: {{ general_rule }}
+Specific Rule: {{ specific_rule }}
+
+A rule is subsumed if:
+- Following the general rule AUTOMATICALLY means you follow the specific rule
+- The specific rule adds NO additional constraints or guidance
+- The specific rule is merely a special case or example of the general rule
+
+Does the general rule completely subsume the specific rule? Answer with JSON:
+{
+  "subsumed": true or false,
+  "reasoning": "Brief explanation"
+}
+
+JSON Response:

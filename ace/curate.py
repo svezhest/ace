@@ -36,7 +36,7 @@ from typing import Literal
 from pydantic import BaseModel
 from pydantic_ai import RunContext
 
-from . import bound, embed, fs, parse, update
+from . import bound, embed, fs, parse, prompts, update
 from .memory import Forbidden, Kind, Memory, needs, perspective_kind, slug
 from .reflect import Lesson, Typed, best_solution
 
@@ -168,7 +168,7 @@ def rewrite_first(new, ctx, memory, d, **extra):
     return new and memory.rewrite(next(iter(memory.schema)), new.strip())
 
 
-def tools(prompt, fields, deps, rounds, toolset=fs.TOOLS, system="You are a curator."):
+def tools(prompt, fields, deps, rounds, toolset=fs.TOOLS, system=prompts.text("curator_system")):
     """Агент с инструментами toolset над deps(memory, delta) (fs.FS для файловых); работает, пока не ответит текстом."""
     def block(ctx, memory, delta):
         ctx.model.run(system, prompt.fill(fields(ctx, memory, delta)), tools=toolset, deps=deps(memory, delta), rounds=rounds)
@@ -308,9 +308,7 @@ def classify_fields(domains, intro, layout):
         strategic = memory.of(perspective_kind("strategic", g["perspective"]))
         tactical = memory.of(perspective_kind("tactical", g["perspective"]))
         strategic_text = "\n" + intro + layout(strategic) if strategic else ""
-        rules = ("\n=== STRATEGIC RULES (Cross-task, persistent): ===\n" + (strategic_text or "No strategic rules yet.")
-                 + "\n\n=== TACTICAL RULES (Current task only): ===\n"
-                 + ("".join(f"{i}. {r.text}\n" for i, r in enumerate(tactical, 1)) or "No tactical rules yet.\n"))
+        rules = prompts.text("scope_rules_context", strategic=strategic_text, tactical=[r.text for r in tactical])
         return dict(allowed_domains=", ".join(domains), update_text=g["text"], rationale=g["rationale"],
                     initial_confidence=g["confidence"], all_rules_context=rules)
     return fields
@@ -365,18 +363,10 @@ def promote(cap, target, optimizer):
 
 def batch_table(memory, ops):
     """Опыты с относящимися к ним операциями, затем операции без id."""
-    if not ops:
-        return "No batch operations."
     dump = lambda op: json.dumps(op, ensure_ascii=False, indent=2)
-    out = []
-    for r in memory.of():
-        related = [op for op in ops if op.get("id") == r.id]
-        out.append(f"Experience {r.id}:\nContent: {r.text}\n"
-                   + ("Related Operations:\n" + "\n".join(map(dump, related)) if related else "No related operations."))
-    loose = [op for op in ops if not op.get("id")]
-    if loose:
-        out.append("Operations without specific Experience ID:\n" + "\n".join(map(dump, loose)))
-    return "\n\n".join(out)
+    experiences = [dict(id=r.id, text=r.text, related=[dump(op) for op in ops if op.get("id") == r.id]) for r in memory.of()]
+    return prompts.text("tfgrpo_batch_table", ops=bool(ops), experiences=experiences,
+                        loose=[dump(op) for op in ops if not op.get("id")])
 
 
 def plan_fields(ctx, memory, deltas, **extra):
@@ -458,7 +448,7 @@ def overview(skill):
 def meta_fields(ctx, memory, deltas, history, **extra):
     done = history[1:]
     if not done:
-        database = "No previous iterations (this is iteration 1, iter0 is baseline). Design an initial skill based on the task."
+        database = prompts.text("mce_no_iterations")
     else:
         database = "\n\n".join(f"### Iteration {i}\n- **Train**: {h.train:.2%} | **Val**: {h.val:.2%}\n"
                                f"- **Skill Overview**:\n{overview(h.text)}" for i, h in enumerate(done, 1))

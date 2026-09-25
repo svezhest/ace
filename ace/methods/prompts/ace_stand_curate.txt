@@ -1,8 +1,0 @@
-Merge the lessons into memory using the tools: create a bullet in memory/ only if it is genuinely new and transferable,
-edit a bullet (read it first) if a lesson refines it. Do nothing for duplicates. When done, reply "done".
-
-## Lessons
-{lessons}
-
-## Memory
-{memory}

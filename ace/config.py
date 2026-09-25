@@ -19,5 +19,5 @@ OFFLINE = bool(os.getenv("OFFLINE"))
 
 ROOT = Path(__file__).parent.parent
 DATA = ROOT / "data"
-PROMPTS = Path(__file__).parent / "methods" / "prompts"
+PROMPTS = Path(__file__).parent / "prompts"
 RESULTS = Path(os.getenv("RESULTS", "results"))

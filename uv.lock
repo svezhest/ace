@@ -13,6 +13,7 @@ name = "ace"
 version = "0.1"
 source = { virtual = "." }
 dependencies = [
+    { name = "jinja2", marker = "python_full_version < '3.15' or platform_system != 'Linux' or sys_platform == 'emscripten'" },
     { name = "pydantic-ai-slim", extra = ["openai"], marker = "python_full_version < '3.15' or platform_system != 'Linux' or sys_platform == 'emscripten'" },
     { name = "sentence-transformers", marker = "python_full_version < '3.15' or platform_system != 'Linux' or sys_platform == 'emscripten'" },
 ]
@@ -20,16 +21,21 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "pytest", marker = "python_full_version < '3.15' or platform_system != 'Linux' or sys_platform == 'emscripten'" },
+    { name = "pyyaml", marker = "python_full_version < '3.15' or platform_system != 'Linux' or sys_platform == 'emscripten'" },
 ]
 
 [package.metadata]
 requires-dist = [
+    { name = "jinja2", specifier = ">=3.1.6" },
     { name = "pydantic-ai-slim", extras = ["openai"], specifier = ">=2.46" },
     { name = "sentence-transformers", specifier = ">=3.0" },
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "pytest", specifier = ">=9.1.1" }]
+dev = [
+    { name = "pytest", specifier = ">=9.1.1" },
+    { name = "pyyaml", specifier = ">=6.0.3" },
+]
 
 [[package]]
 name = "annotated-doc"

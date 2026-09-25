@@ -2,7 +2,7 @@
 python ablate.py TASK [N] [STEP ...]"""
 import sys
 
-from ace import bound, config, inject
+from ace import bound, config, inject, prompts
 from ace.env import Sandbox
 from ace.loop import Solver, run, swap
 from ace.methods import ace, baseline, proto
@@ -13,7 +13,7 @@ from ace.model import Model
 from ace.tasks import TASKS
 
 nobound = lambda *_: None
-PLACEBO = "\n".join(f"[r{i}] Read the question carefully and check units before answering." for i in range(1, 9))
+PLACEBO = prompts.text("placebo")
 CHAIN = {
     "baseline": baseline,
     "placebo": swap(baseline, inject=inject.fixed(PLACEBO)),                    # та же длина промпта без знаний

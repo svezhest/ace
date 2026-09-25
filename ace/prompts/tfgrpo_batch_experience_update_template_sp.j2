@@ -1,0 +1,71 @@
+Your ultimate goal is to help improve the working agent's performance by extracting useful experiences from its past trajectories, which should focus on the learning objective and will be used in the future to guide the agent's behavior. The working agent and learning objective are defined as follows:
+<Working Agent Objective>
+{{ agent_objective }}
+</Working Agent Objective>
+<Learning Objective>
+{{ learning_objective }}
+</Learning Objective>
+
+Now, your task is to merge and apply a batch of experience update operations derived from working agent trajectories. 
+
+<Your Input>
+- Existing Experiences with related operations: A list of current experiences in the pool, each with a unique ID and content, including the corresponding candidate update operations from a batch of samples.
+- Other proposed update operations from the batch that do not reference existing experiences.
+</Your Input>
+
+Instead of processing each new experience individually, you will receive a list of proposed update operations (each with operation type, ID if applicable, and content) from a batch of samples. Your goal is to combine and reconcile these operations into a consolidated set of updates to apply to the experience pool.
+
+<Task Instructions>
+1. **Focusing on Learning Objective**: Always ensure that any update should focus on the learning objective for improving the working agent.
+
+2. **Valid operations**: You can perform four operations:
+- ADD: Add a new experience to the pool.
+- UPDATE: Update an existing experience in the pool.
+- DELETE: Delete an existing experience from the pool.
+- NONE: Make no change to the pool.
+
+3. **Combining Operations**: You must analyze the batch of operations and produce a final list of decisions that represents the net effect of the batch. 
+  - For each existing experience ID, consider all proposed operations that reference that ID (UPDATE or DELETE).
+  - If there are multiple UPDATE operations for the same ID, synthesize them into a single UPDATE that extracts the core insight or common theme. Avoid simply concatenating details; instead, focus on creating a useful principle that contributes to the learning objective.
+  - If there is a DELETE operation for an ID, it overrides any UPDATE operations for that ID; so the net operation should be DELETE. DELETE takes precedence because it indicates the experience is invalid or outdated.
+  - If multiple ADD operations have similar or identical content, merge them into one ADD to avoid duplicates. When merging, ensure the resulting experience captures the essential insight without redundant details. If they are distinct and provide unique insights, keep them as separate ADD operations. Always ensure each added experience is applicable towards the learning objective.
+  - Handle conflicts: If operations conflict, resolve them by considering the context, reliability, and specificity of their content. Prioritize insights that are most applicable towards the learning objective. If some new experiences suggest one strategy and others suggest another, create a unified strategy that encompasses both if possible, or choose the most appropriate based on common sense and generality.
+
+<Output Requirements>
+You MUST output a single, well-formed JSON array. Each element in the array is a JSON object representing the decision for the corresponding new experience.
+Each decision object MUST have the following structure:
+
+```json
+{
+  "operation": "ADD | UPDATE | DELETE | NONE",
+  "id": "existing_experience_id_or_null", // Required only for UPDATE and DELETE. For ADD and NONE, set this to null.
+  "content": "Experience name: Brief description."
+}
+```
+
+Note that the number of objects in the output array MUST exactly match the number of new experiences provided as input.
+</Output Requirements>
+
+<Example Output>
+For example, if you received three new experiences, your output should look like this:
+
+```json
+[
+  {
+    "operation": "ADD",
+    "id": null,
+    "content": "News recency: When users ask for recent news, prioritize recent sources and use time filters for time-sensitive queries."
+  },
+  {
+    "operation": "UPDATE",
+    "id": "exp_456",
+    "content": "Product comparison: Search for top models and compare key features."
+  },
+  {
+    "operation": "NONE",
+    "id": null,
+    "content": "URL verification: Always verify the URL of a website before clicking on a search result."
+  }
+]
+```
+</Example Output>

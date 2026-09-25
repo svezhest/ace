@@ -1,5 +1,5 @@
 """SCOPE (SCOPE/scope: optimizer.py, synthesizer.py, strategic_store.py, memory_optimizer.py).
-Промпты апстрима дословно в prompts/scope_*.txt.
+Промпты апстрима дословно в ace/prompts/scope_*.j2.
 
     1 память      strategic (Rule): правила по доменам, rationale и confidence;
                   tactical: правила текущей задачи (принятые в ней), Kind(per="task") — цикл стирает их перед новой
@@ -22,7 +22,7 @@ from ..loop import Method, Solver, swap
 from ..memory import Kind, Note, Rule, perspectives
 from ..update import Update, ask, at_once, seq, when
 
-P = {n: prompts.load(f"scope_{n}.txt") for n in (
+P = {n: prompts.load(f"scope_{n}") for n in (
     "error", "efficiency", "thoroughness", "selector", "classify", "analyze", "merge", "subsumed", "conflict")}
 
 # 1. память
@@ -33,10 +33,10 @@ MEMORY_K2 = perspectives(MEMORY, PERSPECTIVES)
 
 # 2. инжект
 
-INTRO = "## Strategic Guidelines (Learned Best Practices):\nThese are high-confidence rules learned from previous tasks:\n\n"
+INTRO = prompts.text("scope_strategic_intro")
 DOMAINS_LAYOUT = inject.by_group(inject.dashed, "domain", header="### {}:", title=inject.titled)
 
-tactical = inject.show(("tactical",), line=inject.prefixed("## Learned Guideline:\n"), sep="\n\n", head="")
+tactical = inject.show(("tactical",), line=inject.prefixed(prompts.text("scope_guideline")), sep="\n\n", head="")
 streams = inject.hooked(inject.concat(inject.show(("strategic",), layout=DOMAINS_LAYOUT, before=INTRO, head=""), tactical,
                                       sep="\n\n"), tactical)
 

@@ -1,8 +1,0 @@
-Merge the lessons into memory by rewriting the whole memory: create a bullet in memory/ only if it is genuinely new and transferable,
-edit a bullet (read it first) if a lesson refines it. Do nothing for duplicates. When done, return only the new memory, one bullet per line.
-
-## Lessons
-{lessons}
-
-## Memory
-{memory}

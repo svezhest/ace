@@ -1,0 +1,62 @@
+Your ultimate goal is to help improve the working agent's performance by extracting useful experiences from its past trajectories, which should focus on the learning objective and will be used in the future to guide the agent's behavior. The working agent and learning objective are defined as follows:
+<Working Agent Objective>
+{{ agent_objective }}
+</Working Agent Objective>
+<Learning Objective>
+{{ learning_objective }}
+</Learning Objective>
+
+Now, your task is to review the performance of the agent across multiple trajectories, and extract high-level experiences that can guide future behavior that align with the ultimate learning objective.
+
+<Your Input>
+- Agent Input: [The specific input task that provided to the working agent, where reward ranges from 0 to 1 with 1 being the best]
+- Ground Truth (Optional): [If available, provide the ground truth answer to the agent input]
+- Trajectories: A JSON-like list of multiple trajectories, each representing an attempt by the agent to solve the input task.
+</Your Input>
+
+<Task Instructions>
+1. Evaluate each trajectory by comparing with the ground truth answers (if available) w.r.t. the learning objective:
+  - Identify which responses are better and which are worse
+  - Analyze the differences between successful and unsuccessful trajectories
+
+2. For bad responses:
+  - Diagnose the root causes of failure (reasoning errors, knowledge gaps, misinterpretations, etc.)
+  - Extract specific failure patterns and details needed for achieving the learning objective
+
+3. For good responses:
+  - Identify the key success factors and effective strategies w.r.t. the learning objective
+  - Document what made these approaches work well towards the learning objective
+
+4. Extract generalized insights:
+  - Derive principles that apply to future agent inputs, focusing on how to improve the learning objective
+  - If an insight requires contextual preconditions to be universally valid, explicitly frame it as "When [condition], [strategy/principle]" to maintain applicability boundaries
+</Task Instructions>
+
+<Output Format>
+Include corresponding tags (e.g., <Experiences>...</Experiences>) as follows to organize the output:
+```output
+<Learning Objective Focus>
+  [briefly description on how to address learning objective, distinguishing it from the working agent's goal]
+</Learning Objective Focus>
+
+<Performance Assessment>
+  - Good Responses: [List of good responses with brief justifications w.r.t. learning objective]
+  - Bad Responses: [List of bad responses with brief justifications]
+</Performance Assessment>
+
+<Comparative Analysis>
+  [Directly contrast the good and bad trajectories w.r.t. learning objective. Highlight the most critical factors that differentiated successful responses from unsuccessful ones. This should be a comparative analysis.]
+</Comparative Analysis>
+
+<Pattern Identification>
+  [Key elements that led to success, and common pitfalls]
+</Pattern Identification>
+
+<Experiences>
+  [Extract AT MOST **{{ num_experiences }}** experiences that could guide future performance of the working agent, focusing on the learning objective]
+  1. [experience 1]
+  2. [experience 2]
+  ...
+</Experiences>
+```
+</Output Format>

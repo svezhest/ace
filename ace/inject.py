@@ -27,11 +27,11 @@
 import random
 from dataclasses import dataclass, field, replace
 
-from . import embed, fs
+from . import embed, fs, prompts
 from .feedback import failed
 from .memory import Skill, needs, requirements, slug
 
-HEAD = "What you learned so far:\n"
+HEAD = prompts.text("memory_head")
 
 
 @dataclass
@@ -240,6 +240,9 @@ def pairs_and_sheet(kind, empty):
                                        "PREVIOUS_CHEATSHEET": text_of(memory, kind, empty)})
 
 
+CATALOG = prompts.load("catalog")
+
+
 def catalog(always=(), listed=()):
     """Записи видов always целиком в промпте; видов listed только путь и условие применения,
     тело по read(path) из skills/, смонтированного только на чтение. Чтения отслеживаются."""
@@ -249,11 +252,8 @@ def catalog(always=(), listed=()):
         entries = [r for r in memory.of(*listed) if r not in rules]
         if not rules and not entries:
             return View()
-        text = ""
-        if always:
-            text += "Rules:\n" + ("\n".join(dashed(r) for r in rules) or "(none)") + "\n\n"
         skills = fs.FS({"skills": fs.Mount(memory, listed, "ro", track=True)})
-        text += "Entries you can read with read(path):\n" + fs.listing(skills, "skills")
+        text = CATALOG.fill(always=bool(always), rules="\n".join(dashed(r) for r in rules), listing=fs.listing(skills, "skills"))
         return View(text, [r.id for r in rules], fs.READ_TOOLS, skills, rounds=3)
     inject.reads = True
     return inject
@@ -277,7 +277,7 @@ def on_failure(step):
     return failed(step[2])
 
 
-def triggered(kind="hook", before="Known fix for this error:\n"):
+def triggered(kind="hook", before=prompts.text("hook_intro")):
     """Хуки вида kind, чей trigger встречается в тексте ошибки шага (без учёта регистра)."""
     fires = lambda r, item: r.trigger.lower() in step_error(item).lower()
     return needs("trigger", kinds=(kind,))(show((kind,), pick=where(fires), line=dashed, before=before, head=""))

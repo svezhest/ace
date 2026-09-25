@@ -9,10 +9,10 @@ from .proto import proto as PROTO
 from .scope import CAP, TARGET, optimizer
 from .tfgrpo import group_advantage
 
-SELECT, HOOK = prompts.load("hybrid_select.txt"), prompts.load("hook_reflect.txt")
+SELECT, HOOK = prompts.load("hybrid_select"), prompts.load("hook_reflect")
 
 # reflect ACE, но два кандидата и селектор (Best-of-N из SCOPE)
-select = ask(SELECT, reflect.two_fields, system="You are a selector.", parse=reflect.one_or_two)
+select = ask(SELECT, reflect.two_fields, system=prompts.text("selector_system"), parse=reflect.one_or_two)
 ace_bo2 = swap(ACE, "ace_bo2", reflect=reflect.best_of(reflect_json, 2, select, temperature=0))
 # семантическое преимущество TF-GRPO по группе попыток; дальше куратор ACE
 ace_group = swap(ACE, "ace_group", reflect=seq(group_advantage, on_prev(reflect.free_lessons())), solver=Solver(samples=3))

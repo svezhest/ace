@@ -1,15 +1,20 @@
 """Задачи: данные, инструкция решателю и проверка ответа. Чекеры повторяют ACE, чтобы числа были сравнимы."""
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
-from . import config
+from . import config, prompts
 
 
 @dataclass
 class Task:
+    """Задача: данные, системный промпт и инструкция решателю (prompts/task_<name>_system, _instr), проверка."""
     name: str
-    system: str
-    instr: str
+    system: str = field(init=False)
+    instr: str = field(init=False)
+
+    def __post_init__(self):
+        self.system = prompts.text(f"task_{self.name}_system")
+        self.instr = prompts.text(f"task_{self.name}_instr")
 
     def load(self, split="", size=None):
         """split: "" | "train" | "val"; size — размер выборки в имени файла (по умолчанию из config)."""
@@ -57,25 +62,7 @@ def gpqa_ok(pred, tgt):
 
 CHECK = {"finer": finer_ok, "formula": formula_ok, "meb": meb_ok, "gpqa": gpqa_ok}
 
-TASKS = {t.name: t for t in [
-    Task("finer", "You are an XBRL expert.",
-         "For each numbered entity choose the single best tag from the given list, copying it exactly. "
-         "Reason briefly, then give the final answer as one line: 'FINAL ANSWER: tag1,tag2,...' "
-         "(one tag per entity, in order, comma-separated, nothing else on that line)."),
-    Task("formula", "You are a financial analyst.",
-         "Answer the financial question using the given formula. The answer must be a plain floating point "
-         "number (no units, no currency signs, no thousands separators), rounded to two decimals. "
-         "Reason briefly, then give the final answer as one line: 'FINAL ANSWER: <number>'."),
-    Task("meb", "You are a careful math assistant.",
-         "Below is an equation with missing operators. Your task is to fill in the blanks with the correct "
-         "mathematical operators: +, -, *, or /. Ensure that the equation is correct once the operators are added. "
-         "The operators should be placed in the sequence they appear from left to right. Include the full equation "
-         "with the operators filled in. For instance, for the equation 1 ? 2 ? 3 = 6, the correct answer is 1 + 2 + 3 = 6.\n"
-         "Reason step by step, then give the final equation as one line: 'FINAL ANSWER: <equation>'."),
-    Task("gpqa", "You are a careful expert in physics, chemistry and biology.",
-         "Answer the multiple-choice question below. Reason carefully, then give the final answer as the "
-         "option letter in parentheses on the last line after 'FINAL ANSWER:', e.g. FINAL ANSWER: (B)."),
-]}
+TASKS = {name: Task(name) for name in ("finer", "formula", "meb", "gpqa")}
 
 
 def final_answer(text):

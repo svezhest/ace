@@ -1,5 +1,5 @@
 """Training-Free GRPO (youtu-agent: utu/practice/training_free_grpo.py, experience_updater.py).
-Промпты utu/prompts/practice/experience.yaml дословно в prompts/tfgrpo.yaml, параметры из
+Промпты utu/prompts/practice/experience.yaml дословно в ace/prompts/tfgrpo_*.j2 (пара _sp / _up на промпт), параметры из
 configs/practice/math_reasoning.yaml.
 
     1 память      библиотека опытов «Experience name: Brief description.»
@@ -19,7 +19,6 @@ from ..loop import Method, Solver
 from ..memory import Kind, Note
 from ..update import Update, objectives, paired, retry, seq
 
-Y = prompts.load_yaml("tfgrpo.yaml")
 
 # 1. память
 
@@ -28,26 +27,21 @@ MEMORY = {"experience": Kind(Note, ("add", "edit", "delete"))}
 # 2. инжект
 
 experiences = inject.show(line=inject.dotted, head="",
-                          before="When solving problems, you MUST first carefully read and understand the helpful instructions and experiences:\n")
+                          before=prompts.text("tfgrpo_experiences_intro"))
 
 # 4. обновление
 
-OBJECTIVE = {
-    "formula": "input: A financial question with a formula to apply\noutput: A step-by-step reasoning process that leads to the numeric answer",
-    "finer": "input: A financial text with numbered entities and a list of XBRL tags\noutput: A step-by-step reasoning process that leads to one tag per entity",
-    "meb": "input: An equation with missing operators\noutput: A step-by-step reasoning process that leads to the equation with the operators filled in",
-    "gpqa": "input: A multiple-choice question in physics, chemistry or biology\noutput: A step-by-step reasoning process that leads to the option letter",
-}
-LEARNING = "Help the agent to improve the solving capability on these questions by extracting general and concise guidelines."
+OBJECTIVE = {t: prompts.text(f"tfgrpo_objective_{t}") for t in ("formula", "finer", "meb", "gpqa")}
+LEARNING = prompts.text("tfgrpo_learning")
 NUM, BATCH = 1, 20
 GOALS = objectives(OBJECTIVE, LEARNING, NUM)
 
-summarize = paired(Y, "SINGLE_ROLLOUT_SUMMARY_TEMPLATE", reflect.rollout_fields, GOALS)
-advantage = paired(Y, "SINGLE_QUERY_GROUP_ADVANTAGE", reflect.advantage_fields, GOALS, parse=parse.enclosed("Experiences"))
-against_library = paired(Y, "GROUP_EXPERIENCE_UPDATE_TEMPLATE", reflect.library_fields, GOALS, parse=reflect.nonempty_ops)
+summarize = paired("tfgrpo_single_rollout_summary_template", reflect.rollout_fields, GOALS)
+advantage = paired("tfgrpo_single_query_group_advantage", reflect.advantage_fields, GOALS, parse=parse.enclosed("Experiences"))
+against_library = paired("tfgrpo_group_experience_update_template", reflect.library_fields, GOALS, parse=reflect.nonempty_ops)
 
 group_advantage = reflect.when(reflect.partial_group, seq(reflect.each_attempt(summarize), reflect.summarized, advantage))
-plan = retry(paired(Y, "BATCH_EXPERIENCE_UPDATE_TEMPLATE", curate.plan_fields, GOALS, parse=parse.json_block), 3)
+plan = retry(paired("tfgrpo_batch_experience_update_template", curate.plan_fields, GOALS, parse=parse.json_block), 3)
 
 tfgrpo = Method("tfgrpo", MEMORY, experiences, Feedback("golden"),
                 Update(seq(group_advantage, against_library, reflect.as_ops), curate.planned(plan, curate.apply_ops(curate.op_list)),

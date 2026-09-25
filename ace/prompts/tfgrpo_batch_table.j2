@@ -1,0 +1,9 @@
+{% if not ops %}No batch operations.{% else %}{% for e in experiences %}{% if not loop.first %}
+
+{% endif %}Experience {{ e.id }}:
+Content: {{ e.text }}
+{% if e.related %}Related Operations:
+{{ e.related|join("\n") }}{% else %}No related operations.{% endif %}{% endfor %}{% if loose %}{% if experiences %}
+
+{% endif %}Operations without specific Experience ID:
+{{ loose|join("\n") }}{% endif %}{% endif %}

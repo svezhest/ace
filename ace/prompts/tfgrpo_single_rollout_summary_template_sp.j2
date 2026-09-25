@@ -1,0 +1,70 @@
+Your ultimate goal is to help improve the working agent's performance by extracting useful experiences from its past trajectories, which should focus on the learning objective and will be used in the future to guide the agent's behavior. The working agent and learning objective are defined as follows:
+<Working Agent Objective>
+{{ agent_objective }}
+</Working Agent Objective>
+<Learning Objective>
+{{ learning_objective }}
+</Learning Objective>
+
+Now, your task is to analyze a single trajectory of the agent's interactions, and extract detailed information about its actions, tool usage, reasoning, and outcomes at each step. Focus on how these elements relate to the learning objective, and identify any missed opportunities for improvement.
+
+<Your Input>
+- Agent input: [The specific input that provided to the working agent]
+- Ground Truth (Optional): [If available, provide the ground truth answer to help identify relevant information]
+- Critique: [If available, provide the critique of the agent's response to help identify shortcomings]
+- Trajectory: A JSON-like list of steps representing the agent's interactions, including user inputs, tool calls, and tool responses.
+</Your Input>
+
+<Task Instructions>
+1. **Learning Objective Focus**: Keep the learning objective in mind throughout your analysis. You need to extract insights that will help the agent improve in this specific area. Learning objective does not equals to the working agent goal, so please distinguish them carefully.
+
+2. **Extract Step-by-Step Details**: For each step in the trajectory, describing how it can be improved towards the learning objective. When the critique is available, use it to inform your analysis and provide details. For each step, extract the following information:
+  - **Action Taken**: What the agent did (e.g., called a tool, responded to user).
+  - **Tool Called**: If applicable, the name of the tool used (e.g., `search_google_api`, `web_qa`).
+  - **Tool Parameters**: The arguments passed to the tool (e.g., query strings, URLs).
+  - **Tool Results**: **Extract all data from the tool's return that may be relevant to the task** (e.g., dates, names, numbers, events), even if the agent did not use it. Do not summarize loosely; list specific values.
+  - **Agent's Reasoning**: Infer the agent's thought process or logic behind the action (e.g., why a specific tool was chosen, how results influenced next steps).
+  - **Potential Missed Information**: Note any task-relevant information in the tool results that the agent did not explicitly use or follow up on.
+
+3. **Ensuring Relevance**: Prioritize information directly related to the agent's task. However, do not assume the agent’s actions are correct—extract everything that could be useful, even if the agent ignored it. Omit redundant or irrelevant details to maintain clarity.
+
+4. **Summarize Logic and Flow**: Capture the agent's overall strategy, including how it iterates based on results, handles errors, and progresses toward the working agent goal.
+
+5. **Output Format**: Provide a clear, structured summary of the trajectory. Most of contents should focus on how it could be improved towards the learning objective.
+</Task Instructions>
+
+<Output Requirements>
+How to address learning objective, distinguishing it from the working agent's goal: [briefly description]
+
+Execution Summary:
+1. Step 1: 
+- Tool call: [Function called] with params [parameters]
+- Tool results: 
+  - [Result 1]
+  - [Result 2]
+  - ...
+- Reasoning: [Agent's interpretation]
+- Missed: [Any relevant information not used?]
+
+2. Step 2: 
+- Tool call: [Function called] with params [parameters]
+- Tool results:
+  - [Result 1]
+  - [Result 2]
+  - ...
+- Reasoning: [Agent's interpretation]
+- Missed: [Any relevant information not used?]
+...
+
+Key Findings:
+- [Discovery 1 that addresses the detailed or general contents required by the learning objective]
+- [Discovery 2 that addresses the detailed or general contents required by the learning objective]
+
+Agent Response: [Brief summary of working agent's final output]
+
+Overall Strategies: [the agent's approach, key decisions, and how it achieved (or failed) the task, focusing on those related to the learning objective and providing sufficient details.]
+</Output Requirements>
+
+<Language>
+Use the same language as the input trajectory.
+</Language>
