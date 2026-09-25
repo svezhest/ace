@@ -32,6 +32,7 @@ TOP = 3                     # --retrieve_top_k
 FLAG = "EXECUTE CODE!"
 ROUNDS = 3                  # max_depth_num_rounds generate
 CODE_LIMIT = 3              # секунд на код, как execute_code_with_timeout
+CODE_FILE = "/tmp/code.py"  # код исполняется файлом, как у апстрима (у него — случайное имя tempfile)
 
 
 def dc_input(task, i, question):
@@ -105,7 +106,7 @@ def run_block(text):
 
 def execute(code):
     """execute_code_with_timeout апстрима: stdout, без него — ошибка из stderr или просьба напечатать."""
-    r = sandbox.run(code, limit=CODE_LIMIT)
+    r = sandbox.run(code, limit=CODE_LIMIT, path=CODE_FILE)
     if r["timeout"]:
         return render.DC_TIMEOUT
     out, err = r["stdout"].strip(), r["stderr"].strip()

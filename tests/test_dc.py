@@ -146,15 +146,15 @@ def test_code_rounds(monkeypatch):
     предупреждение; после трёх продолжений последний блок дописывается ещё раз. Без кода — один вызов."""
     ran = []
 
-    def fake_run(code, container=None, limit=10):
-        ran.append((code, limit))
+    def fake_run(code, container=None, limit=10, path=None):
+        ran.append((code, limit, path))
         return {"stdout": "4\n", "stderr": "", "rc": 0, "timeout": False}
     monkeypatch.setattr("ace.env.sandbox.run", fake_run)
     block = "```python\nx = 2\nx * 2\n```\nEXECUTE CODE! trailing"
     model = Stub(lambda call: block)
     p = dc_code.show.prompt(Ex(None), Cheatsheet(), ITEM, 0)
     reply = p.solver.talk(model, p.solver.call(""))
-    assert ran[0] == ("x = 2\nprint(x * 2)", 3) and len(model.calls) == 4
+    assert ran[0] == ("x = 2\nprint(x * 2)", 3, "/tmp/code.py") and len(model.calls) == 4
     current = "```python\nx = 2\nx * 2\n```\nEXECUTE CODE!\n\nOutput of the Python code above:\n```\n4\n```"
     assert reply.text == "\n\n".join([current] * 5)
     assert model.calls[1]["user"] == prompts.text("dc_proceed")
@@ -168,7 +168,7 @@ def test_code_output(monkeypatch):
     outs = iter([{"stdout": "", "stderr": "Traceback\nNameError", "rc": 1, "timeout": False},
                  {"stdout": "", "stderr": "", "rc": 0, "timeout": False},
                  {"stdout": "", "stderr": "", "rc": 124, "timeout": True}])
-    monkeypatch.setattr("ace.env.sandbox.run", lambda code, container=None, limit=10: next(outs))
+    monkeypatch.setattr("ace.env.sandbox.run", lambda code, **kw: next(outs))
     assert "Error in execution: Traceback\nNameError" in show.run_block("```python\nprint(y)\n```")
     assert "No output was generated" in show.run_block("```python\n# nothing\n```")
     assert "Execution took too long, aborting..." in show.run_block("```python\nwhile True: pass\n```")

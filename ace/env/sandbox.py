@@ -23,7 +23,11 @@ ISOLATION = [
 ]
 
 
-def python(limit):
+def python(limit, path=None):
+    """Команда в контейнере: код из stdin; с path — сначала в файл path, как запуск файла (в traceback — строки
+    кода)."""
+    if path:
+        return ["sh", "-c", f"cat > {path} && exec timeout {limit} python -I {path}"]
     return ["timeout", str(limit), "python", "-I", "-"]
 
 
@@ -35,13 +39,14 @@ def trim(text, head=HEAD_LINES, tail=TAIL_LINES):
     return "\n".join(lines[:head] + [render.omitted(len(lines) - head - tail)] + lines[-tail:])
 
 
-def run(code, container=None, limit=TIMEOUT):
+def run(code, container=None, limit=TIMEOUT, path=None):
     """-> dict(stdout, stderr, rc, timeout). Код уходит через stdin, обратно только текст.
-    container — id контейнера попытки (start); без него — одноразовый контейнер на этот вызов. limit — секунд на код."""
+    container — id контейнера попытки (start); без него — одноразовый контейнер на этот вызов. limit — секунд на код;
+    path — исполнить как файл с этим путём внутри контейнера."""
     if container:
-        args = ["docker", "exec", "-i", container, *python(limit)]
+        args = ["docker", "exec", "-i", container, *python(limit, path)]
     else:
-        args = ["docker", "run", "--rm", "-i", *ISOLATION, IMAGE, *python(limit)]
+        args = ["docker", "run", "--rm", "-i", *ISOLATION, IMAGE, *python(limit, path)]
     try:
         p = subprocess.run(args, input=code.encode(), capture_output=True, timeout=limit + DOCKER_GRACE)
     except subprocess.TimeoutExpired:
