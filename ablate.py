@@ -14,6 +14,7 @@ from ace.show import Catalog, Whole
 from ace.solver.evolib import Sampler
 from ace.show.scope import StrategicRules
 from ace.tasks import TASKS
+from ace.wrap import Gate
 from ace.wrap.hooks import Hooks
 
 SPREAD = 0.7                # температура попыток после первой (self-consistency)
@@ -21,11 +22,6 @@ SPREAD = 0.7                # температура попыток после �
 
 def spread(k):
     return 0 if k == 0 else SPREAD
-
-
-def later(name):
-    """Ступень, метода которой ещё нет в реестре, пропускается."""
-    return {name: METHODS[name]} if name in METHODS else {}
 
 
 m = METHODS
@@ -51,16 +47,19 @@ CHAIN = {
     # извлечение (от ace_stand)
     "ace_stand_text": m["ace_stand_text"],      # рефлексия свободным текстом; без меток и память без отсева — иначе стык не сойдётся
     "ace_stand_bo2": m["ace_stand_bo2"],        # Best-of-2: рефлектор дважды при T=0.7, селектор выбирает набор уроков
-    **later("ace_stand_group"),           # контраст TF-GRPO по группе попыток (вердикт группы + извлечение)
+    "ace_stand_group": m["ace_stand_group"],    # контраст TF-GRPO по группе попыток (вердикт группы + извлечение)
     # память (от ace_stand)
     "ace_stand_opt": m["ace_stand_opt"],        # предел 10 с оптимизатором SCOPE вместо отсева
     "ace_stand_rewrite": m["ace_stand_rewrite"],    # куратор переписывает всю память
     # показ (от ace_stand)
     "ace_stand_catalog": swap(ace_stand, "ace_stand_catalog", show=Catalog()),   # каталог id и первых строк, тела — read
     "ace_stand_code": ace_stand_code,           # среда: исполнение python (база хуков)
-    "ace_stand_hooks": Hooks(ace_stand_code, "ace_stand_hooks"),                 # от ace_stand_code: урок после ошибки в конец истории
-    "ace_stand_hooks_system": Hooks(ace_stand_code, "ace_stand_hooks_system", show="system"),   # от ace_stand_code: хуки в системном промпте с начала
+    "ace_stand_code_attempt": swap(ace_stand_code, "ace_stand_code_attempt", env=Sandbox(per="attempt")),   # от ace_stand_code: контейнер живёт попытку (файлы между вызовами)
+    "ace_stand_hooks": m["ace_stand_hooks"],    # от ace_stand_code: урок после ошибки исполнения в конец истории
+    "ace_stand_hooks_system": Hooks(ace_stand_code, "ace_stand_hooks_system", show="system"),   # от ace_stand_hooks: хуки в системном промпте с начала
+    "ace_stand_hooks_raw": Hooks(ace_stand_code, "ace_stand_hooks_raw", learn="raw"),   # от ace_stand_hooks: урок без модели — ошибка и следующий прошедший вызов
     # мета (от ace_stand)
+    "ace_stand_gate": Gate(ace_stand, "ace_stand_gate"),    # правка батча остаётся, только если на val не хуже
     "ace_stand_e3": swap(ace_stand, "ace_stand_e3", protocol=Protocol(offline=True, epochs=ITERATIONS)),   # протокол меты: офлайн, 3 прохода
     "mce_ace_stand": m["mce_ace_stand"],        # от ace_stand_e3: MCE над ACE — навык рефлектору и куратору, откат к лучшей по val
 

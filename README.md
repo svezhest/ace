@@ -56,10 +56,10 @@ uv run python tools/compare.py /tmp/a.json /tmp/b.json   # два снимка: 
 | база | ace_stand — рефлектор с метками, куратор операциями, отсев вредных, показ всего |
 | извлечение | ace_stand_text (свободный текст; память без отсева — иначе стык не сойдётся), ace_stand_bo2 (Best-of-2), ace_stand_group (контраст TF-GRPO по группе из 3, куратор ACE) |
 | память | ace_stand_opt (предел 10 с оптимизатором SCOPE вместо отсева), ace_stand_rewrite (перезапись куратором) |
-| показ | ace_stand_catalog (каталог + read); ace_stand_code (среда с python) -> ace_stand_hooks (урок после ошибки в конец истории) и ace_stand_hooks_system (хуки в системном промпте с начала) |
-| мета | ace_stand_e3 (3 прохода) -> mce_ace_stand (MCE над ACE) |
+| показ и среда | ace_stand_catalog (каталог + read); ace_stand_code (среда с python) -> ace_stand_code_attempt (контейнер на попытку) и ace_stand_hooks (урок после ошибки исполнения в конец истории) -> ace_stand_hooks_system (хуки в системном промпте с начала), ace_stand_hooks_raw (урок без модели: ошибка и следующий прошедший вызов) |
+| мета | ace_stand_gate (правка батча остаётся, только если на val не хуже); ace_stand_e3 (офлайн, 3 прохода) -> mce_ace_stand (MCE над ACE) |
 | вердикт | evolib (голосование) -> evolib_judge (судья) -> evolib_golden (верный ответ) |
-| попытки | evolib_n5 (5 попыток вместо 3), evolib_t07 (попытки различаются и температурой) |
+| попытки | evolib_n5 (5 попыток вместо 3), evolib_t07 (попытки различаются и температурой — параметр решателя EvoLib) |
 | показ посреди попытки | scope_code (правило на шаге переписывает системный промпт, как в апстриме) -> scope_append (дописывается в конец истории) |
 
 `report.py`: верно, обрывы, вызовы, токены; `*` у верных — зачёт pass@k (scope_k2), а не точность; для

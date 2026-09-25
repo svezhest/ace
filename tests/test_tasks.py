@@ -88,3 +88,22 @@ def test_every_method_on_every_task(monkeypatch):
             assert summary["errors"] == 0 and summary["n"] == 2, (name, task.name)
             runs += 1
     assert runs >= 100
+
+
+def test_ablation_chain_runs(monkeypatch):
+    """Каждая ступень ablate.py собирается и идёт по своему протоколу на заглушке без ошибок (mce — агенты Claude SDK,
+    ступени с контейнером на попытку — только при docker)."""
+    import numpy as np
+    from stub import Stub
+
+    import ablate
+    from ace import config
+    from ace.env import sandbox
+    from ace.loop import run
+    monkeypatch.setattr("ace.embed.embed", lambda texts: np.array([[len(t) % 7 + 1.0, 1.0] for t in texts]))
+    monkeypatch.setattr(config, "VAL_SIZE", 2)
+    for name, learner in ablate.CHAIN.items():
+        if name == "mce" or name.endswith("_attempt") and not sandbox.available():
+            continue
+        summary = run(TASKS["formula"], learner, Stub(), 2)
+        assert summary["errors"] == 0 and summary["protocol"] == learner.protocol.name, name
