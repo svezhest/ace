@@ -18,8 +18,9 @@ class Stub:
     def __init__(self, answer=lambda call: "FINAL ANSWER: 0", schemas=None):
         self.answer, self.schemas, self.calls = answer, schemas or {}, []
 
-    def run(self, system, user, output=str, tools=(), deps=None, rounds=0, temperature=0, max_tokens=None, on_step=None):
-        call = dict(system=system, user=user, output=output, tools=tools, temperature=temperature, n=len(self.calls))
+    def run(self, system, user, output=str, tools=(), deps=None, rounds=0, temperature=0, max_tokens=None, on_step=None,
+            top_p=None):
+        call = dict(system=system, user=user, output=output, tools=tools, temperature=temperature, top_p=top_p, n=len(self.calls))
         self.calls.append(call)
         if output is str:
             text = self.answer(call)

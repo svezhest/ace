@@ -14,7 +14,7 @@ from ace import verdict
 from ace.env import Env
 from ace.extract import Extraction, Extractor, Raw
 from ace.learner import Learner
-from ace.loop import Attempts, Experiment, best, greedy, run, vote
+from ace.loop import Attempts, Experiment, Prompt, best, greedy, run, vote
 from ace.memory import Lessons
 from ace.model import Model, Patch
 from ace.show import Sample, Show, Whole
@@ -256,3 +256,12 @@ def test_report_without_log(tmp_path):
     report = Path(__file__).parent.parent / "report.py"
     r = subprocess.run([sys.executable, str(report), str(tmp_path)], capture_output=True, text=True)
     assert r.returncode == 0 and "formula4/x" in r.stdout
+
+
+def test_top_p_reaches_model():
+    class TopP(Show):
+        def prompt(self, ex, memory, item, k):
+            return Prompt(top_p=0.95)
+    model = Stub()
+    run(TASK, Learner("t", show=TopP()), model, 1)
+    assert model.calls[0]["top_p"] == 0.95

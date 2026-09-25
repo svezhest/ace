@@ -106,3 +106,15 @@ def test_patch_tool_result():
 def test_patch_merge():
     p = Patch(system="a", append="x").merge(Patch(append="y", tool_result="t"))
     assert p == Patch(system="a", append="x\n\ny", tool_result="t")
+
+
+def test_top_p():
+    """top_p уходит в настройки запроса, только если задан."""
+    seen = []
+
+    def fn(messages, info):
+        seen.append(dict(info.model_settings))
+        return ModelResponse(parts=[TextPart("FINAL ANSWER: 1")])
+    model_of(fn).run("sys", "q", temperature=0.3, top_p=0.95)
+    model_of(fn).run("sys", "q")
+    assert seen[0]["temperature"] == 0.3 and seen[0]["top_p"] == 0.95 and "top_p" not in seen[1]

@@ -90,9 +90,11 @@ class Fake:
     def __init__(self, targets):
         self.targets, self.log = targets, []
 
-    def run(self, system, user, output=str, tools=(), deps=None, rounds=0, temperature=0, max_tokens=None, on_step=None):
+    def run(self, system, user, output=str, tools=(), deps=None, rounds=0, temperature=0, max_tokens=None, on_step=None,
+            top_p=None):
         self.log.append(dict(system=system, user=user, output=getattr(output, "__name__", str(output)),
-                             tools=[t.__name__ for t in tools], rounds=rounds, temperature=temperature, max_tokens=max_tokens))
+                             tools=[t.__name__ for t in tools], rounds=rounds, temperature=temperature, max_tokens=max_tokens,
+                             **({"top_p": top_p} if top_p is not None else {})))
         seed = h(system, user, temperature, len(self.log) if temperature else "")
         if output is str:
             target = next((t for q, t in self.targets.items() if q in user), None)
