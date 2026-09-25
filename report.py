@@ -1,4 +1,6 @@
-"""Таблица по results/: верно / обрывов / вызовов модели / токенов, доля задач с чтением записей и точность с ним и без.
+"""Таблица по results/: верно, обрывы, вызовы модели, токены; * у верных — зачёт pass@k (лучшая попытка по
+метке), а не точность. Для каталога — доля вопросов с чтением записей и точность с чтением и без; для хуков —
+сколько раз хук показан (fired) и сколько раз помог. Считаются вопросы в зачёт (тест или последний проход).
 Без log.json (старые или прерванные прогоны) — только итог.
 python report.py [results]"""
 import json
@@ -18,14 +20,26 @@ def acc(rows):
     return f"{sum(r['correct'] for r in rows) / len(rows):.2f}" if rows else "-"
 
 
-print(f"{'run':32} {'ok':>5} {'trunc':>5} {'calls':>6} {'tok':>8} {'read%':>6} {'ok|read':>8} {'ok|none':>8}")
+def fired(log):
+    """(показов хуков, из них помогли) по всем попыткам."""
+    shows = [ok for r in log for e in r.get("group", []) for _, ok in e.get("fired", [])]
+    return len(shows), sum(shows)
+
+
+print(f"{'run':36} {'ok':>6} {'trunc':>5} {'calls':>6} {'tok':>9} {'read%':>6} {'ok|read':>8} {'ok|none':>8} {'fired':>6} {'helped':>6}")
 for s in sorted(root.glob("*/*/summary.json")):
     summary = json.load(s.open())
+    if "correct" not in summary:        # пропущенный прогон
+        continue
     path = s.parent / "log.json"
     log = final(json.load(path.open())) if path.exists() else []
-    read = [r for r in log if r.get("read", r.get("used"))]
-    none = [r for r in log if not r.get("read", r.get("used"))]
-    share = f"{len(read) / len(log):>6.0%}" if log else f"{'-':>6}"
-    print(f"{s.parent.parent.name + '/' + s.parent.name:32} {summary['correct']:>3}/{summary['n']:<2}"
-          f"{summary['truncated']:>5} {summary['calls']:>6} {summary['prompt_tokens'] + summary['completion_tokens']:>8}"
-          f"{share} {acc(read):>8} {acc(none):>8}")
+    read = [r for r in log if r.get("read")]
+    none = [r for r in log if not r.get("read")]
+    share = f"{len(read) / len(log):.0%}" if read else "-"
+    shows, helped = fired(log)
+    mark = "*" if any(r.get("pass_at_k") for r in log) else " "
+    print(f"{s.parent.parent.name + '/' + s.parent.name:36} {summary['correct']:>3}/{summary['n']:<2}{mark}"
+          f"{summary['truncated']:>5} {summary['calls']:>6} {summary['prompt_tokens'] + summary['completion_tokens']:>9}"
+          f" {share:>6} {acc(read) if read else '-':>8} {acc(none) if read else '-':>8}"
+          f" {shows if shows else '-':>6} {helped if shows else '-':>6}")
+print("* — pass@k: в зачёт лучшая попытка по метке")

@@ -24,7 +24,7 @@ from dataclasses import dataclass
 from .. import parse, prompts, render
 from ..env import Sandbox
 from ..extract import CONFIDENCE, DOMAIN, RATIONALE
-from ..extract.scope import Rules, current_system, strategic_text
+from ..extract.scope import GUIDELINE, Rules, current_system, strategic_text
 from ..learner import Learner, swap
 from ..loop import Attempts, Prompt, best
 from ..memory import Container, Ids, Record
@@ -233,7 +233,10 @@ STRATEGIC_RULES = StrategicRules()
 @dataclass
 class Scope(Learner):
     """Учится на шаге с инструментом (правило сразу, со следующего запроса оно в системном промпте) и на
-    итоговом ответе (после вопроса, на батче)."""
+    итоговом ответе (после вопроса, на батче). patch="append" — абляция: новое правило дописывается
+    сообщением в конец истории, системный промпт и префикс истории целы."""
+    patch: str = "system"
+
     def prompt(self, ex, item, k, memory=None):
         (memory or self.memory).book(k).begin()
         return super().prompt(ex, item, k, memory)
@@ -251,6 +254,8 @@ class Scope(Learner):
             book.learn(ex, [x])
         if len(book.tactical) == before:
             return None
+        if self.patch == "append":
+            return Patch(append=render.lines(book.tactical[before:], render.prefixed(GUIDELINE), "\n\n"))
         return Patch(system=current_system(attempt.system, book))
 
     def on_question(self, ex, group):
