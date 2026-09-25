@@ -16,6 +16,7 @@ from pathlib import Path
 import pytest
 
 from ace.env import sandbox
+from ace.env.tfgrpo import Kernel
 from ace.learner import swap
 from ace.loop import run
 from ace.memory.tfgrpo import Library
@@ -123,7 +124,7 @@ def test_kernel():
     """Наше ядро на вызовах записи даёт тот же вывод, что python_executor апстрима; workdir у каждого свой."""
     workdir = re.compile(r"/tmp/utu/python_executor/\d{8}_\d{6}_[0-9a-f]{8}")
     for calls in rollouts():
-        kernel = sandbox.Kernel()
+        kernel = Kernel()
         try:
             for arguments, theirs in calls:
                 assert workdir.sub("W", kernel.call(arguments)) == workdir.sub("W", theirs)

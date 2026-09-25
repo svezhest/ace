@@ -209,3 +209,16 @@ def test_wire_tools_go_to_pydantic_ai():
     m = wire("never")
     m.agent.llm = FunctionModel(lambda messages, info: ModelResponse(parts=[TextPart("FINAL ANSWER: 1")]))
     assert ask(m, tools=(add,), rounds=1).output == "FINAL ANSWER: 1" and not m.wire.client.sent
+
+
+def test_tool_retries_do_not_end_talk():
+    """Отбивки одного инструмента подряд (ModelRetry) не обрывают разговор раньше раундов."""
+    from pydantic_ai import ModelRetry
+
+    def strict(x: int) -> str:
+        """Always fails."""
+        raise ModelRetry("bad x")
+    fn = lambda messages, info: (ModelResponse(parts=[TextPart("done")]) if responses(messages) >= 6
+                                 else ModelResponse(parts=[ToolCallPart("strict", {"x": 1})]))
+    r = ask(model_of(fn), tools=(strict,), rounds=10)
+    assert r.output == "done" and r.outcome is Outcome.answer and len(r.steps) == 6

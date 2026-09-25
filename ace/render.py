@@ -118,6 +118,20 @@ def more_lines(left, offset):
 def time_limit(seconds):
     return f"sandbox: time limit of {seconds} s exceeded"
 
+# TF-GRPO: ответ инструмента execute_python_code, когда ядро не ответило — str(dict) как у python_executor апстрима
+
+
+def kernel_failed(error):
+    return str({"success": False, "stdout": "", "stderr": "", "status": False, "output": "", "files": [], "error": error})
+
+
+def kernel_timeout(seconds):
+    """timed_out ядра (tfgrpo_kernel.py): тот же текст, что при пределе внутри ядра."""
+    return kernel_failed(f"Code execution timed out ({seconds} seconds)")
+
+
+KERNEL_DIED = kernel_failed("Kernel died (out of memory or crashed); variables are lost")
+
 # DC: исполнение кода генератора (utils/execute_code.py, language_model.py апстрима)
 
 DC_NO_RESPONSE = "(No response generated)"

@@ -123,7 +123,7 @@ TF9. **TF-GRPO: задачи группы и батча — по порядку.
     У нас — порядок списка; запись `bridge/live/tfgrpo` снята с `as_completed` в порядке создания задач
     (`sitecustomize.py`), как эталоны мостика.
 TF10. **TF-GRPO: инструмент агента — ядро в песочнице.** Апстрим исполняет код модели IPython-ом в своём процессе
-    (`python_executor`, env_mode local); у нас тот же код (`env/kernel.py`: разбор аргументов и ошибки как у
+    (`python_executor`, env_mode local); у нас тот же код (`env/tfgrpo.py` и `env/tfgrpo_kernel.py`: разбор аргументов и ошибки как у
     FunctionTool openai-agents, `execute_python_code_sync`, str(dict)) в контейнере без сети на попытку, пакеты —
     numpy, sympy, scipy, ipython, matplotlib, pydantic версий апстрима (у апстрима в процессе все его пакеты).
     Расходится: workdir в выводе (случайный у обоих), после предела времени ядро начинается заново (у апстрима

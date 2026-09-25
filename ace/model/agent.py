@@ -4,7 +4,7 @@
 import os
 os.environ.setdefault("PYDANTIC_AI_NO_BANNER", "1")
 
-from pydantic_ai import Agent, UsageLimits, capture_run_messages
+from pydantic_ai import Agent, Tool, UsageLimits, capture_run_messages
 from pydantic_ai.exceptions import UnexpectedModelBehavior, UsageLimitExceeded
 from pydantic_ai.messages import (ModelRequest, ModelResponse, RetryPromptPart, SystemPromptPart, TextPart, ToolCallPart,
                                   ToolReturnPart, UserPromptPart)
@@ -16,7 +16,7 @@ from . import Outcome, Reply, Step, content
 
 # запросов сверх раундов инструментов: ответ и одна попытка исправить вывод, не прошедший схему
 EXTRA_REQUESTS = 2
-RETRIES = 3                 # попыток модели исправить невалидный вызов или вывод (не сетевые повторы)
+RETRIES = 3                 # попыток модели исправить вывод, не прошедший схему (не сетевые повторы)
 
 
 def apply(messages, patch):
@@ -89,7 +89,9 @@ class PydanticAI:
         """До limit запросов; -> (ответ или None, все сообщения, Outcome). user — новое сообщение после history
         (None: история уже кончается запросом). Сообщения сохраняются и при сбое: траектория и токены не теряются.
         Пустой системный промпт не отправляется: апстримы шлют промпт одним сообщением user."""
-        agent = Agent(self.llm, system_prompt=system or (), output_type=output, tools=call.tools, retries=RETRIES)
+        # отбивка инструмента (ModelRetry) — обычный шаг: разговор кончается по раундам, а не на 4-й отбивке подряд
+        tools = [Tool(t, max_retries=max(RETRIES, call.rounds)) for t in call.tools]
+        agent = Agent(self.llm, system_prompt=system or (), output_type=output, tools=tools, retries=RETRIES)
         result, outcome = None, Outcome.answer
         with capture_run_messages() as messages:
             try:

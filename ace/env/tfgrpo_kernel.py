@@ -1,6 +1,6 @@
 """Инструмент execute_python_code агента TF-GRPO (youtu-agent: utu/tools/python_executor_toolkit.py,
 utu/tools/local_env/python.py; вызов инструмента — FunctionTool openai-agents). Файл исполняется внутри песочницы
-(sandbox.Kernel): строка stdin {"arguments": аргументы вызова JSON-строкой} -> строка ответа {"output": текст для
+(env/tfgrpo.py: Kernel): строка stdin {"arguments": аргументы вызова JSON-строкой} -> строка ответа {"output": текст для
 модели}. Один IPython на попытку, как persistent shell апстрима: переменные живут между вызовами.
 
 Аргументы — как _on_invoke_tool openai-agents: json.loads, модель execute_python_code_args (code, timeout = 30),

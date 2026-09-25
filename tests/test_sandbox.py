@@ -87,3 +87,31 @@ def test_call_container_is_shared_env():
     """Контейнер на вызов: среда попытки — сама песочница, без состояния."""
     env = Sandbox()
     assert env.open() is env and env.tools == (run_python,)
+
+
+@docker
+def test_kernel_host_timeout():
+    """Код, держащий GIL, ядро не прерывает — хост убивает контейнер после timeout и запаса; модели — текст о
+    пределе времени; нехватка памяти — текст о смерти ядра; дальше — новое ядро с чистыми переменными."""
+    from ace import render
+    from ace.env import tfgrpo
+    kernel = tfgrpo.Kernel()
+    grace = tfgrpo.DOCKER_GRACE
+    try:
+        tfgrpo.DOCKER_GRACE = 3
+        assert "'success': True" in kernel.call('{"code": "x = 1\\nprint(x)"}')
+        assert kernel.call('{"code": "pow(3, 10**10)", "timeout": 1}') == render.kernel_timeout(1)
+        assert kernel.call('{"code": "x = bytearray(900 * 1024 * 1024)"}') == render.KERNEL_DIED
+        assert "NameError" in kernel.call('{"code": "print(x)"}')
+    finally:
+        tfgrpo.DOCKER_GRACE = grace
+        kernel.close()
+
+
+@docker
+def test_timeout_ignoring_sigterm():
+    """Код, который глушит SIGTERM, добивается SIGKILL-ом сразу после предела: вызов не держит лишние 15 с."""
+    import time
+    t0 = time.time()
+    r = sandbox.run("import signal, time\nsignal.signal(signal.SIGTERM, signal.SIG_IGN)\nwhile True: time.sleep(0.1)", limit=2)
+    assert r["timeout"] and time.time() - t0 < 2 + sandbox.DOCKER_GRACE

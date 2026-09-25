@@ -7,7 +7,7 @@ openai-agents; промпты tfgrpo_agent.j2, tfgrpo_answer_dapo.j2, tfgrpo_pro
                 в user — задача как есть; T = 0.3, top_p 0.95; при пустой библиотеке агент остаётся при 0.7
                 (model_copy апстрима поверхностный, температуру rollout возвращают только вместе с опытами)
     разговор    Runner openai-agents над Chat Completions: tools = [execute_python_code], вызовы исполняет ядро
-                в песочнице (env/kernel.py), вывод — сообщением tool; ответ без вызовов — итог; на 50-м ходу к
+                в песочнице (env/tfgrpo.py), вывод — сообщением tool; ответ без вызовов — итог; на 50-м ходу к
                 запросу дописана просьба ответить без инструментов (DummyContextManager), дальше — попытка заново,
                 до 3 раз (rollout_with_semaphore), после — попытка без траектории
     траектория  repr списка сообщений без системного (items_to_messages(to_input_list())): её видит сводка
@@ -15,7 +15,7 @@ openai-agents; промпты tfgrpo_agent.j2, tfgrpo_answer_dapo.j2, tfgrpo_pro
 Инструкции агента: у dapo — math_agent.yaml дословно; у задач стенда (S2) — системный промпт задачи, тот же текст
 про код и вместо формата <answer> инструкция задачи (ответ — строка FINAL ANSWER)."""
 from .. import prompts, render
-from ..env import sandbox
+from ..env.tfgrpo import Kernel
 from ..loop import Prompt, Solver
 from ..model import Call, Reply, messages
 from ..tasks import final_answer
@@ -33,7 +33,6 @@ TOOL = {"type": "function", "function": {
 ROLLOUT_TEMPERATURE, TEMPERATURE, TOP_P = 0.7, 0.3, 0.95
 MAX_TURNS = 50
 RETRIES = 3                 # rollout_with_semaphore
-Kernel = sandbox.Kernel
 
 
 def instructions(task):
