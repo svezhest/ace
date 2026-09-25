@@ -1,0 +1,22 @@
+{
+  "upstream": "EvoLib",
+  "commit": "98266b2",
+  "date": "2026-09-25",
+  "model": "ornith15-9b (ornith15-9b-mlx-8bit через шлюз :8080; reasoning_effort шлюз не понимает, без temperature — умолчание воркера, при seed ответ воспроизводим)",
+  "slice": "HMMT апстрима (eval_main.py _build_hmmt_task): первые 3 задачи MathArena/hmmt_feb_2025, остальные наборы пусты (load_dataset в раннере); 5 итераций — задачи 0, 1, 2, 0, 1 (i = kiter % data_size), на повторах работает сравнение решений",
+  "tasks": 3,
+  "iterations": 5,
+  "k_q_per_problem": 3,
+  "seed": 0,
+  "checker": "matharena e927660 (github eth-sri/matharena, последний коммит до коммита EvoLib): extract_and_grade с конфигом configs/competitions/hmmt/hmmt_feb_2025.yaml через переходник (решение, ответ) -> (сообщения, 0, ответ, конфиг) в раннере; в .venvs/light доставлены sympy 1.14.0, loguru, antlr4-python3-runtime 4.11, pyyaml",
+  "env": "run.py — eval_main.main() апстрима как есть: build_clients -> OpenAI(base_url) с LLMAgent и EmbeddingModel апстрима, заглушки azure и axle, random.seed(0) перед циклом (setup_state); TIKTOKEN_CACHE_DIR=/Users/user/Projects/upstreams/.tiktoken HF_HUB_OFFLINE=1",
+  "embeddings": "uv run python -m tools.record.embeddings --port 8092 (BGE-M3 стенда под именем text-embedding-3-small, base64 float32)",
+  "record": "uv run python -m tools.record.record rec.jsonl --port 8090 --upstream http://localhost:8080 --embeddings-upstream http://127.0.0.1:8092 --seed",
+  "command": "/Users/user/Projects/upstreams/.venvs/light/bin/python run.py OUT http://127.0.0.1:8090/v1 3",
+  "steps": "steps.json — снимки после каждой итерации сняты повторным прогоном run.py по записи (tools.record.replay, 35 из 35 ответов, без промахов): в первом прогоне журналы Future IG в снимке были общими списками",
+  "note": "решатель 15, insight 5, слияние skills 1, слияние insights 1, сравнение решений 2 (на повторах задач 0 и 1: старое решение против ответа большинства в \\boxed{} у matharena не разбирается — неверно), эмбеддинги 11 запросов; библиотека в конце — 12 skills, 4 insights; улучшение на итерациях 0, 1, 2, 4",
+  "calls": 24,
+  "embedding_requests": 11,
+  "model_minutes": 22,
+  "eval_scores": [0, 0, 0, null, 1]
+}
