@@ -95,7 +95,8 @@ def test_requests(replayed):
 
 def test_library(replayed):
     """Библиотека после батча — опыты G0, G1, ... апстрима (recorder.experiences, ExperienceCache)."""
-    assert STEPS == [list(json.load(open(LIVE / "experiences.json")).values())]
+    theirs = list(json.load(open(LIVE / "experiences.json")).values())
+    assert theirs and STEPS == [theirs]
 
 
 def test_rollouts(replayed):

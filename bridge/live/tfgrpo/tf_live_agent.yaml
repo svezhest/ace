@@ -8,7 +8,7 @@ model:
     type: chat.completions
     model: ornith15-9b
   model_settings:
-    temperature: 0.7
+    temperature: 0.3
     top_p: 0.95
     include_usage: true
     extra_args:
@@ -25,7 +25,16 @@ agent:
     \ arrive at the final answer. The Python code should be complete scripts, including\
     \ necessary imports. \nEach code snippet is wrapped with \n```python\ncode snippet\n\
     ```.\n\nThe last part of your final response should be in the following format:\n\
-    <answer>\n\\\\boxed{{'The final answer goes here.'}}\n</answer>"
+    <answer>\n\\\\boxed{{'The final answer goes here.'}}\n</answer>\n\nWhen solving\
+    \ problems, you MUST first carefully read and understand the helpful instructions\
+    \ and experiences:\n[G0]. Reasoning narration: Narrate each logical step explicitly\
+    \ in human-readable prose (define sets, state counts, show arithmetic) rather\
+    \ than relying solely on code comments, since the deliverable emphasizes an auditable\
+    \ reasoning chain that affects correctness scoring.\n[G1]. Compound divisibility\
+    \ conditions: For 'multiples of A or B but not C,' compute the positive condition\
+    \ via inclusion-exclusion with LCM-based intersections, then subtract elements\
+    \ also satisfying the excluded condition, and verify with independent brute-force\
+    \ enumeration when feasible."
 toolkits:
   python_executor:
     mode: builtin
