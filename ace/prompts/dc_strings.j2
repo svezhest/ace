@@ -1,0 +1,46 @@
+{#- Dynamic Cheatsheet апстрима дословно (dynamic-cheatsheet 5cfe3c3): language_model.py (generate, advanced_generate),
+    utils/execute_code.py, run_benchmark.py. -#}
+{% macro question(n, text) %}Question #{{ n }}:
+{{ text }}{% endmacro %}
+{% macro flag() %}EXECUTE CODE!{% endmacro %}
+{% macro empty() %}(empty){% endmacro %}
+{% macro no_response() %}(No response generated){% endmacro %}
+{% macro no_block() %}(No code block found to execute){% endmacro %}
+{% macro code_output(output) %}Output of the Python code above:
+```
+{{ output }}
+```{% endmacro %}
+{% macro code_error(error) %}PYTHON CODE OUTPUT:
+```
+Error: {{ error }}
+```{% endmacro %}
+{% macro execution_error(stderr) %}Error in execution: {{ stderr }}{% endmacro %}
+{% macro no_output() %}(No output was generated. It is possible that you did not include a print statement in your code. If you want to see the output, please include a print statement.){% endmacro %}
+{% macro timeout() %}Execution took too long, aborting...{% endmacro %}
+
+{#- прошлые пары в [[CHEATSHEET]]: все подряд (FullHistoryAppending) и retrieval с близостью; двойной пробел
+    перед # у retrieval — как в апстриме -#}
+{% macro pairs_start() %}### PREVIOUS SOLUTIONS (START){% endmacro %}
+{% macro pairs_end() %}#### PREVIOUS SOLUTIONS (END){% endmacro %}
+{% macro pair(n, question, solution) %}#### Previous Input #{{ n }}:
+
+{{ question }}
+
+#### Model Solution to Previous Input #{{ n }}:
+
+{{ solution }}
+---
+---
+
+{% endmacro %}
+{% macro scored_pair(n, similarity, question, solution) %}#### Previous Input #{{ n }} (Similarity: {{ "%.2f"|format(similarity) }}):
+
+{{ question }}
+
+#### Model Solution to Previous Input  #{{ n }}:
+
+{{ solution }}
+---
+---
+
+{% endmacro %}

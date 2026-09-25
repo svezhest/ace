@@ -52,7 +52,7 @@ class Kernel:
         if line:
             return json.loads(line)["output"]
         self.kill()
-        return render.kernel_timeout(timeout) if line is None else render.KERNEL_DIED
+        return render.kernel_timeout(timeout) if line is None else render.kernel_died()
 
     def kill(self):
         if self.proc is not None:

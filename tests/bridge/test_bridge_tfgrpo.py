@@ -118,8 +118,8 @@ def test_summary_requests():
         model = Fake(calls)
         g = group("A", [1, 0][:len(calls)], target="42" if labeled else "")
         # критика эталона: у первой попытки "Correct.", у второй нет; у math апстрима её нет никогда (test_loop)
-        for e, critique, call in zip(T.rollouts(g, False), ["Correct.", render.NO_CRITIQUE], calls):
-            U.ask(Ex(model), STAGES[0], question=e.question, trajectory=e.output, answer=g.target or render.REDACTED,
+        for e, critique, call in zip(T.rollouts(g, False), ["Correct.", render.TFGRPO.no_critique()], calls):
+            U.ask(Ex(model), STAGES[0], question=e.question, trajectory=e.output, answer=g.target or render.TFGRPO.redacted(),
                   critique=critique)
             assert model.calls[-1]["user"] == messages(call)[1]
         assert model.calls[0]["system"] == messages(calls[0])[0]
@@ -129,7 +129,7 @@ def test_advantage_requests():
     for case, labeled in (("advantage_gt", True), ("advantage_no_gt", False)):
         call = PROMPTS["requests"][case][0]
         g = group("A", [1, 0], target="42" if labeled else "")
-        user = U.P[STAGES[1]][1].fill(question=g.question, answer=g.target or render.REDACTED,
+        user = U.P[STAGES[1]][1].fill(question=g.question, answer=g.target or render.TFGRPO.redacted(),
                                       trajectories=render.attempts(list(zip(T.rollouts(g, False), ["S0", "S1"])), labeled))
         assert user == messages(call)[1]
 
@@ -216,7 +216,7 @@ def test_batch_update(name):
 def test_batch_table(name):
     """_format_exp_and_ops = render.batch_table: опыты по меткам и их операции, затем операции без id."""
     case = MEMORY["format_exp_and_ops"][name]
-    assert list(case["experiences"]) == [render.label(i, None) for i in range(len(case["experiences"]))]
+    assert list(case["experiences"]) == [render.label(i) for i in range(len(case["experiences"]))]
     records = [Lesson(f"r{i}", t) for i, t in enumerate(case["experiences"].values())]
     assert render.batch_table(records, case["operations"]) == case["text"]
 

@@ -12,10 +12,13 @@ tfgrpo_*.j2 дословно, пара системный / пользовате
 Библиотека до конца батча не меняется, поэтому сверка идёт здесь, а план батча — в памяти метода
 (memory/tfgrpo.py). Группа без опыта даёт пустые операции: план батча апстрим строит всегда. Вызовы — без
 параметров запроса, как у апстрима (model_params = {}: температура и предел генерации — сервера)."""
-from .. import parse, render
+from .. import parse, prompts, render
 from ..model import Reader
 from ..upstream.tfgrpo import EXPERIENCES, ask
 from . import OPERATIONS, Extraction, Extractor, scores
+
+TFGRPO = prompts.macros("tfgrpo_strings")
+
 
 def partial(rollouts, labeled):
     """С меткой в работу идут только группы, где верна часть попыток."""
@@ -50,9 +53,9 @@ class Contrast(Extractor):
         eps = rollouts(group, self.scored)
         if not partial(eps, bool(group.target)):
             return None
-        answer = group.target or render.REDACTED
+        answer = group.target or TFGRPO.redacted()
         out = [(e, ask(ex, "single_rollout_summary_template", question=e.question, trajectory=e.output, answer=answer,
-                       critique=render.NO_CRITIQUE)) for e in eps]
+                       critique=TFGRPO.no_critique())) for e in eps]
         return [(e, s) for e, s in out if s is not None]
 
     def advantage(self, ex, group, summaries):
@@ -61,7 +64,7 @@ class Contrast(Extractor):
         if summaries is None or not partial([e for e, _ in summaries], labeled):
             return None
         return ask(ex, "single_query_group_advantage", EXPERIENCES, question=group.question,
-                   answer=group.target or render.REDACTED, trajectories=render.attempts(summaries, labeled))
+                   answer=group.target or TFGRPO.redacted(), trajectories=render.attempts(summaries, labeled))
 
     def update(self, ex, memory, found):
         return ask(ex, "group_experience_update_template", Reader(text=operations),

@@ -28,9 +28,11 @@ GENERATOR = prompts.load("dc_generator")
 SYNTH = prompts.load("dc_synth")
 NOTE = prompts.text("dc_note")
 MEB = prompts.text("dc_meb")
-PROCEED, LAST_ROUND = prompts.text("dc_proceed"), prompts.text("dc_last_round")
+PROCEED = prompts.text("dc_proceed")
+LAST_ROUND = prompts.text("dc_last_round")
+DC = prompts.macros("dc_strings")
+FLAG = DC.flag()            # после блока кода — просьба его исполнить
 TOP = 3                     # --retrieve_top_k
-FLAG = "EXECUTE CODE!"
 ROUNDS = 3                  # max_depth_num_rounds generate
 CODE_LIMIT = 3              # секунд на код, как execute_code_with_timeout
 CODE_FILE = "/tmp/code.py"  # код исполняется файлом, как у апстрима (у него — случайное имя tempfile)
@@ -38,7 +40,7 @@ CODE_FILE = "/tmp/code.py"  # код исполняется файлом, как
 
 def dc_input(task, i, question):
     """Вход задачи i (с нуля), как его строит run_benchmark.py апстрима: у meb — вступление MathEquationBalancer."""
-    text = f"Question #{i + 1}:\n{question}"
+    text = DC.question(n=i + 1, text=question)
     return MEB + text if variant("dc", task) == "meb" else text
 
 
@@ -68,13 +70,13 @@ def generate(model, call, code):
     history, final = list(call.messages), ""
     for depth in range(1, ROUNDS + 2):
         reply = model.ask(Call(list(history), call.params))
-        output = reply.output or render.DC_NO_RESPONSE
+        output = reply.output or DC.no_response()
         head = output.split(FLAG)[0].strip()
         runs_code = code and FLAG in output and head.endswith("```")      # перед флагом — закрытый блок кода
         if not runs_code:
             break
         ran = run_block(head)
-        current = f"{head}\n{FLAG}\n\n{ran.strip() if ran else render.DC_NO_BLOCK}"
+        current = f"{head}\n{FLAG}\n\n{ran.strip() if ran else DC.no_block()}"
         final = f"{final}\n\n{current}".strip()
         if depth > ROUNDS:
             output = current
@@ -96,28 +98,28 @@ def run_block(text):
         last = lines[-1].rstrip()
         if not last.startswith(("print(", "#", " ", "\t")) and "return" not in last:
             lines[-1] = f"print({last})"
-        return render.dc_code_output(execute("\n".join(lines)))
+        return DC.code_output(output=execute("\n".join(lines)))
     except Exception as error:
-        return render.dc_code_error(error)
+        return DC.code_error(error=error)
 
 
 def execute(code):
     """execute_code_with_timeout апстрима: stdout, без него — ошибка из stderr или просьба напечатать."""
     r = sandbox.run(code, limit=CODE_LIMIT, path=CODE_FILE)
     if r["timeout"]:
-        return render.DC_TIMEOUT
+        return DC.timeout()
     out, err = r["stdout"].strip(), r["stderr"].strip()
     if out:
         return out
-    return render.dc_execution_error(err) if err else render.DC_NO_OUTPUT
+    return DC.execution_error(stderr=err) if err else DC.no_output()
 
 
 def cumulative(ex, memory, item, question):
     return memory.current(), memory.records()
 
 
-RETRIEVAL = TopK(TOP, key=lambda r: r.question, layout=lambda recs, memory: render.pairs(recs, True, NOTE), empty=render.EMPTY)
-HISTORY = Whole(layout=lambda recs, memory: render.pairs(recs, False), empty=render.EMPTY)
+RETRIEVAL = TopK(TOP, key=lambda r: r.question, layout=lambda recs, memory: render.pairs(recs, True, NOTE), empty=DC.empty())
+HISTORY = Whole(layout=lambda recs, memory: render.pairs(recs, False), empty=DC.empty())
 
 
 def retrieval(ex, memory, item, question):

@@ -1,0 +1,4 @@
+{#- поля промптов EvoLib: у hmmt — слова апстрима (EvoLib/eval_main.py: «a math expert», «math problem»), у задач
+    стенда — без math (DEVIATIONS S2) -#}
+{% macro expert(math) %}{% if math %}a math expert{% else %}an expert{% endif %}{% endmacro %}
+{% macro subject(math) %}{% if math %}math {% endif %}{% endmacro %}

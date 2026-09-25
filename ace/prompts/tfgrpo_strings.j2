@@ -1,0 +1,13 @@
+{#- Training-Free GRPO апстрима дословно (youtu-agent c2caa53): стадии обучения (utu/practice/experience_updater.py),
+    описание инструмента execute_python_code (utu/tools/python_executor_toolkit.py: схема FunctionTool openai-agents)
+    и текст предела времени ядра. Ядро в песочнице (env/tfgrpo_kernel.py) держит свою копию этих строк: Jinja там нет. -#}
+{% macro redacted() %}[REDACTED]{% endmacro %}
+{% macro no_critique() %}[No critique provided]{% endmacro %}
+{% macro attempt(n, reward, summary) %}Attempt {{ n }} (Reward {{ reward }}):
+{{ summary }}{% endmacro %}
+{% macro experience(label, text) %}[{{ label }}]. {{ text }}{% endmacro %}
+{% macro no_experiences() %}None{% endmacro %}
+{% macro tool_description() %}Executes Python code and returns the output.{% endmacro %}
+{% macro code_description() %}The Python code to execute.{% endmacro %}
+{% macro timeout_description() %}The execution timeout in seconds. Defaults to 30.{% endmacro %}
+{% macro timed_out(seconds) %}Code execution timed out ({{ seconds }} seconds){% endmacro %}

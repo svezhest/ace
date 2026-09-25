@@ -9,7 +9,7 @@ from ..model import Call, messages
 from . import OwnSolver
 
 TEMPLATE = prompts.load("ace_generator")
-NO_REFLECTION = "(empty)"
+NO_REFLECTION = prompts.text("ace_no_reflection")
 
 
 class Generator(OwnSolver):

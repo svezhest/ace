@@ -182,7 +182,7 @@ def test_evaluations_json():
     want["iter1"]["train_metrics"] = {"accuracy": want["iter1"]["train_metrics"]["accuracy"]}
     h = Iteration("s", (1 + 1) / (3 + 1), 0.5, None, val_total=4, rollouts=4, folders={"iter1_sub0": {}, "iter1_sub1": {}})
     assert evaluations([h]) == want
-    assert render.evaluations(evaluations([h])) == json.dumps(want, indent=2)
+    assert render.pretty_json(evaluations([h])) == json.dumps(want, indent=2)
 
 # цикл: main() на заготовках агентов capture_mce.py
 

@@ -26,6 +26,6 @@ SELECTOR = prompts.text("selector_system")
 
 def one_of_two(ex, group, candidates):
     """Модель выбирает набор уроков: ответ «1» или «2»; без ответа первый."""
-    a, b = (render.lessons(x.lessons) for x in candidates[:2])
+    a, b = (render.bullets(x.lessons) for x in candidates[:2])
     out = ex.model.ask(Call(messages(SELECT.fill(a=a, b=b), SELECTOR), params())).output
     return 1 if (out or "1").strip().startswith("2") else 0

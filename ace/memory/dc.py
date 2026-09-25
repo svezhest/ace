@@ -9,13 +9,16 @@ dc_curator.j2 дословно). Вердикта и извлечения нет
                 последний синтезированный под вопрос cheatsheet (его показ оставляет в промпте попытки)"""
 from dataclasses import dataclass
 
-from .. import prompts, render
+from .. import prompts
 from ..extract import INPUT, SHEET
 from ..model import Call, messages
 from ..upstream.dc import CHEATSHEET, MAX_TOKENS, TOKENS, dc_params
 from . import Document, Lessons, Operation, Record
 
 CURATOR = prompts.load("dc_curator")
+DC = prompts.macros("dc_strings")
+
+
 class Sheet(Document):
     """Cheatsheet: до первой записи его нет (показ "(empty)"); записанный пустым показывается пустым,
     как в апстриме."""
@@ -33,7 +36,7 @@ class Sheet(Document):
 
     def current(self):
         """Текст для промптов куратора и синтеза."""
-        return self.text if self.text is not None else render.EMPTY
+        return self.text if self.text is not None else DC.empty()
 
 
 class Cheatsheet(Sheet):

@@ -73,6 +73,7 @@ VALIDATION_ATTEMPTS = 3     # max_validation_attempts run_base_agent
 UTILS = Path(__file__).parent / "mce_utils"     # mce/workspace_utils апстрима дословно: копия в utils/ под-итерации
 CLAUDE_BASE, INTERFACES = prompts.load("mce_claude_base"), prompts.load("mce_claude_interfaces")
 INVALID = prompts.load("mce_claude_invalid")
+MCE = prompts.macros("mce_strings")
 
 
 @dataclass(frozen=True)
@@ -85,12 +86,11 @@ class Signature:
 
     @property
     def args(self):
-        return ", ".join(f"{n}: {t}" for n, t, _ in self.inputs)
+        return render.signature_args(self.inputs)
 
 
-SIGNATURES = {"symptom": (Signature("get_context", (("symptoms", "str", "Patient symptom description"),),
-                                    ("str", "Relevant medical context for diagnosis"),
-                                    "Return context that helps the LLM diagnose based on symptoms."),)}
+SIGNATURES = {"symptom": (Signature("get_context", inputs=(("symptoms", "str", MCE.symptoms()),),
+                                    output=("str", MCE.context()), description=MCE.get_context()),)}
 
 
 def signatures(task):
@@ -210,7 +210,7 @@ async def base_permission(tool_name, input_data, context, iter_dir):
     падает TypeError, и CLI получает ошибку; зовётся он только для инструментов вне allowed_tools (остальные
     разрешены заранее), так что пути он на деле не ограничивает. Так у апстрима — так и здесь."""
     if tool_name not in BASE_TOOLS:
-        return {"behavior": "deny", "message": f"Tool '{tool_name}' not allowed. Allowed: {', '.join(BASE_TOOLS)}",
+        return {"behavior": "deny", "message": MCE.base_tool_denied(tool=tool_name, allowed=", ".join(BASE_TOOLS)),
                 "interrupt": False}
     iter_dir = iter_dir.resolve()
     if tool_name in ["Read", "Write", "Edit", "Glob", "Grep"]:
@@ -223,11 +223,11 @@ async def base_permission(tool_name, input_data, context, iter_dir):
             try:
                 resolved.relative_to(iter_dir)
             except ValueError:
-                return {"behavior": "deny", "message": f"Access denied: restricted to {iter_dir}", "interrupt": True}
+                return {"behavior": "deny", "message": MCE.base_outside(folder=iter_dir), "interrupt": True}
             if tool_name in ["Write", "Edit"]:
                 try:
                     resolved.relative_to((iter_dir / "utils").resolve())
-                    return {"behavior": "deny", "message": "Access denied: cannot write to utils/", "interrupt": True}
+                    return {"behavior": "deny", "message": MCE.base_utils(), "interrupt": True}
                 except ValueError:
                     pass
             return {"behavior": "allow", "updatedInput": input_data}
@@ -241,17 +241,17 @@ def import_function(file_path, name):
         del sys.modules[module_name]
     spec = importlib.util.spec_from_file_location(module_name, file_path)
     if spec is None or spec.loader is None:
-        raise ImportError(f"Could not load spec for {file_path}")
+        raise ImportError(MCE.no_spec(path=file_path))
     module = importlib.util.module_from_spec(spec)
     sys.modules[module_name] = module
     try:
         spec.loader.exec_module(module)
     except Exception as e:
         del sys.modules[module_name]
-        raise ImportError(f"Failed to execute module: {e}")
+        raise ImportError(MCE.exec_failed(error=e))
     if not hasattr(module, name):
         del sys.modules[module_name]
-        raise ImportError(f"Module does not have function '{name}'")
+        raise ImportError(MCE.no_attribute(name=name))
     return getattr(module, name)
 
 
@@ -260,14 +260,14 @@ def validate(folder, sigs):
     параметров и return со значением; модуль исполняется в процессе, как у апстрима."""
     folder = Path(folder)
     if not (folder / "interfaces").exists():
-        return ["interfaces/ directory not found. Create it and implement required functions."]
+        return [MCE.no_interfaces()]
     errors = []
     if not (folder / "interfaces" / "__init__.py").exists():
-        errors.append("interfaces/__init__.py not found. Create it to export your functions.")
+        errors.append(MCE.no_init())
     for sig in sigs:
         error = validate_one(folder, sig)
         if error:
-            errors.append(f"[{sig.name}] {error}")
+            errors.append(MCE.interface_error(name=sig.name, error=error))
     return errors
 
 
@@ -275,25 +275,25 @@ def validate_one(folder, sig):
     """_validate_single_interface: текст ошибки или None."""
     file_path = folder / "interfaces" / f"{sig.name}.py"
     if not file_path.exists():
-        return f"File not found: interfaces/{sig.name}.py"
+        return MCE.no_file(name=sig.name)
     try:
         tree = ast.parse(file_path.read_text(encoding="utf-8"))
     except SyntaxError as e:
-        return f"Syntax error in {sig.name}.py: {e}"
+        return MCE.syntax_error(name=sig.name, error=e)
     except Exception as e:
-        return f"Failed to parse {sig.name}.py: {e}"
+        return MCE.parse_failed(name=sig.name, error=e)
     node = next((n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == sig.name), None)
     if node is None:
-        return f"Function '{sig.name}' not found in interfaces/{sig.name}.py"
+        return MCE.no_function(name=sig.name)
     expected, actual = [n for n, _, _ in sig.inputs], [a.arg for a in node.args.args]
     if actual != expected:
-        return f"Parameter mismatch. Expected: ({', '.join(expected)}), Got: ({', '.join(actual)})"
+        return MCE.mismatch(expected=", ".join(expected), actual=", ".join(actual))
     if not any(isinstance(n, ast.Return) and n.value is not None for n in ast.walk(node)):
-        return f"Function '{sig.name}' has no return statement with a value"
+        return MCE.no_return(name=sig.name)
     try:
         import_function(file_path, sig.name)
     except Exception as e:
-        return f"Import failed: {e}"
+        return MCE.import_failed(error=e)
     return None
 
 

@@ -21,6 +21,8 @@
 import json
 import re
 
+from . import prompts
+
 
 def opened(tag):
     def parse(text):
@@ -198,7 +200,7 @@ def bullet_ids(text):
     return re.findall(r"\[([a-z]{3,}-\d{5})\]", text or "")
 
 
-NO_ANSWER = "No final answer found"
+NO_ANSWER = prompts.text("no_answer")
 
 
 def ace_answer(text):

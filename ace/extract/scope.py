@@ -21,7 +21,8 @@ from . import ATTEMPT, CONFIDENCE, DOMAIN, RATIONALE, Extraction, Extractor
 
 P = {n: prompts.load(f"scope_{n}") for n in ("error", "efficiency", "thoroughness", "selector", "classify")}
 
-DOMAINS = ["tool_usage", "data_validation", "error_handling", "efficiency", "analysis_methodology", "safety", "general"]
+DOMAINS = prompts.text("scope_domains").split()
+STAND = prompts.macros("stand")
 LEVEL = {"low": 0.3, "medium": 0.6, "high": 0.9}    # метка кандидата -> начальная confidence
 DEFAULT_CONFIDENCE = 0.5    # метка не из списка
 BEST_OF_TEMPERATURE = 0.7
@@ -62,7 +63,7 @@ def answer_step(ep):
 
 def agent_context(ex, attempt, book):
     """Агент глазами SCOPE: роль задачи, вопрос и текущий системный промпт."""
-    return dict(agent_name=f"{ex.task.name}_agent", agent_role=ex.task.system, task=attempt.question,
+    return dict(agent_name=STAND.agent_name(task=ex.task.name), agent_role=ex.task.system, task=attempt.question,
                 current_system_prompt=current_system(attempt.system, book))
 
 
@@ -108,7 +109,7 @@ class Rules(Extractor):
         confidence (parse.scope_classification)."""
         initial = proposal.initial()
         context = prompts.text("scope_rules_context", strategic=strategic_text(book), tactical=[r.text for r in book.tactical])
-        prompt = P["classify"].fill(allowed_domains=", ".join(DOMAINS), update_text=proposal.update_text,
+        prompt = P["classify"].fill(allowed_domains=render.allowed_domains(DOMAINS), update_text=proposal.update_text,
                                     rationale=proposal.rationale, initial_confidence=initial, all_rules_context=context)
         read = Reader(text=lambda text: parse.scope_classification(text, initial, DOMAINS))
         c = ex.model.ask(Call(parts(prompt), {}, read)).output

@@ -1,0 +1,41 @@
+{#- MCE апстрима дословно (meta-context-engineering c4b7a7c). -#}
+
+{#- база навыков в промпте мета-агента (mce/prompts/meta_agent.py: _build_skill_database, _extract_skill_overview);
+    train и val — уже в процентах -#}
+{% macro iteration(i, train, val, rollouts, subs, overview, folder) %}### Iteration {{ i }}
+- **Train**: {{ train }} | **Val**: {{ val }}
+- **Rollouts**: {{ rollouts }} ({{ subs }} sub-iteration{% if subs > 1 %}s{% endif %})
+- **Skill Overview**:
+{{ overview }}
+- **Files**: `meta_agent/skills/iter{{ i }}/SKILL.md`, `{{ folder }}/`{% endmacro %}
+{% macro no_skill_file() %}  (SKILL.md not found){% endmacro %}
+{% macro no_overview() %}  (no '## Skill Overview' section found){% endmacro %}
+{% macro empty_overview() %}  (Skill Overview section is empty){% endmacro %}
+
+{#- проверка интерфейсов базового агента (mce/validation.py): ошибки идут агенту -#}
+{% macro no_interfaces() %}interfaces/ directory not found. Create it and implement required functions.{% endmacro %}
+{% macro no_init() %}interfaces/__init__.py not found. Create it to export your functions.{% endmacro %}
+{% macro interface_error(name, error) %}[{{ name }}] {{ error }}{% endmacro %}
+{% macro no_file(name) %}File not found: interfaces/{{ name }}.py{% endmacro %}
+{% macro syntax_error(name, error) %}Syntax error in {{ name }}.py: {{ error }}{% endmacro %}
+{% macro parse_failed(name, error) %}Failed to parse {{ name }}.py: {{ error }}{% endmacro %}
+{% macro no_function(name) %}Function '{{ name }}' not found in interfaces/{{ name }}.py{% endmacro %}
+{% macro mismatch(expected, actual) %}Parameter mismatch. Expected: ({{ expected }}), Got: ({{ actual }}){% endmacro %}
+{% macro no_return(name) %}Function '{{ name }}' has no return statement with a value{% endmacro %}
+{% macro import_failed(error) %}Import failed: {{ error }}{% endmacro %}
+{% macro no_spec(path) %}Could not load spec for {{ path }}{% endmacro %}
+{% macro exec_failed(error) %}Failed to execute module: {{ error }}{% endmacro %}
+{% macro no_attribute(name) %}Module does not have function '{{ name }}'{% endmacro %}
+
+{#- отказы в правах: базовый агент (mce/base_agent.py), мета-агент (mce/meta_agent.py) -#}
+{% macro base_tool_denied(tool, allowed) %}Tool '{{ tool }}' not allowed. Allowed: {{ allowed }}{% endmacro %}
+{% macro base_outside(folder) %}Access denied: restricted to {{ folder }}{% endmacro %}
+{% macro base_utils() %}Access denied: cannot write to utils/{% endmacro %}
+{% macro meta_tool_denied(tool, allowed) %}Tool '{{ tool }}' is not allowed. Allowed tools: {{ allowed }}{% endmacro %}
+{% macro meta_read_outside(workspace) %}Access denied: Read operations restricted to workspace ({{ workspace }}){% endmacro %}
+{% macro meta_write_outside(folder) %}Access denied: Write operations restricted to {{ folder }}{% endmacro %}
+
+{#- интерфейс задачи symptom_diagnosis (env/symptom_diagnosis/symptom_diagnosis_environment.py) -#}
+{% macro symptoms() %}Patient symptom description{% endmacro %}
+{% macro context() %}Relevant medical context for diagnosis{% endmacro %}
+{% macro get_context() %}Return context that helps the LLM diagnose based on symptoms.{% endmacro %}

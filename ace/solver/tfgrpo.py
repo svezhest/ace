@@ -15,22 +15,27 @@ openai-agents; промпты tfgrpo_agent.j2, tfgrpo_answer_dapo.j2, tfgrpo_pro
 Инструкции агента: у dapo — math_agent.yaml дословно; у задач стенда (S2) — системный промпт задачи, тот же текст
 про код и вместо формата <answer> инструкция задачи (ответ — строка FINAL ANSWER)."""
 from .. import prompts, render
-from ..env.tfgrpo import Kernel
+from ..env.tfgrpo import DEFAULT_TIMEOUT, Kernel
 from ..loop import Prompt, Solver
 from ..model import Call, Reply, messages
 from ..tasks import final_answer, variant
 from . import OwnSolver
 
-TEMPLATE, PROBLEM = prompts.load("tfgrpo_agent"), prompts.load("tfgrpo_problem")
+TEMPLATE = prompts.load("tfgrpo_agent")
+PROBLEM = prompts.load("tfgrpo_problem")
 INTRO = "\n\n" + prompts.text("tfgrpo_experiences_intro")
 LAST_TURN = {"role": "user", "content": prompts.text("tfgrpo_last_turn")}
+TFGRPO = prompts.macros("tfgrpo_strings")
+# схема инструмента, как её шлёт openai-agents (FunctionTool python_executor апстрима)
 TOOL = {"type": "function", "function": {
-    "name": "execute_python_code", "description": "Executes Python code and returns the output.", "strict": False,
+    "name": "execute_python_code", "description": TFGRPO.tool_description(), "strict": False,
     "parameters": {"type": "object", "title": "execute_python_code_args", "required": ["code"], "properties": {
-        "code": {"type": "string", "title": "Code", "description": "The Python code to execute."},
-        "timeout": {"type": "integer", "title": "Timeout", "default": 30,
-                    "description": "The execution timeout in seconds. Defaults to 30."}}}}}
-ROLLOUT_TEMPERATURE, TEMPERATURE, TOP_P = 0.7, 0.3, 0.95
+        "code": {"type": "string", "title": "Code", "description": TFGRPO.code_description()},
+        "timeout": {"type": "integer", "title": "Timeout", "default": DEFAULT_TIMEOUT,
+                    "description": TFGRPO.timeout_description()}}}}}
+ROLLOUT_TEMPERATURE = 0.7   # rollout_temperature
+TEMPERATURE = 0.3           # итоговый агент
+TOP_P = 0.95
 MAX_TURNS = 50
 RETRIES = 3                 # rollout_with_semaphore
 

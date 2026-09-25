@@ -101,7 +101,7 @@ def test_kernel_host_timeout():
         tfgrpo.DOCKER_GRACE = 3
         assert "'success': True" in kernel.call('{"code": "x = 1\\nprint(x)"}')
         assert kernel.call('{"code": "pow(3, 10**10)", "timeout": 1}') == render.kernel_timeout(1)
-        assert kernel.call('{"code": "x = bytearray(900 * 1024 * 1024)"}') == render.KERNEL_DIED
+        assert kernel.call('{"code": "x = bytearray(900 * 1024 * 1024)"}') == render.kernel_died()
         assert "NameError" in kernel.call('{"code": "print(x)"}')
     finally:
         tfgrpo.DOCKER_GRACE = grace

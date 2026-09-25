@@ -28,7 +28,7 @@ class Library(Lessons):
                        experiences_and_operations=render.batch_table(self.records(), ops))
             if plan is not None:
                 break
-        ids = {render.label(i, r): r.id for i, r in enumerate(self.records())}
+        ids = {render.label(i): r.id for i, r in enumerate(self.records())}
         # метки модели -> id памяти; чужая метка не находит записи: UPDATE по ней добавляет опыт, DELETE пропускается
         self.apply([dict(p, id=ids.get(str(p.get("id")), "")) for p in plan if isinstance(p, dict)]
                    if isinstance(plan, list) else [], missing="add")

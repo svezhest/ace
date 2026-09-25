@@ -1,0 +1,28 @@
+{#- SCOPE апстрима дословно (SCOPE 4dc0da5): сводка шага и вопрос селектору (optimizer.py _build_step_summary,
+    synthesizer.py), правила оптимизатору (memory_optimizer.py), strategic правила (strategic_store.py). -#}
+{% macro no_details() %}(no step details){% endmacro %}
+{% macro model_output(text) %}Model output: {{ text }}{% endmacro %}
+{% macro tool_calls(text) %}Tool calls: {{ text }}{% endmacro %}
+{% macro observations(text) %}Observations: {{ text }}{% endmacro %}
+{% macro issue(step, type, message) %}Error Type: {{ type }}
+Error Message: {{ message }}
+
+Last Step:
+{{ step }}{% endmacro %}
+{% macro step_details(step) %}Step Details:
+{{ step }}{% endmacro %}
+{% macro candidate(i, update, rationale, confidence) %}
+[Candidate {{ i }}]
+Update: {{ update }}
+Rationale: {{ rationale }}
+Confidence: {{ confidence }}
+{% endmacro %}
+{% macro no_rules() %}(none){% endmacro %}
+{% macro rule(id, text) %}Rule {{ id }}: {{ text }}
+{% endmacro %}
+{% macro rule_block(id, text, rationale) %}
+Rule {{ id }}:
+  Text: {{ text }}
+  Rationale: {{ rationale }}
+{% endmacro %}
+{% macro domain(title) %}### {{ title }}:{% endmacro %}

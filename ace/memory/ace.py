@@ -36,7 +36,7 @@ class Ops(BaseModel):
 
 
 def curator_prompt(template, memory, x):
-    return template.fill(lessons=render.lessons(x.lessons), memory=render.lines(memory.records()) or render.EMPTY)
+    return template.fill(lessons=render.bullets(x.lessons), memory=render.lines(memory.records()) or render.EMPTY)
 
 
 def curate_ops(ex, memory, x):
@@ -90,8 +90,7 @@ class CappedPlaybook(Playbook):
 
 
 P = {n: prompts.load(f"ace_{n}") for n in ("curator", "curator_nogt", "merge")}
-SECTIONS = ["STRATEGIES & INSIGHTS", "FORMULAS & CALCULATIONS", "CODE SNIPPETS & TEMPLATES", "COMMON MISTAKES TO AVOID",
-            "PROBLEM-SOLVING HEURISTICS", "CONTEXT CLUES & INDICATORS", "OTHERS"]
+SECTIONS = prompts.text("ace_sections").splitlines()
 OTHERS, GENERAL = "others", "general"
 SLUGS = {"financial_strategies_and_insights": "fin", "formulas_and_calculations": "calc", "code_snippets_and_templates": "code",
          "common_mistakes_to_avoid": "err", "problem_solving_heuristics": "prob", "context_clues_and_indicators": "ctx",
@@ -165,7 +164,7 @@ class SectionedPlaybook(Sections):
         """Curator.curate апстрима: ответ текстом, разбор и проверка как у апстрима (ошибка — ответ пропускается
         целиком); применяются только ADD, UPDATE / DELETE / MERGE апстрим молча пропускает."""
         fields = dict(token_budget=TOKEN_BUDGET, current_step=ex.i + 1, total_samples=ex.total,
-                      playbook_stats=render.stats(self.stats()), recent_reflection=x.lessons[-1],
+                      playbook_stats=render.pretty_json(self.stats()), recent_reflection=x.lessons[-1],
                       current_playbook=layout(self), question_context=question_context(ex.task.name, x.group.question))
         prompt = P["curator" if x.group.target else "curator_nogt"].fill(**fields)
         self.apply(ex.model.ask(Call(messages(prompt), ace_params(), self.read)).output or [])

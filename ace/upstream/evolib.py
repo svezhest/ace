@@ -4,10 +4,12 @@ import math
 
 import numpy as np
 
+from .. import prompts
 from ..model import TEXT, Call, Reply, params
 from ..tasks import variant
 
 EPS = 0.01                  # пол логарифма в IG
+EVOLIB = prompts.macros("evolib_strings")
 # LLMAgent апстрима с reasoning API (модель задачи HMMT — o4-mini): без температуры
 REASONING = {"max_completion_tokens": 50000, "reasoning_effort": "high"}
 TRIES = 20                  # пустой ответ — тот же запрос заново; у апстрима без предела
@@ -19,8 +21,9 @@ def llm_params(task):
 
 
 def domain(task):
-    """Поля промптов EvoLib: у hmmt — тексты апстрима (math), у задач стенда — без math (S2)."""
-    return dict(expert="a math expert", math="math ") if variant("evolib", task) == "math" else dict(expert="an expert", math="")
+    """Поля промптов EvoLib: у hmmt — слова апстрима, у задач стенда — без math (S2)."""
+    math = variant("evolib", task) == "math"
+    return dict(expert=EVOLIB.expert(math=math), math=EVOLIB.subject(math=math))
 
 
 def generate(model, call):

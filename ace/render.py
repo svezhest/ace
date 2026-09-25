@@ -1,7 +1,7 @@
-"""Сериализации: всё, что из данных стенда сшивается в текст для модели. Формулировки — шаблоны в
-ace/prompts/, здесь только сборка: строки записей и раскладки памяти, сообщения решателю, траектория,
-вердикт, поля промптов SCOPE, TF-GRPO, EvoLib, MCE, хуков, вывод песочницы.
-Каждую сериализацию, взятую у апстрима, сверяют с ним по этому модулю."""
+"""Сериализации: всё, что из данных стенда сшивается в текст для модели. Формулировки — шаблоны в ace/prompts/
+(строки стенда — stand.j2, строки апстримов — <метод>_strings.j2), здесь только сборка: строки записей и раскладки
+памяти, файловые инструменты, сообщение решателю, траектория, вердикт, поля промптов SCOPE, TF-GRPO, MCE, хуков,
+вывод песочницы. Каждую сериализацию, взятую у апстрима, сверяют с ним по этому модулю."""
 import json
 import re
 
@@ -10,7 +10,13 @@ from pydantic_ai.messages import TextPart, ToolCallPart, ToolReturnPart
 from . import prompts
 from .tasks import variant
 
-NONE, EMPTY = "(none)", "(empty)"
+STAND = prompts.macros("stand")
+SCOPE = prompts.macros("scope_strings")
+TFGRPO = prompts.macros("tfgrpo_strings")
+MCE = prompts.macros("mce_strings")
+DC = prompts.macros("dc_strings")
+
+EMPTY = STAND.empty()
 
 # строка записи
 
@@ -28,49 +34,47 @@ def numbered(r):
 
 
 def counted(r):
+    """Пункт ACE: «[id] helpful=N harmful=M :: текст» (формат playbook апстрима)."""
     return f"[{r.id}] helpful={r.helpful} harmful={r.harmful} :: {r.text}"
 
 
 def prefixed(prefix):
-    return lambda r: prefix + r.text
+    def line(r):
+        return prefix + r.text
+    return line
 
 
 def lines(records, line=numbered, sep="\n"):
     return sep.join(line(r) for r in records)
 
+
+def bullets(texts):
+    """Тексты строками «- текст»."""
+    return "\n".join(f"- {t}" for t in texts)
+
 # раскладки памяти
 
 
-def titled(groups, line, header="## {}", sep="\n\n"):
-    """Группы записей под заголовками: groups — пары (заголовок, записи); пустые группы тоже показываются."""
-    return sep.join("\n".join([header.format(t)] + [line(r) for r in records]) for t, records in groups)
-
-
 def pairs(records, scored, note=""):
-    """Пары (вопрос, решение) в оформлении DC. scored (retrieval): с пояснением note и близостью,
-    самая похожая последней; иначе (полная история) по порядку. Двойной пробел в «Input  #» — как в апстриме."""
-    text = "### PREVIOUS SOLUTIONS (START)\n\n" + (f"{note}\n\n" if scored else "")
-    for i, r in enumerate(records[::-1] if scored else records):
-        if scored:
-            text += (f"#### Previous Input #{i + 1} (Similarity: {r.score:.2f}):\n\n{r.question}\n\n"
-                     f"#### Model Solution to Previous Input  #{i + 1}:\n\n{r.text}\n---\n---\n\n")
-        else:
-            text += (f"#### Previous Input #{i + 1}:\n\n{r.question}\n\n"
-                     f"#### Model Solution to Previous Input #{i + 1}:\n\n{r.text}\n---\n---\n\n")
-    return (text.strip() + "\n\n" if scored else text) + "#### PREVIOUS SOLUTIONS (END)"
-
-
-def lessons(items):
-    """Уроки дельты для куратора."""
-    return "\n".join(f"- {l}" for l in items)
+    """Пары (вопрос, решение) в оформлении DC. scored (retrieval): пояснение note, у каждой пары близость, самая
+    похожая последней; иначе (полная история) по порядку."""
+    text = DC.pairs_start() + "\n\n"
+    if not scored:
+        for i, r in enumerate(records):
+            text += DC.pair(n=i + 1, question=r.question, solution=r.text)
+        return text + DC.pairs_end()
+    text += note + "\n\n"
+    for i, r in enumerate(records[::-1]):
+        text += DC.scored_pair(n=i + 1, similarity=r.score, question=r.question, solution=r.text)
+    return text.strip() + "\n\n" + DC.pairs_end()
 
 # файловые инструменты (fs.py)
 
 
 def listing(base, folders, files):
     """Содержимое папки base: подпапки со слешем, затем файлы (имя, краткая строка); пустая — EMPTY."""
-    lines = [f"{base}/{name}/" for name in folders] + [f"{base}/{name}  {head}" for name, head in files]
-    return "\n".join(lines) or EMPTY
+    rows = [f"{base}/{name}/" for name in folders] + [f"{base}/{name}  {head}" for name, head in files]
+    return "\n".join(rows) or EMPTY
 
 
 def mounts(modes):
@@ -78,16 +82,16 @@ def mounts(modes):
     return "\n".join(f"{name}/  ({mode})" for name, mode in modes)
 
 
-def numbered_lines(lines, start):
+def numbered_lines(rows, start):
     """Строки файла с номерами «N: текст» от start."""
-    return "\n".join(f"{i}: {line}" for i, line in enumerate(lines, start))
+    return "\n".join(f"{i}: {row}" for i, row in enumerate(rows, start))
 
 # решатель и его траектория
 
 
-def user_message(instr, context, note=""):
+def user_message(instr, question, note=""):
     """Инструкция задачи, вопрос и заметка рефлектора (раунды ACE)."""
-    return f"{instr}\n\n{context}" + (f"\n\nReflection:\n{note}" if note else "")
+    return prompts.text("user_message", instr=instr, question=question, note=note)
 
 
 def transcript(messages):
@@ -106,20 +110,23 @@ def transcript(messages):
 
 def retry_error(content):
     """Отбивка инструмента: строка ModelRetry или список ошибок валидации pydantic (все, через «; »)."""
-    return f"Error: {content if isinstance(content, str) else '; '.join(e['msg'] for e in content)}"
+    if isinstance(content, str):
+        return STAND.tool_error(message=content)
+    return STAND.tool_error(message="; ".join(e["msg"] for e in content))
 
 
 def verdict(ok, target=""):
     if ok is None:
-        return "unknown"
+        return STAND.unknown()
     if ok:
-        return "correct"
-    return f"wrong, correct answer: {target}" if target else "wrong"
+        return STAND.correct()
+    if target:
+        return STAND.wrong_answer(target=target)
+    return STAND.wrong()
 
 
 def python_output(stdout, stderr):
     return f"[stdout]\n{stdout}\n[stderr]\n{stderr}".strip()
-
 
 # TF-GRPO: ответ инструмента execute_python_code, когда ядро не ответило — str(dict) как у python_executor апстрима
 
@@ -130,30 +137,11 @@ def kernel_failed(error):
 
 def kernel_timeout(seconds):
     """timed_out ядра (tfgrpo_kernel.py): тот же текст, что при пределе внутри ядра."""
-    return kernel_failed(f"Code execution timed out ({seconds} seconds)")
+    return kernel_failed(TFGRPO.timed_out(seconds=seconds))
 
 
-KERNEL_DIED = kernel_failed("Kernel died (out of memory or crashed); variables are lost")
-
-# DC: исполнение кода генератора (utils/execute_code.py, language_model.py апстрима)
-
-DC_NO_RESPONSE = "(No response generated)"
-DC_NO_BLOCK = "(No code block found to execute)"
-DC_NO_OUTPUT = ("(No output was generated. It is possible that you did not include a print statement in your code. "
-                "If you want to see the output, please include a print statement.)")
-DC_TIMEOUT = "Execution took too long, aborting..."
-
-
-def dc_code_output(output):
-    return f"Output of the Python code above:\n```\n{output}\n```"
-
-
-def dc_code_error(error):
-    return f"PYTHON CODE OUTPUT:\n```\nError: {error}\n```"
-
-
-def dc_execution_error(stderr):
-    return f"Error in execution: {stderr}"
+def kernel_died():
+    return kernel_failed(STAND.kernel_died())
 
 # рефлексия стенда и хуки
 
@@ -162,13 +150,16 @@ ERROR_TAIL = 500        # хвост ошибки инструмента: traceb
 ARGS_HEAD = 300         # начало аргументов вызова
 
 
-def failures(steps):
+def failed_steps(steps):
     """Шаги с ошибкой, по номерам: вызов и хвост ошибки."""
-    return "\n\n".join(f"{i}. {name} {args[:ARGS_HEAD]}\n{result[-ERROR_TAIL:]}" for i, (name, args, result) in enumerate(steps, 1))
+    blocks = []
+    for i, (name, args, result) in enumerate(steps, 1):
+        blocks.append(f"{i}. {name} {args[:ARGS_HEAD]}\n{result[-ERROR_TAIL:]}")
+    return "\n\n".join(blocks)
 
 
 def hooks(records):
-    return "\n".join(f"- trigger: {r.trigger}\n  lesson: {r.text}" for r in records) or NONE
+    return "\n".join(STAND.hook(trigger=r.trigger, lesson=r.text) for r in records) or STAND.nothing()
 
 
 def raw_hook(name, args):
@@ -177,8 +168,8 @@ def raw_hook(name, args):
 # ACE
 
 
-def stats(values):
-    """Статистика плейбука для куратора."""
+def pretty_json(values):
+    """JSON с отступом 2, как json.dumps(..., indent=2) апстримов: статистика playbook ACE, evaluations.json MCE."""
     return json.dumps(values, indent=2)
 
 
@@ -187,17 +178,23 @@ def ace_playbook(sections):
     (_initialize_empty_playbook), новый пункт — в конец раздела, после этой пустой строки и перед следующим
     заголовком (apply_curator_operations); у последнего раздела пустой строки нет. sections — пары (заголовок,
     записи)."""
-    lines = []
+    rows = []
     for i, (title, records) in enumerate(sections):
-        lines += [f"## {title}"] + ([""] if i < len(sections) - 1 else []) + [counted(r) for r in records]
-    return "\n".join(lines)
+        rows.append(f"## {title}")
+        if i < len(sections) - 1:
+            rows.append("")
+        rows += [counted(r) for r in records]
+    return "\n".join(rows)
 
 
 def bullets_used(records):
     """Пункты, которые назвал решатель, для рефлектора (extract_playbook_bullets): строка пункта с первой строкой
     текста — апстрим разбирает playbook построчно."""
-    first = lambda text: text.split("\n")[0].strip()
-    return "\n".join(f"[{r.id}] helpful={r.helpful} harmful={r.harmful} :: {first(r.text)}" for r in records)
+    rows = []
+    for r in records:
+        first = r.text.split("\n")[0].strip()
+        rows.append(f"[{r.id}] helpful={r.helpful} harmful={r.harmful} :: {first}")
+    return "\n".join(rows)
 
 
 def merge_group(records):
@@ -207,7 +204,9 @@ def merge_group(records):
 # SCOPE; обрезки как в апстриме по умолчанию (truncate_context=True)
 
 
-OUTPUT_CUT, TOOLS_CUT, OBSERVATIONS_CUT = 200, 150, 150
+OUTPUT_CUT = 200            # _build_step_summary: model_output[:200]
+TOOLS_CUT = 150             # tool_calls[:150]
+OBSERVATIONS_CUT = 150      # observations[:150]
 
 
 def cut(s, n):
@@ -215,9 +214,14 @@ def cut(s, n):
 
 
 def step_summary(output="", tools="", observations=""):
-    parts = [f"Model output: {cut(output, OUTPUT_CUT)}" if output else "", f"Tool calls: {cut(tools, TOOLS_CUT)}" if tools else "",
-             f"Observations: {cut(observations, OBSERVATIONS_CUT)}" if observations else ""]
-    return "\n".join(p for p in parts if p) or "(no step details)"
+    parts = []
+    if output:
+        parts.append(SCOPE.model_output(text=cut(output, OUTPUT_CUT)))
+    if tools:
+        parts.append(SCOPE.tool_calls(text=cut(tools, TOOLS_CUT)))
+    if observations:
+        parts.append(SCOPE.observations(text=cut(observations, OBSERVATIONS_CUT)))
+    return "\n".join(parts) or SCOPE.no_details()
 
 
 def tool_call(name, args):
@@ -225,32 +229,38 @@ def tool_call(name, args):
 
 
 def tool_error(result):
-    return "ToolError", result[-ERROR_TAIL:]
+    """Ошибка шага с инструментом: (тип, хвост ошибки)."""
+    return STAND.tool_error_type(), result[-ERROR_TAIL:]
 
 
 def incorrect_answer(answer, target):
-    return "IncorrectAnswer", f"Incorrect answer. Model answered '{answer}'" + (f", expected '{target}'." if target else ".")
+    return STAND.incorrect_answer_type(), STAND.incorrect_answer(answer=answer, target=target)
 
 
 def truncated_answer():
-    return "Truncated", "The output was cut at the token limit before the final answer."
+    return STAND.truncated_type(), STAND.truncated()
 
 
 def answer_seen(ok):
-    return "" if ok is None else f"Answer {'correct' if ok else 'incorrect'}"
+    return "" if ok is None else STAND.answer_seen(ok=ok)
 
 
 def rules(texts):
-    return "\n".join(f"- {r}" for r in texts) or NONE
+    return bullets(texts) or SCOPE.no_rules()
 
 
 def candidates(items):
-    return "".join(f"\n[Candidate {i}]\nUpdate: {c.update_text}\nRationale: {c.rationale}\nConfidence: {c.confidence}\n"
-                   for i, c in enumerate(items))
+    out = ""
+    for i, c in enumerate(items):
+        out += SCOPE.candidate(i=i, update=c.update_text, rationale=c.rationale, confidence=c.confidence)
+    return out
 
 
 def issue(step, error):
-    return f"Error Type: {error[0]}\nError Message: {error[1]}\n\nLast Step:\n{step}" if error else f"Step Details:\n{step}"
+    if not error:
+        return SCOPE.step_details(step=step)
+    kind, message = error
+    return SCOPE.issue(step=step, type=kind, message=message)
 
 
 def strategic(intro, text):
@@ -261,51 +271,59 @@ def strategic(intro, text):
 def domains(groups):
     """Strategic правила по доменам (get_strategic_rules_text): groups — пары (домен, правила), пустые
     домены пропускаются; tool_usage -> Tool Usage."""
-    return titled([(d.replace("_", " ").title(), rules) for d, rules in groups if rules], dashed, header="### {}:")
+    blocks = []
+    for domain, rules in groups:
+        if rules:
+            title = domain.replace("_", " ").title()
+            blocks.append("\n".join([SCOPE.domain(title=title)] + [dashed(r) for r in rules]))
+    return "\n\n".join(blocks)
+
+
+def allowed_domains(names):
+    return ", ".join(names)
 
 
 def rule_list(rules):
     """Правила для анализа оптимизатором."""
-    return "".join(f"Rule {x['id']}: {x['rule']}\n" for x in rules)
+    return "".join(SCOPE.rule(id=x["id"], text=x["rule"]) for x in rules)
 
 
 def rule_group(rules):
     """Правила для слияния оптимизатором."""
-    return "".join(f"\nRule {x['id']}:\n  Text: {x['rule']}\n  Rationale: {x['rationale']}\n" for x in rules)
+    return "".join(SCOPE.rule_block(id=x["id"], text=x["rule"], rationale=x["rationale"]) for x in rules)
 
 # TF-GRPO
 
 
-REDACTED = "[REDACTED]"
-NO_CRITIQUE = "[No critique provided]"
-
-
 def attempts(pairs, labeled):
     """Сводки попыток группы с наградой 0/1; без метки награда скрыта."""
-    return "\n\n".join(f"Attempt {i + 1} (Reward {float(bool(g.ok)) if labeled else REDACTED}):\n{s}" for i, (g, s) in enumerate(pairs))
+    blocks = []
+    for i, (episode, summary) in enumerate(pairs):
+        reward = float(bool(episode.ok)) if labeled else TFGRPO.redacted()
+        blocks.append(TFGRPO.attempt(n=i + 1, reward=reward, summary=summary))
+    return "\n\n".join(blocks)
 
 
-def label(i, r):
+def label(i):
     """Опыт по месту в библиотеке: G0, G1, ... — ключи апстрима, которые он заново раздаёт после каждого батча."""
     return f"G{i}"
 
 
 def experiences(records):
-    return "\n".join(f"[{label(i, r)}]. {r.text}" for i, r in enumerate(records)) or "None"
+    rows = [TFGRPO.experience(label=label(i), text=r.text) for i, r in enumerate(records)]
+    return "\n".join(rows) or TFGRPO.no_experiences()
 
 
 def batch_table(records, ops):
     """Опыты с относящимися к ним операциями, затем операции без id."""
-    dump = lambda op: json.dumps(op, ensure_ascii=False, indent=2)
-    table = [dict(id=label(i, r), text=r.text, related=[dump(op) for op in ops if op.get("id") == label(i, r)])
-             for i, r in enumerate(records)]
-    return prompts.text("tfgrpo_batch_table", ops=bool(ops), experiences=table, loose=[dump(op) for op in ops if not op.get("id")])
-
-# EvoLib
-
-
-def evaluation(verdict):
-    return f"\nEvaluation: {verdict}\n"
+    def dump(op):
+        return json.dumps(op, ensure_ascii=False, indent=2)
+    table = []
+    for i, r in enumerate(records):
+        related = [dump(op) for op in ops if op.get("id") == label(i)]
+        table.append(dict(id=label(i), text=r.text, related=related))
+    loose = [dump(op) for op in ops if not op.get("id")]
+    return prompts.text("tfgrpo_batch_table", ops=bool(ops), experiences=table, loose=loose)
 
 # MCE (mce/prompts/meta_agent.py, utils.py, main.py): строки и json — как у апстрима
 
@@ -316,16 +334,16 @@ NEXT_SECTION = re.compile(r"\n##\s+[^#]")
 def overview(skill):
     """_extract_skill_overview: раздел «## Skill Overview» навыка с отступом; None — SKILL.md нет."""
     if skill is None:
-        return "  (SKILL.md not found)"
+        return MCE.no_skill_file()
     match = OVERVIEW.search(skill)
     if not match:
-        return "  (no '## Skill Overview' section found)"
+        return MCE.no_overview()
     rest = skill[match.end():]
     end = NEXT_SECTION.search(rest)
     text = (rest[:end.start()] if end else rest).strip()
     if not text:
-        return "  (Skill Overview section is empty)"
-    return "\n".join(f"  {l}" if l.strip() else "" for l in text.split("\n"))
+        return MCE.empty_overview()
+    return "\n".join(f"  {line}" if line.strip() else "" for line in text.split("\n"))
 
 
 def skill_database(evaluations, skills, current):
@@ -341,17 +359,16 @@ def skill_database(evaluations, skills, current):
         if data is None:
             continue
         metric = next(iter(data.get("val_metrics") or {}), "accuracy")
-        subs = data.get("num_sub_iters", 1)
-        entries.append(f"### Iteration {i}\n- **Train**: {data[f'train_{metric}']:.2%} | **Val**: {data[f'val_{metric}']:.2%}\n"
-                       f"- **Rollouts**: {data.get('total_rollouts', 0)} ({subs} sub-iteration{'s' if subs > 1 else ''})\n"
-                       f"- **Skill Overview**:\n{overview(skills.get(f'iter{i}'))}\n"
-                       f"- **Files**: `meta_agent/skills/iter{i}/SKILL.md`, `{data.get('last_sub_folder', f'iter{i}')}/`")
+        entries.append(MCE.iteration(i=i, train=f"{data[f'train_{metric}']:.2%}", val=f"{data[f'val_{metric}']:.2%}",
+                                     rollouts=data.get("total_rollouts", 0), subs=data.get("num_sub_iters", 1),
+                                     overview=overview(skills.get(f"iter{i}")),
+                                     folder=data.get("last_sub_folder", f"iter{i}")))
     return "\n\n".join(entries) or prompts.text("mce_only_baseline")
 
 
-def evaluations(values):
-    """meta_agent/evaluations.json."""
-    return json.dumps(values, indent=2)
+def signature_args(inputs):
+    """Параметры интерфейса для промптов: «symptoms: str» через запятую; inputs — (имя, тип, описание)."""
+    return ", ".join(f"{name}: {typ}" for name, typ, _ in inputs)
 
 
 def train_json(summary, results):
@@ -367,7 +384,9 @@ def jsonl(rows):
 def skilled(system, ex):
     """Системный промпт обучения с навыком от мета-уровня (ex.skill, MCE); без навыка — как был."""
     skill = getattr(ex, "skill", "")
-    return system + "\n\n" + prompts.text("meta_skill", skill=skill) if skill else system
+    if not skill:
+        return system
+    return system + "\n\n" + prompts.text("meta_skill", skill=skill)
 
 
 def task_instruction(task):

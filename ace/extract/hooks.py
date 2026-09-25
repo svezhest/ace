@@ -55,7 +55,7 @@ class FromErrors(Extractor):
 def by_model(ex, ep, memory, level="high"):
     """Уверенные уроки модели, чей trigger есть в тексте одной из ошибок попытки."""
     missed = [memory.get(i) for i in dict.fromkeys(i for i, ok in ep.fired if not ok) if memory.get(i)]
-    prompt = REFLECT.fill(question=ep.question, errors=render.failures(failures(ep)), output=ep.output,
+    prompt = REFLECT.fill(question=ep.question, errors=render.failed_steps(failures(ep)), output=ep.output,
                           verdict=render.verdict(ep.ok, ep.target), missed=render.hooks(missed))
     r = ex.model.ask(Call(messages(prompt), params(), Reader(schema=HookLessons))).output
     errors = [s.result.lower() for s in failures(ep)]

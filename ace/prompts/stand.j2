@@ -1,0 +1,29 @@
+{#- Короткие строки стенда: вердикт, шаги и ошибки для рефлексии, хуки, пустые места. -#}
+{% macro empty() %}(empty){% endmacro %}
+{% macro nothing() %}(none){% endmacro %}
+{% macro tool_error(message) %}Error: {{ message }}{% endmacro %}
+
+{% macro unknown() %}unknown{% endmacro %}
+{% macro correct() %}correct{% endmacro %}
+{% macro wrong() %}wrong{% endmacro %}
+{% macro wrong_answer(target) %}wrong, correct answer: {{ target }}{% endmacro %}
+
+{% macro hook(trigger, lesson) %}- trigger: {{ trigger }}
+  lesson: {{ lesson }}{% endmacro %}
+
+{#- ошибки итогового шага для SCOPE: (тип, сообщение); у апстрима шаг — только вызов инструмента -#}
+{% macro tool_error_type() %}ToolError{% endmacro %}
+{% macro incorrect_answer_type() %}IncorrectAnswer{% endmacro %}
+{% macro incorrect_answer(answer, target) %}Incorrect answer. Model answered '{{ answer }}'{% if target %}, expected '{{ target }}'.{% else %}.{% endif %}{% endmacro %}
+{% macro truncated_type() %}Truncated{% endmacro %}
+{% macro truncated() %}The output was cut at the token limit before the final answer.{% endmacro %}
+{% macro answer_seen(ok) %}Answer {% if ok %}correct{% else %}incorrect{% endif %}{% endmacro %}
+{% macro agent_name(task) %}{{ task }}_agent{% endmacro %}
+
+{#- evolib_judge: вердикт лучшей попытки в промпте insight, как Test Result кодовых задач апстрима -#}
+{% macro evaluation(verdict) %}
+Evaluation: {{ verdict }}
+{% endmacro %}
+
+{#- ядро TF-GRPO умерло (нехватка памяти): текст ошибки в ответе инструмента -#}
+{% macro kernel_died() %}Kernel died (out of memory or crashed); variables are lost{% endmacro %}

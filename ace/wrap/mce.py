@@ -111,7 +111,7 @@ def reference(ex, history):
     ref = Files("meta_agent")
     ref.write("train.jsonl", render.jsonl(ex.task.load("train")))
     if history:
-        ref.write("evaluations.json", render.evaluations(evaluations(history)))
+        ref.write("evaluations.json", render.pretty_json(evaluations(history)))
     for it, text in skills(history).items():
         ref.write(f"skills/{it}/SKILL.md", text)
     return ref
@@ -149,6 +149,7 @@ META_TOOLS = ["Read", "Write", "Edit", "Bash", "Glob", "Grep", "Task", "TaskOutp
               "KillShell", "EnterPlanMode"]
 CLAUDE_META, CLAUDE_META_INTERFACES = prompts.load("mce_claude_meta"), prompts.load("mce_claude_meta_interfaces")
 CLAUDE_MISSING = prompts.load("mce_claude_skill_missing")
+MCE = prompts.macros("mce_strings")
 
 
 async def meta_permission(tool_name, input_data, context, iter_dir):
@@ -157,7 +158,7 @@ async def meta_permission(tool_name, input_data, context, iter_dir):
     workspace_base = iter_dir.parent.resolve()
     iter_dir = iter_dir.resolve()
     if tool_name not in META_TOOLS:
-        return {"behavior": "deny", "message": f"Tool '{tool_name}' is not allowed. Allowed tools: {', '.join(META_TOOLS)}",
+        return {"behavior": "deny", "message": MCE.meta_tool_denied(tool=tool_name, allowed=", ".join(META_TOOLS)),
                 "interrupt": False}
     if tool_name in ["Read", "Write", "Edit", "Glob", "Grep"]:
         file_path = input_data.get("file_path") or input_data.get("path")
@@ -172,7 +173,7 @@ async def meta_permission(tool_name, input_data, context, iter_dir):
                     return {"behavior": "allow", "updatedInput": input_data}
                 except ValueError:
                     return {"behavior": "deny", "interrupt": True,
-                            "message": f"Access denied: Read operations restricted to workspace ({workspace_base})"}
+                            "message": MCE.meta_read_outside(workspace=workspace_base)}
             if tool_name in ["Write", "Edit"]:
                 skills_dir = iter_dir / ".claude" / "skills"
                 try:
@@ -180,7 +181,7 @@ async def meta_permission(tool_name, input_data, context, iter_dir):
                     return {"behavior": "allow", "updatedInput": input_data}
                 except ValueError:
                     return {"behavior": "deny", "interrupt": True,
-                            "message": f"Access denied: Write operations restricted to {skills_dir}"}
+                            "message": MCE.meta_write_outside(folder=skills_dir)}
     return {"behavior": "allow", "updatedInput": input_data}
 
 

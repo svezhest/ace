@@ -21,6 +21,9 @@ from . import ATTRIBUTION, BEST_ANSWER, IG, Extraction, Extractor
 
 UNEVALUATED = 0.5           # множитель баллов без внешней оценки, когда insight есть
 INSIGHT = prompts.load("evolib_insight")
+STAND = prompts.macros("stand")
+
+
 @dataclass
 class Best:
     """Лучшее решение вопроса: весь ответ решателя, его ответ и балл."""
@@ -60,7 +63,7 @@ class Gains(Extractor):
         b = max(range(len(eps)), key=scores.__getitem__)
         best, ig, insight = eps[b], log_gain(scores[b], scores), ""
         if self.evaluated and scores[b] < 1:
-            insight = self.insight(ex, group, best, render.evaluation(render.verdict(best.ok, best.target)))
+            insight = self.insight(ex, group, best, STAND.evaluation(verdict=render.verdict(best.ok, best.target)))
         elif not self.evaluated and best.output:
             insight = self.insight(ex, group, best, "")
             if insight:
