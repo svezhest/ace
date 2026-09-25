@@ -16,8 +16,10 @@
     trigger       фрагмент ошибки, по которому урок показывается (хуки по ошибкам)
     attempt       номер попытки, на которой урок извлечён (SCOPE: урок — в память перспективы попытки)
 
-Извлечение на шаге (SCOPE: правило посреди попытки) — step(ex, attempt, шаг, memory) -> Extraction | None; у
-остальных его нет. Реализации — extract/<метод>.py."""
+Масштаб извлечения (scale): "question" — extractor(ex, group, memory) после каждого вопроса; "batch" —
+batch(ex, groups, memory) -> [Extraction] на батче, стадиями по всему батчу (TF-GRPO). Извлечение на шаге (SCOPE:
+правило посреди попытки) — step(ex, attempt, шаг, memory) -> Extraction | None; у остальных его нет.
+Реализации — extract/<метод>.py."""
 from dataclasses import dataclass, field
 
 LABELS, CONFIDENCE, DOMAIN, ATTRIBUTION, IG, BEST_ANSWER = "labels", "confidence", "domain", "attribution", "ig", "best_answer"
@@ -41,8 +43,12 @@ class Extraction:
 
 class Extractor:
     gives = frozenset()
+    scale = "question"
 
     def __call__(self, ex, group, memory):
+        raise NotImplementedError
+
+    def batch(self, ex, groups, memory):
         raise NotImplementedError
 
     def step(self, ex, attempt, step, memory):

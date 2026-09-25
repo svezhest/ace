@@ -51,7 +51,7 @@ def library(*texts):
 def test_contrast_partial():
     """Попытка в зачёт (0) не входит в группу для обучения; сводка на каждую из остальных, награды 0/1."""
     model = Stub(by_prompt())
-    x = Contrast()(Ex(model), group([True, True, False, True, False, False]), library("Old: one."))
+    x = Contrast().batch(Ex(model), [group([True, True, False, True, False, False])], library("Old: one."))[0]
     assert [c["user"].split("\n")[0] for c in model.calls[:5]] == ["<Working Agent Input>"] * 5
     advantage = model.calls[5]["user"]
     assert "Attempt 1 (Reward 1.0)" in advantage and "Attempt 2 (Reward 0.0)" in advantage and "Attempt 6" not in advantage
@@ -65,7 +65,7 @@ def test_contrast_skips_uniform_group():
     """С меткой группа, где все попытки для обучения верны (или все неверны), ничего не даёт — без вызовов;
     попытка в зачёт не считается."""
     model = Stub(by_prompt())
-    x = Contrast()(Ex(model), group([False, True, True, True, True, True]), library())
+    x = Contrast().batch(Ex(model), [group([False, True, True, True, True, True])], library())[0]
     assert model.calls == [] and x.extras[OPERATIONS] == [] and x.lessons == []
 
 
@@ -73,14 +73,14 @@ def test_contrast_without_label():
     """Без верного ответа в работу идёт любая группа, ответ и награды скрыты."""
     model = Stub(by_prompt())
     g = Group("q", [episode(k=k) for k in range(3)])
-    Contrast()(Ex(model), g, library())
+    Contrast().batch(Ex(model), [g], library())[0]
     assert "<Ground Truth>\n[REDACTED]" in model.calls[2]["user"] and "(Reward [REDACTED])" in model.calls[2]["user"]
 
 
 def test_contrast_bad_update():
     """Сверка без JSON-списка — пустые операции."""
     model = Stub(by_prompt(ops='{"operation": "ADD"}'))
-    x = Contrast()(Ex(model), group([True, True, False]), library())
+    x = Contrast().batch(Ex(model), [group([True, True, False])], library())[0]
     assert x.extras[OPERATIONS] == []
 
 

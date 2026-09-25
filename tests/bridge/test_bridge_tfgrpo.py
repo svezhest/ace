@@ -38,8 +38,7 @@ class Fake:
 
     def ask(self, call):
         system, user = roles(call.messages)
-        self.calls.append(dict(system=system, user=user, temperature=call.params.get("temperature"),
-                               top_p=call.params.get("top_p")))
+        self.calls.append(dict(system=system, user=user, params=call.params))
         if self.answer:
             return text_reply(call, self.answer(user))
         assert (system, user) in self.replies, f"запроса нет в эталоне:\n{user[:300]}"
@@ -252,19 +251,15 @@ def test_empty_summary_kept():
 
 
 def test_loop():
-    """ExperienceUpdater.run на двух батчах: те же запросы (по стадиям), те же ответы, те же опыты G0, G1, ...;
-    все вызовы без температуры (model_params = {})."""
+    """ExperienceUpdater.run на двух батчах: те же запросы в том же порядке (стадии по всему батчу), те же ответы, те
+    же опыты G0, G1, ...; все вызовы без параметров запроса (model_params = {})."""
     m = MEM.Library()
     for run in LOOP:
         assert [r.text for r in m.records()] == list(run["before"].values())
         model = Fake(run["requests"])
-        extractions = [T.Contrast()(Ex(model), group(c, r), m) for c, r in run["rewards"].items()]
-        m.learn(Ex(model), extractions)
-        deviation("TF3")        # у нас извлечение по вопросу, у апстрима стадии по всему батчу: сравниваем по стадиям
-        ours = sorted(model.calls, key=lambda c: stage(c["user"]))
-        assert [(c["system"], c["user"]) for c in ours] == [messages(c) for c in run["requests"]]
-        assert all(c["params"] == {} for c in run["requests"])
-        assert all(c["temperature"] is None and c["top_p"] is None for c in model.calls)
+        m.learn(Ex(model), T.Contrast().batch(Ex(model), [group(c, r) for c, r in run["rewards"].items()], m))
+        assert [(c["system"], c["user"]) for c in model.calls] == [messages(c) for c in run["requests"]]
+        assert all(c["params"] == {} for c in run["requests"]) and all(c["params"] == {} for c in model.calls)
         assert render.experiences(m.records()) == "\n".join(f"[{k}]. {v}" for k, v in run["experiences"].items())
 
 # показ и настройки

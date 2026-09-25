@@ -11,7 +11,8 @@
 
 Хуки: перед попыткой память узнаёт о новой попытке (begin: срок жизни «попытка»), показ даёт промпт; на шаге
 при обучении извлечение может дать урок сразу (extract.step, SCOPE) — память принимает его тут же, затем показ
-может вмешаться (Patch); извлечение — на конце вопроса, память принимает извлечённое на батче. Обёртки
+может вмешаться (Patch); извлечение — на конце вопроса (или стадиями на батче: scale="batch"), память
+принимает извлечённое на батче. Обёртки
 (ace/wrap/) перехватывают хуки поверх ученика.
 Стык с проверкой один: память требует добавки (requires), извлечение их даёт (gives); сверка при сборке.
 Абляция — swap(ученик, name, уровень=замена)."""
@@ -69,9 +70,11 @@ class Learner:
         pass
 
     def on_question(self, ex, group):
-        if self.extract is None:
-            return
-        x = self.extract(ex, group, self.memory)
+        if self.extract is not None and self.extract.scale == "question":
+            self.keep(self.extract(ex, group, self.memory))
+
+    def keep(self, x):
+        """Извлечённое — до батча; добавки только объявленные."""
         if x is None:
             return
         undeclared = set(x.extras) - set(self.extract.gives)
@@ -80,6 +83,9 @@ class Learner:
         self.pending.append(x)
 
     def on_batch(self, ex, groups):
+        if self.extract is not None and self.extract.scale == "batch":
+            for x in self.extract.batch(ex, groups, self.memory):
+                self.keep(x)
         if self.pending:
             self.memory.learn(ex, self.pending)
         self.pending = []
