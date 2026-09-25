@@ -26,7 +26,6 @@ STAND = prompts.macros("stand")
 LEVEL = {"low": 0.3, "medium": 0.6, "high": 0.9}    # метка кандидата -> начальная confidence
 DEFAULT_CONFIDENCE = 0.5    # метка не из списка
 BEST_OF_TEMPERATURE = 0.7
-NO_IMPROVEMENT = ("", "no improvement needed", "none")
 
 
 @dataclass
@@ -68,7 +67,7 @@ def agent_context(ex, attempt, book):
 
 
 def meaningful(c):
-    return c.update_text.strip().lower() not in NO_IMPROVEMENT
+    return c.update_text.strip().lower() not in parse.NO_IMPROVEMENT
 
 
 class Rules(Extractor):

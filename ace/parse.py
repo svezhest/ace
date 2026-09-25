@@ -1,23 +1,6 @@
-"""Разбор ответов модели, общий для всех уровней. Каждая функция берёт текст (или None) и не падает.
-
-    opened(tag)         после первого <tag> до </tag>, следующего <tag> или конца; None без <tag>
-                        (DC: extract_cheatsheet апстрима)
-    enclosed(tag)       между <tag> и </tag> без учёта регистра; "" без пары (TF-GRPO: Experiences)
-    between(text, a, b) между первым a и следующим b; "" без них (EvoLib)
-    fenced(text, tag)   все закрытые блоки ```tag подряд, каждый с переводом строки (EvoLib extract_fenced_blocks)
-    first_fenced        первый закрытый блок ```tag без пробелов по краям; "" без него (EvoLib extract_first_fenced_block)
-    json_block          JSON из последнего ```json или всего текста; None, если не разбирается (TF-GRPO)
-    subtasks            блоки <subtask> с description (EvoLib extract_subtasks)
-    counted_line(id)    «[id] helpful=N harmful=M :: текст» -> (текст, N, M) (ACE BulletpointAnalyzer)
-    ace_json            extract_json_from_text ACE: весь текст, ```json, первый объект {...} (ACE)
-    bullet_tags         _extract_bullet_tags рефлектора ACE без json_mode: массив после "bullet_tags" (ACE)
-    ace_operations      _extract_and_validate_operations куратора ACE: операции или None (ACE)
-    bullet_ids          id пунктов в ответе генератора ACE, регулярка апстрима (ACE)
-    ace_answer          extract_answer ACE: final_answer из JSON и откаты апстрима (ACE)
-    dc_answer           extract_answer DC: последний <answer> или блок в кавычках после FINAL ANSWER (DC)
-    scope_*             ответы синтезатора, селектора, классификатора и оптимизатора SCOPE, с откатами апстрима
-    json_object         общий разбор JSON: весь текст, последний ```json, последний объект {...}; None
-    structured          общий разбор ответа в pydantic-схему (Reader(schema=...) на проводе); None"""
+"""Разбор ответов модели, общий для всех уровней. Каждая функция берёт текст (или None) и не падает. Разборщики
+апстримов — порты их функций (имя и файл — в докстроке), с их откатами; свои промпты стенда со схемой ответа на
+проводе разбирает json_object / structured."""
 import json
 import re
 
@@ -25,6 +8,7 @@ from . import prompts
 
 
 def opened(tag):
+    """После первого <tag> до </tag>, следующего <tag> или конца; None без <tag> (DC: extract_cheatsheet апстрима)."""
     def parse(text):
         if not text or f"<{tag}>" not in text:
             return None
@@ -33,6 +17,7 @@ def opened(tag):
 
 
 def enclosed(tag):
+    """Между <tag> и </tag> без учёта регистра; "" без пары (TF-GRPO: <Experiences>)."""
     start_tag, end_tag = f"<{tag.lower()}>", f"</{tag.lower()}>"
 
     def parse(text):
@@ -46,12 +31,14 @@ def enclosed(tag):
 
 
 def between(text, start, end):
+    """Между первым start и следующим end; "" без них (EvoLib)."""
     if start not in text or end not in text.split(start, 1)[1]:
         return ""
     return text.split(start, 1)[1].split(end, 1)[0].strip()
 
 
 def fenced(text, tag):
+    """Все закрытые блоки ```tag подряд, каждый с переводом строки (EvoLib: extract_fenced_blocks)."""
     out, rest = "", text or ""
     while "```" + tag in rest:
         rest = rest.split("```" + tag, 1)[1]
@@ -63,11 +50,15 @@ def fenced(text, tag):
 
 
 def first_fenced(text, tag):
-    rest = (text or "").split("```" + tag, 1)
-    return rest[1].split("```", 1)[0].strip() if len(rest) == 2 and "```" in rest[1] else ""
+    """Первый закрытый блок ```tag без пробелов по краям; "" без него (EvoLib: extract_first_fenced_block)."""
+    parts = (text or "").split("```" + tag, 1)
+    if len(parts) < 2 or "```" not in parts[1]:
+        return ""
+    return parts[1].split("```", 1)[0].strip()
 
 
 def json_block(text):
+    """JSON из последнего ```json или всего текста; None, если не разбирается (TF-GRPO)."""
     try:
         return json.loads(text.split("```json")[-1].split("```")[0])
     except (json.JSONDecodeError, AttributeError):
@@ -91,6 +82,7 @@ def subtasks(text):
 
 
 def counted_line(id):
+    """«[id] helpful=N harmful=M :: текст» -> (текст, N, M); иначе None (ACE: BulletpointAnalyzer)."""
     def parse(text):
         text = (text or "").strip()
         if not (text.startswith(f"[{id}]") and "::" in text):
@@ -103,6 +95,18 @@ def counted_line(id):
     return parse
 
 
+def first_json(candidates, accept=None):
+    """Первый кандидат, который разбирается как JSON (и проходит accept); иначе None."""
+    for text in candidates:
+        try:
+            data = json.loads(text)
+        except json.JSONDecodeError:
+            continue
+        if accept is None or accept(data):
+            return data
+    return None
+
+
 def ace_json(text):
     """extract_json_from_text (ACE playbook_utils.py:256): весь текст; иначе первый разобранный блок ```json (регистр
     не важен); иначе первый разобранный объект {...} по балансу скобок, скобки в строках не считаются; иначе None."""
@@ -111,19 +115,10 @@ def ace_json(text):
             return json.loads(text.strip())
         except json.JSONDecodeError:
             pass
-        for block in re.findall(r"```json\s*(.*?)\s*```", text, re.DOTALL | re.IGNORECASE):
-            try:
-                return json.loads(block.strip())
-            except json.JSONDecodeError:
-                continue
-        for candidate in braced(text):
-            try:
-                return json.loads(candidate)
-            except json.JSONDecodeError:
-                continue
+        blocks = [b.strip() for b in re.findall(r"```json\s*(.*?)\s*```", text, re.DOTALL | re.IGNORECASE)]
+        return first_json(blocks + braced(text))
     except Exception:
-        pass
-    return None
+        return None
 
 
 def braced(text):
@@ -153,6 +148,20 @@ def braced(text):
     return out
 
 
+def matching(text, start, pair):
+    """Номер скобки, парной к открывающей pair[0] на start (скобки внутри строк считаются); нет пары — None."""
+    opening, closing = pair
+    depth = 0
+    for i in range(start, len(text)):
+        if text[i] == opening:
+            depth += 1
+        elif text[i] == closing:
+            depth -= 1
+            if depth == 0:
+                return i
+    return None
+
+
 def bullet_tags(text):
     """_extract_bullet_tags рефлектора ACE без json_mode (reflector.py:100): JSON-массив от первой [ после
     "bullet_tags" до парной ]; иначе []. Что внутри массива — как есть."""
@@ -160,17 +169,11 @@ def bullet_tags(text):
     bracket = text.find("[", start) if start != -1 else -1
     if bracket == -1:
         return []
-    depth, end = 0, bracket
-    for i in range(bracket, len(text)):
-        if text[i] == "[":
-            depth += 1
-        elif text[i] == "]":
-            depth -= 1
-            if depth == 0:
-                end = i + 1
-                break
+    end = matching(text, bracket, "[]")
+    if end is None:
+        return []
     try:
-        return json.loads(text[bracket:end])
+        return json.loads(text[bracket:end + 1])
     except json.JSONDecodeError:
         return []
 
@@ -237,15 +240,8 @@ def boxed_content(text):
     m = re.search(r"\\boxed\{", text)
     if not m:
         return None
-    depth = 0
-    for i in range(m.end() - 1, len(text)):
-        if text[i] == "{":
-            depth += 1
-        elif text[i] == "}":
-            depth -= 1
-            if depth == 0:
-                return text[m.end():i]
-    return None
+    end = matching(text, m.end() - 1, "{}")
+    return None if end is None else text[m.end():end]
 
 
 def dc_answer(text):
@@ -261,6 +257,7 @@ def dc_answer(text):
         text = text.split("FINAL ANSWER")[-1].strip()
         if text[0] == ":":
             text = text[1:].strip()
+        # разделитель блока: оба есть — тот, что раньше; один — он; ни одного — IndexError ниже, как у апстрима
         single, back = text.find("'''"), text.find("```")
         if min(single, back) != -1:
             text = text.split("'''" if single < back else "```")[1].strip()
@@ -281,20 +278,15 @@ def scope_json(text):
         return json.loads(text)
     except (json.JSONDecodeError, TypeError):
         pass
-    matches = re.findall(r'```(?:json)?\s*(\{.*?\})\s*```', text or "", re.DOTALL)
-    if matches:
-        try:
-            return json.loads(matches[0])
-        except json.JSONDecodeError:
-            pass
-    for match in re.findall(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', text or "", re.DOTALL):
-        try:
-            data = json.loads(match)
-            if "update_text" in data:
-                return data
-        except json.JSONDecodeError:
-            continue
-    return None
+    blocks = re.findall(r'```(?:json)?\s*(\{.*?\})\s*```', text or "", re.DOTALL)
+    data = first_json(blocks[:1])
+    if data is not None:
+        return data
+    objects = re.findall(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', text or "", re.DOTALL)
+    return first_json(objects, lambda data: "update_text" in data)
+
+
+NO_IMPROVEMENT = ("", "no improvement needed", "none")     # кандидат без правила (synthesizer.py)
 
 
 def scope_guideline(text, quality=False):
@@ -310,7 +302,7 @@ def scope_guideline(text, quality=False):
             return None
         if quality:
             update = update.strip()
-            if not update or update.lower() in ("", "no improvement needed", "none"):
+            if update.lower() in NO_IMPROVEMENT:
                 return None
         return dict(update_text=update, rationale=data.get("rationale", ""), confidence=data.get("confidence", "medium"))
     except (AttributeError, TypeError):
@@ -351,12 +343,7 @@ def scope_object(text):
     if start == -1 or end <= start:
         return None
     text = text[start:end]
-    for candidate in (text, text.replace("'", '"')):
-        try:
-            return json.loads(candidate)
-        except json.JSONDecodeError:
-            continue
-    return None
+    return first_json([text, text.replace("'", '"')])
 
 
 def scope_analysis(text):
@@ -394,7 +381,7 @@ def scope_classification(text, initial, domains):
         c.setdefault("scope", "tactical")
         c.setdefault("confidence", initial)
         c.setdefault("domain", "general")
-        if c["scope"] == "strategic" and c.get("domain", "general") not in domains:
+        if c["scope"] == "strategic" and c["domain"] not in domains:
             c["domain"] = "general"
         c["confidence"] = float(c["confidence"])
         return c
@@ -414,12 +401,8 @@ def json_object(text):
         return json.loads(text.strip())
     except json.JSONDecodeError:
         pass
-    for candidate in reversed(re.findall(r"```json\s*(.*?)\s*```", text, re.DOTALL) + braced(text)):
-        try:
-            return json.loads(candidate)
-        except json.JSONDecodeError:
-            continue
-    return None
+    candidates = re.findall(r"```json\s*(.*?)\s*```", text, re.DOTALL) + braced(text)
+    return first_json(reversed(candidates))
 
 
 def structured(text, schema):
