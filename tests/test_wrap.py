@@ -15,7 +15,7 @@ from ace.loop import Group, run
 from ace.memory import Lessons
 from ace.memory.ace import Ops
 from ace.memory.mce import Context
-from ace.methods.mce import mce, mce_ace
+from ace.methods.mce import mce_ace, mce_fs as mce
 from ace.wrap.mce import META, MISSING, meta_agent
 from ace.wrap import Gate, Wrapper, skilled
 from ace.wrap.mce import Meta

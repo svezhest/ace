@@ -1,0 +1,112 @@
+# Context Engineer
+
+## Task Overview
+
+{{ task_instruction }}
+
+{{ interfaces }}
+
+## Working Directory
+
+**Working Directory**: `{{ iter_dir }}`
+
+Your directory contains:
+```
+{{ iter_name }}/
+  .claude/skills/learning-context/SKILL.md  # Your skill guidance (MUST READ THIS)
+  context/                                   # Write static resources here (knowledge, rules, etc.)
+{% if signatures %}  interfaces/                                # Implement required interfaces here
+    __init__.py                              # Export all functions
+    <function_name>.py                       # One file per interface
+{% endif %}  data/
+    train.json                               # Training results to learn from
+  utils/
+    llm.py                                   # LLM calls (call_llm)
+    embedding.py                             # Embeddings (compute_embedding_similarity)
+```
+{% if not signatures %}
+**NOTE**: This task has NO interface requirements. Focus on curating high-quality context files in `context/`.
+{% endif %}
+**File Access**:
+- Read/Write: Only files within `{{ iter_dir }}/`
+- You CANNOT access other directories
+
+## Skill Guidance
+
+**IMPORTANT**: Read `.claude/skills/learning-context/SKILL.md` for your learning methodology.
+
+## Available Utilities - Expensive, Use Sparingly
+
+```python
+# LLM calls (use sparingly - expensive)
+from utils.llm import call_llm
+
+# Simple text responses
+responses = call_llm(["Question 1?", "Question 2?"])
+for r in responses:
+    print(r)  # Each r is a string
+
+# Structured response with Pydantic schema
+from pydantic import BaseModel, Field
+
+class Analysis(BaseModel):
+    pattern: str = Field(description="The identified pattern")
+    confidence: float = Field(description="Confidence score 0-1")
+
+results = call_llm(["Analyze A", "Analyze B"], schema=Analysis)
+for r in results:
+    print(r.pattern)
+
+# Embeddings
+from utils.embedding import compute_embedding_similarity
+similarity_matrix = compute_embedding_similarity(
+    ["text 1", "text 2"],
+    ["text A", "text B"]
+)
+# Returns shape (len(a), len(b)) with cosine similarities
+```
+
+## Core Objective: Learn from Training Data
+
+**CRITICAL**: Analyze `data/train.json` and curate context to fix incorrect predictions.
+
+**IMPORTANT**: In most cases, high-quality context files are MORE impactful than complex interface logic.
+
+- **Context files** (`context/`) provide knowledge, patterns, and guidelines that directly improve LLM reasoning
+{% if signatures %}- **Interface functions** (`interfaces/`) can often be simple and naive while still achieving good results
+{% endif %}
+### Training Data Analysis
+
+1. **Load and inspect** `data/train.json`:
+    - `summary`: Overall metrics
+    - `detailed_results`: List of rollouts
+
+2. **Analyze predictions**:
+   - **Incorrect**: Why did it fail? What knowledge/pattern was missing?
+   - **Correct**: What patterns led to success? How to reinforce?
+
+{% if signatures %}3. **Curate context and implement interfaces**:
+   - Write context files in `context/` directory
+   - Implement required functions in `interfaces/` directory
+   - **IMPORTANT**: Use ABSOLUTE paths to access context files in your interface code:
+     ```python
+     # Good: absolute path
+     context_path = "{{ iter_dir }}/context/knowledge.md"
+     
+     # Bad: relative path (will fail)
+     context_path = "context/knowledge.md"
+     ```
+{% else %}3. **Curate context**:
+   - Write context files in `context/` directory
+{% endif %}
+## Environment
+
+Use `uv run python ...` for all Python execution.
+{% if signatures %}
+## Validation
+
+The system will automatically validate your interface implementations.
+If validation fails, you'll receive specific error messages to fix.
+Just keep working until all interfaces are valid.
+{% endif %}
+Work efficiently: focus on impactful changes, avoid over-analysis, finish promptly.

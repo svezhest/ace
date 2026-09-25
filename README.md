@@ -18,7 +18,7 @@
 
 Методы (`ace/methods/<метод>.py` — только сборка, в docstring — что метод берёт на каждом уровне): baseline;
 ace, ace_text, ace_rewrite (стенд), ace_exact и ace_exact_dedup (как в апстриме), ace_exact_used; dc, dc_code, dc_rs, dc_retrieval,
-dc_history; scope, scope_bo2, scope_code, scope_k2; tfgrpo; evolib, evolib_judge; mce, mce_ace; гибриды ace_bo2,
+dc_history; scope, scope_bo2, scope_code, scope_k2; tfgrpo; evolib, evolib_judge; mce, mce_fs, mce_ace; гибриды ace_bo2,
 ace_opt, ace_hooks, ace_group. По умолчанию уровни ведут себя как апстрим; неустранимые отличия —
 [DEVIATIONS.md](DEVIATIONS.md), верность — тесты-мостик `tests/bridge/` (эталоны сняты с апстримов, `bridge/`)
 и воспроизведение записей апстримов на живой модели `tests/live/` (`bridge/live/<метод>/`).

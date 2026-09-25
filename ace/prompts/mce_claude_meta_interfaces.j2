@@ -1,0 +1,9 @@
+{% if not signatures %}## Required Interfaces
+
+No specific interfaces defined.{% else %}## Required Interfaces
+
+The base-agent must implement these interfaces:
+
+{% for s in signatures %}- `{{ s.name }}({{ s.args }}) -> {{ s.output[0] }}`: {{ s.description }}
+{% endfor %}
+Your skill should guide the base-agent in implementing these effectively.{% endif %}

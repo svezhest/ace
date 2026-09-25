@@ -1,6 +1,6 @@
 #!/bin/sh
 # Окружения для снятия эталонов: чистые worktree апстримов на зафиксированных коммитах и venv через uv.
-# usage: bridge/setup_envs.sh [ace|mce|youtu|light ...]   (без аргументов — все)
+# usage: bridge/setup_envs.sh [ace|mce|youtu|light|litellm ...]   (без аргументов — все)
 set -e
 REPRO=${REPRO:-/Users/user/Projects/itmo/cs-masters/thesis/repro}
 UP=${UPSTREAMS:-/Users/user/Projects/upstreams}
@@ -37,5 +37,10 @@ if want light; then
   uv pip install -q -p "$V/light" -r "$UP/EvoLib/EvoLib/requirements.txt" \
     "openai>=1.0.0" "anthropic>=0.18.0" "litellm>=1.0.0" python-dotenv \
     numpy tiktoken scikit-learn
+fi
+# LiteLLM proxy для агентов Claude SDK в MCE (запись bridge/live/mce и её воспроизведение в tests/live/test_mce.py)
+if want litellm; then
+  uv venv -q --allow-existing -p 3.12 "$V/litellm"
+  uv pip install -q -p "$V/litellm" --index-url https://pypi.org/simple "litellm[proxy]==1.102.1"
 fi
 echo ok

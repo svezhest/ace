@@ -1,0 +1,10 @@
+Interface validation failed. Please fix the following issues:
+
+{% for e in errors %}- {{ e }}
+{% endfor %}
+Remember:
+- Each interface must be in `interfaces/{name}.py`
+- Function name must match exactly
+- Parameter names must match the signature
+- Function must have a return statement
+- Export functions in `interfaces/__init__.py`

@@ -11,7 +11,8 @@
                     (agent.py)
     wire            «провод апстрима»: официальный клиент openai, chat.completions.create ровно с messages и params
                     вызова, без своей логики; ответ текстом -> reader (wire.py)
-Вызов с инструментами (решатель с run_python, агенты MCE) идёт только через pydantic-ai. Агентный цикл апстрима
+Вызов с инструментами (решатель с run_python, агенты mce_fs) идёт только через pydantic-ai; агенты mce — Claude
+Agent SDK (claude.py). Агентный цикл апстрима
 (TF-GRPO: openai-agents) идёт проводом при любом бэкенде: model.message(messages, params) -> ответ как есть.
 Эмбеддинги — model.embed(texts, name): провод — /v1/embeddings сервера с моделью name, как у апстрима (EvoLib),
 pydantic-ai — BGE-M3 стенда (ace.embed); сервер эмбеддингов стенда — тот же BGE-M3 (tools/record/embeddings.py)."""
@@ -140,7 +141,7 @@ class Model:
         from .agent import PydanticAI
         from .wire import Wire
         self.name = name or config.MODEL
-        base_url = base_url or config.OPENAI_BASE_URL
+        base_url = self.base_url = base_url or config.OPENAI_BASE_URL
         self.backend = backend or config.BACKEND
         if self.backend not in ("pydantic-ai", "wire"):
             raise ValueError(f"неизвестный бэкенд модели: {self.backend}")

@@ -348,4 +348,8 @@ def jsonl(rows):
 
 
 def task_instruction(task):
+    """Инструкция задачи агентам MCE: у бенчмарка апстрима — его get_task_instruction (mce_task_<задача>), у
+    задач стенда — системный промпт и инструкция решателю (S2)."""
+    if (prompts.PROMPTS / f"mce_task_{task.name}.j2").exists():
+        return prompts.text(f"mce_task_{task.name}")
     return f"{task.system} {task.instr}"

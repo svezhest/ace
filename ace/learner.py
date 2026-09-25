@@ -65,6 +65,10 @@ class Learner:
             p.temperature, p.top_p = self.attempts.temperature(k), self.attempts.top_p(k)
         return p
 
+    def sample(self, ex, split, n):
+        """Вопросы прохода: первые n (MCE апстрима — случайная выборка на каждой итерации, wrap/mce.py)."""
+        return ex.task.load(split)[:n]
+
     def on_step(self, ex, attempt, step):
         if attempt.training and self.extract is not None:
             x = self.extract.step(ex, attempt, step, self.memory)

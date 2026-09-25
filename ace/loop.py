@@ -290,7 +290,7 @@ def run(task, learner, model, n=config.SIZE, out=None, split="", epochs=None, of
             test("initial", i, item)
     best, best_val = learner.snapshot(), -1
     for epoch in range(epochs):
-        items = task.load("train" if offline else split)[:n]
+        items = learner.sample(ex, "train" if offline else split, n)
         ex.epoch, ex.total, batch = epoch, len(items), []
         for i, item in enumerate(items):
             if window and i % window == 0:

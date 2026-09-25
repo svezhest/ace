@@ -104,11 +104,12 @@ class Fake:
 task = TASKS["formula"]
 targets = {r["context"]: r["target"] for s in ("", "train", "val") for r in task.load(s)}
 # батч 2 и офлайн, чтобы на 4 задачах сработали события батча и прохода
-special = {"tfgrpo": (dict(every=2), {}), "mce": (dict(every=2), dict(epochs=2, offline=True)),
+special = {"tfgrpo": (dict(every=2), {}), "mce_fs": (dict(every=2), dict(epochs=2, offline=True)),
            "mce_ace": (dict(every=2), dict(epochs=2, offline=True))}
 traces = {}
 tmp = Path(tempfile.mkdtemp(prefix="trace-"))
-for name in names or sorted(METHODS):
+# mce — агенты Claude SDK через LiteLLM (model/claude.py): на фиктивной модели не идёт, его сверка — tests/live/test_mce.py
+for name in names or sorted(set(METHODS) - {"mce"}):
     parts, kw = special.get(name, ({}, {}))
     fake = Fake(targets)
     summary = run(task, swap(METHODS[name], **parts) if parts else METHODS[name], fake, 4, str(tmp / name), **kw)

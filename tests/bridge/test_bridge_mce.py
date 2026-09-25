@@ -12,7 +12,7 @@ from ace import fs, render
 from ace.learner import swap
 from ace.loop import run
 from ace.memory.mce import BASE, WORKSPACE
-from ace.methods.mce import mce
+from ace.methods.mce import mce_fs as mce
 from ace.wrap.mce import META, MISSING, evaluations
 from ace.model import Reply, roles
 from ace.tasks import Task
