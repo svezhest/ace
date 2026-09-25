@@ -43,3 +43,8 @@ uv run python tools/trace.py /tmp/t.json && uv run python tools/compare.py tools
 Настройки (`ace/config.py`, из окружения): `OPENAI_BASE_URL` (по умолчанию `http://localhost:8080/v1`; старое
 `LOCAL_BASE_URL` тоже читается), `OPENAI_API_KEY` (`local`), `MODEL`, `MAX_TOKENS` (MEB: 8192), `SEED`, размеры
 выборок `SIZE` и `VAL_SIZE` (40 и 10, входят в имя файла данных), `EPOCHS`, `OFFLINE`, `RESULTS`.
+
+Перенесены на уровни (поток B): scope, scope_bo2, scope_code, scope_k2 (`ace/methods/scope.py`, правило на шаг —
+`ace/extract/scope.py`); mce = Meta(базовый агент с файлами) и mce_ace = Meta(ACE) (`ace/methods/mce.py`);
+обёртки Meta и Gate (`ace/wrap.py`), Hooks — хуки по ошибкам (`ace/hooks.py`); гибриды ace_bo2, ace_opt, ace_hooks
+(`ace/methods/hybrids.py`). ace_group — после переноса TF-GRPO.
