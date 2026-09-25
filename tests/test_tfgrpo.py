@@ -109,11 +109,11 @@ def test_plan_retries_and_no_ops():
 
 
 def test_attempts_and_batch():
-    """В зачёт итоговый агент (T=0.3, top_p 0.95), группа из 5 при T=0.7; неполный батч отбрасывается."""
+    """В зачёт итоговый агент (T=0.3, top_p 0.95), группа из 5 при T=0.7 с тем же top_p; неполный батч отбрасывается."""
     model = Stub(lambda call: right(call) if call["temperature"] == 0.3 else by_prompt()(call))
     summary = run(TASK, tfgrpo, model, 2)
     solver = model.solver_calls()
-    assert [(c["temperature"], c["top_p"]) for c in solver[:1 + GROUP]] == [(0.3, 0.95)] + [(0.7, None)] * GROUP
+    assert [(c["temperature"], c["top_p"]) for c in solver[:1 + GROUP]] == [(0.3, 0.95)] + [(0.7, 0.95)] * GROUP
     assert summary["correct"] == 2
     assert not any(c["user"].startswith("<Experiences and Proposed Operations>") for c in model.calls)
     assert render.experiences([]) == "None"

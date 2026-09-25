@@ -5,10 +5,12 @@ tfgrpo_*.j2 дословно, пара системный / пользовате
     -> групповое преимущество по сводкам с наградами 0/1 (_group_advantage): не больше NUM опытов в <Experiences>
     -> сверка с библиотекой (_group_update): операции ADD / UPDATE / DELETE / NONE в ```json
 
-Попытки для обучения — все, кроме той, что в зачёт (она — итоговый агент, как оценка апстрима). С верным
-ответом в работу идёт только группа, где верна часть попыток: до сводок и после них (сводка может не
-получиться). Библиотека до конца батча не меняется, поэтому сверка идёт здесь, а план батча — в памяти
-метода (methods/tfgrpo.py). Группа без опыта даёт пустые операции: план батча апстрим строит всегда."""
+Попытки для обучения — все, кроме той, что в зачёт (она — итоговый агент, как оценка апстрима), и без
+пустой траектории (апстрим отбрасывает rollout без trajectories). С верным ответом в работу идёт только группа,
+где верна часть попыток: до сводок и после них. Сводка выпадает, только если модель не ответила (исключение
+у апстрима); пустая сводка остаётся. Все вызовы — без температуры, как у апстрима (model_params = {}).
+Библиотека до конца батча не меняется, поэтому сверка идёт здесь, а план батча — в памяти метода
+(methods/tfgrpo.py). Группа без опыта даёт пустые операции: план батча апстрим строит всегда."""
 from .. import parse, prompts, render
 from . import OPERATIONS, Extraction, Extractor, scores
 
@@ -25,7 +27,7 @@ def ask(ex, name, **fields):
     """Пара промптов апстрима: системный с целями агента и обучения, пользовательский с полями."""
     sp, up = P[name]
     system = sp.fill(agent_objective=OBJECTIVE[ex.task.name], learning_objective=LEARNING, num_experiences=NUM)
-    return ex.model.run(system, up.fill(fields)).output
+    return ex.model.run(system, up.fill(fields), temperature=None).output
 
 
 def partial(rollouts, labeled):
@@ -37,7 +39,7 @@ def partial(rollouts, labeled):
 
 
 def rollouts(group):
-    return [e for i, e in enumerate(group.episodes) if i != group.chosen]
+    return [e for i, e in enumerate(group.episodes) if i != group.chosen and e.output]
 
 
 def operations(text):
@@ -55,7 +57,7 @@ class Contrast(Extractor):
         if partial(eps, labeled):
             summaries = [(e, ask(ex, "single_rollout_summary_template", question=e.question, trajectory=e.output,
                                  answer=answer, critique=render.NO_CRITIQUE)) for e in eps]
-            summaries = [(e, s) for e, s in summaries if s]
+            summaries = [(e, s) for e, s in summaries if s is not None]
             if partial([e for e, _ in summaries], labeled):
                 found = EXPERIENCES(ask(ex, "single_query_group_advantage", question=group.question, answer=answer,
                                         trajectories=render.attempts(summaries, labeled)))

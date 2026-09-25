@@ -30,10 +30,9 @@ def enclosed(tag):
         if text is None:
             return None
         low = text.lower()
-        if start_tag in low and end_tag in low:
-            start = low.index(start_tag) + len(start_tag)
-            return text[start:low.index(end_tag, start)].strip()
-        return ""
+        start = low.find(start_tag)
+        end = low.find(end_tag, start + len(start_tag)) if start >= 0 else -1
+        return text[start + len(start_tag):end].strip() if end >= 0 else ""
     return parse
 
 

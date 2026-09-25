@@ -3,7 +3,8 @@
     uv run python tools/as_old.py OUT.json [method ...] && uv run python tools/compare.py OUT.json
 
     tfgrpo         в зачёт жадная попытка при T = 0, а не итоговый агент апстрима (T = 0.3, top_p 0.95);
-                   опыты помечены id записей, а не местом G0, G1, ...
+                   опыты помечены id записей, а не местом G0, G1, ...; группа без top_p, обновление при T = 0,
+                   цели без перевода строки в конце (TF6)
     evolib         ответ первой попытки подменён ответом большинства до вердикта группы (так делал старый
                    решатель с vote=True): её балл всегда 1, лучшая — всегда первая
     evolib_judge   то же; судья после всех попыток группы, а не после каждой
@@ -27,8 +28,30 @@ hybrids = importlib.import_module("ace.methods.hybrids")
 
 def old_tfgrpo():
     render.label = lambda i, r: r.id
+    contrast = importlib.import_module("ace.extract.tfgrpo")
+    for k in contrast.OBJECTIVE:
+        contrast.OBJECTIVE[k] = contrast.OBJECTIVE[k].rstrip("\n")
+    contrast.LEARNING = contrast.LEARNING.rstrip("\n")
+    run = contrast.ask
+
+    def ask(ex, name, **fields):
+        model, ex.model = ex.model, Zero(ex.model)
+        try:
+            return run(ex, name, **fields)
+        finally:
+            ex.model = model
+    contrast.ask = tfgrpo.ask = ask
     return swap(tfgrpo.tfgrpo, attempts=Attempts(1 + tfgrpo.GROUP, lambda k: 0 if k == 0 else tfgrpo.TEMPERATURE,
                                                  pick=greedy))
+
+
+class Zero:
+    """Модель, у которой вызов без температуры идёт при T = 0 (так звал обновление старый код)."""
+    def __init__(self, model):
+        self.model = model
+
+    def run(self, *args, temperature=None, **kw):
+        return self.model.run(*args, temperature=0 if temperature is None else temperature, **kw)
 
 
 def first_is_vote(ex, group):
