@@ -276,7 +276,7 @@ def run(task, learner, model, n=config.SIZE, out=None, split="", epochs=None, of
     final = [r for r in log if r["phase"] == "test" or r["phase"] == "online" and r["epoch"] == epochs - 1]
     summary = dict(task=task.name, method=learner.name, model=model.name, n=len(final), epochs=epochs, offline=offline,
                    correct=sum(r["correct"] for r in final), truncated=sum(r["finish"] == "length" for r in final),
-                   **model.usage())
+                   accuracy=task.accuracy([r["answer"] for r in final], [r["target"] for r in final]), **model.usage())
     if out:
         Path(out).mkdir(parents=True, exist_ok=True)
         json.dump(log, open(f"{out}/log.json", "w"), ensure_ascii=False, indent=1)

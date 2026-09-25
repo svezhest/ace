@@ -11,7 +11,8 @@ MEB = TASKS["meb"]
 
 @pytest.mark.parametrize("answer, ok", [
     ("1 + 2 + 3 = 6", True),
-    ("1 × 2 × 3 = 6", True),              # засчитывается любая верная расстановка
+    ("1 * 2 * 3 = 6", True),              # засчитывается любая верная расстановка
+    ("1 × 2 × 3 = 6", False),             # знаки × ÷ апстрим DC не принимает
     ("1 + 2 * 3 = 7", False),             # значение сверяется с правой частью эталона
     ("1 - 2 + 3 = 6", False),
     ("1 + 23 = 6", False),                # числа не те
@@ -28,13 +29,14 @@ def test_meb_negative():
     assert MEB.check("19 - 8 * 28 = -205", "19 - 8 * 28 = -205")
 
 
-@pytest.mark.parametrize("answer, ok", [("12.50", True), ("$12.5", True), ("12.51", False), ("abc", False)])
+@pytest.mark.parametrize("answer, ok", [("12.50", True), ("$12.5", False), ("12.51", False), ("abc", False)])
 def test_formula(answer, ok):
     assert TASKS["formula"].check(answer, "12.5") is ok
 
 
 def test_formula_target_not_number():
-    assert TASKS["formula"].check("abc", "abc") is False
+    """Нечисла апстрим ACE сравнивает строками."""
+    assert TASKS["formula"].check("abc", "abc") is True
 
 
 def test_finer():
