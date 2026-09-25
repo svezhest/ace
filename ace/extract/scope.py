@@ -9,11 +9,10 @@
 
 Что правило видит о памяти, берёт у памяти перспективы попытки (book): её имя (промпт качества),
 tactical правила (applied_rules и текущий системный промпт) и текст strategic для классификатора.
-Ответы по схеме — структурированный вывод; значения по умолчанию и приведения — как у разбора апстрима
-(DEVIATIONS SC1)."""
-from pydantic import BaseModel
+Модель отвечает текстом, разбор — функции апстрима в parse.py (scope_*), с его откатами."""
+from dataclasses import dataclass
 
-from .. import prompts, render
+from .. import parse, prompts, render
 from . import CONFIDENCE, DOMAIN, RATIONALE, Extraction, Extractor
 
 P = {n: prompts.load(f"scope_{n}") for n in ("error", "efficiency", "thoroughness", "selector", "classify")}
@@ -21,33 +20,23 @@ INTRO = prompts.text("scope_strategic_intro")
 GUIDELINE = prompts.text("scope_guideline")
 
 DOMAINS = ["tool_usage", "data_validation", "error_handling", "efficiency", "analysis_methodology", "safety", "general"]
-GENERAL = "general"
 LEVEL = {"low": 0.3, "medium": 0.6, "high": 0.9}    # метка кандидата -> начальная confidence
 DEFAULT_CONFIDENCE = 0.5    # метка не из списка
 BEST_OF_TEMPERATURE = 0.7
 NO_IMPROVEMENT = ("", "no improvement needed", "none")
 
 
-class Proposal(BaseModel):
+@dataclass
+class Proposal:
+    """Кандидат правила (Guideline апстрима)."""
     update_text: str = ""
     rationale: str = ""
-    confidence: str | int | float = "medium"   # метка low / medium / high или число, как у апстрима
+    confidence: object = "medium"       # метка low / medium / high или число, как пришло от модели
 
     def initial(self):
         """Начальная confidence: метка по LEVEL (чужая — DEFAULT_CONFIDENCE), число как есть."""
         c = self.confidence
         return LEVEL.get(c.lower(), DEFAULT_CONFIDENCE) if isinstance(c, str) else float(c)
-
-
-class Selection(BaseModel):
-    selected_index: int = 0
-
-
-class Classification(BaseModel):
-    is_duplicate: bool = False
-    scope: str = "tactical"
-    confidence: float | None = None
-    domain: str = GENERAL
 
 
 def tool_step(step):
@@ -104,40 +93,37 @@ class Rules(Extractor):
         if error:
             fields.update(error_type=error[0], error_message=error[1])
         prompt = (P["error"] if error else P[book.name]).fill(fields)
-        one = lambda t: ex.model.run("", prompt, output=Proposal, temperature=t).output
+
+        def one(temperature, quality):
+            c = parse.scope_guideline(ex.model.run("", prompt, temperature=temperature).output, quality)
+            return Proposal(**c) if c else None
         if self.n == 1:
-            c = one(0)
-            if c and not error:         # на качестве апстрим отдаёт текст правила без пробелов по краям
-                c.update_text = c.update_text.strip()
-            return c if c and c.update_text and (error or meaningful(c)) else None
-        cands = [c for c in (one(BEST_OF_TEMPERATURE) for _ in range(self.n)) if c and (error or meaningful(c))]
+            c = one(0, not error)
+            return c if c and c.update_text else None
+        cands = [c for c in (one(BEST_OF_TEMPERATURE, False) for _ in range(self.n)) if c and (error or meaningful(c))]
         if len(cands) < 2:
             best = cands[0] if cands else None
         else:
-            s = ex.model.run("", P["selector"].fill(agent_context(ex, attempt, book), issue_type="error" if error else "quality",
-                                                    issue_details=render.issue(summary, error),
-                                                    candidates=render.candidates(cands)), output=Selection).output
-            i = s.selected_index if s else 0
-            best = cands[i] if 0 <= i < len(cands) else cands[0]
+            out = ex.model.run("", P["selector"].fill(agent_context(ex, attempt, book), issue_type="error" if error else "quality",
+                                                      issue_details=render.issue(summary, error),
+                                                      candidates=render.candidates(cands))).output
+            best = cands[parse.scope_selection(out, len(cands))]
         return best if best and best.update_text else None
 
     def classify(self, ex, proposal, book, group=None):
-        """Классификатор -> Extraction с одним уроком или None (дубль). Сбой классификатора (и confidence: null,
-        на котором падает float() апстрима) — tactical с исходной confidence; strategic с доменом не из списка —
-        general."""
+        """Классификатор -> Extraction с одним уроком или None (дубль); сбой разбора — tactical с исходной
+        confidence (parse.scope_classification)."""
         initial = proposal.initial()
         context = prompts.text("scope_rules_context", strategic=strategic_text(book), tactical=[r.text for r in book.tactical])
-        c = ex.model.run("", P["classify"].fill(allowed_domains=", ".join(DOMAINS), update_text=proposal.update_text,
-                                                rationale=proposal.rationale, initial_confidence=initial,
-                                                all_rules_context=context), output=Classification).output
-        if c is None or c.confidence is None and "confidence" in c.model_fields_set:
-            c = Classification(confidence=initial)
-        if c.is_duplicate:
+        out = ex.model.run("", P["classify"].fill(allowed_domains=", ".join(DOMAINS), update_text=proposal.update_text,
+                                                  rationale=proposal.rationale, initial_confidence=initial,
+                                                  all_rules_context=context)).output
+        c = parse.scope_classification(out, initial, DOMAINS)
+        if c["is_duplicate"]:
             return None
-        confidence = initial if c.confidence is None else c.confidence
-        domain = (c.domain if c.domain in DOMAINS else GENERAL) if c.scope == "strategic" else None
+        domain = c["domain"] if c["scope"] == "strategic" else None
         return Extraction(group, [proposal.update_text], [],
-                          {CONFIDENCE: [confidence], DOMAIN: [domain], RATIONALE: [proposal.rationale]})
+                          {CONFIDENCE: [c["confidence"]], DOMAIN: [domain], RATIONALE: [proposal.rationale]})
 
     def step(self, ex, attempt, step, book):
         """Событие шага с инструментом: правило сразу."""

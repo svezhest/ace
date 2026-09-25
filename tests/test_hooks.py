@@ -16,7 +16,6 @@ from ace.learner import Learner
 from ace.loop import Attempt, Group, Prompt, run
 from ace.methods.ace import Ops
 from ace.methods.hybrids import CappedPlaybook, ace_bo2, ace_hooks, ace_opt
-from ace.methods.scope import Analysis, Rule
 from ace.model import Model, Patch, Step
 
 ERROR = "Traceback (most recent call last):\nZeroDivisionError: division by zero"
@@ -146,8 +145,9 @@ def test_ace_bo2_selects():
 
 
 def test_ace_opt_caps_playbook():
-    model = Stub(schemas={"Analysis": Analysis(consolidation=[[1, 2, 3]]), "Rule": Rule(rule="merged", rationale="m"),
-                          "Ops": Ops(ops=[dict(op="ADD", text=f"bullet {i}") for i in range(11)])})
+    optimizer = lambda call: (json.dumps(dict(consolidation=[[1, 2, 3]])) if "rule optimization analyzer" in call["user"]
+                              else json.dumps(dict(rule="merged", rationale="m")))
+    model = Stub(optimizer, schemas={"Ops": Ops(ops=[dict(op="ADD", text=f"bullet {i}") for i in range(11)])})
     m = CappedPlaybook()
     m.add("kept")
     m.count(["r1"], [])

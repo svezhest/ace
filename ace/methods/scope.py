@@ -21,9 +21,7 @@ scope_bo2 — Best-of-2 с селектором. scope_code — решатель
 """
 from dataclasses import dataclass
 
-from pydantic import BaseModel
-
-from .. import prompts, render
+from .. import parse, prompts, render
 from ..env import Sandbox
 from ..extract import CONFIDENCE, DOMAIN, RATIONALE
 from ..extract.scope import Rules, current_system, strategic_text
@@ -48,26 +46,10 @@ THOROUGHNESS, EFFICIENCY = "thoroughness", "efficiency"
 # правило пришло из записи памяти и не менялось
 
 
-class Analysis(BaseModel):
-    consolidation: list[list[int]] = []
-    subsumption: list[list[int]] = []
-    conflicts: list[list[int]] = []
-
-
-class Rule(BaseModel):
-    """Слитое или исправленное правило; без rationale апстрим оставляет исходные правила (KeyError)."""
-    rule: str
-    rationale: str
-
-
-class Subsumed(BaseModel):
-    subsumed: bool = False
-
-
 def rule_optimizer(passes=OPTIMIZER_PASSES):
     """-> optimize(model, rules, target): анализ, затем конфликты, поглощение, слияние, до passes проходов;
-    номера правил стабильны между проходами."""
-    llm = lambda model, name, fields, output: model.run("", P[name].fill(fields), output=output).output
+    номера правил стабильны между проходами. Модель отвечает текстом, разбор — parse.scope_* (как у апстрима)."""
+    llm = lambda model, name, fields: model.run("", P[name].fill(fields)).output
 
     def resolve(model, rules, pairs):
         by_id, done, fixed = {x["id"]: x for x in rules}, set(), {}
@@ -75,11 +57,11 @@ def rule_optimizer(passes=OPTIMIZER_PASSES):
             if len(pair) < 2 or pair[0] not in by_id or pair[1] not in by_id or pair[0] in done or pair[1] in done:
                 continue
             a, b = by_id[pair[0]], by_id[pair[1]]
-            r = llm(model, "conflict", dict(idx1=a["id"], rule1_text=a["rule"], rule1_rationale=a["rationale"],
-                                            idx2=b["id"], rule2_text=b["rule"], rule2_rationale=b["rationale"]), Rule)
+            r = parse.scope_rule(llm(model, "conflict", dict(idx1=a["id"], rule1_text=a["rule"], rule1_rationale=a["rationale"],
+                                                             idx2=b["id"], rule2_text=b["rule"], rule2_rationale=b["rationale"])))
             if r:
                 done |= {a["id"], b["id"]}
-                fixed[a["id"]] = dict(rule=r.rule, rationale=r.rationale, id=a["id"],
+                fixed[a["id"]] = dict(rule=r[0], rationale=r[1], id=a["id"],
                                       confidence=max(a.get("confidence", RULE_CONFIDENCE), b.get("confidence", RULE_CONFIDENCE)))
         return [fixed.get(x["id"], x) for x in rules if x["id"] not in done or x["id"] in fixed]
 
@@ -87,8 +69,8 @@ def rule_optimizer(passes=OPTIMIZER_PASSES):
         by_id, gone = {x["id"]: x for x in rules}, set()
         for pair in pairs:
             if len(pair) >= 2 and pair[0] in by_id and pair[1] in by_id:
-                r = llm(model, "subsumed", dict(general_rule=by_id[pair[0]]["rule"], specific_rule=by_id[pair[1]]["rule"]), Subsumed)
-                if r and r.subsumed:
+                if parse.scope_subsumed(llm(model, "subsumed", dict(general_rule=by_id[pair[0]]["rule"],
+                                                                    specific_rule=by_id[pair[1]]["rule"]))):
                     gone.add(pair[1])
         return [x for x in rules if x["id"] not in gone]
 
@@ -104,9 +86,9 @@ def rule_optimizer(passes=OPTIMIZER_PASSES):
             # номера в промпте — из группы по порядку, как в апстриме (_merge_rules: indices[i]), даже если
             # какого-то номера среди правил нет
             numbered = [dict(x, id=i) for i, x in zip(group, parts)]
-            r = llm(model, "merge", dict(rules_text=render.rule_group(numbered)), Rule)
+            r = parse.scope_rule(llm(model, "merge", dict(rules_text=render.rule_group(numbered))))
             if r:
-                out.append(dict(rule=r.rule, rationale=r.rationale, id=parts[0]["id"],
+                out.append(dict(rule=r[0], rationale=r[1], id=parts[0]["id"],
                                 confidence=max(x.get("confidence", RULE_CONFIDENCE) for x in parts)))
             else:
                 out += parts
@@ -118,24 +100,31 @@ def rule_optimizer(passes=OPTIMIZER_PASSES):
         for _ in range(passes):
             if len(rules) <= target:
                 break
-            a = llm(model, "analyze", dict(num_rules=len(rules), rules_text=render.rule_list(rules)), Analysis) or Analysis()
-            if not (a.conflicts or a.subsumption or a.consolidation):
+            # с одним правилом апстрим модель не зовёт
+            a = (parse.scope_analysis(llm(model, "analyze", dict(num_rules=len(rules), rules_text=render.rule_list(rules))))
+                 if len(rules) > 1 else parse.scope_analysis(""))
+            if not (a["conflicts"] or a["subsumption"] or a["consolidation"]):
                 break
-            rules = resolve(model, rules, a.conflicts)
-            rules = prune_subsumed(model, rules, a.subsumption)
-            rules = consolidate(model, rules, a.consolidation)
+            rules = resolve(model, rules, a["conflicts"])
+            rules = prune_subsumed(model, rules, a["subsumption"])
+            rules = consolidate(model, rules, a["consolidation"])
         return rules
     return optimize
 
 
 def compress(model, records, optimizer, target, cap, new):
     """Записи сверх cap сжимаются оптимизатором до target, остаток обрезается до cap. Нетронутая запись
-    остаётся собой (id и статистика); исправленное и слитое — новые записи new(правило)."""
+    остаётся собой (id и статистика); исправленное и слитое — новые записи new(правило). Сбой оптимизатора
+    (ответ не той формы) — только усечение, как в _optimize_domain_rules апстрима."""
     if len(records) <= cap:
         return records
     rules = [dict(rule=r.text, rationale=getattr(r, "rationale", ""), confidence=getattr(r, "confidence", RULE_CONFIDENCE),
                   record=r) for r in records]
-    return [x["record"] if "record" in x else new(x) for x in optimizer(model, rules, target)][:cap]
+    try:
+        rules = optimizer(model, rules, target)
+    except Exception:           # апстрим ловит любое исключение оптимизатора
+        pass
+    return [x["record"] if "record" in x else new(x) for x in rules][:cap]
 
 
 def duplicate_words(text, texts, overlap=DUPLICATE_OVERLAP):

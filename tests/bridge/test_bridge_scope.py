@@ -1,7 +1,7 @@
 """Мостик к SCOPE (4dc0da5): эталоны bridge/fixtures/scope (снятие — bridge/capture_scope.py).
 
-Промпты — шаблоны апстрима, заполненные теми же значениями, и запросы, которые записал фейк; разбор ответов —
-значения по умолчанию и приведения схем против разбора апстрима (SC1); память — дубль по словам, пороги 0.85 и
+Промпты — шаблоны апстрима, заполненные теми же значениями, и запросы, которые записал фейк; модель отвечает
+текстом эталона; разбор ответов (parse.scope_*) — на всех входах эталона; память — дубль по словам, пороги 0.85 и
 0.5, лимит 20 на агента, предел домена с оптимизатором; цикл — шаги эталона через извлечение и память SCOPE."""
 import json
 import re
@@ -10,14 +10,14 @@ from types import SimpleNamespace
 import pytest
 from upstream import deviation, fixture, messages
 
-from ace import render
+from ace import parse, render
 from ace.extract import CONFIDENCE, DOMAIN
+from ace.extract.scope import DOMAINS, Proposal, Rules, answer_step, strategic_text
 from ace.extract.scope import P as EXTRACT_P
-from ace.extract.scope import Classification, Proposal, Rules, Selection, answer_step, strategic_text
 from ace.loop import Episode, Group, Prompt
 from ace.memory import Record
 from ace.methods.scope import P as OPTIMIZER_P
-from ace.methods.scope import PER_RUN, Analysis, Book, Perspectives, Scope, Subsumed, duplicate_words, rule_optimizer, scope
+from ace.methods.scope import PER_RUN, Book, Perspectives, Scope, duplicate_words, rule_optimizer, scope
 from ace.model import Reply
 
 PROMPTS, PARSERS, MEMORY, LOOP = (fixture("scope", n) for n in ("prompts", "parsers", "memory", "loop"))
@@ -32,7 +32,7 @@ TEMPLATES = {"ERROR_REFLECTION_PROMPT": EXTRACT_P["error"], "QUALITY_REFLECTION_
 
 
 class Model:
-    """Модель-заглушка: ответ по схеме — reply(схема, промпт); пишет промпты и температуру."""
+    """Модель-заглушка: текст ответа — reply(промпт); пишет промпты и температуру."""
     name, max_tokens = "stub", 100
 
     def __init__(self, reply):
@@ -40,8 +40,9 @@ class Model:
 
     def run(self, system, user, output=str, tools=(), deps=None, rounds=0, temperature=0, max_tokens=None, on_step=None,
             top_p=None):
-        self.calls.append(dict(user=user, output=output.__name__, temperature=temperature))
-        return Reply(self.reply(output, user), "", False, [])
+        assert output is str
+        self.calls.append(dict(user=user, temperature=temperature))
+        return Reply(self.reply(user), "", False, [])
 
 
 def ex(model, name="finer"):
@@ -53,24 +54,27 @@ def user(call):
     return messages(call)[1]
 
 
-def parsed(schema, text):
-    """Объект, который модель отдала бы по схеме (SC1): JSON из ответа эталона, как его берёт первый шаг разбора
-    апстрима (блок ```json, иначе ```, иначе весь текст; без закрывающей ограды — до предпоследнего символа);
-    не JSON или не прошёл схему — None."""
-    text = text.strip()
-    for fence in ("```json", "```"):
-        if fence in text:
-            start = text.find(fence) + len(fence)
-            text = text[start:text.find("```", start)].strip()
-            break
-    try:
-        return schema.model_validate(json.loads(text))
-    except (ValueError, TypeError):
-        return None
+MARKERS = dict(error="analyzing agent execution errors", quality="analyzing agent execution quality",
+               select="evaluating multiple candidate", classify="You are a rule classifier",
+               analyze="rule optimization analyzer", merge="merging similar rules", subsumed="subsumes",
+               conflict="resolving a conflict")
 
 
-def replies(**by_schema):
-    return lambda output, prompt: by_schema[output.__name__](prompt)
+def kind(prompt):
+    return next(k for k, m in MARKERS.items() if m in prompt)
+
+
+def by_kind(calls):
+    """Ответ эталона по виду промпта (для вызовов, где вид однозначно задаёт ответ)."""
+    answer = {}
+    for c in calls:
+        answer.setdefault(kind(user(c)), c["response"])
+    return Model(lambda prompt: answer[kind(prompt)])
+
+
+def js(obj):
+    """Ответ модели как у фейка эталона: JSON в блоке ```json."""
+    return f"```json\n{json.dumps(obj)}\n```"
 
 # промпты
 
@@ -88,8 +92,6 @@ def test_template(name):
 
 SUMMARY = "Model output: The tag is Revenues.\nObservations: Answer incorrect"
 ERROR = ("Exception", "Incorrect answer. Model answered 'Revenues', expected 'Loss'.")
-UPDATE = Proposal(update_text="Check the sign of each value before tagging.",
-                  rationale="The agent confused losses with gains.", confidence="high")
 
 
 def attempt(system=BASE):
@@ -104,7 +106,7 @@ def test_synthesizer_requests():
     rules = render.rules(["Always read the full sentence."])
     assert EXTRACT_P["error"].fill(fields, error_type=ERROR[0], error_message=ERROR[1], applied_rules=rules) == user(calls[0])
     assert EXTRACT_P["thoroughness"].fill(fields, applied_rules=rules) == user(calls[2])
-    model = Model(lambda output, prompt: UPDATE)
+    model = Model(lambda prompt: calls[1]["response"])
     got = [Rules().propose(ex(model), attempt(), Book(), SUMMARY, ERROR),
            Rules().propose(ex(model), attempt(), Book("efficiency"), SUMMARY, None)]
     assert [c["user"] for c in model.calls] == [user(calls[1]), user(calls[3])]
@@ -115,17 +117,17 @@ def test_synthesizer_requests():
 
 def test_best_of_n_selector():
     """Best-of-N: кандидаты и выбор; промпт селектора из наших полей — как у апстрима. Кандидаты у нас — одна
-    модель при T = 0.7 (SC3)."""
-    deviation("SC3")
+    модель при T = 0.7 (SC2)."""
+    deviation("SC2")
     calls = PROMPTS["synthesizer"]["primary_calls"]
     cand = PROMPTS["synthesizer"]["candidate_calls"][0]
-    first = parsed(Proposal, calls[4]["response"])
-    second = parsed(Proposal, cand["response"])
+    first = Proposal(**parse.scope_guideline(calls[4]["response"]))
+    second = Proposal(**parse.scope_guideline(cand["response"]))
     selector = dict(agent_name=AGENT, agent_role=ROLE, task=TASK, current_system_prompt=BASE, issue_type="error",
                     issue_details=render.issue(SUMMARY, ERROR), candidates=render.candidates([first, second]))
     assert EXTRACT_P["selector"].fill(selector) == user(calls[5])
-    picks = iter([first, second])
-    model = Model(replies(Proposal=lambda p: next(picks), Selection=lambda p: parsed(Selection, calls[5]["response"])))
+    answers = iter([calls[4]["response"], cand["response"], calls[5]["response"]])
+    model = Model(lambda prompt: next(answers))
     best = Rules(n=2).propose(ex(model), attempt(), Book(), SUMMARY, ERROR)
     assert best.update_text == PROMPTS["synthesizer"]["results"]["best_of_n_error"]["update_text"]
     assert [c["temperature"] for c in model.calls] == [0.7, 0.7, 0]
@@ -134,7 +136,7 @@ def test_best_of_n_selector():
 def test_classifier_requests():
     """Классификатор: strategic из памяти и tactical попытки в контексте; пустая память."""
     c = PROMPTS["classification"]
-    model = Model(lambda output, prompt: parsed(Classification, c["calls"][0]["response"]))
+    model = Model(lambda prompt: c["calls"][0]["response"])
     book = Book()
     book.promote(ex(model), "Always read the full sentence.", 0.9, "general", "context")
     book.tactical = [Record("t1", "Tactical one."), Record("t2", "Bare string rule.")]
@@ -148,12 +150,7 @@ def test_classifier_requests():
 def test_memory_optimizer_requests():
     """Оптимизатор правил: анализ, конфликт, поглощение, слияние — запросы и итог как у апстрима."""
     m = PROMPTS["memory_optimizer"]
-    answer = {"analyzer": 0, "resolving a conflict": 1, "subsumes": 2, "merging similar": 3}
-    by_marker = {marker: next(c["response"] for c in m["calls"] if marker in user(c)) for marker in answer}
-
-    def reply(output, prompt):
-        return parsed(output, next(r for marker, r in by_marker.items() if marker in prompt))
-    model = Model(reply)
+    model = by_kind(m["calls"])
     six = [dict(rule=f"Rule text {i}.", rationale=f"why {i}", confidence=0.85 + i / 100) for i in range(6)]
     out = rule_optimizer()(model, six, 3)
     assert [c["user"] for c in model.calls] == [user(c) for c in m["calls"]]
@@ -173,24 +170,39 @@ def test_strategic_rules_text():
     book.promote(ex(Model(None)), "Always read the full sentence.", 0.9, "general", "context")
     assert strategic_text(book) == PROMPTS["strategic_rules_text"]
 
-# разбор ответов: схема против разбора апстрима (SC1)
+# разбор ответов: функции апстрима в parse.py на всех входах эталона
+
+# входы эталона _extract_json — bridge/capture_scope.py (JSON_CASES)
+JSON_CASES = {
+    "plain": '{"update_text": "A", "rationale": "r", "confidence": "high"}',
+    "fenced_json": 'Here:\n```json\n{"update_text": "A", "rationale": "r"}\n```\nDone.',
+    "fenced_plain": '```\n{"update_text": "A", "rationale": "r"}\n```',
+    "two_objects": '{"update_text": "first"} and then {"update_text": "second"}',
+    "two_fenced": '```json\n{"update_text": "first"}\n```\n```json\n{"update_text": "second"}\n```',
+    "garbage_around": 'Sure! {"update_text": "A", "confidence": 0.9} hope this helps',
+    "no_update_text_key": 'text {"rule": "A"} text',
+    "truncated": '```json\n{"update_text": "A", "rationale": "cut',
+    "list": '[{"update_text": "A"}]',
+    "nested": 'x {"update_text": "A", "meta": {"k": 1}} y',
+    "deep_nested": 'x {"update_text": "A", "meta": {"k": {"z": 1}}} y',
+    "single_quotes": "{'update_text': 'A'}",
+    "think_prefix": '<think>{"draft": 1}</think>{"update_text": "A"}',
+    "empty": "",
+}
 
 
-def test_proposal_parse():
-    """Объект, который достал _extract_json, у нас приходит по схеме: те же значения по умолчанию; не объект —
-    кандидата нет."""
-    deviation("SC1")
-    for case, r in PARSERS["synthesizer._extract_json"].items():
-        obj = r["ok"]
-        try:
-            p = Proposal.model_validate(obj)
-        except ValueError:
-            p = None
-        if not isinstance(obj, dict):
-            assert p is None, case          # апстрим: update_data.get на списке падает -> None
-            continue
-        assert (p.update_text, p.rationale, p.confidence) == (obj.get("update_text", ""), obj.get("rationale", ""),
-                                                              obj.get("confidence", "medium")), case
+@pytest.mark.parametrize("case", sorted(JSON_CASES))
+def test_extract_json(case):
+    assert parse.scope_json(JSON_CASES[case]) == PARSERS["synthesizer._extract_json"][case]["ok"]
+
+
+@pytest.mark.parametrize("case", sorted(JSON_CASES))
+def test_guideline_from_extract_json(case):
+    """Кандидат из разобранного: .get с умолчаниями апстрима; список — сбой (.get падает)."""
+    data = PARSERS["synthesizer._extract_json"][case]["ok"]
+    want = (dict(update_text=data.get("update_text", ""), rationale=data.get("rationale", ""),
+                 confidence=data.get("confidence", "medium")) if isinstance(data, dict) and data else None)
+    assert parse.scope_guideline(JSON_CASES[case]) == want
 
 
 def test_proposal_initial_confidence():
@@ -200,46 +212,42 @@ def test_proposal_initial_confidence():
 
 def test_quality_strips_update():
     """На качестве апстрим отдаёт правило без пробелов по краям; «none» без ошибки отбрасывается."""
-    model = Model(lambda output, prompt: Proposal(update_text="  Keep it short.  "))
+    model = Model(lambda prompt: js(dict(update_text="  Keep it short.  ")))
     assert Rules().propose(ex(model), attempt(), Book(), SUMMARY, None).update_text == "Keep it short."
-    model = Model(lambda output, prompt: Proposal(update_text=" None "))
+    model = Model(lambda prompt: js(dict(update_text=" None ")))
     assert Rules().propose(ex(model), attempt(), Book(), SUMMARY, None) is None
 
 
-RECOVERED = {"RuleAnalyzer.analyze": {"garbage_around", "single_quotes"},
-             "SubsumptionOptimizer._verify_subsumption": {"single_quotes"}}
+def test_selection():
+    """_select_best_update: индекс в пределах, иначе первый; без ключа и при сбое — первый."""
+    assert [parse.scope_selection(t, 2) for t in (js(dict(selected_index=1)), js(dict(selected_index=5)), '{"x": 1}',
+                                                  '{"selected_index": "1"}', "junk")] == [1, 0, 0, 0, 0]
 
 
 def test_analyzer_parse():
-    """RuleAnalyzer: отсутствующие ключи — пустые списки; не объект — пусто. Починку текста апстрима (фигурные
-    скобки из прозы, одинарные кавычки) заменяет схема (SC1)."""
-    deviation("SC1")
     cases = PARSERS["RuleAnalyzer.analyze"]
     for case, text in cases["inputs"].items():
-        want = cases["results"][case]
-        a = parsed(Analysis, text) or Analysis()
-        got = dict(consolidation=a.consolidation, subsumption=a.subsumption, conflicts=a.conflicts)
-        assert (got == {k: want[k] for k in got}) != (case in RECOVERED["RuleAnalyzer.analyze"]), case
+        assert parse.scope_analysis(text) == cases["results"][case], case
 
 
 def test_subsumption_parse():
-    deviation("SC1")
     cases = PARSERS["SubsumptionOptimizer._verify_subsumption"]
     for case, text in PARSERS["RuleAnalyzer.analyze"]["inputs"].items():
-        s = parsed(Subsumed, text.replace("consolidation", "subsumed").replace("[[0, 1]]", "true"))
-        got = bool(s and s.subsumed)
-        assert (got == cases["results"][case]) != (case in RECOVERED["SubsumptionOptimizer._verify_subsumption"]), case
+        text = text.replace("consolidation", "subsumed").replace("[[0, 1]]", "true")
+        assert parse.scope_subsumed(text) == cases["results"][case], case
+
+
+KEYS = ("is_duplicate", "scope", "confidence", "domain")
 
 
 def test_classifier_parse():
-    """Классификатор: дубль, область, confidence (строка-число приводится, слово — сбой), домен не из списка у
-    strategic -> general; сбой -> tactical с исходной confidence."""
-    deviation("SC1")
+    """Разбор классификатора и решение нашего извлечения: дубль — правила нет; confidence и домен strategic."""
     cases = PARSERS["SCOPEOptimizer._classify_and_check_duplicate"]
     for case, text in cases["inputs"].items():
         want = cases["results"][case]
-        model = Model(lambda output, prompt: parsed(Classification, text))
-        x = Rules().classify(ex(model), Proposal(update_text="Check signs.", rationale="r", confidence=0.6), Book())
+        assert {k: parse.scope_classification(text, 0.6, DOMAINS)[k] for k in KEYS} == {k: want[k] for k in KEYS}, case
+        x = Rules().classify(ex(Model(lambda prompt: text)), Proposal(update_text="Check signs.", rationale="r", confidence=0.6),
+                             Book())
         if want["is_duplicate"]:
             assert x is None, case
             continue
@@ -249,9 +257,15 @@ def test_classifier_parse():
 
 def test_classifier_null_confidence():
     """«confidence»: null — float(None) апстрима падает, откат на tactical с исходной confidence."""
-    model = Model(lambda output, prompt: Classification.model_validate(dict(scope="strategic", confidence=None)))
-    x = Rules().classify(ex(model), Proposal(update_text="u", confidence="high"), Book())
+    x = Rules().classify(ex(Model(lambda prompt: '{"scope": "strategic", "confidence": null}')),
+                         Proposal(update_text="u", confidence="high"), Book())
     assert x.extras[CONFIDENCE] == [0.9] and x.extras[DOMAIN] == [None]
+
+
+def test_rule_parse():
+    """Слияние и конфликт: без rationale правила остаются (KeyError апстрима)."""
+    assert parse.scope_rule('{"rule": "R", "rationale": "why"}') == ("R", "why")
+    assert parse.scope_rule('{"rule": "R"}') is None and parse.scope_rule("[1]") is None and parse.scope_rule("") is None
 
 # память
 
@@ -302,11 +316,6 @@ def test_threshold_is_one_constant():
     assert [r.text for r in book.tactical] == [case["returned"][0]] and not book.records() and not case["strategic_rules"]
 
 
-def optimizer_model(calls):
-    """Ответы оптимизатора эталона по маркеру промпта."""
-    answer = {marker: next(c["response"] for c in calls if marker in user(c))
-              for marker in ("analyzer", "resolving a conflict", "subsumes", "merging similar") if any(marker in user(c) for c in calls)}
-    return Model(lambda output, prompt: parsed(output, next(r for m, r in answer.items() if m in prompt)))
 
 
 def test_overflow_truncate():
@@ -325,7 +334,7 @@ def test_overflow_truncate():
 def test_overflow_optimizer(case, cap, target, n, conf):
     """Предел домена: оптимизатор до int(0.8 * предела), остаток усекается; запросы и итог как у апстрима."""
     case = MEMORY[case]
-    model = optimizer_model(case["calls"])
+    model = by_kind(case["calls"])
     book = Book(cap=cap, target=target)
     for i in range(n):
         book.promote(ex(model), rule(i)[0], conf(i), "general", rule(i)[1])
@@ -349,10 +358,10 @@ def test_optimize_rules_two_passes():
     merge = next(c["response"] for c in case["calls"] if "merging similar" in user(c))
     subsumed = next(c["response"] for c in case["calls"] if "subsumes" in user(c))
 
-    def reply(output, prompt):
+    def reply(prompt):
         if "analyzer" in prompt:
-            return parsed(Analysis, second if "Merged A" in prompt else first)
-        return parsed(output, merge if "merging similar" in prompt else subsumed)
+            return second if "Merged A" in prompt else first
+        return merge if "merging similar" in prompt else subsumed
     model = Model(reply)
     out = rule_optimizer()(model, [dict(x) for x in case["input"]], 3)
     assert [c["user"] for c in model.calls] == [user(c) for c in case["calls"]]
@@ -365,9 +374,9 @@ def test_limit_per_agent_across_tasks():
     получают, хотя синтезатор и классификатор зовутся; у другого агента (перспективы) счётчик свой."""
     case = MEMORY["max_rules_per_task=20 across tasks"]
     task_of = re.compile(r"answered 'n(\d+)'")
-    synth = lambda prompt: Proposal(update_text=f"Tactical rule from task {task_of.search(prompt)[1]}.", rationale="r",
-                                    confidence="medium")
-    model = Model(replies(Proposal=synth, Classification=lambda p: Classification(scope="tactical", confidence=0.6)))
+    synth = js(dict(update_text="Tactical rule from task N.", rationale="r", confidence="medium"))
+    classify = js(dict(is_duplicate=False, scope="tactical", confidence=0.6, domain="general", reason="r"))
+    model = Model(lambda prompt: classify if kind(prompt) == "classify" else synth.replace("task N", "task " + task_of.search(prompt)[1]))
     memory = Perspectives(("thoroughness", "other"))
     learner = Scope("scope", memory=memory, show=scope.show, extract=Rules())
     got = []
@@ -387,17 +396,16 @@ def test_limit_per_agent_across_tasks():
 
 
 def loop_model():
-    """Ответы синтезатора и классификатора эталона (synth_replies, classifier_replies)."""
-    def synth(prompt):
+    """Ответы синтезатора и классификатора эталона (synth_replies, classifier_replies), как у фейка."""
+    def reply(prompt):
+        if kind(prompt) == "classify":
+            update = prompt.split("Update: ", 1)[1].split("\n", 1)[0]
+            return next((js(c) for key, c in LOOP["classifier_replies"].items() if update.startswith(key)), "not json at all")
         for key, r in LOOP["synth_replies"].items():
             if f"expected '{key}'" in prompt or f"-> {key}." in prompt:
-                return Proposal.model_validate(r)
-        return Proposal(update_text="", rationale="")
-
-    def classify(prompt):
-        update = prompt.split("Update: ", 1)[1].split("\n", 1)[0]
-        return next((Classification.model_validate(c) for key, c in LOOP["classifier_replies"].items() if update.startswith(key)), None)
-    return Model(replies(Proposal=synth, Classification=classify))
+                return js(r)
+        return js(dict(update_text="", rationale=""))
+    return Model(reply)
 
 
 SYSTEM_BLOCK = re.compile(r"(Current system prompt \(for reference[^\n]*\n)(.*?)(\n\nAlready applied rules)", re.S)
@@ -405,7 +413,7 @@ SYSTEM_BLOCK = re.compile(r"(Current system prompt \(for reference[^\n]*\n)(.*?)
 
 def with_system(prompt, system):
     """Запрос апстрима с нашим текущим системным промптом: repro дописывает правила всех прошлых задач, у нас —
-    strategic при запуске попытки и tactical только этой попытки (B2, SC4)."""
+    strategic при запуске попытки и tactical только этой попытки (B2, SC3)."""
     return SYSTEM_BLOCK.sub(lambda m: m.group(1) + system + m.group(3), prompt)
 
 
@@ -435,12 +443,13 @@ LOOP_OUTPUT = {"finer_0": "Entity 1200 -> Revenues. FINAL ANSWER: Revenues",
                "finer_6": "Entity 12 -> Revenues. FINAL ANSWER: Revenues"}
 
 
-def check_steps(done):
+def check_steps(done, model):
     for step, ep, calls, tactical in done:
         want = step["calls"]
-        assert [c["output"] for c in calls] == ["Proposal"] + ["Classification"] * (len(want) - 1), step["task_id"]
-        # синтезатор: тип ошибки у нас по событию (SC2), системный промпт — текущий нашей попытки (B2, SC4)
-        deviation("SC2", "B2", "SC4")
+        assert [kind(c["user"]) for c in calls] == [kind(user(c)) for c in want], step["task_id"]
+        assert [c["response"] for c in want] == [model.reply(c["user"]) for c in calls], step["task_id"]
+        # синтезатор: тип ошибки у нас по событию (SC1), системный промпт — текущий нашей попытки (B2, SC3)
+        deviation("SC1", "B2", "SC3")
         ours = calls[0]["user"].replace("- Error Type: IncorrectAnswer", "- Error Type: Exception")
         assert ours == with_system(user(want[0]), ep.system), step["task_id"]
         if len(want) > 1:
@@ -457,7 +466,7 @@ def test_loop():
     memory = Perspectives()
     learner = Scope("scope", memory=memory, show=scope.show, extract=Rules())
     done = run_steps(learner, model, LOOP["run1"]["steps"])
-    check_steps(done)
+    check_steps(done, model)
     book = memory.book(0)
     assert book.accepted == LOOP["run1"]["applied_rules_count"][AGENT]
     # второй прогон апстрима: strategic подгружены с диска, счётчик принятых новый
@@ -465,4 +474,4 @@ def test_loop():
     fresh = Perspectives()
     fresh.book(0).domains = book.domains
     learner2 = Scope("scope", memory=fresh, show=scope.show, extract=Rules())
-    check_steps(run_steps(learner2, model, LOOP["run2"]["steps"]))
+    check_steps(run_steps(learner2, model, LOOP["run2"]["steps"]), model)

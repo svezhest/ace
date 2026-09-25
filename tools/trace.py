@@ -78,8 +78,7 @@ def fill(tp, seed):
     if origin in (typing.Union, getattr(__import__("types"), "UnionType", None)):
         return fill([a for a in args if a is not type(None)][0], seed)
     if isinstance(tp, type) and issubclass(tp, pydantic.BaseModel):
-        return tp(**{k: NAMED.get(k) if k in NAMED and str in (f.annotation, *typing.get_args(f.annotation))
-                     else fill(f.annotation, seed + i)
+        return tp(**{k: NAMED.get(k) if k in NAMED and f.annotation is str else fill(f.annotation, seed + i)
                      for i, (k, f) in enumerate(tp.model_fields.items())})
     return None
 
