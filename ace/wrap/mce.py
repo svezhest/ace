@@ -24,7 +24,7 @@ from . import Wrapper, correct
 
 META, META_ACE = prompts.load("mce_meta"), prompts.load("mce_meta_ace")
 MISSING = prompts.load("mce_skill_missing")
-ATTEMPTS = 3                # max_validation_attempts мета-агента: SKILL.md не записан — просьба записать
+SKILL_TRIES = 3             # max_validation_attempts мета-агента: ответов, пока SKILL.md не записан
 
 
 @dataclass
@@ -119,7 +119,7 @@ def reference(ex, history):
 
 def meta_agent(template):
     """author для Meta — мета-агент с файлами (run_meta_agent): читает всё в workspace (meta_agent/ и папки
-    прошлых под-итераций), пишет SKILL.md в папку первой под-итерации. Не записал — до ATTEMPTS раз просьба в
+    прошлых под-итераций), пишет SKILL.md в папку первой под-итерации. Не записал — до SKILL_TRIES раз просьба в
     том же разговоре; так и не записал — навык прошлой итерации."""
     def author(ex, history):
         name = f"iter{len(history) + 1}_sub0"
@@ -132,7 +132,7 @@ def meta_agent(template):
                              skill_output_path=path, skill_database=render.skill_database(
                                  evaluations(history), skills(history), len(history) + 1))
         talk = None
-        for _ in range(ATTEMPTS):
+        for _ in range(SKILL_TRIES):
             reply = ex.model.ask(Call(messages(user), params(), tools=fs.TOOLS, deps=fs.FS(mounts, root=WORKSPACE), rounds=ROUNDS,
                                       history=talk))
             if out.read(SKILL) is not None:
@@ -198,10 +198,10 @@ def claude_meta(ex, ws, folder, iteration):
     options = ClaudeAgentOptions(cwd=str(ws.base), allowed_tools=META_TOOLS,
                                  can_use_tool=partial(meta_permission, iter_dir=folder))
     ok = ex.model.session(prompt, options, lambda: None if skill.exists() else CLAUDE_MISSING.fill(expected_path=skill),
-                          ATTEMPTS, ws.root)
+                          SKILL_TRIES, ws.root)
     cleanup(folder, "meta")
     if not ok:
-        raise RuntimeError(f"Meta-agent failed to generate SKILL.md after {ATTEMPTS} attempts")
+        raise RuntimeError(f"Meta-agent failed to generate SKILL.md after {SKILL_TRIES} attempts")
     return skill.read_text()
 
 

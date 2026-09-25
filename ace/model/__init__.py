@@ -13,8 +13,8 @@
                     вызова, без своей логики; ответ текстом -> reader (wire.py)
 Входы Model — все вызовы идут через них и все в расходе (usage):
     ask(Call) -> Reply          вызов; с инструментами — только через pydantic-ai
-    message(messages, params)   агентный цикл апстрима (TF-GRPO: openai-agents) — проводом при любом бэкенде, ответ
-                                как есть (сообщение с tool_calls)
+    message(messages, params)   агентный цикл апстрима (TF-GRPO: openai-agents) — проводом при любом бэкенде,
+                                ответ как есть (сообщение с tool_calls)
     session(...)                агент Claude Agent SDK на этой модели (MCE апстрима, claude.py): ходы и токены — из
                                 итогового сообщения SDK
     embed(texts, name)          эмбеддинги: провод — /v1/embeddings сервера с моделью name, как у апстрима (EvoLib),
@@ -76,7 +76,7 @@ def content(m):
 
 
 def roles(messages):
-    """(системный или "", последний пользовательский) — модели-заглушки, трасса."""
+    """(системный или "", последний пользовательский) — только для моделей-заглушек (tests/stub.py, tools/trace.py)."""
     system = next((content(m) for m in messages if m["role"] == "system"), "")
     return system, next((content(m) for m in reversed(messages) if m["role"] == "user"), "")
 
@@ -130,9 +130,14 @@ class Patch:
 
     def merge(self, other):
         """Два вмешательства одного шага: системный промпт — последний, дописывания — подряд."""
-        join = lambda a, b: "\n\n".join(x for x in (a, b) if x) or None
-        return Patch(other.system if other.system is not None else self.system,
-                     join(self.append, other.append), join(self.tool_result, other.tool_result))
+        system = other.system if other.system is not None else self.system
+        return Patch(system=system, append=joined(self.append, other.append),
+                     tool_result=joined(self.tool_result, other.tool_result))
+
+
+def joined(a, b):
+    """Два дописывания подряд через пустую строку; оба пустые — None."""
+    return "\n\n".join(x for x in (a, b) if x) or None
 
 
 @dataclass
@@ -158,28 +163,31 @@ class Model:
         from .agent import PydanticAI
         from .wire import Wire
         self.name = name or config.MODEL
-        base_url = self.base_url = base_url or config.OPENAI_BASE_URL
+        self.base_url = base_url or config.OPENAI_BASE_URL
         self.backend = backend or config.BACKEND
         if self.backend not in ("pydantic-ai", "wire"):
             raise ValueError(f"неизвестный бэкенд модели: {self.backend}")
-        self.agent = PydanticAI(self.name, base_url)
-        self.wire = Wire(self.name, base_url) if self.backend == "wire" else None
-        self.direct = self.wire or Wire(self.name, base_url)    # model.message: провод при любом бэкенде
+        self.agent = PydanticAI(self.name, self.base_url)
+        self.wire = Wire(self.name, self.base_url)      # провод: бэкенд wire и model.message при любом бэкенде
         self.agents = dict(calls=0, prompt_tokens=0, completion_tokens=0)     # агенты Claude SDK
         self.embedded = 0
 
+    @property
+    def on_wire(self):
+        return self.backend == "wire"
+
     def ask(self, call):
-        if self.wire is None or call.tools or call.history is not None:
-            return self.agent.ask(call)
-        return self.wire.ask(call)
+        if self.on_wire and not call.tools and call.history is None:
+            return self.wire.ask(call)
+        return self.agent.ask(call)
 
     def message(self, messages, params):
         """(сообщение assistant dict, finish_reason): запрос ровно с messages и params (с tools), ответ с tool_calls."""
-        return self.direct.message(messages, params)
+        return self.wire.message(messages, params)
 
-    def session(self, prompt, options, feedback, attempts, root):
+    def session(self, prompt, options, feedback, replies, root):
         """Разговор агента Claude SDK на этой модели (claude.session), CLI с окружением корня root; -> готово ли."""
-        ok, used = claude.session(prompt, options, feedback, attempts, claude.env(root, self.name, self.base_url))
+        ok, used = claude.session(prompt, options, feedback, replies, claude.env(root, self.name, self.base_url))
         for k, v in used.items():
             self.agents[k] += v
         return ok
@@ -187,12 +195,13 @@ class Model:
     def embed(self, texts, name):
         """Векторы texts списками: провод — запрос /v1/embeddings с моделью name, иначе BGE-M3 стенда."""
         self.embedded += len(texts)
-        if self.wire is not None:
+        if self.on_wire:
             return self.wire.embed(texts, name)
         return embed.embed(texts).tolist()
 
     def usage(self):
         """Расход: вызовы и токены всех входов (агенты Claude SDK — отдельно и в сумме), тексты эмбеддингов."""
-        out = {k: sum(getattr(b, k) for b in (self.agent, self.direct)) + self.agents[k]
-               for k in ("calls", "prompt_tokens", "completion_tokens")}
+        out = {}
+        for counter in ("calls", "prompt_tokens", "completion_tokens"):
+            out[counter] = getattr(self.agent, counter) + getattr(self.wire, counter) + self.agents[counter]
         return dict(out, agent_calls=self.agents["calls"], embedded=self.embedded)

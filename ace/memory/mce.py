@@ -69,7 +69,7 @@ class Context(Files):
 CLAUDE_SKILL = ".claude/skills/learning-context/SKILL.md"
 BASE_TOOLS = ["Skill", "Read", "Write", "Edit", "Bash", "Glob", "Grep", "Task", "TaskOutput", "ExitPlanMode", "TodoWrite",
               "KillShell", "EnterPlanMode"]
-VALIDATION_ATTEMPTS = 3     # max_validation_attempts run_base_agent
+VALIDATION_TRIES = 3        # max_validation_attempts run_base_agent: ответов, пока проверка не прошла
 UTILS = Path(__file__).parent / "mce_utils"     # mce/workspace_utils апстрима дословно: копия в utils/ под-итерации
 CLAUDE_BASE, INTERFACES = prompts.load("mce_claude_base"), prompts.load("mce_claude_interfaces")
 INVALID = prompts.load("mce_claude_invalid")
@@ -377,7 +377,7 @@ class Folder:
         (self.path / "data" / "train.json").write_text(train_json(ex, groups, [g.item["id"] for g in groups], field),
                                                         encoding="utf-8")
         if not base_agent(ex, self.ws, self.path):
-            raise RuntimeError(f"Base-agent failed at {self.path.name}: validation failed after {VALIDATION_ATTEMPTS} attempts")
+            raise RuntimeError(f"Base-agent failed at {self.path.name}: validation failed after {VALIDATION_TRIES} attempts")
         self.loaded = None
 
 
@@ -395,6 +395,6 @@ def base_agent(ex, ws, folder):
             return None
         errors = validate(folder, sigs)
         return INVALID.fill(errors=errors) if errors else None
-    ok = ex.model.session(prompt, options, feedback, VALIDATION_ATTEMPTS if sigs else 1, ws.root)
+    ok = ex.model.session(prompt, options, feedback, VALIDATION_TRIES if sigs else 1, ws.root)
     cleanup(folder, "base")
     return ok

@@ -22,12 +22,16 @@ pydantic_ai.BANNER_ENABLED = False     # что печатать, решает �
 def apply(messages, patch):
     """Patch к истории: последнее сообщение — запрос с результатами инструментов шага."""
     if patch.system is not None:
-        for p in (p for m in messages if isinstance(m, ModelRequest) for p in m.parts):
-            if isinstance(p, SystemPromptPart):
-                p.content = patch.system
+        for m in messages:
+            if not isinstance(m, ModelRequest):
+                continue
+            for part in m.parts:
+                if isinstance(part, SystemPromptPart):
+                    part.content = patch.system
     last = messages[-1]
     if patch.tool_result:
-        results = [p for p in last.parts if isinstance(p, (ToolReturnPart, RetryPromptPart)) and isinstance(p.content, str)]
+        results = [part for part in last.parts
+                   if isinstance(part, (ToolReturnPart, RetryPromptPart)) and isinstance(part.content, str)]
         if results:
             results[-1].content += "\n\n" + patch.tool_result
         else:
@@ -36,13 +40,17 @@ def apply(messages, patch):
         last.parts.append(UserPromptPart(patch.append))
 
 
-def split(messages):
+def to_pydantic_ai(messages):
     """Сообщения вызова -> (системный промпт, история pydantic-ai до последнего сообщения, последнее — user).
     При непустой истории системный промпт входит в её первый запрос: pydantic-ai ставит его только без истории."""
     system = "\n\n".join(content(m) for m in messages if m["role"] == "system")
     turns = [m for m in messages if m["role"] != "system"]
-    history = [ModelRequest([UserPromptPart(content(m))]) if m["role"] == "user" else ModelResponse([TextPart(content(m))])
-               for m in turns[:-1]]
+    history = []
+    for m in turns[:-1]:
+        if m["role"] == "user":
+            history.append(ModelRequest([UserPromptPart(content(m))]))
+        else:
+            history.append(ModelResponse([TextPart(content(m))]))
     if history and system and isinstance(history[0], ModelRequest):
         history[0].parts.insert(0, SystemPromptPart(system))
     return system, history, content(turns[-1])
@@ -54,36 +62,42 @@ class PydanticAI:
         self.calls = self.prompt_tokens = self.completion_tokens = 0
 
     def ask(self, call):
-        system, history, user = split(call.messages)
-        history = (call.history or []) + history or None
+        system, history, user = to_pydantic_ai(call.messages)
+        history = (call.history or []) + history
+        history = history or None       # pydantic-ai различает пустую историю и её отсутствие
         output = call.reader.schema or str
         limit = call.rounds + EXTRA_REQUESTS
         if call.on_step is None:
             result, messages, outcome = self.request(system, user, history, output, call, limit)
         else:
-            # ШАГОВЫЙ РЕЖИМ. Нужен тем, кто вмешивается посреди попытки: показу после ошибки (урок в конец истории)
-            # и SCOPE (правило, выученное на шаге, переписывает системный промпт). Прогон идёт по одному запросу;
-            # после шага с инструментами on_step получает новые шаги и может вернуть Patch, он применяется к
-            # истории до следующего запроса. История сообщений переходит из запроса в запрос.
-            result, messages = None, None
-            for _ in range(limit):
-                before = steps(messages or [])
-                if messages is None:
-                    result, messages, outcome = self.request(system, user, history, output, call, 1)
-                else:
-                    result, messages, outcome = self.request(system, None, messages, output, call, 1)
-                new = steps(messages)[len(before):]
-                if outcome is not Outcome.step:
-                    break
-                patch = call.on_step(new) if new else None
-                if patch:
-                    apply(messages, patch)
-                    if patch.system is not None:
-                        system = patch.system
+            result, messages, outcome = self.stepwise(system, user, history, output, call, limit)
         responses = [m for m in messages if isinstance(m, ModelResponse)]
         out = result if call.reader.schema else call.reader.read(result)
-        return Reply(out, render.transcript(messages), any(m.finish_reason == "length" for m in responses), steps(messages),
-                     outcome, messages, result if isinstance(result, str) else None)
+        return Reply(out, render.transcript(messages), truncated=any(m.finish_reason == "length" for m in responses),
+                     steps=steps(messages), outcome=outcome, messages=messages,
+                     raw=result if isinstance(result, str) else None)
+
+    def stepwise(self, system, user, history, output, call, limit):
+        """Шаговый режим — для тех, кто вмешивается посреди попытки: показ после ошибки (урок в конец истории) и
+        SCOPE (правило, выученное на шаге, переписывает системный промпт). Прогон идёт по одному запросу к модели;
+        после шага с инструментами on_step получает новые шаги и может вернуть Patch — он применяется к истории до
+        следующего запроса. -> (ответ, все сообщения, Outcome)."""
+        seen = 0                # шагов уже отдано on_step
+        result, messages, outcome = self.request(system, user, history, output, call, 1)
+        for n in range(1, limit + 1):
+            new = steps(messages)[seen:]
+            seen += len(new)
+            if outcome is not Outcome.step:
+                break
+            patch = call.on_step(new) if new else None
+            if patch:
+                apply(messages, patch)
+                if patch.system is not None:
+                    system = patch.system
+            if n == limit:
+                break
+            result, messages, outcome = self.request(system, None, messages, output, call, 1)
+        return result, messages, outcome
 
     def request(self, system, user, history, output, call, limit):
         """До limit запросов; -> (ответ или None, все сообщения, Outcome). user — новое сообщение после history

@@ -40,13 +40,13 @@ def prepare(root):
         (root / ".venv").symlink_to(config.MCE_VENV)
 
 
-def session(prompt, options, feedback, attempts, environ):
+def session(prompt, options, feedback, replies, environ):
     """Разговор ClaudeSDKClient, как у агентов MCE: промпт, ответ до конца; feedback() -> None (готово) или текст
-    следующего сообщения; до attempts ответов. CLI запускается с окружением environ целиком. -> (готово ли,
+    следующего сообщения; до replies ответов агента. CLI запускается с окружением environ целиком. -> (готово ли,
     расход: calls — ходы модели агента по ResultMessage.num_turns, prompt_tokens, completion_tokens). Фоновые
     вызовы малой модели CLI SDK не считает."""
     used = dict(calls=0, prompt_tokens=0, completion_tokens=0)
-    return asyncio.run(_session(prompt, options, feedback, attempts, environ, used)), used
+    return asyncio.run(_session(prompt, options, feedback, replies, environ, used)), used
 
 
 def count(message, used):
@@ -59,7 +59,7 @@ def count(message, used):
         used["completion_tokens"] += usage.get("output_tokens", 0) or 0
 
 
-async def _session(prompt, options, feedback, attempts, environ, used):
+async def _session(prompt, options, feedback, replies, environ, used):
     from claude_agent_sdk import ClaudeSDKClient
     saved = dict(os.environ)
     os.environ.clear()          # SDK отдаёт CLI os.environ процесса: на время запуска — только environ
@@ -72,15 +72,14 @@ async def _session(prompt, options, feedback, attempts, environ, used):
         os.environ.update(saved)
     try:
         await client.query(prompt)
-        for attempt in range(attempts):
+        for reply in range(replies):
             async for message in client.receive_response():
                 count(message, used)
             note = feedback()
             if note is None:
                 return True
-            if attempt + 1 >= attempts:
-                break
-            await client.query(note)
+            if reply < replies - 1:
+                await client.query(note)
         return False
     finally:
         await client.disconnect()
