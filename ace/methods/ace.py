@@ -10,13 +10,15 @@ ace_text — рефлексия свободным текстом: меток н
     соберётся: памяти нужны labels).
 ace_rewrite — куратор переписывает всю память, пункт на строку: старые пункты уходят со счётчиками, новые — с нуля.
 
-ace_exact — как в апстриме (ace/ace/ace.py, core/, playbook_utils.py; промпты ace_*.j2 дословно):
-    память      playbook из 7 разделов (контейнеры с общей нумерацией); пункты только добавляются: куратор
-                (последняя рефлексия, вопрос, бюджет токенов, статистика) отвечает ADD с разделом; счётчики
-    показ       весь playbook по разделам, строка «[id] helpful=X harmful=Y :: текст», и просьба назвать
+ace_exact — как в апстриме (ace/ace/ace.py, core/, playbook_utils.py; промпты ace_*.j2 дословно; сверка —
+tests/bridge/test_bridge_ace.py):
+    память      playbook из 7 разделов, id «calc-00001» (слаг раздела и общий номер); пункты только добавляются:
+                куратор (последняя рефлексия, контекст вопроса, бюджет токенов, статистика) отвечает текстом, из
+                JSON берутся только ADD; счётчики
+    показ       весь playbook текстом апстрима, строка «[id] helpful=X harmful=Y :: текст», и просьба назвать
                 использованные пункты строкой USED (вместо bullet_ids)
     извлечение  диагноз с метками, при неверном ответе до 3 раундов с новой попыткой (extract/ace.py)
-    Решение после куратора в апстриме только для отчёта: не делаем.
+    Решение после куратора и тест окна в апстриме только для отчёта: не делаем (DEVIATIONS ACE3).
 ace_exact_dedup — после куратора похожие пункты сливаются моделью (BulletpointAnalyzer; в апстриме выключен).
 """
 from typing import Literal
@@ -27,7 +29,7 @@ from .. import embed, parse, prompts, render
 from ..extract import LABELS
 from ..extract.ace import Diagnose, Reflector
 from ..learner import Learner, swap
-from ..memory import HARMFUL, HELPFUL, Lessons, Operation, Sections
+from ..memory import HARMFUL, HELPFUL, Ids, Lessons, Operation, Sections
 from ..show import Whole
 from ..wrap import skilled
 
@@ -93,43 +95,71 @@ ace_rewrite = swap(ace, "ace_rewrite", memory=Playbook(curate_rewrite))
 P = {n: prompts.load(f"ace_{n}") for n in ("curator", "curator_nogt", "merge")}
 SECTIONS = ["STRATEGIES & INSIGHTS", "FORMULAS & CALCULATIONS", "CODE SNIPPETS & TEMPLATES", "COMMON MISTAKES TO AVOID",
             "PROBLEM-SOLVING HEURISTICS", "CONTEXT CLUES & INDICATORS", "OTHERS"]
-OTHERS = "others"
+OTHERS, GENERAL = "others", "general"
+SLUGS = {"financial_strategies_and_insights": "fin", "formulas_and_calculations": "calc", "code_snippets_and_templates": "code",
+         "common_mistakes_to_avoid": "err", "problem_solving_heuristics": "prob", "context_clues_and_indicators": "ctx",
+         "others": "misc", "meta_strategies": "meta"}
 TOKEN_BUDGET = 80000
 HIGH_HELPFUL, HIGH_HARMFUL = 5, 2   # пункт «high performing»: helpful больше и harmful меньше этих
 DEDUP = 0.85                # порог косинуса слияния; у апстрима 0.90 под all-mpnet, у BGE-M3 косинусы ниже
 MERGE_TEMPERATURE = 0.3
 
 
-def slug(title):
-    """Имя раздела из заголовка апстрима."""
-    return title.lower().strip().replace(" ", "_").replace("&", "and")
+def section_key(name):
+    """Имя раздела из заголовка или из операции куратора, как в apply_curator_operations (без strip: у операции
+    лишний пробел даёт другое имя)."""
+    return name.lower().replace(" ", "_").replace("&", "and")
 
 
-TITLES = {slug(s): s for s in SECTIONS}
+def section_slug(name):
+    """get_section_slug апстрима (utils.py:52): слаг из словаря или первые буквы слов (одно слово — 4 буквы)."""
+    clean = section_key(name.strip())
+    if clean in SLUGS:
+        return SLUGS[clean]
+    words = clean.split("_")
+    return words[0][:4] if len(words) == 1 else "".join(w[0] for w in words[:5])
 
 
-class Addition(BaseModel):
-    type: str = "ADD"
-    section: str = "others"
-    content: str
+TITLES = {section_key(s): s for s in SECTIONS}
 
 
-class Curation(BaseModel):
-    reasoning: str
-    operations: list[Addition] = []
+def question_context(task, text):
+    """Question Context куратора — context из DataProcessor апстрима: у formula пусто (весь вход — вопрос,
+    parse_context_and_question_formula), у остальных — текст после «Input: », если вход в формате
+    «Instruction: ... Input: ... Answer: » (parse_instruction_and_input), иначе пусто."""
+    if task == "formula" or not ("Input: " in text and "Instruction: " in text):
+        return ""
+    return text.split("Input: ")[1].split("Answer: ")[0].strip()
+
+
+class SlugIds(Ids):
+    """Id пункта апстрима: слаг раздела и общий номер, «calc-00001» (apply_curator_operations)."""
+    slug = "misc"
+
+    def next(self):
+        self.n += 1
+        return f"{self.slug}-{self.n:05d}"
+
+    def order(self, id):
+        return int(id.rsplit("-", 1)[1])
 
 
 def layout(records, playbook):
-    """Весь playbook по разделам, пустые разделы тоже (как в апстриме)."""
-    return render.titled([(TITLES[n], s.records()) for n, s in playbook.sections.items()], render.counted)
+    """Весь playbook текстом, как его ведёт апстрим."""
+    return render.ace_playbook([(TITLES[n], s.records()) for n, s in playbook.sections.items()])
 
 
 class SectionedPlaybook(Sections):
+    """Playbook апстрима: 7 разделов, общий счётчик id со слагом раздела. Порядок пунктов — как в тексте апстрима:
+    по разделам, внутри раздела по добавлению; пункт раздела general — в начало OTHERS."""
     requires = frozenset({LABELS})
 
     def __init__(self, dedup=None):
-        super().__init__(list(TITLES), "bullet", ops=Operation.ADD)
+        super().__init__(list(TITLES), "bullet", ops=Operation.ADD, ids=SlugIds())
         self.dedup = dedup
+
+    def records(self):
+        return [r for s in self.sections.values() for r in s.items]
 
     def learn(self, ex, extractions):
         for x in extractions:
@@ -138,17 +168,43 @@ class SectionedPlaybook(Sections):
         if self.dedup:
             self.merge_similar(ex)
 
-    def section(self, name):
-        return slug(name) if slug(name) in self.sections else OTHERS
-
     def curate(self, ex, x):
+        """Curator.curate апстрима: ответ текстом, разбор и проверка как у апстрима (ошибка — ответ пропускается
+        целиком); применяются только ADD, UPDATE / DELETE / MERGE апстрим молча пропускает."""
         fields = dict(token_budget=TOKEN_BUDGET, current_step=ex.i + 1, total_samples=ex.total,
                       playbook_stats=render.stats(self.stats()), recent_reflection=x.lessons[-1],
-                      current_playbook=layout(None, self), question_context=x.group.question)
-        r = ex.model.run("", P["curator" if x.group.target else "curator_nogt"].fill(fields), output=Curation).output
-        for op in (r.operations if r else []):
-            if op.type == "ADD":            # apply_curator_operations апстрима применяет только ADD
-                self.add(op.content, self.section(op.section))
+                      current_playbook=layout(None, self), question_context=question_context(ex.task.name, x.group.question))
+        out = ex.model.run("", P["curator" if x.group.target else "curator_nogt"].fill(fields)).output
+        self.apply(parse.ace_operations(out) or [])
+
+    def apply(self, ops):
+        """apply_curator_operations апстрима: только ADD; раздел без strip, неизвестный — OTHERS, general — в начало
+        OTHERS; id — слаг раздела и общий номер. Ошибка на любой операции — не применяется ни одна."""
+        adds = []
+        try:
+            for op in ops:
+                if op["type"] == "ADD":
+                    adds.append((self.place(op.get("section", GENERAL)), f"{op.get('content', '')}"))
+        except Exception:
+            return
+        top = 0
+        for (name, slug), text in adds:
+            self.ids.slug = slug
+            if name == GENERAL:     # раздела general нет: пункт встаёт сразу под заголовок OTHERS
+                self.add(text, OTHERS)
+                items = self.sections[OTHERS].items
+                items.insert(top, items.pop())
+                top += 1
+            else:
+                self.add(text, name)
+
+    def place(self, section):
+        """(раздел, слаг) нового пункта: неизвестный раздел — others, кроме general (слаг gene, место — начало
+        OTHERS)."""
+        name = section_key(section)
+        if name not in self.sections and name != GENERAL:
+            name = OTHERS
+        return name, section_slug(name)
 
     def stats(self):
         """get_playbook_stats апстрима."""
@@ -187,6 +243,7 @@ class SectionedPlaybook(Sections):
             merged = self.merge(ex, [recs[j] for j in group])
             if merged:
                 text, helpful, harmful = merged
+                self.ids.slug = recs[i].id.rsplit("-", 1)[0]
                 self.update(recs[i].id, text, outcomes=[HELPFUL] * helpful + [HARMFUL] * harmful)
             for j in group[1:]:
                 self.delete(recs[j].id)

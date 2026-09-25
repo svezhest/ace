@@ -172,6 +172,24 @@ def stats(values):
     return json.dumps(values, indent=2)
 
 
+def ace_playbook(sections):
+    """Playbook ACE текстом, как его ведёт апстрим: пустой — заголовки через пустую строку
+    (_initialize_empty_playbook), новый пункт — в конец раздела, после этой пустой строки и перед следующим
+    заголовком (apply_curator_operations); у последнего раздела пустой строки нет. sections — пары (заголовок,
+    записи)."""
+    lines = []
+    for i, (title, records) in enumerate(sections):
+        lines += [f"## {title}"] + ([""] if i < len(sections) - 1 else []) + [counted(r) for r in records]
+    return "\n".join(lines)
+
+
+def bullets_used(records):
+    """Пункты, которые назвал решатель, для рефлектора (extract_playbook_bullets): строка пункта с первой строкой
+    текста — апстрим разбирает playbook построчно."""
+    first = lambda text: text.split("\n")[0].strip()
+    return "\n".join(f"[{r.id}] helpful={r.helpful} harmful={r.harmful} :: {first(r.text)}" for r in records)
+
+
 def merge_group(records):
     """Группа похожих пунктов для слияния (BulletpointAnalyzer)."""
     return "\n".join(f"{k + 1}. {counted(r)}" for k, r in enumerate(records))

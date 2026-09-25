@@ -1,14 +1,16 @@
 """Извлечение ACE и память ACE: рефлектор стенда (метки и без), диагноз с раундами новой попытки,
 куратор операциями, отсев, playbook по разделам; стык при абляции."""
+import json
+
 import pytest
 from stub import TASK, Stub, episode
 
 from ace import prompts
 from ace.extract import LABELS, Extraction, Labels
-from ace.extract.ace import Diagnose, Diagnosis, Reflection, Reflector, Tag, reported, used_line
+from ace.extract.ace import Diagnose, Reflection, Reflector, reported, used_line
 from ace.learner import swap
 from ace.loop import Group
-from ace.methods.ace import Curation, Op, Ops, Playbook, SectionedPlaybook, ace, curate_rewrite
+from ace.methods.ace import Op, Ops, Playbook, SectionedPlaybook, ace, curate_rewrite
 
 
 class Ex:
@@ -86,30 +88,47 @@ def test_used_line():
 
 
 def diagnosis(tags):
-    return Diagnosis(reasoning="", error_identification="", root_cause_analysis="", correct_approach="",
-                     key_insight="k", bullet_tags=[Tag(id=i, tag=t) for i, t in tags])
+    """Ответ рефлектора текстом, как у апстрима: JSON с bullet_tags."""
+    return json.dumps(dict(reasoning="", key_insight="k", bullet_tags=[dict(id=i, tag=t) for i, t in tags]))
 
 
 def test_diagnose_rounds():
     """Неверный ответ: диагноз, метки в копию памяти, новая попытка с диагнозом; до верной попытки."""
-    tags = iter([[("r1", "harmful")], [("r1", "harmful"), ("r2", "helpful")], [("r2", "helpful")]])
-    model = Stub(schemas={"Diagnosis": lambda call: diagnosis(next(tags))})
+    tags = [[("r1", "harmful")], [("r1", "harmful"), ("r2", "helpful")], [("r2", "helpful")]]
+    replies = iter(diagnosis(t) for t in tags)
+    model = Stub(lambda call: next(replies))
     memory = playbook("a", "b")
     retries = [episode("5", ok=False, target="4", final="USED: r1"), episode("4", ok=True, target="4")]
     ex = Ex(model, retries)
-    x = Diagnose()(ex, group(episode("3", ok=False, target="4", final="USED: r1, r2")), memory)
+    x = Diagnose()(ex, group(episode("3", ok=False, target="4", final="USED: r2, r1")), memory)
     assert [n[1] for n in ex.notes] == [[(0, 1), (0, 0)], [(0, 2), (1, 0)]]     # метки раундов — в копию
     assert x.extras[LABELS] == Labels(["r2"], ["r1", "r1"])
     assert [r.harmful for r in memory.records()] == [0, 0]   # сама память не тронута
-    assert x.lessons == [diagnosis([("r1", "harmful"), ("r2", "helpful")]).model_dump_json(indent=2)]
-    assert ex.notes[0][0] == diagnosis([("r1", "harmful")]).model_dump_json(indent=2)
+    assert x.lessons == [diagnosis(tags[1])] and ex.notes[0][0] == diagnosis(tags[0])
     users = [c["user"] for c in model.calls]
-    assert "[r1] helpful=0 harmful=0 :: a\n[r2] helpful=0 harmful=0 :: b" in users[0]
+    assert "[r1] helpful=0 harmful=0 :: a\n[r2] helpful=0 harmful=0 :: b" in users[0]     # в порядке памяти
     assert "[r1] helpful=0 harmful=1 :: a" in users[1] and "harmful=0 :: b" not in users[1]
 
 
+def test_diagnose_tags_as_upstream():
+    """update_bullet_counts: повтор id — последняя метка, ключ bullet вместо id, neutral и чужие метки не считаются."""
+    reply = ('text "bullet_tags": [{"id": "r1", "tag": "helpful"}, {"id": "r1", "tag": "harmful"}, '
+             '{"bullet": "r2", "tag": "helpful"}, {"id": "r3", "tag": "useful"}] tail')
+    x = Diagnose()(Ex(Stub(lambda call: reply)), group(episode("4", ok=True, target="4")), playbook("a", "b", "c"))
+    assert x.extras[LABELS] == Labels(["r2"], ["r1"]) and x.lessons == [reply]
+
+
+def test_diagnose_bullets_used():
+    """Нет строки USED или none — «No bullets used»; названы, но нет в памяти — строка апстрима."""
+    for final, text in (("FINAL ANSWER: 4", "ace_no_bullets"), ("USED: none", "ace_no_bullets"),
+                        ("USED: r9", "ace_bullets_not_found")):
+        model = Stub(lambda call: "")
+        Diagnose()(Ex(model), group(episode("4", ok=True, target="4", final=final)), playbook("a"))
+        assert prompts.text(text) in model.calls[0]["user"]
+
+
 def test_diagnose_right_answer_one_round():
-    model = Stub(schemas={"Diagnosis": diagnosis([("r1", "helpful")])})
+    model = Stub(lambda call: diagnosis([("r1", "helpful")]))
     ex = Ex(model)
     x = Diagnose()(ex, group(episode("4", ok=True, target="4", final="USED: r1")), playbook("a"))
     assert len(model.calls) == 1 and ex.notes == [] and x.extras[LABELS] == Labels(["r1"], [])
@@ -117,11 +136,10 @@ def test_diagnose_right_answer_one_round():
 
 def test_diagnose_without_label():
     """Без верного ответа — промпт _nogt, без ground truth; раунд один, после него новая попытка, как в апстриме."""
-    model = Stub(schemas={"Diagnosis": diagnosis([])})
+    model = Stub(lambda call: diagnosis([]))
     ex = Ex(model, [episode("5")])
     Diagnose()(ex, group(episode("4", ok=None)), playbook())
     assert len(ex.notes) == 1 and len(model.calls) == 1
-    assert prompts.text("ace_no_bullets") in model.calls[0]["user"]
     assert model.calls[0]["user"] == prompts.load("ace_reflector_nogt").fill(
         question="q", reasoning_trace="FINAL ANSWER: 4", predicted_answer="4",
         environment_feedback=prompts.text("ace_environment_feedback", correct=None),
@@ -129,13 +147,16 @@ def test_diagnose_without_label():
 
 
 def test_sectioned_playbook():
+    """Куратор апстрима: только ADD, неизвестный раздел — OTHERS, id со слагом раздела и общим номером."""
     m = SectionedPlaybook()
-    model = Stub(schemas={"Curation": Curation(reasoning="", operations=[
+    reply = json.dumps(dict(reasoning="", operations=[
         dict(type="ADD", section="Formulas & Calculations", content="f"), dict(type="ADD", section="nowhere", content="o"),
-        dict(type="UPDATE", section="others", content="skip")])})
+        dict(type="UPDATE", section="others", content="skip")]))
+    model = Stub(lambda call: reply)
     m.learn(Ex(model), [Extraction(group(episode(target="4")), ["{json}"], [], {LABELS: Labels()})])
-    assert [(m.section_of(r.id), r.text) for r in m.records()] == [("formulas_and_calculations", "f"), ("others", "o")]
+    assert [(m.section_of(r.id), r.id, r.text) for r in m.records()] == [
+        ("formulas_and_calculations", "calc-00001", "f"), ("others", "misc-00002", "o")]
     user = model.calls[0]["user"]
     assert "## STRATEGIES & INSIGHTS\n\n## FORMULAS & CALCULATIONS" in user and "{json}" in user
-    m.count(["r1"] * 6, [])
+    m.count(["misc-00002"] * 6, [])
     assert m.stats()["high_performing"] == 1 and m.stats()["by_section"]["OTHERS"]["count"] == 1

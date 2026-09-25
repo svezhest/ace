@@ -123,8 +123,8 @@ class Lessons(Container):
 
 class Sections(Container):
     """Разделы — контейнеры уроков с общей нумерацией; records() — все записи в порядке появления."""
-    def __init__(self, names, kind="lesson", record=Lesson, ops=ALL):
-        self.kind, self.ids = kind, Ids()
+    def __init__(self, names, kind="lesson", record=Lesson, ops=ALL, ids=None):
+        self.kind, self.ids = kind, ids or Ids()
         self.sections = {n: Lessons(kind, record, ops, self.ids) for n in names}
 
     def records(self):

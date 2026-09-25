@@ -5,12 +5,13 @@
     Diagnose    рефлектор апстрима (ace/core/reflector.py; промпты ace_reflector*.j2 дословно): диагноз с
                 метками пунктов; при неверном ответе до rounds раундов «диагноз -> метки в копию памяти ->
                 новая попытка с диагнозом как заметкой» (ex.retry: стрелка извлечение -> попытки).
-                Какие пункты решатель использовал, он называет сам строкой USED (вместо bullet_ids)."""
+                Ответ текстом и разбор, как у апстрима (parse.bullet_tags). Какие пункты решатель использовал,
+                он называет сам строкой USED (вместо bullet_ids)."""
 import copy
 
 from pydantic import BaseModel
 
-from .. import prompts, render
+from .. import parse, prompts, render
 from ..wrap import skilled
 from . import LABELS, Extraction, Extractor, Labels, scores
 
@@ -51,20 +52,6 @@ P = {n: prompts.load(f"ace_{n}") for n in ("reflector", "reflector_nogt")}
 ROUNDS = 3
 
 
-class Tag(BaseModel):
-    id: str
-    tag: str
-
-
-class Diagnosis(BaseModel):
-    reasoning: str
-    error_identification: str
-    root_cause_analysis: str
-    correct_approach: str
-    key_insight: str
-    bullet_tags: list[Tag] = []
-
-
 def used_line(text):
     """Самоотчёт вместо bullet_ids: последняя строка «USED: r1, r3» в обычном ответе решателя."""
     lines = [l for l in text.splitlines() if l.strip().upper().startswith("USED:")]
@@ -76,44 +63,63 @@ def reported(ep, memory):
     return [i for i in used_line(ep.final) if memory.get(i)]
 
 
+def named(ep):
+    """id, которые решатель назвал в строке USED (как bullet_ids генератора апстрима); «none» — ни одного."""
+    return [i for i in used_line(ep.final) if i and i.lower() != "none"]
+
+
+def bullets_used(memory, ids):
+    """extract_playbook_bullets апстрима: названные пункты в порядке playbook; без id и без найденных — строки
+    апстрима."""
+    if not ids:
+        return prompts.text("ace_no_bullets")
+    found = [r for r in memory.records() if r.id in ids]
+    return render.bullets_used(found) if found else prompts.text("ace_bullets_not_found")
+
+
+def tag_map(tags):
+    """Метки рефлектора, как их применяет update_bullet_counts апстрима: id (или bullet) -> tag, при повторе id
+    побеждает последняя; не список и не словари — ничего."""
+    out = {}
+    for t in tags if isinstance(tags, list) else []:
+        if isinstance(t, dict) and (t.get("id") or t.get("bullet", "")):
+            out[t.get("id") or t.get("bullet", "")] = t.get("tag", "neutral")
+    return out
+
+
 class Diagnose(Extractor):
+    """Рефлектор апстрима: ответ текстом, метки — разбор bullet_tags без json_mode (по умолчанию в апстриме),
+    урок для куратора — весь ответ рефлектора, как recent_reflection апстрима."""
     gives = frozenset({LABELS})
 
     def __init__(self, rounds=ROUNDS):
         self.rounds = rounds
 
-    def diagnose(self, ex, ep, used, memory):
+    def diagnose(self, ex, ep, memory):
         """Поля рефлектора апстрима; без верного ответа — промпт _nogt."""
-        bullets = [render.counted(memory.get(i)) for i in used if memory.get(i)]
         fields = dict(question=ep.question, reasoning_trace=ep.output, predicted_answer=ep.answer,
                       environment_feedback=prompts.text("ace_environment_feedback", correct=ep.ok),
-                      bullets_used="\n".join(bullets) if used else prompts.text("ace_no_bullets"))
+                      bullets_used=bullets_used(memory, named(ep)))
         if ep.target:
             fields["ground_truth"] = ep.target
-        return ex.model.run("", P["reflector" if ep.target else "reflector_nogt"].fill(fields), output=Diagnosis).output
+        return ex.model.run("", P["reflector" if ep.target else "reflector_nogt"].fill(fields)).output or ""
 
     def __call__(self, ex, group, memory):
         """Метки каждого раунда сразу идут в копию памяти: следующую попытку решатель делает уже с ними.
-        В извлечении метки всех раундов и диагноз последнего."""
+        В извлечении метки всех раундов и ответ рефлектора последнего раунда."""
         ep = group.episodes[0]
-        local, attempt, used = copy.deepcopy(memory), ep, reported(ep, memory)
-        labels, last = Labels(), None
+        local, attempt, labels = copy.deepcopy(memory), ep, Labels()
         for _ in range(self.rounds if ep.ok is False else 1):
-            d = self.diagnose(ex, attempt, used, local)
-            if not d:
-                break
-            last = d
-            helpful = [t.id for t in d.bullet_tags if t.tag == "helpful"]
-            harmful = [t.id for t in d.bullet_tags if t.tag == "harmful"]
+            text = self.diagnose(ex, attempt, local)
+            tags = tag_map(parse.bullet_tags(text))
+            helpful = [i for i, t in tags.items() if t == "helpful"]
+            harmful = [i for i, t in tags.items() if t == "harmful"]
             local.count(helpful, harmful)
             labels.helpful += helpful
             labels.harmful += harmful
             if attempt.ok:
                 break
-            attempt = ex.retry(local, d.model_dump_json(indent=2))
-            used = reported(attempt, local)
+            attempt = ex.retry(local, text)
             if attempt.ok:
                 break
-        if last is None:
-            return None
-        return Extraction(group, [last.model_dump_json(indent=2)], scores(group), {LABELS: labels})
+        return Extraction(group, [text], scores(group), {LABELS: labels})

@@ -7,8 +7,12 @@
     fenced(text, tag)   все блоки ```tag подряд (EvoLib)
     json_block          JSON из последнего ```json или всего текста; None, если не разбирается (TF-GRPO)
     subtasks            блоки <subtask> с description (EvoLib)
-    counted_line(id)    «[id] helpful=N harmful=M :: текст» -> (текст, N, M) (ACE BulletpointAnalyzer)"""
+    counted_line(id)    «[id] helpful=N harmful=M :: текст» -> (текст, N, M) (ACE BulletpointAnalyzer)
+    ace_json            extract_json_from_text ACE: весь текст, ```json, первый объект {...} (ACE)
+    bullet_tags         _extract_bullet_tags рефлектора ACE без json_mode: массив после "bullet_tags" (ACE)
+    ace_operations      _extract_and_validate_operations куратора ACE: операции или None (ACE)"""
 import json
+import re
 
 
 def opened(tag):
@@ -74,3 +78,95 @@ def counted_line(id):
             return None
         return body.strip(), int(counts["helpful"]), int(counts["harmful"])
     return parse
+
+
+def ace_json(text):
+    """extract_json_from_text (ACE playbook_utils.py:256): весь текст; иначе первый разобранный блок ```json (регистр
+    не важен); иначе первый разобранный объект {...} по балансу скобок, скобки в строках не считаются; иначе None."""
+    try:
+        try:
+            return json.loads(text.strip())
+        except json.JSONDecodeError:
+            pass
+        for block in re.findall(r"```json\s*(.*?)\s*```", text, re.DOTALL | re.IGNORECASE):
+            try:
+                return json.loads(block.strip())
+            except json.JSONDecodeError:
+                continue
+        for candidate in braced(text):
+            try:
+                return json.loads(candidate)
+            except json.JSONDecodeError:
+                continue
+    except Exception:
+        pass
+    return None
+
+
+def braced(text):
+    """Объекты {...} верхнего уровня по балансу скобок, как find_json_objects апстрима (кавычки пропускаются
+    целиком, экранированный символ тоже)."""
+    out, i = [], 0
+    while i < len(text):
+        if text[i] != "{":
+            i += 1
+            continue
+        depth, start = 1, i
+        i += 1
+        while i < len(text) and depth > 0:
+            if text[i] == "{":
+                depth += 1
+            elif text[i] == "}":
+                depth -= 1
+            elif text[i] == '"':
+                i += 1
+                while i < len(text) and text[i] != '"':
+                    if text[i] == "\\":
+                        i += 1
+                    i += 1
+            i += 1
+        if depth == 0:
+            out.append(text[start:i])
+    return out
+
+
+def bullet_tags(text):
+    """_extract_bullet_tags рефлектора ACE без json_mode (reflector.py:100): JSON-массив от первой [ после
+    "bullet_tags" до парной ]; иначе []. Что внутри массива — как есть."""
+    start = (text or "").find('"bullet_tags"')
+    bracket = text.find("[", start) if start != -1 else -1
+    if bracket == -1:
+        return []
+    depth, end = 0, bracket
+    for i in range(bracket, len(text)):
+        if text[i] == "[":
+            depth += 1
+        elif text[i] == "]":
+            depth -= 1
+            if depth == 0:
+                end = i + 1
+                break
+    try:
+        return json.loads(text[bracket:end])
+    except json.JSONDecodeError:
+        return []
+
+
+def ace_operations(text):
+    """_extract_and_validate_operations куратора ACE (curator.py:344): JSON с reasoning (строка) и operations
+    (список словарей с type, у ADD ещё section и content) -> список операций; иначе None — ответ куратора
+    пропускается целиком."""
+    info = ace_json(text or "")
+    try:
+        if not info or "reasoning" not in info or "operations" not in info:
+            return None
+        if not isinstance(info["reasoning"], str) or not isinstance(info["operations"], list):
+            return None
+        for op in info["operations"]:
+            if not isinstance(op, dict) or "type" not in op:
+                return None
+            if op["type"] == "ADD" and not {"type", "section", "content"} <= set(op):
+                return None
+    except TypeError:
+        return None
+    return info["operations"]
