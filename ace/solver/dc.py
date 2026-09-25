@@ -14,12 +14,11 @@ Generator — решатель попытки: одно сообщение user 
                 вопросе тоже (пары "(empty)"); без блока <cheatsheet> генератор видит сами пары, и они же
                 сохраняются как cheatsheet (extract_cheatsheet(old_cheatsheet=пары), как в апстриме)
     history     все прошлые пары подряд (dc_history, FullHistoryAppending)"""
-from dataclasses import dataclass
-
 from .. import parse, prompts, render
 from ..env import sandbox
 from ..loop import Prompt, Solver
 from ..upstream.dc import CHEATSHEET, MAX_TOKENS, TOKENS, dc_params
+from ..extract import INPUT, SHEET
 from ..model import Call, Reply, messages
 from ..tasks import variant
 from ..show import TopK, Whole
@@ -43,12 +42,6 @@ def dc_input(task, i, question):
     return MEB + text if variant("dc", task) == "meb" else text
 
 
-@dataclass
-class DCPrompt(Prompt):
-    input: str = ""             # вход задачи, как его видит генератор (он же вопрос куратора)
-    sheet: str = ""             # что стояло в [[CHEATSHEET]]: DC-RS хранит его как прошлый cheatsheet
-
-
 class Generator(OwnSolver):
     """Решатель DC апстрима; sheet(ex, память, item, вход) -> (текст для [[CHEATSHEET]], показанные записи)."""
     def __init__(self, sheet, code=False):
@@ -63,7 +56,7 @@ class Generator(OwnSolver):
 
         def talk(model, call):
             return generate(model, call, self.code)
-        return DCPrompt(shown=[r.id for r in recs], solver=Solver(call, parse.dc_answer, talk), input=question, sheet=text)
+        return Prompt(shown=[r.id for r in recs], solver=Solver(call, parse.dc_answer, talk), seen={INPUT: question, SHEET: text})
 
 
 def generate(model, call, code):

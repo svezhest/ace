@@ -15,6 +15,8 @@
     rationale     обоснование урока (SCOPE)
     trigger       фрагмент ошибки, по которому урок показывается (хуки по ошибкам)
     attempt       номер попытки, на которой урок извлечён (SCOPE: урок — в память перспективы попытки)
+    input         вход задачи, как его видел решатель (DC: вопрос куратора)
+    sheet         что стояло в [[CHEATSHEET]] у решателя (DC-RS хранит его как прошлый cheatsheet)
 
 Масштаб извлечения (scale): "question" — extractor(ex, group, memory) после каждого вопроса; "batch" —
 batch(ex, groups, memory) -> [Extraction] на батче, стадиями по всему батчу (TF-GRPO). Извлечение на шаге (SCOPE:
@@ -25,6 +27,7 @@ from dataclasses import dataclass, field
 LABELS, CONFIDENCE, DOMAIN, ATTRIBUTION, IG, BEST_ANSWER = "labels", "confidence", "domain", "attribution", "ig", "best_answer"
 OPERATIONS = "operations"
 RATIONALE, TRIGGER, ATTEMPT = "rationale", "trigger", "attempt"
+INPUT, SHEET = "input", "sheet"
 
 
 class Contract(ValueError):
@@ -61,9 +64,19 @@ class Extractor:
 
 
 class Raw(Extractor):
-    """Нет извлечения: память читает сырое (DC, MCE)."""
+    """Нет извлечения: память читает сырое (MCE)."""
     def __call__(self, ex, group, memory):
         return Extraction(group, [], scores(group))
+
+
+class Seen(Raw):
+    """Нет извлечения, но память видит, что показал решатель (DC: вход задачи и cheatsheet — Prompt.seen)."""
+    gives = frozenset({INPUT, SHEET})
+
+    def __call__(self, ex, group, memory):
+        x = super().__call__(ex, group, memory)
+        x.extras = {k: group.episodes[0].prompt.seen[k] for k in self.gives}
+        return x
 
 
 def scores(group):

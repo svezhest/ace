@@ -10,7 +10,8 @@ from sklearn.metrics.pairwise import cosine_similarity
 from upstream import fixture
 
 from ace import prompts
-from ace.loop import Episode, Group, run
+from ace.extract import INPUT, SHEET
+from ace.loop import Episode, Group, Prompt, run
 from ace.model import text_reply
 
 DC = importlib.import_module("ace.methods.dc")       # модуль: имя в пакете занято самим методом
@@ -93,8 +94,8 @@ def test_cumulative_curator_request():
     rec = PROMPTS["cumulative"]
     model = Model([rec["curator"]])
     output = rec["generator"]["response"].strip()
-    ep = Episode(rec["input"], 0, SHOW.DCPrompt(input=rec["input"]), output, output, "", [], False, [], [], [])
-    MEM.Cheatsheet().learn(Ex(model), [EXTRACT.Raw()(None, Group(rec["input"], [ep]), None)])
+    ep = Episode(rec["input"], 0, Prompt(seen={INPUT: rec["input"], SHEET: ""}), output, output, "", [], False, [], [], [])
+    MEM.Cheatsheet().learn(Ex(model), [EXTRACT.Seen()(None, Group(rec["input"], [ep]), None)])
     assert model.calls == [request(rec["curator"])]
 
 

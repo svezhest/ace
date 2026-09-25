@@ -1,5 +1,6 @@
 """Память Dynamic Cheatsheet (dynamic-cheatsheet: dynamic_cheatsheet/language_model.py; промпт куратора
-dc_curator.j2 дословно). Вердикта и извлечения нет: память читает сырое — вход задачи и весь ответ генератора.
+dc_curator.j2 дословно). Вердикта и извлечения нет: память читает сырое (весь ответ генератора) и то, что
+показал решатель (добавки input и sheet, extract.Seen).
 
     Cheatsheet  DC-Cu: один текст целиком; после каждого вопроса куратор (вход задачи, как его видел генератор,
                 весь ответ генератора, прошлый текст или "(empty)") пишет новый до 2 * max_tokens; без блока
@@ -9,6 +10,7 @@ dc_curator.j2 дословно). Вердикта и извлечения нет
 from dataclasses import dataclass
 
 from .. import prompts, render
+from ..extract import INPUT, SHEET
 from ..model import Call, messages
 from ..upstream.dc import CHEATSHEET, MAX_TOKENS, TOKENS, dc_params
 from . import Document, Lessons, Operation, Record
@@ -35,10 +37,12 @@ class Sheet(Document):
 
 
 class Cheatsheet(Sheet):
+    requires = frozenset({INPUT})
+
     def learn(self, ex, extractions):
         for x in extractions:
             ep = x.group.episodes[0]
-            fields = {"QUESTION": ep.prompt.input, "MODEL_ANSWER": ep.output, "PREVIOUS_CHEATSHEET": self.current()}
+            fields = {"QUESTION": x.extras[INPUT], "MODEL_ANSWER": ep.output, "PREVIOUS_CHEATSHEET": self.current()}
             call = Call(messages(CURATOR.fill(fields)), dc_params(TOKENS * MAX_TOKENS), CHEATSHEET)
             new = ex.model.ask(call).output
             if new is not None:
@@ -55,18 +59,19 @@ class Pair(Record):
 
 
 class Pairs(Lessons):
-    """Пары прошлых вопросов; sheet — последний синтезированный cheatsheet (DC-RS): показ кладёт его в промпт
-    попытки (prompt.sheet), память сохраняет."""
+    """Пары прошлых вопросов; sheet — последний синтезированный cheatsheet (DC-RS): решатель показал его в попытке
+    (добавка sheet), память сохраняет."""
     def __init__(self, sheet=False):
         super().__init__("pair", record=Pair, ops=Operation.ADD)
         self.sheet = Sheet() if sheet else None
+        self.requires = frozenset({SHEET}) if sheet else frozenset()
 
     def learn(self, ex, extractions):
         for x in extractions:
             ep = x.group.episodes[0]
             self.add(ep.output, question=ep.question)
             if self.sheet is not None:
-                self.sheet.rewrite(ep.prompt.sheet)
+                self.sheet.rewrite(x.extras[SHEET])
 
     def chars(self):
         return super().chars() + (self.sheet.chars() if self.sheet else 0)

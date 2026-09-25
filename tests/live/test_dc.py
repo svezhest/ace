@@ -15,6 +15,7 @@ from pathlib import Path
 import pytest
 
 from ace.env import sandbox
+from ace.extract import SHEET
 from ace.learner import swap
 from ace.loop import run
 from ace.memory.dc import Cheatsheet, Pairs
@@ -32,13 +33,13 @@ STEPS = []                  # после каждого обучения: (чт�
 class WatchedSheet(Cheatsheet):
     def learn(self, ex, extractions):
         super().learn(ex, extractions)
-        STEPS.append((extractions[-1].group.episodes[0].prompt.sheet, self.text))
+        STEPS.append((extractions[-1].extras[SHEET], self.text))
 
 
 class WatchedPairs(Pairs):
     def learn(self, ex, extractions):
         super().learn(ex, extractions)
-        STEPS.append((extractions[-1].group.episodes[0].prompt.sheet, [(r.question, r.text) for r in self.records()]))
+        STEPS.append((extractions[-1].extras[SHEET], [(r.question, r.text) for r in self.records()]))
 
 
 METHODS = {"dc": swap(dc, memory=WatchedSheet()), "dc_code": swap(dc_code, memory=WatchedSheet()),

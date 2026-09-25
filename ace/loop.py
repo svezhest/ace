@@ -48,6 +48,7 @@ class Prompt:
     top_p: float = None         # None — по умолчанию сервера (TF-GRPO: итоговый агент апстрима с top_p 0.95)
     note: str = ""              # заметка к сообщению решателю (раунды рефлексии ACE)
     solver: Solver = None       # свой решатель метода; тогда системного промпта задачи и среды нет
+    seen: dict = field(default_factory=dict)    # что ещё решатель показал (DC: вход задачи, cheatsheet) — для извлечения
 
 
 @dataclass
