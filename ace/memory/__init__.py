@@ -8,7 +8,8 @@
 нужны от извлечения (ace/extract), learn(ex, extractions) и begin(k) — начало попытки k (срок жизни записей)."""
 from .documents import Document, Files
 from .lessons import ALL, Container, Ids, Lessons, Operation, Sections
-from .record import HARMFUL, HEAD_CHARS, HELPFUL, Lesson, Record
+from .counters import HARMFUL, HELPFUL, Counted
+from .record import HEAD_CHARS, Lesson, Record
 
-__all__ = ["ALL", "Container", "Document", "Files", "HARMFUL", "HEAD_CHARS", "HELPFUL", "Ids", "Lesson", "Lessons",
-           "Operation", "Record", "Sections"]
+__all__ = ["ALL", "Container", "Counted", "Document", "Files", "HARMFUL", "HEAD_CHARS", "HELPFUL", "Ids", "Lesson",
+           "Lessons", "Operation", "Record", "Sections"]

@@ -10,6 +10,7 @@ from ace.extract import LABELS, Extraction, Labels
 from ace.extract.ace import Diagnose, Reflection, Reflector, named, used_line
 from ace.learner import swap
 from ace.loop import Group
+from ace.memory.counters import count
 from ace.memory.ace import Op, Ops, Playbook, SectionedPlaybook, curate_rewrite
 from ace.methods.ace import ace_stand
 
@@ -64,7 +65,7 @@ def test_ablation_needs_both_levels():
 def test_playbook_learn():
     """Метки -> журнал, уроки -> куратор (UPDATE — новый пункт), затем отсев вредных."""
     m = playbook("a", "b")
-    m.count([], ["r2", "r2"])
+    count(m, [], ["r2", "r2"])
     model = Stub(schemas={"Ops": Ops(ops=[Op(op="UPDATE", id="r1", text="a2"), Op(op="ADD", text="c")])})
     x = Extraction(group(episode()), ["lesson"], [1.0], {LABELS: Labels(["r1"], ["r2"])})
     m.learn(Ex(model), [x])
@@ -158,5 +159,5 @@ def test_sectioned_playbook():
         ("formulas_and_calculations", "calc-00001", "f"), ("others", "misc-00002", "o")]
     user = model.calls[0]["user"]
     assert "## STRATEGIES & INSIGHTS\n\n## FORMULAS & CALCULATIONS" in user and "{json}" in user
-    m.count(["misc-00002"] * 6, [])
+    count(m, ["misc-00002"] * 6, [])
     assert m.stats()["high_performing"] == 1 and m.stats()["by_section"]["OTHERS"]["count"] == 1

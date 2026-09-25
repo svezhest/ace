@@ -13,6 +13,7 @@ from pydantic import BaseModel
 
 from .. import parse, prompts, render
 from ..memory.ace import ace_input, ace_params
+from ..memory.counters import count
 from ..model import Call, Reader, messages, params
 from . import LABELS, Extraction, Extractor, Labels, scores
 
@@ -122,7 +123,7 @@ class Diagnose(Extractor):
             tags = tag_map(tags)
             helpful = [i for i, t in tags.items() if t == "helpful"]
             harmful = [i for i, t in tags.items() if t == "harmful"]
-            local.count(helpful, harmful)
+            count(local, helpful, harmful)
             labels.helpful += helpful
             labels.harmful += harmful
             if attempt.ok:

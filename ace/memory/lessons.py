@@ -5,14 +5,13 @@
     delete(id)          DELETE
     apply(ops)          операции, предложенные моделью; запрещённые контейнеру (ops) пропускаются
     replace(texts)      вся память заново: старые записи уходят со статистикой, новые с нуля
-    count(helpful, harmful)   метки извлечения — в журналы исходов записей
     prune(test)         отсев записей, для которых test(r)
 
 Контейнеры: Lessons — список записей; Sections — разделы (каждый Lessons) с общей нумерацией.
 Права (ops) ограничивают только операции модели; политики метода (отсев, слияние) — его код."""
 from enum import Flag, auto
 
-from .record import HARMFUL, HELPFUL, Lesson
+from .record import Lesson
 
 
 class Operation(Flag):
@@ -38,7 +37,7 @@ class Ids:
 
 
 class Container:
-    """Общее для контейнеров уроков: поиск, журнал исходов, отсев, размер, ключ, сериализация."""
+    """Общее для контейнеров уроков: поиск, размер, ключ, сериализация."""
     requires = frozenset()      # добавки, которые память требует от извлечения (extract/__init__.py)
 
     def records(self):
@@ -52,12 +51,6 @@ class Container:
 
     def __len__(self):
         return len(self.records())
-
-    def count(self, helpful, harmful):
-        for ids, outcome in ((helpful, HELPFUL), (harmful, HARMFUL)):
-            for id in ids:
-                if self.get(id):
-                    self.get(id).outcomes.append(outcome)
 
     def chars(self):
         return sum(len(r.text) for r in self.records())

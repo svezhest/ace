@@ -12,6 +12,7 @@ from ace.env import Env
 from ace.extract import LABELS, TRIGGER, Extraction, Labels
 from ace.extract.ace import Reflection
 from ace.extract.hooks import HookLesson, HookLessons, by_model, by_trajectory, error_kind
+from ace.memory.counters import count
 from ace.memory.hooks import HookBook
 from ace.wrap.hooks import Hooks
 from ace.learner import Learner
@@ -172,7 +173,7 @@ def test_ace_opt_caps_playbook():
     model = Stub(optimizer, schemas={"Ops": Ops(ops=[dict(op="ADD", text=f"bullet {i}") for i in range(11)])})
     m = CappedPlaybook()
     m.add("kept")
-    m.count(["r1"], [])
+    count(m, ["r1"], [])
     m.learn(Ex(model), [Extraction(None, ["l"], [], {LABELS: Labels()})])
     texts = [r.text for r in m.records()]
     assert len(texts) == 10 and texts[-1] == "merged"

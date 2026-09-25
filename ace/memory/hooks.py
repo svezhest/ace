@@ -3,13 +3,14 @@
 from dataclasses import dataclass
 
 from ..extract import LABELS, TRIGGER
-from . import Ids, Lesson, Lessons
+from . import Ids, Lessons
+from .counters import Counted, count, prune_harmful
 
 PRUNE = 2
 
 
 @dataclass(frozen=True, eq=False)
-class Hook(Lesson):
+class Hook(Counted):
     """Урок по ошибке: показывается, когда текст ошибки содержит trigger."""
     trigger: str = ""
 
@@ -29,7 +30,7 @@ class HookBook(Lessons):
     def learn(self, ex, extractions):
         for x in extractions:
             if LABELS in x.extras:
-                self.count(x.extras[LABELS].helpful, x.extras[LABELS].harmful)
+                count(self, x.extras[LABELS].helpful, x.extras[LABELS].harmful)
             for text, trigger in zip(x.lessons, x.extras[TRIGGER]):
                 old = next((r for r in self.items if r.trigger.lower() == trigger.lower()), None)
                 if old is None:
@@ -37,4 +38,4 @@ class HookBook(Lessons):
                 elif old.text != text:
                     self.update(old.id, text, trigger=trigger)
         if self.prune_at:
-            self.prune(lambda r: r.harmful >= self.prune_at and r.harmful > r.helpful)
+            prune_harmful(self, self.prune_at)

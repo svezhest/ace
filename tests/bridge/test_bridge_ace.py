@@ -12,7 +12,8 @@ from ace import parse, prompts, render
 from ace.extract.ace import bullets_used, tag_map
 from ace.learner import swap
 from ace.loop import run
-from ace.memory import HARMFUL, HELPFUL, Lesson
+from ace.memory import HARMFUL, HELPFUL, Counted
+from ace.memory.counters import count
 from ace.memory.ace import SectionedPlaybook, SECTIONS, ace_input, ace_params, layout, question_context, section_slug
 from ace.methods.ace import ace
 from ace.model import text_reply
@@ -237,7 +238,7 @@ def counts(text):
 def test_update_bullet_counts(name):
     m = playbook_like_upstream()
     tags = tag_map(TAGS[name])
-    m.count([i for i, t in tags.items() if t == "helpful"], [i for i, t in tags.items() if t == "harmful"])
+    count(m, [i for i, t in tags.items() if t == "helpful"], [i for i, t in tags.items() if t == "harmful"])
     assert {r.id: (r.helpful, r.harmful) for r in m.records()} == counts(MEMORY["update_bullet_counts"][name]["ok"])
 
 
@@ -321,7 +322,7 @@ def test_online_loop(tmp_path, key):
     memory = json.load(open(tmp_path / "memory.json"))
     final = SectionedPlaybook()
     for r in memory:
-        final.sections[r["section"]].items.append(Lesson(r["id"], r["text"], r["outcomes"]))
+        final.sections[r["section"]].items.append(Counted(r["id"], r["text"], r["outcomes"]))
     assert layout(final) == up["final_playbook"]
     assert max(int(r["id"].rsplit("-", 1)[1]) for r in memory) + 1 == up["next_global_id"]
 

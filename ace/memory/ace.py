@@ -14,7 +14,8 @@ from .. import embed, parse, prompts, render
 from ..extract import LABELS
 from ..model import Call, Reader, messages, params
 from ..tasks import variant
-from . import HARMFUL, HELPFUL, Ids, Lessons, Operation, Sections
+from . import Ids, Lessons, Operation, Sections
+from .counters import HARMFUL, HELPFUL, Counted, count, prune_harmful
 from .scope import CAP, TARGET, compress, rule_optimizer
 
 # стенд
@@ -57,18 +58,18 @@ class Playbook(Lessons):
     """Пункты стенда: метки рефлектора -> журнал исходов, уроки -> куратор, затем отсев вредных.
     prune=None — без отсева; тогда и метки не нужны."""
     def __init__(self, curator=curate_ops, prune=PRUNE_HARMFUL):
-        super().__init__("bullet", ops=Operation.ADD | Operation.UPDATE)
+        super().__init__("bullet", Counted, Operation.ADD | Operation.UPDATE)
         self.curator, self.prune_at = curator, prune
         self.requires = frozenset({LABELS}) if prune else frozenset()
 
     def learn(self, ex, extractions):
         for x in extractions:
             if LABELS in x.extras:
-                self.count(x.extras[LABELS].helpful, x.extras[LABELS].harmful)
+                count(self, x.extras[LABELS].helpful, x.extras[LABELS].harmful)
             if x.lessons:
                 self.curator(ex, self, x)
         if self.prune_at:
-            self.prune(lambda r: r.harmful >= self.prune_at and r.harmful > r.helpful)
+            prune_harmful(self, self.prune_at)
 
 
 class CappedPlaybook(Playbook):
@@ -174,15 +175,19 @@ class SectionedPlaybook(Sections):
     requires = frozenset({LABELS})
 
     def __init__(self, dedup=None, read=OPERATIONS):
-        super().__init__(list(TITLES), "bullet", ops=Operation.ADD, ids=SlugIds())
+        super().__init__(list(TITLES), "bullet", Counted, Operation.ADD, SlugIds())
         self.dedup, self.read = dedup, read
 
     def records(self):
         return [r for s in self.sections.values() for r in s.items]
 
+    def key(self):
+        """Кэш val: решатель видит в playbook и счётчики пунктов (layout), не только текст."""
+        return tuple((r.id, r.text, r.helpful, r.harmful) for r in self.records())
+
     def learn(self, ex, extractions):
         for x in extractions:
-            self.count(x.extras[LABELS].helpful, x.extras[LABELS].harmful)
+            count(self, x.extras[LABELS].helpful, x.extras[LABELS].harmful)
             self.curate(ex, x)
         if self.dedup:
             self.merge_similar(ex)
@@ -246,7 +251,8 @@ class SectionedPlaybook(Sections):
     def merge_similar(self, ex):
         """BulletpointAnalyzer: к пункту i все следующие с косинусом >= DEDUP, уже попавшие в группу
         пропускаются; группа сливается моделью в новый пункт на месте первого со счётчиками, которые вернула
-        модель (сумма по группе); если ответ не разобрался, остаётся первый. Остальные уходят."""
+        модель (сумма по группе), остальные уходят; если ответ не разобрался, группа остаётся целиком, как у
+        апстрима (индексы не попадают в processed_indices)."""
         recs = self.records()
         if len(recs) < 2:
             return
@@ -264,8 +270,8 @@ class SectionedPlaybook(Sections):
                 text, helpful, harmful = merged
                 self.ids.slug = recs[i].id.rsplit("-", 1)[0]
                 self.update(recs[i].id, text, outcomes=[HELPFUL] * helpful + [HARMFUL] * harmful)
-            for j in group[1:]:
-                self.delete(recs[j].id)
+                for j in group[1:]:
+                    self.delete(recs[j].id)
 
     def merge(self, ex, group):
         first = group[0]
