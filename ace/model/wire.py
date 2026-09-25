@@ -26,6 +26,9 @@ class Wire:
         reply.messages = call.messages + [{"role": "assistant", "content": choice.message.content or ""}]
         return reply
 
+    def embed(self, texts, name):
+        return [d.embedding for d in self.client.embeddings.create(model=name, input=texts).data]
+
     def message(self, messages, params):
         """Ответ как есть: (сообщение assistant dict без пустых полей, finish_reason)."""
         choice = self.create(messages, params)

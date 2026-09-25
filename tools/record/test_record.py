@@ -3,10 +3,12 @@ import json
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+import numpy as np
 import openai
 import pytest
 
 from tools.record import wire
+from tools.record.embeddings import Embedder
 from tools.record.record import Recorder
 from tools.record.replay import Replayer
 
@@ -185,3 +187,14 @@ def test_sse_tool_calls_and_usage():
     assert "content" not in first["choices"][0]["delta"]
     assert last["choices"][0]["finish_reason"] == "tool_calls"
     assert usage["usage"] == {"total_tokens": 2}
+
+
+def test_embeddings_server(monkeypatch):
+    """Сервер эмбеддингов: клиент openai по умолчанию просит base64 и получает те же float32, что списком."""
+    monkeypatch.setattr("ace.embed.embed", lambda texts: np.array([[len(t), 0.1] for t in texts], dtype="float32"))
+    srv = start(Embedder(("127.0.0.1", 0)))
+    c = client(srv)
+    got = [d.embedding for d in c.embeddings.create(model="text-embedding-3-small", input=["ab", "c"]).data]
+    listed = c.embeddings.create(model="text-embedding-3-small", input="ab", encoding_format="float").data[0].embedding
+    srv.shutdown()
+    assert got == [[2.0, np.float32(0.1).item()], [1.0, np.float32(0.1).item()]] and listed == got[0]

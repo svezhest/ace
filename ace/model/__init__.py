@@ -12,12 +12,14 @@
     wire            «провод апстрима»: официальный клиент openai, chat.completions.create ровно с messages и params
                     вызова, без своей логики; ответ текстом -> reader (wire.py)
 Вызов с инструментами (решатель с run_python, агенты MCE) идёт только через pydantic-ai. Агентный цикл апстрима
-(TF-GRPO: openai-agents) идёт проводом при любом бэкенде: model.message(messages, params) -> ответ как есть."""
+(TF-GRPO: openai-agents) идёт проводом при любом бэкенде: model.message(messages, params) -> ответ как есть.
+Эмбеддинги — model.embed(texts, name): провод — /v1/embeddings сервера с моделью name, как у апстрима (EvoLib),
+pydantic-ai — BGE-M3 стенда (ace.embed); сервер эмбеддингов стенда — тот же BGE-M3 (tools/record/embeddings.py)."""
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Callable, NamedTuple
 
-from .. import config, parse
+from .. import config, embed, parse
 
 
 @dataclass(frozen=True)
@@ -154,6 +156,12 @@ class Model:
     def message(self, messages, params):
         """(сообщение assistant dict, finish_reason): запрос ровно с messages и params (с tools), ответ с tool_calls."""
         return self.direct.message(messages, params)
+
+    def embed(self, texts, name):
+        """Векторы texts списками: провод — запрос /v1/embeddings с моделью name, иначе BGE-M3 стенда."""
+        if self.wire is not None:
+            return self.wire.embed(texts, name)
+        return embed.embed(texts).tolist()
 
     def usage(self):
         return {k: sum(getattr(b, k) for b in (self.agent, self.direct)) for k in ("calls", "prompt_tokens", "completion_tokens")}
