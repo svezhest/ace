@@ -110,7 +110,7 @@ class Diagnose(Extractor):
                       bullets_used=bullets_used(memory, self.ids(ep)))
         if ep.target:
             fields["ground_truth"] = ep.target
-        reply = ex.model.ask(Call(messages(P["reflector" if ep.target else "reflector_nogt"].fill(fields)), ace_params(), self.read))
+        reply = ex.model.ask(Call(messages(P["reflector" if ep.target else "reflector_nogt"].fill(**fields)), ace_params(), self.read))
         return reply.raw or "", reply.output
 
     def __call__(self, ex, group, memory):

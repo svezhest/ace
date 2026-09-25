@@ -100,7 +100,7 @@ def test_templates(key):
                   answer="A", critique="C", trajectories="TS", existing_experiences="E", new_experiences="N",
                   experiences_and_operations="EO")
     ours = U.P[name][part == "up"]
-    assert ours.fill(values) == jinja2.Template(PROMPTS["templates"][key]).render(**values)
+    assert ours.fill(**values) == jinja2.Template(PROMPTS["templates"][key]).render(**values)
 
 
 def test_objectives_form():

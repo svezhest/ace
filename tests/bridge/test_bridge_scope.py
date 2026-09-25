@@ -91,7 +91,7 @@ def test_template(name):
     values = {f: f"<{f}> {{\"a\": [1]}}\nline 2" for f in fields}
     if "initial_confidence" in values:
         values["initial_confidence"] = 0.8765
-    assert TEMPLATES[name].fill(values) == raw.format(**values)
+    assert TEMPLATES[name].fill(**values) == raw.format(**values)
 
 
 SUMMARY = "Model output: The tag is Revenues.\nObservations: Answer incorrect"
@@ -108,8 +108,8 @@ def test_synthesizer_requests():
     fields = dict(agent_name=AGENT, agent_role=ROLE, task=TASK, last_step_summary=SUMMARY, current_system_prompt=BASE)
     # с правилами — из наших полей (applied_rules); у нас tactical всегда и в системном промпте, это проверяет цикл
     rules = render.rules(["Always read the full sentence."])
-    assert EXTRACT_P["error"].fill(fields, error_type=ERROR[0], error_message=ERROR[1], applied_rules=rules) == user(calls[0])
-    assert EXTRACT_P["thoroughness"].fill(fields, applied_rules=rules) == user(calls[2])
+    assert EXTRACT_P["error"].fill(**fields, error_type=ERROR[0], error_message=ERROR[1], applied_rules=rules) == user(calls[0])
+    assert EXTRACT_P["thoroughness"].fill(**fields, applied_rules=rules) == user(calls[2])
     model = Model(lambda prompt: calls[1]["response"])
     got = [Rules().propose(ex(model), attempt(), Book(), SUMMARY, ERROR),
            Rules().propose(ex(model), attempt(), Book("efficiency"), SUMMARY, None)]
@@ -133,7 +133,7 @@ def test_best_of_n_selector():
     second = Proposal(**parse.scope_guideline(cand["response"]))
     selector = dict(agent_name=AGENT, agent_role=ROLE, task=TASK, current_system_prompt=BASE, issue_type="error",
                     issue_details=render.issue(SUMMARY, ERROR), candidates=render.candidates([first, second]))
-    assert EXTRACT_P["selector"].fill(selector) == user(calls[5])
+    assert EXTRACT_P["selector"].fill(**selector) == user(calls[5])
     answers = iter([calls[4]["response"], cand["response"], calls[5]["response"]])
     model = Model(lambda prompt: next(answers))
     best = Rules(n=2).propose(ex(model), attempt(), Book(), SUMMARY, ERROR)

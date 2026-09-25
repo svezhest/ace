@@ -53,7 +53,7 @@ def test_template(ours, theirs, names):
         want = template.format(*[values[n] for n in names])
     else:
         want = template.format(**values)
-    assert prompts.load(ours).fill(values) == want
+    assert prompts.load(ours).fill(**values) == want
 
 
 def test_empty_playbook():
@@ -82,7 +82,7 @@ def test_reflector_request(key):
              "bullets_used": "Part of Playbook that's used by the generator to answer the question"}
     values = {n: section(user, heads[n], nxt[n]) for n in names}
     assert values["environment_feedback"] == prompts.text("ace_environment_feedback", correct=nogt)
-    assert prompts.load("ace_" + ("reflector_nogt" if nogt else "reflector")).fill(values) == user
+    assert prompts.load("ace_" + ("reflector_nogt" if nogt else "reflector")).fill(**values) == user
     assert system == "" and call["temperature"] == 0.0 and "response_format" not in call
 
 
@@ -94,7 +94,7 @@ def test_curator_request(key):
     values = dict(token_budget=80000, current_step=1, total_samples=4, recent_reflection="Use plain numbers.",
                   current_playbook=section(user, "Current Playbook", "Question Context"),
                   playbook_stats=section(user, "Current Playbook Stats", "Recent Reflection"), question_context="ctx text")
-    assert prompts.load("ace_curator" + ("" if key == "curator_gt" else "_nogt")).fill(values) == user
+    assert prompts.load("ace_curator" + ("" if key == "curator_gt" else "_nogt")).fill(**values) == user
 
 
 def test_params():

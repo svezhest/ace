@@ -43,7 +43,7 @@ class Cheatsheet(Sheet):
         for x in extractions:
             ep = x.group.episodes[0]
             fields = {"QUESTION": x.extras[INPUT], "MODEL_ANSWER": ep.output, "PREVIOUS_CHEATSHEET": self.current()}
-            call = Call(messages(CURATOR.fill(fields)), dc_params(TOKENS * MAX_TOKENS), CHEATSHEET)
+            call = Call(messages(CURATOR.fill(**fields)), dc_params(TOKENS * MAX_TOKENS), CHEATSHEET)
             new = ex.model.ask(call).output
             if new is not None:
                 self.rewrite(new)

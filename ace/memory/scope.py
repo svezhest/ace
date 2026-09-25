@@ -35,7 +35,7 @@ def rule_optimizer(passes=OPTIMIZER_PASSES):
     """-> optimize(model, rules, target): анализ, затем конфликты, поглощение, слияние, до passes проходов;
     номера правил стабильны между проходами. Модель отвечает текстом, разбор — parse.scope_* (как у апстрима)."""
     def llm(model, name, fields, read):
-        return model.ask(Call(parts(P[name].fill(fields)), {}, Reader(text=read))).output
+        return model.ask(Call(parts(P[name].fill(**fields)), {}, Reader(text=read))).output
 
     def resolve(model, rules, pairs):
         by_id, done, fixed = {x["id"]: x for x in rules}, set(), {}

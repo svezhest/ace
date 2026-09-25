@@ -83,7 +83,7 @@ class Rules(Extractor):
                       applied_rules=render.rules([r.text for r in book.tactical]))
         if error:
             fields.update(error_type=error[0], error_message=error[1])
-        prompt = (P["error"] if error else P[book.name]).fill(fields)
+        prompt = (P["error"] if error else P[book.name]).fill(**fields)
 
         def one(extra, quality):
             read = Reader(text=lambda text: parse.scope_guideline(text, quality))
@@ -97,7 +97,7 @@ class Rules(Extractor):
         if len(cands) < 2:
             best = cands[0] if cands else None
         else:
-            select = P["selector"].fill(agent_context(ex, attempt, book), issue_type="error" if error else "quality",
+            select = P["selector"].fill(**agent_context(ex, attempt, book), issue_type="error" if error else "quality",
                                         issue_details=render.issue(summary, error), candidates=render.candidates(cands))
             read = Reader(text=lambda text: parse.scope_selection(text, len(cands)))
             best = cands[ex.model.ask(Call(parts(select), {}, read)).output]

@@ -21,7 +21,7 @@ def ask(ex, name, read=TEXT, **fields):
     sp, up = P[name]
     learning = LEARNING_DAPO if variant("tfgrpo", ex.task) == "math" else LEARNING
     system = sp.fill(agent_objective=objective(ex.task), learning_objective=learning, num_experiences=NUM)
-    return ex.model.ask(Call(messages(up.fill(fields), system), {}, read)).output
+    return ex.model.ask(Call(messages(up.fill(**fields), system), {}, read)).output
 
 
 def objective(task):

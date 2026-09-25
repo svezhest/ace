@@ -167,7 +167,7 @@ class SectionedPlaybook(Sections):
         fields = dict(token_budget=TOKEN_BUDGET, current_step=ex.i + 1, total_samples=ex.total,
                       playbook_stats=render.stats(self.stats()), recent_reflection=x.lessons[-1],
                       current_playbook=layout(self), question_context=question_context(ex.task.name, x.group.question))
-        prompt = P["curator" if x.group.target else "curator_nogt"].fill(fields)
+        prompt = P["curator" if x.group.target else "curator_nogt"].fill(**fields)
         self.apply(ex.model.ask(Call(messages(prompt), ace_params(), self.read)).output or [])
 
     def apply(self, ops):

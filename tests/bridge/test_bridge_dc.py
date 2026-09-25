@@ -52,7 +52,7 @@ def fake_embed(monkeypatch):
 ])
 def test_template(ours, theirs, fields):
     values = {f: f"<{f}> {{x}} {{{{y}}}}\nline" for f in fields}
-    assert prompts.load(ours).fill(values) == upstream_fill(PROMPTS["templates"][theirs], values)
+    assert prompts.load(ours).fill(**values) == upstream_fill(PROMPTS["templates"][theirs], values)
 
 
 @pytest.mark.parametrize("i, task", [(0, "gpqa"), (1, "meb"), (2, "meb"), (3, "gpqa")])
