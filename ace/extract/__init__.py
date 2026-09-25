@@ -11,11 +11,13 @@
     attribution   какие записи были в промпте каких попыток (EvoLib, Future IG)
     ig            прирост лучшей попытки группы (EvoLib)
     best_answer   лучшее решение вопроса (EvoLib)
+    operations    операции над библиотекой, предложенные по вопросу: словари operation / id / content (TF-GRPO)
 
 Реализации: ace.py — рефлектор стенда и диагноз ACE апстрима с раундами повторной попытки."""
 from dataclasses import dataclass, field
 
 LABELS, CONFIDENCE, DOMAIN, ATTRIBUTION, IG, BEST_ANSWER = "labels", "confidence", "domain", "attribution", "ig", "best_answer"
+OPERATIONS = "operations"
 
 
 @dataclass
