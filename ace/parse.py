@@ -14,6 +14,7 @@
     ace_operations      _extract_and_validate_operations куратора ACE: операции или None (ACE)
     bullet_ids          id пунктов в ответе генератора ACE, регулярка апстрима (ACE)
     ace_answer          extract_answer ACE: final_answer из JSON и откаты апстрима (ACE)
+    dc_answer           extract_answer DC: последний <answer> или блок в кавычках после FINAL ANSWER (DC)
     scope_*             ответы синтезатора, селектора, классификатора и оптимизатора SCOPE, с откатами апстрима
     json_object         общий разбор JSON: весь текст, последний ```json, последний объект {...}; None
     structured          общий разбор ответа в pydantic-схему (Reader(schema=...) на проводе); None"""
@@ -243,6 +244,31 @@ def boxed_content(text):
             if depth == 0:
                 return text[m.end():i]
     return None
+
+
+def dc_answer(text):
+    """extract_answer DC (dynamic_cheatsheet/utils/extractor.py:12): после последнего <answer> до </answer>;
+    иначе после последнего FINAL ANSWER (без двоеточия) — первый блок в ``` или ''' (какой встретится раньше);
+    иначе NO_ANSWER."""
+    text = text or ""
+    if "<answer>" in text:
+        return text.split("<answer>")[-1].strip().split("</answer>")[0].strip()
+    if "FINAL ANSWER" not in text:
+        return NO_ANSWER
+    try:
+        text = text.split("FINAL ANSWER")[-1].strip()
+        if text[0] == ":":
+            text = text[1:].strip()
+        single, back = text.find("'''"), text.find("```")
+        if min(single, back) != -1:
+            text = text.split("'''" if single < back else "```")[1].strip()
+        else:
+            text = text.split("```" if single == -1 else "'''")[1].strip()
+        if text.split("\n")[0].strip().lower() == "python":
+            text = "\n".join(text.split("\n")[1:]).strip()
+        return text
+    except IndexError:
+        return NO_ANSWER
 
 # SCOPE (SCOPE/scope 4dc0da5): разбор ответов дословно, с откатами апстрима
 

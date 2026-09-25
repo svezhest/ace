@@ -4,18 +4,18 @@ import random
 import numpy as np
 from stub import Stub
 
-from ace import fs, parse, prompts
+from ace import fs
 from ace.learner import Learner
 from ace.loop import Attempt, Prompt
 from ace.memory import Lessons
-from ace.model import Patch, Reader, Step
-from ace.show import HEAD, AfterError, Catalog, Choose, Sample, Show, Synth, TopK, Whole
+from ace.model import Patch, Step
+from ace.show import HEAD, AfterError, Catalog, Choose, Sample, Show, TopK, Whole
 
 ITEM = {"context": "What is 2 / 4?", "target": "0.5"}
 
 
 class Ex:
-    model = Stub(lambda call: "<cheatsheet>short</cheatsheet>")
+    model = Stub()
 
 
 def memory(*texts):
@@ -55,14 +55,6 @@ def test_choose():
     assert Choose((0.9, Show()), (1.0, full)).prompt(Ex, memory("a"), ITEM, 0).shown == ["r1"]
     random.seed(0)
     assert Choose((0.5, full)).prompt(Ex, memory("a"), ITEM, 0) == Prompt()
-
-
-def test_synth():
-    fields = lambda text, memory, item: dict(PREVIOUS_INPUT_OUTPUT_PAIRS=text, NEXT_INPUT=item["context"], PREVIOUS_CHEATSHEET="")
-    show = Synth(Whole(empty="(empty)"), prompts.load("dc_synth"), fields, Reader(text=parse.opened("cheatsheet")), tokens=2)
-    p = show.prompt(Ex, memory(), ITEM, 0)
-    assert p.system == "\n\n" + HEAD + "short"
-    assert ITEM["context"] in Ex.model.calls[-1]["user"]
 
 
 def test_catalog():

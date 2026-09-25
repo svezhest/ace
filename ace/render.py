@@ -118,6 +118,26 @@ def more_lines(left, offset):
 def time_limit(seconds):
     return f"sandbox: time limit of {seconds} s exceeded"
 
+# DC: исполнение кода генератора (utils/execute_code.py, language_model.py апстрима)
+
+DC_NO_RESPONSE = "(No response generated)"
+DC_NO_BLOCK = "(No code block found to execute)"
+DC_NO_OUTPUT = ("(No output was generated. It is possible that you did not include a print statement in your code. "
+                "If you want to see the output, please include a print statement.)")
+DC_TIMEOUT = "Execution took too long, aborting..."
+
+
+def dc_code_output(output):
+    return f"Output of the Python code above:\n```\n{output}\n```"
+
+
+def dc_code_error(error):
+    return f"PYTHON CODE OUTPUT:\n```\nError: {error}\n```"
+
+
+def dc_execution_error(stderr):
+    return f"Error in execution: {stderr}"
+
 # рефлексия стенда и хуки
 
 

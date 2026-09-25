@@ -1,22 +1,24 @@
-"""DC: cheatsheet целиком (куратор переписывает, без блока остаётся старый), пары DC-RS и синтез под вопрос,
+"""DC: генератор апстрима (вход задачи, cheatsheet в промпте, ответ <answer>, разговор с исполнением кода),
+cheatsheet целиком (куратор переписывает, без блока остаётся старый), пары DC-RS и синтез под вопрос,
 синтезированный cheatsheet сохраняется; контроли retrieval и history."""
 import numpy as np
 from stub import TASK, Stub, episode
 
-from ace import config, prompts
+from ace import prompts
 from ace.extract import Raw
 from ace.loop import Group, run
 from ace.memory.dc import Cheatsheet, Pairs
-from ace.methods.dc import dc, dc_history, dc_retrieval, dc_rs
+from ace.methods.dc import dc, dc_code, dc_history, dc_retrieval, dc_rs
+from ace.parse import dc_answer
 from ace.render import EMPTY
-from ace.show.dc import SheetPrompt
-from ace.show import HEAD
+from ace.show import dc as show
+from ace.tasks import TASKS
 
 ITEM = {"context": "What is 2 / 4?", "target": "0.5"}
 
 
 class Ex:
-    task, training = TASK, True
+    task, training, i = TASK, True, 0
 
     def __init__(self, model):
         self.model = model
@@ -26,30 +28,58 @@ def extraction(ep):
     return Raw()(Ex(None), Group(ep.question, [ep]), None)
 
 
+def generated(prompt, question="q1"):
+    """Эпизод с промптом генератора (куратору нужен вход задачи)."""
+    ep = episode(question=question)
+    ep.prompt = prompt
+    return ep
+
+
+def test_input():
+    assert show.dc_input("formula", 0, "x") == "Question #1:\nx"
+    meb = show.dc_input("meb", 4, "1 ? 2 = 3")
+    assert meb.startswith("Below is an equation") and meb.endswith("= 6.\n\nEquation: Question #5:\n1 ? 2 = 3")
+
+
+def test_answer():
+    assert dc_answer("a <answer>1</answer> b <answer> 2 + 3 = 5 </answer>") == "2 + 3 = 5"
+    assert dc_answer("FINAL ANSWER:\n```\n1 + 2 = 3\n```") == "1 + 2 = 3"
+    assert dc_answer("FINAL ANSWER: 3") == dc_answer("nothing") == "No final answer found"
+
+
+def test_generator_prompt():
+    p = dc.show.prompt(Ex(None), Cheatsheet(), ITEM, 0)
+    call = p.solver.call("")
+    assert call.params == {"temperature": 0.0, "max_completion_tokens": 2048}
+    assert [m["role"] for m in call.messages] == ["user"]
+    assert call.messages[0]["content"] == prompts.load("dc_generator").fill(QUESTION=p.input, CHEATSHEET=EMPTY)
+    assert p.input == "Question #1:\n" + ITEM["context"] and p.sheet == EMPTY
+
+
 def test_cheatsheet_rewrite():
     m = Cheatsheet()
-    assert m.records() == [] and dc.show.prompt(Ex(None), m, ITEM, 0).system == "\n\n" + HEAD + EMPTY
     model = Stub(lambda call: "notes <cheatsheet>\nv1\n</cheatsheet>")
-    m.learn(Ex(model), [extraction(episode(question="q1"))])
-    assert m.text == "v1"
+    p = dc.show.prompt(Ex(None), m, ITEM, 0)
+    m.learn(Ex(model), [extraction(generated(p))])
+    assert m.text == "v1" and dc.show.prompt(Ex(None), m, ITEM, 0).sheet == "v1"
     call = model.calls[0]
-    assert call["system"] == "" and "q1" in call["user"] and "FINAL ANSWER: 1" in call["user"] and EMPTY in call["user"]
-    m.learn(Ex(Stub(lambda call: "no block")), [extraction(episode())])
+    assert call["system"] == "" and p.input in call["user"] and "FINAL ANSWER: 1" in call["user"] and EMPTY in call["user"]
+    m.learn(Ex(Stub(lambda call: "no block")), [extraction(generated(p))])
     assert m.text == "v1"
-    m.learn(Ex(Stub(lambda call: "<cheatsheet></cheatsheet>")), [extraction(episode())])
-    assert m.text == "" and dc.show.prompt(Ex(None), m, ITEM, 0).system == ""
+    m.learn(Ex(Stub(lambda call: "<cheatsheet></cheatsheet>")), [extraction(generated(p))])
+    assert m.text == "" and dc.show.prompt(Ex(None), m, ITEM, 0).sheet == ""
 
 
-def test_curator_budget():
+def test_curator_params():
     seen = []
 
-    class Budget(Stub):
+    class Params(Stub):
         def ask(self, call):
-            seen.append(call.params["max_tokens"])
+            seen.append(call.params)
             return super().ask(call)
-    model = Budget(lambda call: "<cheatsheet>v</cheatsheet>")
-    Cheatsheet().learn(Ex(model), [extraction(episode())])
-    assert seen == [2 * config.MAX_TOKENS]
+    p = dc.show.prompt(Ex(None), Cheatsheet(), ITEM, 0)
+    Cheatsheet().learn(Ex(Params(lambda call: "<cheatsheet>v</cheatsheet>")), [extraction(generated(p))])
+    assert seen == [{"temperature": 0.0, "max_completion_tokens": 4096}]
 
 
 def fake_embed(monkeypatch):
@@ -66,41 +96,81 @@ def pairs(*questions, sheet=False):
 
 def test_retrieval_and_history(monkeypatch):
     fake_embed(monkeypatch)
-    assert dc_retrieval.show.prompt(Ex(None), pairs(), ITEM, 0).system == "\n\n" + HEAD + EMPTY
+    assert dc_retrieval.show.prompt(Ex(None), pairs(), ITEM, 0).sheet == EMPTY
     p = dc_retrieval.show.prompt(Ex(None), pairs("q1", "q2", "q3"), ITEM, 0)
     assert p.shown == ["r2", "r3", "r1"]
-    text = p.system
+    text = p.sheet
     assert prompts.text("dc_note") in text and "(Similarity: 1.00)" in text
     assert text.index("solution of q2") > text.index("solution of q3") > text.index("solution of q1")     # самая похожая последней
-    h = dc_history.show.prompt(Ex(None), pairs("q1", "q2"), ITEM, 0).system
+    h = dc_history.show.prompt(Ex(None), pairs("q1", "q2"), ITEM, 0).sheet
     assert h.index("q1") < h.index("q2") and "Similarity" not in h
 
 
+def test_upstream_embeddings():
+    """Вопросы meb с готовыми эмбеддингами апстрима: близость по ним, BGE-M3 не нужна."""
+    qs = [r["context"] for r in TASKS["meb"].load()[:4]]
+    p = dc_retrieval.show.prompt(Ex(None), pairs(*qs[:3]), {"context": qs[3]}, 0)
+    assert len(p.shown) == 3 and "(Similarity: 0." in p.sheet
+
+
 def test_synthesis_kept(monkeypatch):
-    """Синтез видит пары, вопрос и прошлый cheatsheet; синтезированный текст в промпте попытки, память его хранит."""
+    """Синтез видит пары, вход задачи и прошлый cheatsheet; синтезированный текст — в промпте генератора, память
+    его хранит."""
     fake_embed(monkeypatch)
     m = pairs("q1", sheet=True)
     model = Stub(lambda call: "<cheatsheet>for this question</cheatsheet>")
     p = dc_rs.show.prompt(Ex(model), m, ITEM, 0)
-    assert isinstance(p, SheetPrompt) and p.sheet == "for this question" and p.system.endswith("for this question")
+    assert p.sheet == "for this question" and "for this question" in p.solver.call("").messages[0]["content"]
     user = model.calls[0]["user"]
-    assert "solution of q1" in user and ITEM["context"] in user and EMPTY in user
-    ep = episode(question=ITEM["context"])
-    ep.prompt = p
-    m.learn(Ex(model), [extraction(ep)])
+    assert "solution of q1" in user and p.input in user and EMPTY in user
+    m.learn(Ex(model), [extraction(generated(p, ITEM["context"]))])
     assert [r.question for r in m.records()] == ["q1", ITEM["context"]] and m.sheet.text == "for this question"
     assert [d["kind"] for d in m.dump()] == ["pair", "pair", "sheet"]
 
 
 def test_synthesis_fallback():
-    """Без блока <cheatsheet> решатель видит сами пары, и они же сохраняются как cheatsheet (как в апстриме)."""
-    m = Pairs(sheet=True)
-    p = dc_rs.show.prompt(Ex(Stub(lambda call: "nothing")), m, ITEM, 0)
-    assert p.sheet == EMPTY and p.system == "\n\n" + HEAD + EMPTY
+    """Без блока <cheatsheet> генератор видит сами пары, и они же сохраняются как cheatsheet (как в апстриме)."""
+    p = dc_rs.show.prompt(Ex(Stub(lambda call: "nothing")), Pairs(sheet=True), ITEM, 0)
+    assert p.sheet == EMPTY
 
 
 def test_dc_run():
-    """Цикл: без вердикта, куратор после каждого вопроса."""
-    model = Stub(lambda call: "<cheatsheet>v</cheatsheet>" if "CHEATSHEET" in call["user"] else "FINAL ANSWER: 1")
+    """Цикл: без вердикта, куратор после каждого вопроса, генератор видит новый cheatsheet и номер вопроса."""
+    model = Stub(lambda call: "<cheatsheet>v</cheatsheet>" if "CHEATSHEET" in call["user"] else "<answer>1</answer>")
     run(TASK, dc, model, 2)
-    assert len(model.calls) == 4 and "\n\n" + HEAD + "v" in model.calls[2]["system"]
+    assert len(model.calls) == 4 and "Question #2:" in model.calls[2]["user"] and "\nv\n" in model.calls[2]["user"]
+
+
+def test_code_rounds(monkeypatch):
+    """Разговор с кодом: вывод песочницы в формате апстрима, просьба продолжить, в последнем раунде —
+    предупреждение; после трёх продолжений последний блок дописывается ещё раз. Без кода — один вызов."""
+    ran = []
+
+    def fake_run(code, container=None, limit=10):
+        ran.append((code, limit))
+        return {"stdout": "4\n", "stderr": "", "rc": 0, "timeout": False}
+    monkeypatch.setattr("ace.env.sandbox.run", fake_run)
+    block = "```python\nx = 2\nx * 2\n```\nEXECUTE CODE! trailing"
+    model = Stub(lambda call: block)
+    p = dc_code.show.prompt(Ex(None), Cheatsheet(), ITEM, 0)
+    reply = p.solver.talk(model, p.solver.call(""))
+    assert ran[0] == ("x = 2\nprint(x * 2)", 3) and len(model.calls) == 4
+    current = "```python\nx = 2\nx * 2\n```\nEXECUTE CODE!\n\nOutput of the Python code above:\n```\n4\n```"
+    assert reply.text == "\n\n".join([current] * 5)
+    assert model.calls[1]["user"] == prompts.text("dc_proceed")
+    assert model.calls[3]["user"] == prompts.text("dc_proceed") + prompts.text("dc_last_round")
+    plain = dc.show.prompt(Ex(None), Cheatsheet(), ITEM, 0)
+    assert plain.solver.talk(Stub(lambda call: block), plain.solver.call("")).text == block
+
+
+def test_code_output(monkeypatch):
+    """execute_code_with_timeout: без stdout — stderr, без обоих — просьба напечатать, предел — сообщение апстрима."""
+    outs = iter([{"stdout": "", "stderr": "Traceback\nNameError", "rc": 1, "timeout": False},
+                 {"stdout": "", "stderr": "", "rc": 0, "timeout": False},
+                 {"stdout": "", "stderr": "", "rc": 124, "timeout": True}])
+    monkeypatch.setattr("ace.env.sandbox.run", lambda code, container=None, limit=10: next(outs))
+    assert "Error in execution: Traceback\nNameError" in show.run_block("```python\nprint(y)\n```")
+    assert "No output was generated" in show.run_block("```python\n# nothing\n```")
+    assert "Execution took too long, aborting..." in show.run_block("```python\nwhile True: pass\n```")
+    assert show.run_block("no code") == ""
+    assert show.run_block("```python\n```") == "PYTHON CODE OUTPUT:\n```\nError: list index out of range\n```"

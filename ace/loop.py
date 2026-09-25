@@ -25,10 +25,12 @@ from .verdict import majority
 
 @dataclass
 class Solver:
-    """Решатель метода вместо общего (генератор ACE): call(заметка) -> Call — запрос целиком, заметка рефлектора
-    внутри него; answer(ответ текстом) -> ответ в зачёт."""
+    """Решатель метода вместо общего (генератор ACE, DC): call(заметка) -> Call — запрос целиком, заметка рефлектора
+    внутри него; answer(ответ текстом) -> ответ в зачёт; talk(модель, Call) -> Reply — свой разговор метода вместо
+    одного вызова (DC: исполнение кода между вызовами)."""
     call: callable
     answer: callable
+    talk: callable = None
 
 
 @dataclass
@@ -168,10 +170,12 @@ class Experiment:
         return ep
 
     def solved(self, item, k, prompt):
-        """Попытка своим решателем метода: один вызов без инструментов."""
-        reply = self.model.ask(prompt.solver.call(prompt.note))
+        """Попытка своим решателем метода: без инструментов, один вызов или разговор метода."""
+        solver = prompt.solver
+        call = solver.call(prompt.note)
+        reply = solver.talk(self.model, call) if solver.talk else self.model.ask(call)
         final = reply.output or ""
-        ep = Episode(item["context"], k, prompt, reply.text, final, prompt.solver.answer(final), [], reply.truncated,
+        ep = Episode(item["context"], k, prompt, reply.text, final, solver.answer(final), [], reply.truncated,
                      [], [], [])
         self.learner.verdict(self, ep, item["target"])
         return ep

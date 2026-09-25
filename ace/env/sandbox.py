@@ -21,8 +21,10 @@ ISOLATION = [
     "--security-opt", "no-new-privileges",
     "--cap-drop", "ALL",
 ]
-PYTHON = ["timeout", str(TIMEOUT), "python", "-I", "-"]
-DOCKER_ARGS = ["docker", "run", "--rm", "-i", *ISOLATION, IMAGE, *PYTHON]
+
+
+def python(limit):
+    return ["timeout", str(limit), "python", "-I", "-"]
 
 
 def trim(text, head=HEAD_LINES, tail=TAIL_LINES):
@@ -33,18 +35,21 @@ def trim(text, head=HEAD_LINES, tail=TAIL_LINES):
     return "\n".join(lines[:head] + [render.omitted(len(lines) - head - tail)] + lines[-tail:])
 
 
-def run(code, container=None):
+def run(code, container=None, limit=TIMEOUT):
     """-> dict(stdout, stderr, rc, timeout). Код уходит через stdin, обратно только текст.
-    container — id контейнера попытки (start); без него — одноразовый контейнер на этот вызов."""
-    args = ["docker", "exec", "-i", container, *PYTHON] if container else DOCKER_ARGS
+    container — id контейнера попытки (start); без него — одноразовый контейнер на этот вызов. limit — секунд на код."""
+    if container:
+        args = ["docker", "exec", "-i", container, *python(limit)]
+    else:
+        args = ["docker", "run", "--rm", "-i", *ISOLATION, IMAGE, *python(limit)]
     try:
-        p = subprocess.run(args, input=code.encode(), capture_output=True, timeout=TIMEOUT + DOCKER_GRACE)
+        p = subprocess.run(args, input=code.encode(), capture_output=True, timeout=limit + DOCKER_GRACE)
     except subprocess.TimeoutExpired:
         return {"stdout": "", "stderr": render.NO_RESPONSE, "rc": -1, "timeout": True}
     out, err = p.stdout.decode(errors="replace"), p.stderr.decode(errors="replace")
     timed_out = p.returncode == TIMEOUT_RC
     if timed_out:
-        err += "\n" + render.time_limit(TIMEOUT)
+        err += "\n" + render.time_limit(limit)
     return {"stdout": trim(out), "stderr": trim(err), "rc": p.returncode, "timeout": timed_out}
 
 

@@ -1,41 +1,137 @@
-"""Показ Dynamic Cheatsheet (dynamic-cheatsheet; промпты dc_synth.j2, dc_note.j2 дословно).
+"""Показ Dynamic Cheatsheet: генератор апстрима целиком (dynamic-cheatsheet: language_model.py advanced_generate и
+generate, run_benchmark.py; промпты dc_generator.j2, dc_synth.j2, dc_note.j2 дословно).
 
-    SHEET       dc: весь текст, пустой — "(empty)"
-    retrieval   top-3 прошлых пары по близости вопросов (BGE-M3) в оформлении PREVIOUS SOLUTIONS, самая похожая
-                последней (dc_retrieval)
-    SYNTHESIS   dc_rs: из retrieval и прошлого cheatsheet модель синтезирует cheatsheet под вопрос, и на первом
-                вопросе тоже (пары "(empty)"); без блока <cheatsheet> решатель видит сами пары, и они же
+Generator — решатель попытки: одно сообщение user из generator_prompt.txt с cheatsheet и входом задачи, как его
+строит run_benchmark (dc_input: «Question #k:», у meb — вступление задачи); T = 0.0, max_completion_tokens 2048;
+ответ в зачёт — extract_answer (parse.dc_answer). С кодом (dc_code) — разговор generate: блок ```python перед
+«EXECUTE CODE!» исполняется в песочнице (run_block), вывод и просьба продолжить — сообщениями, до 3 продолжений.
+
+Что стоит в [[CHEATSHEET]]:
+    cumulative  dc: весь текст памяти, до первой записи — "(empty)"
+    retrieval   top-3 прошлых пары по близости вопросов (embed.similarity) в оформлении PREVIOUS SOLUTIONS, самая
+                похожая последней (dc_retrieval, Dynamic_Retrieval)
+    synthesis   dc_rs: из retrieval и прошлого cheatsheet модель синтезирует cheatsheet под вопрос, и на первом
+                вопросе тоже (пары "(empty)"); без блока <cheatsheet> генератор видит сами пары, и они же
                 сохраняются как cheatsheet (extract_cheatsheet(old_cheatsheet=пары), как в апстриме)
     history     все прошлые пары подряд (dc_history, FullHistoryAppending)"""
 from dataclasses import dataclass
 
-from .. import prompts, render
-from ..loop import Prompt
-from ..memory.dc import CHEATSHEET
-from ..memory.dc import TOKENS
-from . import Synth, TopK, Whole
+from .. import parse, prompts, render
+from ..env import sandbox
+from ..loop import Prompt, Solver
+from ..memory.dc import CHEATSHEET, MAX_TOKENS, TOKENS, dc_params
+from ..model import Call, Reply, messages
+from . import Show, TopK, Whole
 
+GENERATOR = prompts.load("dc_generator")
 SYNTH = prompts.load("dc_synth")
 NOTE = prompts.text("dc_note")
-TOP = 3
+MEB = prompts.text("dc_meb")
+PROCEED, LAST_ROUND = prompts.text("dc_proceed"), prompts.text("dc_last_round")
+TOP = 3                     # --retrieve_top_k
+FLAG = "EXECUTE CODE!"
+ROUNDS = 3                  # max_depth_num_rounds generate
+CODE_LIMIT = 3              # секунд на код, как execute_code_with_timeout
+
+
+def dc_input(task, i, question):
+    """Вход задачи i (с нуля), как его строит run_benchmark.py апстрима: у meb — вступление MathEquationBalancer."""
+    text = f"Question #{i + 1}:\n{question}"
+    return MEB + text if task == "meb" else text
 
 
 @dataclass
-class SheetPrompt(Prompt):
-    sheet: str = ""             # синтезированный под вопрос cheatsheet (или пары, если синтез не разобрался)
+class DCPrompt(Prompt):
+    input: str = ""             # вход задачи, как его видит генератор (он же вопрос куратора)
+    sheet: str = ""             # что стояло в [[CHEATSHEET]]: DC-RS хранит его как прошлый cheatsheet
 
 
-class Synthesis(Synth):
-    def shown(self, text, recs):
-        p = super().shown(text, recs)
-        return SheetPrompt(p.system, shown=p.shown, sheet=text)
+class Generator(Show):
+    """Решатель DC апстрима; sheet(ex, память, item, вход) -> (текст для [[CHEATSHEET]], показанные записи)."""
+    def __init__(self, sheet, code=False):
+        self.sheet, self.code = sheet, code
+
+    def prompt(self, ex, memory, item, k):
+        question = dc_input(ex.task.name, ex.i, item["context"])
+        text, recs = self.sheet(ex, memory, item, question)
+
+        def call(note):
+            return Call(messages(GENERATOR.fill(QUESTION=question, CHEATSHEET=text)), dc_params())
+
+        def talk(model, call):
+            return generate(model, call, self.code)
+        return DCPrompt(shown=[r.id for r in recs], solver=Solver(call, parse.dc_answer, talk), input=question, sheet=text)
 
 
-def pairs_and_sheet(text, memory, item):
-    return {"PREVIOUS_INPUT_OUTPUT_PAIRS": text, "NEXT_INPUT": item["context"], "PREVIOUS_CHEATSHEET": memory.sheet.current()}
+def generate(model, call, code):
+    """LanguageModel.generate апстрима: пустой ответ — "(No response generated)"; с кодом ответ, где перед FLAG
+    стоит блок в ```, обрезается по FLAG, код исполняется, и разговор продолжается (в последнем раунде — с
+    предупреждением); после ROUNDS продолжений последний блок с выводом дописывается ещё раз, как в апстриме.
+    -> Reply: весь накопленный текст (final_output апстрима)."""
+    history, final = list(call.messages), ""
+    for depth in range(1, ROUNDS + 2):
+        reply = model.ask(Call(list(history), call.params))
+        output = reply.output or render.DC_NO_RESPONSE
+        head = output.split(FLAG)[0].strip()
+        if not (code and FLAG in output and len(head) >= 3 and head.endswith("```")):
+            break
+        ran = run_block(head)
+        current = f"{head}\n{FLAG}\n\n{ran.strip() if ran else render.DC_NO_BLOCK}"
+        final = f"{final}\n\n{current}".strip()
+        if depth > ROUNDS:
+            output = current
+            break
+        history += [{"role": "assistant", "content": current},
+                    {"role": "user", "content": PROCEED + (LAST_ROUND if depth == ROUNDS else "")}]
+    text = f"{final}\n\n{output}".strip()
+    return Reply(text, text, reply.truncated)
 
 
-SHEET = Whole(line=render.plain, empty=render.EMPTY)
-retrieval = TopK(TOP, key=lambda r: r.question, layout=lambda recs, memory: render.pairs(recs, True, NOTE), empty=render.EMPTY)
-history = Whole(layout=lambda recs, memory: render.pairs(recs, False), empty=render.EMPTY)
-SYNTHESIS = Synthesis(retrieval, SYNTH, pairs_and_sheet, CHEATSHEET, TOKENS)
+def run_block(text):
+    """extract_and_run_python_code апстрима: первый блок ```python; последняя строка без print, отступа, # и
+    return оборачивается в print; исполнение — в песочнице (у апстрима python3 на хосте) с тем же пределом и теми
+    же сообщениями."""
+    if "```python" not in text:
+        return ""
+    try:
+        lines = text.split("```python", 1)[1].split("```", 1)[0].strip().splitlines()
+        last = lines[-1].rstrip()
+        if not last.startswith(("print(", "#", " ", "\t")) and "return" not in last:
+            lines[-1] = f"print({last})"
+        return render.dc_code_output(execute("\n".join(lines)))
+    except Exception as error:
+        return render.dc_code_error(error)
+
+
+def execute(code):
+    """execute_code_with_timeout апстрима: stdout, без него — ошибка из stderr или просьба напечатать."""
+    r = sandbox.run(code, limit=CODE_LIMIT)
+    if r["timeout"]:
+        return render.DC_TIMEOUT
+    out, err = r["stdout"].strip(), r["stderr"].strip()
+    if out:
+        return out
+    return render.dc_execution_error(err) if err else render.DC_NO_OUTPUT
+
+
+def cumulative(ex, memory, item, question):
+    return memory.current(), memory.records()
+
+
+RETRIEVAL = TopK(TOP, key=lambda r: r.question, layout=lambda recs, memory: render.pairs(recs, True, NOTE), empty=render.EMPTY)
+HISTORY = Whole(layout=lambda recs, memory: render.pairs(recs, False), empty=render.EMPTY)
+
+
+def retrieval(ex, memory, item, question):
+    return RETRIEVAL.text(ex, memory, item)
+
+
+def history(ex, memory, item, question):
+    return HISTORY.text(ex, memory, item)
+
+
+def synthesis(ex, memory, item, question):
+    pairs, recs = RETRIEVAL.text(ex, memory, item)
+    prompt = SYNTH.fill(PREVIOUS_INPUT_OUTPUT_PAIRS=pairs, NEXT_INPUT=question, PREVIOUS_CHEATSHEET=memory.sheet.current())
+    out = ex.model.ask(Call(messages(prompt), dc_params(TOKENS * MAX_TOKENS), CHEATSHEET)).output
+    return (pairs if out is None else out), recs

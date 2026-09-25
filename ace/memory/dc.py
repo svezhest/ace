@@ -1,19 +1,26 @@
 """Память Dynamic Cheatsheet (dynamic-cheatsheet: dynamic_cheatsheet/language_model.py; промпт куратора
-dc_curator.j2 дословно). Вердикта и извлечения нет: память читает сырое — вопрос и весь ответ решателя.
+dc_curator.j2 дословно). Вердикта и извлечения нет: память читает сырое — вход задачи и весь ответ генератора.
 
-    Cheatsheet  DC-Cu: один текст целиком; после каждого вопроса куратор (вопрос, весь ответ решателя, прошлый
-                текст или "(empty)") пишет новый до 2 * max_tokens; без блока <cheatsheet> остаётся старый
-    Pairs       DC-RS и контроли: пары (вопрос, весь ответ решателя), только добавляются; sheet — последний
-                синтезированный под вопрос cheatsheet (его показ оставляет в промпте попытки)"""
+    Cheatsheet  DC-Cu: один текст целиком; после каждого вопроса куратор (вход задачи, как его видел генератор,
+                весь ответ генератора, прошлый текст или "(empty)") пишет новый до 2 * max_tokens; без блока
+                <cheatsheet> остаётся старый
+    Pairs       DC-RS и контроли: пары (сырой вопрос датасета, весь ответ генератора), только добавляются; sheet —
+                последний синтезированный под вопрос cheatsheet (его показ оставляет в промпте попытки)"""
 from dataclasses import dataclass
 
-from .. import config, parse, prompts, render
-from ..model import Call, Reader, messages, params
+from .. import parse, prompts, render
+from ..model import Call, Reader, messages
 from . import Document, Lessons, Operation, Record
 
 CURATOR = prompts.load("dc_curator")
 CHEATSHEET = Reader(text=parse.opened("cheatsheet"))   # extract_cheatsheet апстрима
+MAX_TOKENS = 2048           # --max_tokens апстрима
 TOKENS = 2                  # куратор и синтез пишут до 2 * max_tokens, как в апстриме
+
+
+def dc_params(tokens=MAX_TOKENS):
+    """Параметры всех вызовов апстрима (_generate_openai: T = 0.0 и max_completion_tokens)."""
+    return dict(temperature=0.0, max_completion_tokens=tokens)
 
 
 class Sheet(Document):
@@ -40,8 +47,8 @@ class Cheatsheet(Sheet):
     def learn(self, ex, extractions):
         for x in extractions:
             ep = x.group.episodes[0]
-            fields = {"QUESTION": ep.question, "MODEL_ANSWER": ep.output, "PREVIOUS_CHEATSHEET": self.current()}
-            call = Call(messages(CURATOR.fill(fields)), params(max_tokens=TOKENS * config.MAX_TOKENS), CHEATSHEET)
+            fields = {"QUESTION": ep.prompt.input, "MODEL_ANSWER": ep.output, "PREVIOUS_CHEATSHEET": self.current()}
+            call = Call(messages(CURATOR.fill(fields)), dc_params(TOKENS * MAX_TOKENS), CHEATSHEET)
             new = ex.model.ask(call).output
             if new is not None:
                 self.rewrite(new)
@@ -49,7 +56,7 @@ class Cheatsheet(Sheet):
 
 @dataclass(frozen=True, eq=False)
 class Pair(Record):
-    """Пара DC-RS: вопрос и решение (text) — весь ответ решателя. Сырой опыт, не меняется."""
+    """Пара DC-RS: сырой вопрос и решение (text) — весь ответ генератора. Сырой опыт, не меняется."""
     question: str = ""
 
     def head(self):

@@ -11,12 +11,13 @@ c4b7a7c (MCE). Тесты — `uv run pytest tests/bridge`.
 
 ## Общее
 
-S1. **Решатель общий для всех методов, кроме ace_exact.** Методы сравниваются по памяти при одном решателе:
+S1. **Решатель общий для всех методов, кроме ace_exact и DC.** Методы сравниваются по памяти при одном решателе:
     системный промпт задачи, память — в нём же (после «What you learned so far:» или раздел метода), вопрос — весь
     вход задачи, ответ — строка FINAL ANSWER (`tasks.final_answer`), код — инструмент `run_python`, траектория для
     обучения — наш транскрипт (`render.transcript`). ace_exact идёт генератором апстрима целиком (`show/ace.py`:
-    GENERATOR, свой решатель попытки `loop.Solver`); общий решатель с playbook — вариант ace_exact_used. Решатели
-    апстримов: DC — `generator_prompt.txt` (cheatsheet в `[[CHEATSHEET]]`, ответ `<answer>`, код по «EXECUTE CODE!»);
+    GENERATOR, свой решатель попытки `loop.Solver`); общий решатель с playbook — вариант ace_exact_used. Все
+    варианты DC — генератором апстрима (`show/dc.py`: Generator — `generator_prompt.txt`, вход задачи как в
+    `run_benchmark.py`, ответ `extract_answer`, у dc_code код по «EXECUTE CODE!»). Решатели апстримов:
     EvoLib — `HMMT_SOLVER_PROMPT` (ответ — первый `<answer>` без `$`; у нас просьба решать подзадачами в формате
     `HMMT_FORMAT_PROMPT` — в системном промпте, раздел памяти с теми же вступлениями — в его конце, решение
     попытки — вся траектория); TF-GRPO — агент openai-agents (инструкция `math_agent.yaml`, траектория — repr
@@ -25,12 +26,11 @@ S1. **Решатель общий для всех методов, кроме ace
 S2. **Задачи стенда, а не бенчмарки апстримов.** Тексты апстримов, привязанные к домену их бенчмарка, заменены
     текстами наших задач, форма та же: цели агента и обучения TF-GRPO (`tfgrpo_objective_*.j2`,
     `tfgrpo_learning.j2` вместо math; input / output и перевод строки в конце, как у yaml-блока); промпты EvoLib
-    без «math» («You are an expert», «the following problem», «better problem solving»); вопрос куратора и
-    синтеза DC — сырой вход задачи, без префикса задачи и «Question #k:» из `run_benchmark.py` (пары DC-RS и у
-    апстрима хранят сырой вход); поля агента для синтезатора SCOPE — agent_name «<задача>_agent», agent_role —
-    системный промпт задачи, task — вопрос, current_system_prompt — системный промпт решателя сейчас (роль,
-    подсказка среды, strategic при запуске, tactical этой попытки); в data/train.json MCE поле вопроса —
-    `question` (у symptom_diagnosis — `symptoms`), метрика одна — accuracy. Мостик подставляет тексты, с которыми
+    без «math» («You are an expert», «the following problem», «better problem solving»); поля агента для
+    синтезатора SCOPE — agent_name «<задача>_agent», agent_role — системный промпт задачи, task — вопрос,
+    current_system_prompt — системный промпт решателя сейчас (роль, подсказка среды, strategic при запуске,
+    tactical этой попытки); в data/train.json MCE поле вопроса — `question` (у symptom_diagnosis — `symptoms`),
+    метрика одна — accuracy. Мостик подставляет тексты, с которыми
     снят эталон.
 S3. **Протокол стенда один для всех методов.** (а) Онлайн в зачёт — первая попытка обучения. Исключение — ace_exact:
     протокол online апстрима (`learner.window`, `recheck`): начальный тест потока, в зачёт тест окна из
@@ -48,9 +48,10 @@ S3. **Протокол стенда один для всех методов.** (
 S4. **Модель одна, параметры запросов — стенда.** Все вызовы идут в одну модель стенда при T = 0 и общем пределе
     генерации (`model.params`, `config.MAX_TOKENS`), если метод не задаёт своё (TF-GRPO: попытки при 0.3 / 0.7 и
     top_p 0.95, обновление без параметров, как у апстрима; ace_exact: T = 0.0 и `max_completion_tokens` 4096, как
-    `timed_llm_call` при api_provider openai). У апстримов модели и параметры свои: EvoLib HMMT — o4-mini
+    `timed_llm_call` при api_provider openai; DC: T = 0.0 и `max_completion_tokens` 2048, у куратора и синтеза
+    4096, как `_generate_openai`). У апстримов модели и параметры свои: EvoLib HMMT — o4-mini
     через reasoning API (`max_completion_tokens` 50000, `reasoning_effort` high; T = 0 и top_p 0.5 — только без
-    reasoning API), DC — `max_tokens` 2048; scope_bo2 — основная модель и `candidate_models` по разу, у нас одна
+    reasoning API); scope_bo2 — основная модель и `candidate_models` по разу, у нас одна
     модель дважды при T = 0.7 (селектор, отсев пустых и «no improvement needed», первый кандидат при сбое выбора —
     как у апстрима). Мостик сверяет параметры там, где эталон их пишет.
 
@@ -72,10 +73,11 @@ CHK2. **gpqa — наша проверка**: буква варианта в н�
 
 ## Методы
 
-DC3. **DC: эмбеддинги BGE-M3 считаются на ходу**, а не берутся готовыми из `embeddings/<task>.csv` (для наших
-    задач их у апстрима нет). Близость — скалярное произведение нормированных векторов, то же, что
-    `cosine_similarity` апстрима; отбор top-k и порядок (самая похожая последней) — как в апстриме. Мостик
-    подставляет векторы эталона.
+DC3. **DC: эмбеддинги BGE-M3 для задач без готовых эмбеддингов апстрима.** У meb — готовые, как в апстриме
+    (строки `embeddings/MathEquationBalancer.csv` для наших вопросов: `data/meb_embeddings.csv`) и
+    `cosine_similarity`; для finer, formula и gpqa их у апстрима нет — BGE-M3 считаются на ходу
+    (`embed.similarity`), близость — скалярное произведение нормированных векторов. Отбор top-k и порядок (самая
+    похожая последней) — как в апстриме.
 SC1. **SCOPE: тип ошибки шага — по событию: ToolError, IncorrectAnswer, Truncated.** Апстрим пишет
     `type(error).__name__` исключения агента. У нас исключений нет: ошибка инструмента — текст результата, неверный
     ответ и обрыв — события цикла; имя говорит модели, что случилось.

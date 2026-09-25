@@ -1,18 +1,17 @@
-"""Мостик к Dynamic Cheatsheet (dynamic-cheatsheet 5cfe3c3, эталоны bridge/fixtures/dc/): шаблоны куратора и
-синтеза, записанные запросы, extract_cheatsheet, показ пар (Dynamic_Retrieval, FullHistoryAppending) и цикл
-DC-Cu / DC-RS на пяти вопросах, где наша модель отвечает ответами фейка апстрима по порядку вызовов."""
-import copy
+"""Мостик к Dynamic Cheatsheet (dynamic-cheatsheet 5cfe3c3, эталоны bridge/fixtures/dc/): шаблоны генератора,
+куратора и синтеза, записанные запросы, extract_cheatsheet, вход задачи, показ пар (Dynamic_Retrieval,
+FullHistoryAppending) и цикл DC-Cu / DC-RS на пяти вопросах, где наша модель отвечает ответами фейка апстрима по
+порядку вызовов: каждый запрос — те же сообщения и параметры."""
 import importlib
 import json
 
-import numpy as np
 import pytest
-from upstream import deviation, fixture, messages
+from sklearn.metrics.pairwise import cosine_similarity
+from upstream import fixture
 
-from ace import config, prompts, render
-from ace.loop import Episode, Group, Prompt, run
-from ace.model import roles, text_reply
-from ace.show import HEAD, Scored
+from ace import prompts
+from ace.loop import Episode, Group, run
+from ace.model import text_reply
 
 DC = importlib.import_module("ace.methods.dc")       # модуль: имя в пакете занято самим методом
 MEM = importlib.import_module("ace.memory.dc")
@@ -20,18 +19,10 @@ SHOW = importlib.import_module("ace.show.dc")
 EXTRACT = importlib.import_module("ace.extract")
 PROMPTS, PARSERS, MEMORY, LOOP = (fixture("dc", level) for level in ("prompts", "parsers", "memory", "loop"))
 CU, RS = LOOP["DynamicCheatsheet_Cumulative"], LOOP["DynamicCheatsheet_RetrievalSynthesis"]
-GENERATOR = "# GENERATOR (PROBLEM SOLVER)"
-MAX_TOKENS = 2048           # run_benchmark.py по умолчанию; куратор и синтез — вдвое больше
-
-
-@pytest.fixture(autouse=True)
-def budget(monkeypatch):
-    """Предел генерации стенда — как у апстрима по умолчанию."""
-    monkeypatch.setattr(config, "MAX_TOKENS", MAX_TOKENS)
 
 
 def raw(step, i):
-    """Сырой вход датасета: input_txt апстрима без префикса задачи и «Question #k:» (S2)."""
+    """Сырой вход датасета: input_txt апстрима без префикса задачи и «Question #k:»."""
     return step["input"].split(f"Question #{i + 1}:\n", 1)[1]
 
 
@@ -45,28 +36,28 @@ def upstream_fill(template, values):
     return template
 
 
-def as_raw(text, i, steps):
-    deviation("S2")
-    return text.replace(steps[i]["input"], QUESTIONS[i])
-
-
 def fake_embed(monkeypatch):
-    """Готовые эмбеддинги эталона вместо BGE-M3, нормированные: скалярное произведение = cosine_similarity (DC3)."""
-    deviation("DC3")
-    vecs = np.array(MEMORY["embeddings"], dtype=float)
-    vecs = vecs / np.linalg.norm(vecs, axis=1, keepdims=True)
-    monkeypatch.setattr("ace.embed.embed", lambda texts: np.array([vecs[QUESTIONS.index(t)] for t in texts]))
+    """Векторы эталона и cosine_similarity, как у апстрима."""
+    vecs = {q: v for q, v in zip(QUESTIONS, MEMORY["embeddings"])}
+    monkeypatch.setattr("ace.embed.similarity", lambda texts, query: cosine_similarity([vecs[query]], [vecs[t] for t in texts])[0])
 
 # промпты
 
 
 @pytest.mark.parametrize("ours, theirs, fields", [
+    ("dc_generator", "generator_prompt.txt", ["QUESTION", "CHEATSHEET"]),
     ("dc_curator", "curator_prompt_for_dc_cumulative.txt", ["QUESTION", "MODEL_ANSWER", "PREVIOUS_CHEATSHEET"]),
     ("dc_synth", "curator_prompt_for_dc_retrieval_synthesis.txt", ["PREVIOUS_INPUT_OUTPUT_PAIRS", "NEXT_INPUT", "PREVIOUS_CHEATSHEET"]),
 ])
 def test_template(ours, theirs, fields):
     values = {f: f"<{f}> {{x}} {{{{y}}}}\nline" for f in fields}
     assert prompts.load(ours).fill(values) == upstream_fill(PROMPTS["templates"][theirs], values)
+
+
+@pytest.mark.parametrize("i, task", [(0, "gpqa"), (1, "meb"), (2, "meb"), (3, "gpqa")])
+def test_input(i, task):
+    """Вход задачи, как его строит run_benchmark: «Question #k:», у MathEquationBalancer — вступление задачи."""
+    assert SHOW.dc_input(task, i, QUESTIONS[i]) == RS[i]["input"]
 
 
 class Model:
@@ -78,9 +69,7 @@ class Model:
 
     def ask(self, call):
         response = self.upstream[len(self.calls)]["response"] if len(self.calls) < len(self.upstream) else ""
-        system, user = roles(call.messages)
-        self.calls.append(dict(system=system, user=user, temperature=call.params.get("temperature"),
-                               max_tokens=call.params.get("max_tokens")))
+        self.calls.append(dict(messages=call.messages, params=call.params))
         return text_reply(call, response)
 
     def usage(self):
@@ -88,42 +77,38 @@ class Model:
 
 
 class Ex:
+    task, i = None, 0
+
     def __init__(self, model):
         self.model = model
 
 
+def request(up):
+    """Запрос апстрима так, как его шлёт наш вызов: сообщения и параметры."""
+    return dict(messages=up["messages"], params=dict(temperature=up["temperature"], max_completion_tokens=up["max_completion_tokens"]))
+
+
 def test_cumulative_curator_request():
-    """Куратор DC-Cu: тот же запрос посимвольно, T = 0, до 2 * max_tokens; пустой cheatsheet — "(empty)"."""
+    """Куратор DC-Cu: тот же запрос, T = 0.0, до 2 * max_tokens; пустой cheatsheet — "(empty)"."""
     rec = PROMPTS["cumulative"]
     model = Model([rec["curator"]])
-    MEM.Cheatsheet().learn(Ex(model), [EXTRACT.Raw()(None, group(rec["input"], rec["generator"]["response"]), None)])
-    call = model.calls[0]
-    assert (call["system"], call["user"]) == messages(rec["curator"])
-    assert call["temperature"] == rec["curator"]["temperature"] and call["max_tokens"] == rec["curator"]["max_completion_tokens"]
-
-
-def group(question, output):
-    """Группа из одной попытки: куратор читает вопрос и весь ответ решателя."""
-    return Group(question, [Episode(question, 0, Prompt(), output, output, "", [], False, [], [], [])])
+    output = rec["generator"]["response"].strip()
+    ep = Episode(rec["input"], 0, SHOW.DCPrompt(input=rec["input"]), output, output, "", [], False, [], [], [])
+    MEM.Cheatsheet().learn(Ex(model), [EXTRACT.Raw()(None, Group(rec["input"], [ep]), None)])
+    assert model.calls == [request(rec["curator"])]
 
 
 def test_synthesis_request(monkeypatch):
-    """Синтез DC-RS со второго вопроса: пары в оформлении апстрима с близостью, следующий вопрос, прошлый
-    cheatsheet; запрос посимвольно, до 2 * max_tokens."""
+    """Синтез DC-RS со второго вопроса: пары в оформлении апстрима с близостью, следующий вход, прошлый cheatsheet;
+    тот же запрос, до 2 * max_tokens."""
+    fake_embed(monkeypatch)
     rec = PROMPTS["synthesis_with_pairs"]
-    synth = rec["calls"][0]
-    vecs = np.array(MEMORY["embeddings"], dtype=float)
-    sim = vecs[1] @ vecs[0] / np.linalg.norm(vecs[1]) / np.linalg.norm(vecs[0])
-    pairs = render.pairs([Scored(MEM.Pair("r1", OUTPUTS[0], question=QUESTIONS[0]), sim)], True, SHOW.NOTE)
-    first = PROMPTS["synthesis_first"]["calls"][0]["response"]
     memory = MEM.Pairs(sheet=True)
-    memory.sheet.rewrite(MEM.CHEATSHEET.read(first))
-    fields = SHOW.pairs_and_sheet(pairs, memory, {"context": rec["input"]})
-    assert ("", SHOW.SYNTH.fill(fields)) == messages(synth)
-    model = Model([synth])
-    SHOW.Synthesis(SHOW.retrieval, SHOW.SYNTH, lambda *a: fields, MEM.CHEATSHEET, MEM.TOKENS).prompt(Ex(model), MEM.Pairs(), {}, 0)
-    assert model.calls[0]["max_tokens"] == synth["max_completion_tokens"] and model.calls[0]["temperature"] == synth["temperature"]
-
+    memory.add(OUTPUTS[0], question=QUESTIONS[0])
+    memory.sheet.rewrite(MEM.CHEATSHEET.read(PROMPTS["synthesis_first"]["calls"][0]["response"]))
+    model = Model(rec["calls"])
+    SHOW.synthesis(Ex(model), memory, {"context": QUESTIONS[1]}, rec["input"])
+    assert model.calls == [request(rec["calls"][0])]
 
 # разборщик
 
@@ -152,24 +137,19 @@ def pairs_memory(n):
     return m
 
 
-def top(k):
-    show = copy.copy(SHOW.retrieval)
-    show.k = k
-    return show
-
-
-@pytest.mark.parametrize("name, show", [("Dynamic_Retrieval_top3", top(3)), ("Dynamic_Retrieval_top2", top(2)),
-                                        ("FullHistoryAppending", SHOW.history)])
-def test_shown_pairs(monkeypatch, name, show):
-    """Что видит решатель: отбор top-k по близости (самая похожая последней) или все пары подряд, оформление
-    как у апстрима, "(empty)" без пар."""
+@pytest.mark.parametrize("name, k", [("Dynamic_Retrieval_top3", 3), ("Dynamic_Retrieval_top2", 2), ("FullHistoryAppending", None)])
+def test_shown_pairs(monkeypatch, name, k):
+    """Что стоит в [[CHEATSHEET]]: отбор top-k по близости (самая похожая последней) или все пары подряд,
+    оформление как у апстрима, "(empty)" без пар."""
     fake_embed(monkeypatch)
+    if k:
+        monkeypatch.setattr(SHOW.RETRIEVAL, "k", k)
+    sheet = SHOW.retrieval if k else SHOW.history
     for i, want in enumerate(MEMORY[name]):
         m = pairs_memory(i)
-        p = show.prompt(Ex(None), m, {"context": QUESTIONS[i]}, 0)
-        assert p.system == "\n\n" + HEAD + want["shown_cheatsheet"], (name, i)
-        order = [m.get(id).question for id in p.shown]
-        assert order == want["top_k_original_inputs"], (name, i)
+        text, recs = sheet(Ex(None), m, {"context": QUESTIONS[i]}, "")
+        assert text == want["shown_cheatsheet"], (name, i)
+        assert [r.question for r in recs] == want["top_k_original_inputs"], (name, i)
 
 # цикл
 
@@ -185,41 +165,26 @@ class Task:
         return False
 
 
-def upstream_sheet(generator_prompt):
-    """То, что апстрим подставил в [[CHEATSHEET]] промпта решателя."""
-    head, tail = PROMPTS["templates"]["generator_prompt.txt"].split("[[CHEATSHEET]]")
-    return generator_prompt[len(head):].rsplit(tail.split("[[QUESTION]]")[0], 1)[0]
+def loop(monkeypatch, tmp_path, method, steps):
+    """Цикл на вопросах эталона (у него задачи вперемешку: вход задачи — из эталона): вызов за вызовом тот же
+    запрос, что у апстрима, и ни одного лишнего."""
+    monkeypatch.setattr(SHOW, "dc_input", lambda task, i, question: steps[i]["input"])
+    upstream = [c for s in steps for c in s["calls"]]
+    model = Model(upstream)
+    run(Task(), method, model, len(steps), str(tmp_path))
+    assert model.calls == [request(c) for c in upstream]
+    return json.load(open(tmp_path / "memory.json")), json.load(open(tmp_path / "log.json"))
 
 
-def check_loop(steps, ours):
-    """Вызов за вызовом: решатель видит тот же текст памяти (S1), куратор и синтез — тот же запрос (S2);
-    температура и бюджет те же."""
-    deviation("S1")
-    calls = iter(ours)
-    for i, step in enumerate(steps):
-        for up in step["calls"]:
-            call, (_, user) = next(calls), messages(up)
-            assert call["temperature"] == up["temperature"] and call["max_tokens"] == up["max_completion_tokens"]
-            if GENERATOR in user:
-                assert call["user"] == render.user_message(Task.instr, QUESTIONS[i])
-                assert call["system"] == Task.system + "\n\n" + HEAD + upstream_sheet(user), i
-            else:
-                assert (call["system"], call["user"]) == ("", as_raw(user, i, steps)), i
-    assert next(calls, None) is None
-
-
-def test_loop_cumulative(tmp_path):
-    model = Model([c for s in CU for c in s["calls"]])
-    run(Task(), DC.dc, model, len(CU), str(tmp_path))
-    check_loop(CU, model.calls)
-    assert json.load(open(tmp_path / "memory.json")) == [dict(kind="sheet", id="sheet", text=CU[-1]["final_cheatsheet"])]
+def test_loop_cumulative(monkeypatch, tmp_path):
+    memory, log = loop(monkeypatch, tmp_path, DC.dc, CU)
+    assert memory == [dict(kind="sheet", id="sheet", text=CU[-1]["final_cheatsheet"])]
+    assert [r["answer"] for r in log] == [s["final_answer"] for s in CU]
 
 
 def test_loop_retrieval_synthesis(monkeypatch, tmp_path):
     fake_embed(monkeypatch)
-    model = Model([c for s in RS for c in s["calls"]])
-    run(Task(), DC.dc_rs, model, len(RS), str(tmp_path))
-    check_loop(RS, model.calls)
-    memory = json.load(open(tmp_path / "memory.json"))
+    memory, log = loop(monkeypatch, tmp_path, DC.dc_rs, RS)
     assert [(r["question"], r["text"]) for r in memory if r["kind"] == "pair"] == list(zip(QUESTIONS, OUTPUTS))
     assert memory[-1] == dict(kind="sheet", id="sheet", text=RS[-1]["final_cheatsheet"])
+    assert [r["answer"] for r in log] == [s["final_answer"] for s in RS]

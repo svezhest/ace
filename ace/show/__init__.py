@@ -9,7 +9,6 @@
     TopK        k ближайших к вопросу по эмбеддингу
     Sample      k записей с возвращением, с вероятностью по весу (weight — у метода)
     Choose      одно случайное число выбирает ветку показа (EvoLib: skills, insights или ничего)
-    Synth       модель переписывает показанное под вопрос (DC-RS)
     Catalog     в промпте строки каталога (id и head()), тела — инструментом read, только чтение;
                 прочитанное цикл пишет в episode.used
     AfterError  после шага с ошибкой — записи, чей триггер есть в тексте ошибки, сообщением в конец истории
@@ -21,9 +20,9 @@
 random — показ случаен (выборка): val такой памяти не кэшируется. watches_steps — показу нужны шаги попытки."""
 import random
 
-from .. import config, embed, fs, prompts, render
+from .. import embed, fs, prompts, render
 from ..loop import Prompt
-from ..model import Call, Patch, messages, params
+from ..model import Patch
 
 HEAD = prompts.text("memory_head")
 CATALOG = prompts.load("catalog")
@@ -80,13 +79,14 @@ def question(item):
 
 
 class TopK(Whole):
-    """k ближайших к запросу query(item) по эмбеддингу key(запись), от самой близкой; у каждой score."""
+    """k ближайших к запросу query(item) по эмбеддингу key(запись) (embed.similarity), от самой близкой; у каждой
+    score. При равной близости порядок — как у argsort апстрима DC."""
     def __init__(self, k, key=lambda r: r.text, query=question, **whole):
         super().__init__(**whole)
         self.k, self.key, self.query = k, key, query
 
     def pick(self, records, item):
-        sims = embed.embed([self.key(r) for r in records]) @ embed.embed([self.query(item)])[0]
+        sims = embed.similarity([self.key(r) for r in records], self.query(item))
         return [Scored(records[i], float(sims[i])) for i in sims.argsort()[::-1][:self.k]]
 
 
@@ -118,23 +118,6 @@ class Choose(Show):
                 if out.shown:
                     return out
         return Prompt()
-
-
-class Synth(Show):
-    """Модель переписывает показанное base под вопрос: fields(текст base, память, item) -> поля шаблона,
-    read(ответ) -> текст или None (тогда решатель видит сам base). tokens — доля бюджета генерации."""
-    def __init__(self, base, template, fields, read, tokens=1):
-        self.base, self.template, self.fields, self.read, self.tokens = base, template, fields, read, tokens
-
-    def prompt(self, ex, memory, item, k):
-        text, recs = self.base.text(ex, memory, item)
-        prompt = self.template.fill(self.fields(text or "", memory, item))
-        out = ex.model.ask(Call(messages(prompt), params(max_tokens=self.tokens * config.MAX_TOKENS), self.read)).output
-        return self.shown(out if out is not None else text, recs)
-
-    def shown(self, text, recs):
-        """Промпт из итогового текста; метод, которому нужен сам текст (DC-RS хранит синтез), переопределяет."""
-        return Prompt("\n\n" + self.base.head + text, shown=[r.id for r in recs]) if text else Prompt()
 
 
 class Catalog(Show):
