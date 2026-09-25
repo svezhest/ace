@@ -1,0 +1,22 @@
+{
+  "formula_0": {
+    "formula_agent": [
+      {
+        "update_text": "When the formula provides explicit definitions (e.g., Operating Income: EBIT, Revenue: Total sales), first identify and extract these values from the question text before substituting numbers; if the required components are missing or ambiguous, state the value cannot be computed rather than guessing.",
+        "rationale": "This generalizes the agent's handling of formula-based questions by ensuring it maps defined terms to question values and avoids fabricating missing inputs—a correctness safeguard relevant across all formula tasks, not just this one.",
+        "timestamp": "2026-09-25T16:52:01.891521",
+        "confidence": 0.72
+      }
+    ]
+  },
+  "formula_1": {
+    "formula_agent": [
+      {
+        "update_text": "When applying the DDM formula P_0 = D_1 / (r - g), first verify r > g; if r ≤ g, the model is invalid and state so instead of computing. Always express the final answer with exactly 2 decimal places.",
+        "rationale": "Prevents a silent division-by-zero or negative-price error when the growth rate meets or exceeds the discount rate, which would otherwise produce an undefined or nonsensical result.",
+        "timestamp": "2026-09-25T16:52:27.312192",
+        "confidence": 0.85
+      }
+    ]
+  }
+}

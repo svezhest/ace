@@ -1,4 +1,6 @@
-"""SCOPE (SCOPE/scope: optimizer.py, synthesizer.py, strategic_store.py, memory_optimizer.py).
+"""SCOPE (SCOPE/scope: optimizer.py, synthesizer.py, strategic_store.py, memory_optimizer.py; сверка —
+tests/bridge/test_bridge_scope.py и записи живой модели tests/live/test_scope.py). Агента у SCOPE нет: решатель —
+общий (S1), подключён как в examples/basic_usage.py (SC2).
 
     извлечение  правило на шаг (extract/scope.py): на каждом шаге с инструментом — сразу, посреди попытки; на
                 итоговом ответе — после вопроса
@@ -7,7 +9,7 @@
     показ       strategic при запуске; принятое на шаге правило переписывает системный промпт (show/scope.py)
     вердикт     верный ответ: неверный итог — ошибка шага
 
-scope_bo2 — Best-of-2 с селектором. scope_code — решатель с исполнением python (как агенты апстрима с
+scope_bo2 — Best-of-2 с селектором: кандидат основной модели и candidate_models — та же модель при T = 0.7. scope_code — решатель с исполнением python (как агенты апстрима с
 инструментами). scope_k2 — две перспективы по статье (efficiency и thoroughness), у каждой своя память, в зачёт
 лучшая по метке: это pass@k, в логе помечено."""
 from ..env import Sandbox

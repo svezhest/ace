@@ -1,0 +1,162 @@
+[
+ {
+  "phase": "online",
+  "epoch": 0,
+  "i": 0,
+  "question": "Use formula Operating Margin to answer the question. Answer with a numerical answer with 2 decimal places and with no explanations or other text. Formula: Operating Margin = (Operating Income / Revenue) × 100, Explanation: Operating Income: Earnings before interest and taxes (EBIT), Revenue: Total sales. Question:  \"For a landscaping business that earned a revenue of $300,000 and an Operating Income of $45,000 last year, find the Operating Margin.”. Answer:",
+  "target": "15.0",
+  "answer": "15.00",
+  "correct": true,
+  "pick": "first",
+  "pass_at_k": false,
+  "vote": "",
+  "finish": "stop",
+  "output": "Operating Margin = (45,000 / 300,000) × 100 = 15.00\n\nFINAL ANSWER: 15.00",
+  "shown": [],
+  "read": [],
+  "gated": [],
+  "memory_chars": 0,
+  "sec": 8.0,
+  "group": [
+   {
+    "k": 0,
+    "answer": "15.00",
+    "ok": true,
+    "temperature": 0,
+    "finish": "stop",
+    "shown": [],
+    "read": [],
+    "fired": [],
+    "patches": []
+   }
+  ]
+ },
+ {
+  "phase": "online",
+  "epoch": 0,
+  "i": 1,
+  "question": "Use formula Dividend Discount Model (DDM) to answer the question. Answer with a numerical answer with 2 decimal places and with no explanations or other text. Formula: P_0 = D_1 / (r - g), Explanation: P_0: Current stock price, D_1: Dividend next period, r: Discount rate (or required rate of return), g: Growth rate of the dividend. Question:  \"An aerospace company's next dividend (D_1) is estimated to be $4, growing annually at a rate of 3%, and the required rate of return is 13%. Compute the current stock price using the Dividend Discount Model.\". Answer:",
+  "target": "40.0",
+  "answer": "40.00",
+  "correct": true,
+  "pick": "first",
+  "pass_at_k": false,
+  "vote": "",
+  "finish": "stop",
+  "output": "P_0 = D_1 / (r - g) = 4 / (0.13 - 0.03) = 4 / 0.10 = 40.00\n\nFINAL ANSWER: 40.00",
+  "shown": [],
+  "read": [],
+  "gated": [],
+  "memory_chars": 0,
+  "sec": 8.5,
+  "group": [
+   {
+    "k": 0,
+    "answer": "40.00",
+    "ok": true,
+    "temperature": 0,
+    "finish": "stop",
+    "shown": [],
+    "read": [],
+    "fired": [],
+    "patches": []
+   }
+  ]
+ },
+ {
+  "phase": "online",
+  "epoch": 0,
+  "i": 2,
+  "question": "Use formula Dividend Yield to answer the question. Answer with a numerical answer with 2 decimal places and with no explanations or other text. Formula: Dividend Yield = Annual Dividends per Share / Price per Share, Explanation: Annual Dividends per Share: Dividends paid per share annually, Price per Share: Current share price. Question:  \"What would the dividend yield be for a company offering $0.90 in dividends per share annually, with each share priced at $18?\". Answer:",
+  "target": "0.05",
+  "answer": "0.05",
+  "correct": true,
+  "pick": "first",
+  "pass_at_k": false,
+  "vote": "",
+  "finish": "stop",
+  "output": "Dividend Yield = $0.90 / $18 = 0.05\n\nFINAL ANSWER: 0.05",
+  "shown": [],
+  "read": [],
+  "gated": [],
+  "memory_chars": 0,
+  "sec": 6.7,
+  "group": [
+   {
+    "k": 0,
+    "answer": "0.05",
+    "ok": true,
+    "temperature": 0,
+    "finish": "stop",
+    "shown": [],
+    "read": [],
+    "fired": [],
+    "patches": []
+   }
+  ]
+ },
+ {
+  "phase": "online",
+  "epoch": 0,
+  "i": 3,
+  "question": "Use formula Put-Call Parity to answer the question. Answer with a numerical answer with 2 decimal places and with no explanations or other text. Formula: C - P = S - X / (1 + r)^t, Explanation: C: Call option price, P: Put option price, S: Price of the underlying asset, X: Exercise price of the option, r: Risk-free interest rate, t: Time to expiration. Question:  \"What must be the put option price (P) if the market price of the asset (S) is $200, the call option’s price (C) is $25, exercise price (X) is $195, the risk-free interest rate (r) at 0.8%, and the time to maturity (t) is 1 year?\". Answer:",
+  "target": "18.45",
+  "answer": "18.45",
+  "correct": true,
+  "pick": "first",
+  "pass_at_k": false,
+  "vote": "",
+  "finish": "stop",
+  "output": "Using Put-Call Parity: C - P = S - X/(1+r)^t\n\nSolving for P:\nP = C - S + X/(1+r)^t\nP = 25 - 200 + 195/(1.008)^1\nP = 25 - 200 + 193.4524\nP = 18.45\n\nFINAL ANSWER: 18.45",
+  "shown": [],
+  "read": [],
+  "gated": [],
+  "memory_chars": 0,
+  "sec": 24.9,
+  "group": [
+   {
+    "k": 0,
+    "answer": "18.45",
+    "ok": true,
+    "temperature": 0,
+    "finish": "stop",
+    "shown": [],
+    "read": [],
+    "fired": [],
+    "patches": []
+   }
+  ]
+ },
+ {
+  "phase": "online",
+  "epoch": 0,
+  "i": 4,
+  "question": "Use formula Interest Coverage Ratio to answer the question. Answer with a numerical answer with 2 decimal places and with no explanations or other text. Formula: Interest Coverage Ratio = EBIT / Interest Expense, Explanation: EBIT: Earnings before interest and taxes, Interest Expense: Cost of interest on debt. Question:  If an entertainment company's earnings before interest and taxes total $900,000 with $180,000 in interest payments, what does the Interest Coverage Ratio show?. Answer:",
+  "target": "5.0",
+  "answer": "5.00",
+  "correct": true,
+  "pick": "first",
+  "pass_at_k": false,
+  "vote": "",
+  "finish": "stop",
+  "output": "The Interest Coverage Ratio = EBIT / Interest Expense = $900,000 / $180,000 = 5.00\n\nFINAL ANSWER: 5.00",
+  "shown": [],
+  "read": [],
+  "gated": [],
+  "memory_chars": 0,
+  "sec": 28.1,
+  "group": [
+   {
+    "k": 0,
+    "answer": "5.00",
+    "ok": true,
+    "temperature": 0,
+    "finish": "stop",
+    "shown": [],
+    "read": [],
+    "fired": [],
+    "patches": []
+   }
+  ]
+ }
+]

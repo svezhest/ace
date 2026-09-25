@@ -1,0 +1,22 @@
+{
+  "formula_3": {
+    "formula_agent": [
+      {
+        "update_text": "For formula-based math problems, always verify the answer by substituting it back into the original equation before finalizing.",
+        "rationale": "Substitution check catches arithmetic or sign errors (e.g., a misplaced negative) that would otherwise produce an incorrect result.",
+        "timestamp": "2026-09-25T16:50:37.392412",
+        "confidence": 0.85
+      }
+    ]
+  },
+  "formula_4": {
+    "formula_agent": [
+      {
+        "update_text": "For formula-based problems where all inputs are provided in the question, answer directly without any tool calls or web searches.",
+        "rationale": "This task required no external data since EBIT and Interest Expense were given, yet the agent's guidelines heavily emphasize browsing/searching that added zero value.",
+        "timestamp": "2026-09-25T16:51:02.909622",
+        "confidence": 0.85
+      }
+    ]
+  }
+}

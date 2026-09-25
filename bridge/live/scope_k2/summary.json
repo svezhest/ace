@@ -1,0 +1,14 @@
+{
+ "task": "formula",
+ "method": "scope_k2",
+ "model": "ornith15-9b",
+ "n": 2,
+ "epochs": 1,
+ "offline": false,
+ "correct": 2,
+ "truncated": 0,
+ "accuracy": 1.0,
+ "calls": 4,
+ "prompt_tokens": 816,
+ "completion_tokens": 210
+}

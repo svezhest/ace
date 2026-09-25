@@ -1,0 +1,851 @@
+[
+ [
+  {
+   "strategic": {
+    "tool_usage": [
+     {
+      "rule": "Open at most three search results per query before refining the query.",
+      "rationale": "Reading many results wastes the browsing budget.",
+      "confidence": 0.92,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "Pass absolute file paths to the file reader tool.",
+      "rationale": "Relative paths resolve against an unknown directory.",
+      "confidence": 0.9,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "Batch independent web requests into one tool call when the tool supports it.",
+      "rationale": "Batching saves round trips.",
+      "confidence": 0.87,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     }
+    ],
+    "data_validation": [
+     {
+      "rule": "Check that a downloaded file is not empty before parsing it.",
+      "rationale": "Empty downloads cause confusing parser errors.",
+      "confidence": 0.93,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "Confirm the date of a web page before citing it as current.",
+      "rationale": "Stale pages give outdated facts.",
+      "confidence": 0.9,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "Verify that a scraped table has the expected number of columns.",
+      "rationale": "Broken markup shifts columns.",
+      "confidence": 0.88,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     }
+    ],
+    "error_handling": [
+     {
+      "rule": "On an HTTP 429 response, wait before retrying the same request.",
+      "rationale": "Immediate retries extend rate limiting.",
+      "confidence": 0.91,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "If a page fails to load, try its archived copy.",
+      "rationale": "Archives often keep removed pages.",
+      "confidence": 0.88,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "When a file is not found, list the directory before guessing another name.",
+      "rationale": "Listing avoids blind guesses.",
+      "confidence": 0.86,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     }
+    ],
+    "efficiency": [
+     {
+      "rule": "Cache pages already fetched in this task instead of fetching them again.",
+      "rationale": "Refetching wastes time.",
+      "confidence": 0.9,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "Stop browsing once two independent sources agree.",
+      "rationale": "Further sources rarely change the answer.",
+      "confidence": 0.87,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "Prefer an official API over scraping when both are available.",
+      "rationale": "APIs return structured data faster.",
+      "confidence": 0.86,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     }
+    ],
+    "analysis_methodology": [
+     {
+      "rule": "Cross-check a surprising claim against a second independent source.",
+      "rationale": "Single sources can be wrong.",
+      "confidence": 0.94,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "Record the URL of every fact used in the answer.",
+      "rationale": "Sources make the answer checkable.",
+      "confidence": 0.91,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "Separate facts found on pages from inferences drawn from them.",
+      "rationale": "Mixing them hides uncertainty.",
+      "confidence": 0.89,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     }
+    ],
+    "safety": [
+     {
+      "rule": "Do not submit web forms or make purchases on behalf of the user.",
+      "rationale": "Such actions have real consequences.",
+      "confidence": 0.9,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "Do not download executables.",
+      "rationale": "Executables can be malicious.",
+      "confidence": 0.89,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "Do not include personal data found on web pages in the answer.",
+      "rationale": "Personal data must not be spread.",
+      "confidence": 0.86,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     }
+    ],
+    "general": [
+     {
+      "rule": "Summarize long web pages before quoting from them.",
+      "rationale": "Summaries keep the context short.",
+      "confidence": 0.95,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "State which websites were consulted.",
+      "rationale": "Users want to know the sources.",
+      "confidence": 0.9,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "Keep notes of visited pages in the scratchpad.",
+      "rationale": "Notes prevent revisiting pages.",
+      "confidence": 0.87,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     }
+    ]
+   },
+   "tactical": [],
+   "accepted": 0
+  }
+ ],
+ [
+  {
+   "strategic": {
+    "tool_usage": [
+     {
+      "rule": "Open at most three search results per query before refining the query.",
+      "rationale": "Reading many results wastes the browsing budget.",
+      "confidence": 0.92,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "Pass absolute file paths to the file reader tool.",
+      "rationale": "Relative paths resolve against an unknown directory.",
+      "confidence": 0.9,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "Batch independent web requests into one tool call when the tool supports it.",
+      "rationale": "Batching saves round trips.",
+      "confidence": 0.87,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     }
+    ],
+    "data_validation": [
+     {
+      "rule": "Check that a downloaded file is not empty before parsing it.",
+      "rationale": "Empty downloads cause confusing parser errors.",
+      "confidence": 0.93,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "Confirm the date of a web page before citing it as current.",
+      "rationale": "Stale pages give outdated facts.",
+      "confidence": 0.9,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "Verify that a scraped table has the expected number of columns.",
+      "rationale": "Broken markup shifts columns.",
+      "confidence": 0.88,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     }
+    ],
+    "error_handling": [
+     {
+      "rule": "On an HTTP 429 response, wait before retrying the same request.",
+      "rationale": "Immediate retries extend rate limiting.",
+      "confidence": 0.91,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "If a page fails to load, try its archived copy.",
+      "rationale": "Archives often keep removed pages.",
+      "confidence": 0.88,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "When a file is not found, list the directory before guessing another name.",
+      "rationale": "Listing avoids blind guesses.",
+      "confidence": 0.86,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     }
+    ],
+    "efficiency": [
+     {
+      "rule": "Cache pages already fetched in this task instead of fetching them again.",
+      "rationale": "Refetching wastes time.",
+      "confidence": 0.9,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "Stop browsing once two independent sources agree.",
+      "rationale": "Further sources rarely change the answer.",
+      "confidence": 0.87,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "Prefer an official API over scraping when both are available.",
+      "rationale": "APIs return structured data faster.",
+      "confidence": 0.86,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     }
+    ],
+    "analysis_methodology": [
+     {
+      "rule": "Cross-check a surprising claim against a second independent source.",
+      "rationale": "Single sources can be wrong.",
+      "confidence": 0.94,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "Record the URL of every fact used in the answer.",
+      "rationale": "Sources make the answer checkable.",
+      "confidence": 0.91,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "Separate facts found on pages from inferences drawn from them.",
+      "rationale": "Mixing them hides uncertainty.",
+      "confidence": 0.89,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     }
+    ],
+    "safety": [
+     {
+      "rule": "Do not submit web forms or make purchases on behalf of the user.",
+      "rationale": "Such actions have real consequences.",
+      "confidence": 0.9,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "Do not download executables.",
+      "rationale": "Executables can be malicious.",
+      "confidence": 0.89,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "Do not include personal data found on web pages in the answer.",
+      "rationale": "Personal data must not be spread.",
+      "confidence": 0.86,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     }
+    ],
+    "general": [
+     {
+      "rule": "Summarize long web pages before quoting from them.",
+      "rationale": "Summaries keep the context short.",
+      "confidence": 0.95,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "State which websites were consulted.",
+      "rationale": "Users want to know the sources.",
+      "confidence": 0.9,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "Keep notes of visited pages in the scratchpad.",
+      "rationale": "Notes prevent revisiting pages.",
+      "confidence": 0.87,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     }
+    ]
+   },
+   "tactical": [],
+   "accepted": 0
+  }
+ ],
+ [
+  {
+   "strategic": {
+    "tool_usage": [
+     {
+      "rule": "Open at most three search results per query before refining the query.",
+      "rationale": "Reading many results wastes the browsing budget.",
+      "confidence": 0.92,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "Pass absolute file paths to the file reader tool.",
+      "rationale": "Relative paths resolve against an unknown directory.",
+      "confidence": 0.9,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "Batch independent web requests into one tool call when the tool supports it.",
+      "rationale": "Batching saves round trips.",
+      "confidence": 0.87,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     }
+    ],
+    "data_validation": [
+     {
+      "rule": "Check that a downloaded file is not empty before parsing it.",
+      "rationale": "Empty downloads cause confusing parser errors.",
+      "confidence": 0.93,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "Confirm the date of a web page before citing it as current.",
+      "rationale": "Stale pages give outdated facts.",
+      "confidence": 0.9,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "Verify that a scraped table has the expected number of columns.",
+      "rationale": "Broken markup shifts columns.",
+      "confidence": 0.88,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     }
+    ],
+    "error_handling": [
+     {
+      "rule": "On an HTTP 429 response, wait before retrying the same request.",
+      "rationale": "Immediate retries extend rate limiting.",
+      "confidence": 0.91,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "If a page fails to load, try its archived copy.",
+      "rationale": "Archives often keep removed pages.",
+      "confidence": 0.88,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "When a file is not found, list the directory before guessing another name.",
+      "rationale": "Listing avoids blind guesses.",
+      "confidence": 0.86,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     }
+    ],
+    "efficiency": [
+     {
+      "rule": "Cache pages already fetched in this task instead of fetching them again.",
+      "rationale": "Refetching wastes time.",
+      "confidence": 0.9,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "Stop browsing once two independent sources agree.",
+      "rationale": "Further sources rarely change the answer.",
+      "confidence": 0.87,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "Prefer an official API over scraping when both are available.",
+      "rationale": "APIs return structured data faster.",
+      "confidence": 0.86,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     }
+    ],
+    "analysis_methodology": [
+     {
+      "rule": "Cross-check a surprising claim against a second independent source.",
+      "rationale": "Single sources can be wrong.",
+      "confidence": 0.94,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "Record the URL of every fact used in the answer.",
+      "rationale": "Sources make the answer checkable.",
+      "confidence": 0.91,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "Separate facts found on pages from inferences drawn from them.",
+      "rationale": "Mixing them hides uncertainty.",
+      "confidence": 0.89,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     }
+    ],
+    "safety": [
+     {
+      "rule": "Do not submit web forms or make purchases on behalf of the user.",
+      "rationale": "Such actions have real consequences.",
+      "confidence": 0.9,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "Do not download executables.",
+      "rationale": "Executables can be malicious.",
+      "confidence": 0.89,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "Do not include personal data found on web pages in the answer.",
+      "rationale": "Personal data must not be spread.",
+      "confidence": 0.86,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     }
+    ],
+    "general": [
+     {
+      "rule": "Summarize long web pages before quoting from them.",
+      "rationale": "Summaries keep the context short.",
+      "confidence": 0.95,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "State which websites were consulted.",
+      "rationale": "Users want to know the sources.",
+      "confidence": 0.9,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "Keep notes of visited pages in the scratchpad.",
+      "rationale": "Notes prevent revisiting pages.",
+      "confidence": 0.87,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     }
+    ]
+   },
+   "tactical": [],
+   "accepted": 0
+  }
+ ],
+ [
+  {
+   "strategic": {
+    "tool_usage": [
+     {
+      "rule": "Open at most three search results per query before refining the query.",
+      "rationale": "Reading many results wastes the browsing budget.",
+      "confidence": 0.92,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "Pass absolute file paths to the file reader tool.",
+      "rationale": "Relative paths resolve against an unknown directory.",
+      "confidence": 0.9,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "Batch independent web requests into one tool call when the tool supports it.",
+      "rationale": "Batching saves round trips.",
+      "confidence": 0.87,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     }
+    ],
+    "data_validation": [
+     {
+      "rule": "Check that a downloaded file is not empty before parsing it.",
+      "rationale": "Empty downloads cause confusing parser errors.",
+      "confidence": 0.93,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "Confirm the date of a web page before citing it as current.",
+      "rationale": "Stale pages give outdated facts.",
+      "confidence": 0.9,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "Verify that a scraped table has the expected number of columns.",
+      "rationale": "Broken markup shifts columns.",
+      "confidence": 0.88,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     }
+    ],
+    "error_handling": [
+     {
+      "rule": "On an HTTP 429 response, wait before retrying the same request.",
+      "rationale": "Immediate retries extend rate limiting.",
+      "confidence": 0.91,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "If a page fails to load, try its archived copy.",
+      "rationale": "Archives often keep removed pages.",
+      "confidence": 0.88,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "When a file is not found, list the directory before guessing another name.",
+      "rationale": "Listing avoids blind guesses.",
+      "confidence": 0.86,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     }
+    ],
+    "efficiency": [
+     {
+      "rule": "Cache pages already fetched in this task instead of fetching them again.",
+      "rationale": "Refetching wastes time.",
+      "confidence": 0.9,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "Stop browsing once two independent sources agree.",
+      "rationale": "Further sources rarely change the answer.",
+      "confidence": 0.87,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "Prefer an official API over scraping when both are available.",
+      "rationale": "APIs return structured data faster.",
+      "confidence": 0.86,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     }
+    ],
+    "analysis_methodology": [
+     {
+      "rule": "Separate facts found on pages from inferences drawn from them.",
+      "rationale": "Mixing them hides uncertainty.",
+      "confidence": 0.89,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "For formula-based math problems, always verify the answer by substituting it back into the original equation before finalizing.",
+      "rationale": "Substitution check catches arithmetic or sign errors (e.g., a misplaced negative) that would otherwise produce an incorrect result.",
+      "confidence": 0.85,
+      "added_timestamp": "2026-09-25T16:50:37.393126",
+      "source_task_id": "formula_3"
+     },
+     {
+      "rule": "Support every fact with a second independent source and record the URL of each one used.",
+      "rationale": "This rule combines verification (checking surprising claims against an additional independent source to guard against single-source errors) with traceability (recording URLs so any claim can be checked), eliminating redundancy while preserving both intents.",
+      "confidence": 0.94,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     }
+    ],
+    "safety": [
+     {
+      "rule": "Do not submit web forms or make purchases on behalf of the user.",
+      "rationale": "Such actions have real consequences.",
+      "confidence": 0.9,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "Do not download executables.",
+      "rationale": "Executables can be malicious.",
+      "confidence": 0.89,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "Do not include personal data found on web pages in the answer.",
+      "rationale": "Personal data must not be spread.",
+      "confidence": 0.86,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     }
+    ],
+    "general": [
+     {
+      "rule": "Summarize long web pages before quoting from them.",
+      "rationale": "Summaries keep the context short.",
+      "confidence": 0.95,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "State which websites were consulted.",
+      "rationale": "Users want to know the sources.",
+      "confidence": 0.9,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "Keep notes of visited pages in the scratchpad.",
+      "rationale": "Notes prevent revisiting pages.",
+      "confidence": 0.87,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     }
+    ]
+   },
+   "tactical": [
+    "For formula-based math problems, always verify the answer by substituting it back into the original equation before finalizing."
+   ],
+   "accepted": 1
+  }
+ ],
+ [
+  {
+   "strategic": {
+    "tool_usage": [
+     {
+      "rule": "Open at most three search results per query before refining the query.",
+      "rationale": "Reading many results wastes the browsing budget.",
+      "confidence": 0.92,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "Pass absolute file paths to the file reader tool.",
+      "rationale": "Relative paths resolve against an unknown directory.",
+      "confidence": 0.9,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "Batch independent web requests into one tool call when the tool supports it.",
+      "rationale": "Batching saves round trips.",
+      "confidence": 0.87,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     }
+    ],
+    "data_validation": [
+     {
+      "rule": "Check that a downloaded file is not empty before parsing it.",
+      "rationale": "Empty downloads cause confusing parser errors.",
+      "confidence": 0.93,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "Confirm the date of a web page before citing it as current.",
+      "rationale": "Stale pages give outdated facts.",
+      "confidence": 0.9,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "Verify that a scraped table has the expected number of columns.",
+      "rationale": "Broken markup shifts columns.",
+      "confidence": 0.88,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     }
+    ],
+    "error_handling": [
+     {
+      "rule": "On an HTTP 429 response, wait before retrying the same request.",
+      "rationale": "Immediate retries extend rate limiting.",
+      "confidence": 0.91,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "If a page fails to load, try its archived copy.",
+      "rationale": "Archives often keep removed pages.",
+      "confidence": 0.88,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "When a file is not found, list the directory before guessing another name.",
+      "rationale": "Listing avoids blind guesses.",
+      "confidence": 0.86,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     }
+    ],
+    "efficiency": [
+     {
+      "rule": "Prefer an official API over scraping when both are available.",
+      "rationale": "APIs return structured data faster.",
+      "confidence": 0.86,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "For formula-based problems where all inputs are provided in the question, answer directly without any tool calls or web searches.",
+      "rationale": "This task required no external data since EBIT and Interest Expense were given, yet the agent's guidelines heavily emphasize browsing/searching that added zero value.",
+      "confidence": 0.85,
+      "added_timestamp": "2026-09-25T16:51:02.910673",
+      "source_task_id": "formula_4"
+     },
+     {
+      "rule": "Avoid redundant work: reuse pages already fetched in this task, and stop browsing once two independent sources agree.",
+      "rationale": "This rule consolidates the efficiency guidance from both originals—preventing wasted time by not refetching cached pages and not over-searching by halting once corroboration is reached—while preserving the intent of minimizing unnecessary effort.",
+      "confidence": 0.9,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     }
+    ],
+    "analysis_methodology": [
+     {
+      "rule": "Separate facts found on pages from inferences drawn from them.",
+      "rationale": "Mixing them hides uncertainty.",
+      "confidence": 0.89,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "For formula-based math problems, always verify the answer by substituting it back into the original equation before finalizing.",
+      "rationale": "Substitution check catches arithmetic or sign errors (e.g., a misplaced negative) that would otherwise produce an incorrect result.",
+      "confidence": 0.85,
+      "added_timestamp": "2026-09-25T16:50:37.393126",
+      "source_task_id": "formula_3"
+     },
+     {
+      "rule": "Support every fact with a second independent source and record the URL of each one used.",
+      "rationale": "This rule combines verification (checking surprising claims against an additional independent source to guard against single-source errors) with traceability (recording URLs so any claim can be checked), eliminating redundancy while preserving both intents.",
+      "confidence": 0.94,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     }
+    ],
+    "safety": [
+     {
+      "rule": "Do not submit web forms or make purchases on behalf of the user.",
+      "rationale": "Such actions have real consequences.",
+      "confidence": 0.9,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "Do not download executables.",
+      "rationale": "Executables can be malicious.",
+      "confidence": 0.89,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "Do not include personal data found on web pages in the answer.",
+      "rationale": "Personal data must not be spread.",
+      "confidence": 0.86,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     }
+    ],
+    "general": [
+     {
+      "rule": "Summarize long web pages before quoting from them.",
+      "rationale": "Summaries keep the context short.",
+      "confidence": 0.95,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "State which websites were consulted.",
+      "rationale": "Users want to know the sources.",
+      "confidence": 0.9,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     },
+     {
+      "rule": "Keep notes of visited pages in the scratchpad.",
+      "rationale": "Notes prevent revisiting pages.",
+      "confidence": 0.87,
+      "added_timestamp": "2026-09-01T00:00:00",
+      "source_task_id": "seed"
+     }
+    ]
+   },
+   "tactical": [
+    "For formula-based problems where all inputs are provided in the question, answer directly without any tool calls or web searches."
+   ],
+   "accepted": 2
+  }
+ ]
+]

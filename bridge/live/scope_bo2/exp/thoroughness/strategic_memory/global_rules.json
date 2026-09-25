@@ -1,0 +1,13 @@
+{
+  "formula_agent": {
+    "error_handling": [
+      {
+        "rule": "When applying the DDM formula P_0 = D_1 / (r - g), first verify r > g; if r ≤ g, the model is invalid and state so instead of computing. Always express the final answer with exactly 2 decimal places.",
+        "rationale": "Prevents a silent division-by-zero or negative-price error when the growth rate meets or exceeds the discount rate, which would otherwise produce an undefined or nonsensical result.",
+        "confidence": 0.85,
+        "added_timestamp": "2026-09-25T16:52:27.313061",
+        "source_task_id": "formula_1"
+      }
+    ]
+  }
+}

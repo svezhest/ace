@@ -1,0 +1,40 @@
+[
+ [
+  {
+   "strategic": {},
+   "tactical": [],
+   "accepted": 0
+  },
+  {
+   "strategic": {},
+   "tactical": [
+    "When the formula references named components (e.g., Operating Income, Revenue), first extract each value from the question by matching exact terms and units before substituting; if a referenced component is missing or ambiguous, state that it cannot be computed rather than guessing."
+   ],
+   "accepted": 1
+  }
+ ],
+ [
+  {
+   "strategic": {},
+   "tactical": [],
+   "accepted": 0
+  },
+  {
+   "strategic": {
+    "error_handling": [
+     {
+      "rule": "When applying the DDM formula P_0 = D_1 / (r - g), first verify r > g; if r ≤ g, the model is invalid and state so instead of computing. Always express the final answer with exactly 2 decimal places.",
+      "rationale": "Prevents a silent division-by-zero or negative-price error when the growth rate meets or exceeds the discount rate, which would otherwise produce an undefined or nonsensical result.",
+      "confidence": 0.85,
+      "added_timestamp": "2026-09-25T16:53:13.693545",
+      "source_task_id": "formula_1"
+     }
+    ]
+   },
+   "tactical": [
+    "When applying the DDM formula P_0 = D_1 / (r - g), first verify r > g; if r ≤ g, the model is invalid and state so instead of computing. Always express the final answer with exactly 2 decimal places."
+   ],
+   "accepted": 2
+  }
+ ]
+]

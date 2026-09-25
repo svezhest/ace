@@ -1,0 +1,22 @@
+{
+  "formula_0": {
+    "formula_agent": [
+      {
+        "update_text": "When the formula references named components (e.g., Operating Income, Revenue), first extract each value from the question by matching exact terms and units before substituting; if a referenced component is missing or ambiguous, state that it cannot be computed rather than guessing.",
+        "rationale": "This generalizes beyond this trivial case to ensure the agent reliably maps formula variables to provided values and avoids fabricating inputs when data is absent.",
+        "timestamp": "2026-09-25T16:52:52.136968",
+        "confidence": 0.72
+      }
+    ]
+  },
+  "formula_1": {
+    "formula_agent": [
+      {
+        "update_text": "When applying the DDM formula P_0 = D_1 / (r - g), first verify r > g; if r ≤ g, the model is invalid and state so instead of computing. Always express the final answer with exactly 2 decimal places.",
+        "rationale": "Prevents a silent division-by-zero or negative-price error when the growth rate meets or exceeds the discount rate, which would otherwise produce an undefined or nonsensical result.",
+        "timestamp": "2026-09-25T16:53:13.692689",
+        "confidence": 0.85
+      }
+    ]
+  }
+}

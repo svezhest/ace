@@ -1,0 +1,28 @@
+{
+  "formula_0": {
+    "formula_agent": [
+      {
+        "update_text": "When a percentage or ratio is computed, verify the result lies within its valid range (e.g., 0-100% for margins) before finalizing.",
+        "rationale": "A margin of 15.0 here is correct, but this guard catches nonsensical outputs like negative or >100% values that would slip through unchecked.",
+        "timestamp": "2026-09-25T16:53:34.117943",
+        "confidence": 0.85
+      },
+      {
+        "update_text": "When a percentage or ratio is computed, always format the final answer with exactly 2 decimal places (e.g., '15.00', not '15.0') to match the required output format.",
+        "rationale": "The correct value was output as '15.0' instead of the required '15.00', violating the specified 2-decimal-place format despite being numerically correct.",
+        "timestamp": "2026-09-25T16:53:47.379453",
+        "confidence": 0.85
+      }
+    ]
+  },
+  "formula_1": {
+    "formula_agent": [
+      {
+        "update_text": "When applying the Dividend Discount Model, verify that r > g (required return exceeds growth rate) before computing; if r ≤ g, the model is invalid and no finite price exists.",
+        "rationale": "The DDM formula P_0 = D_1/(r-g) produces a negative or undefined result when r ≤ g, so this domain-specific guard prevents nonsensical outputs in dividend/growth scenarios.",
+        "timestamp": "2026-09-25T16:54:04.282812",
+        "confidence": 0.85
+      }
+    ]
+  }
+}

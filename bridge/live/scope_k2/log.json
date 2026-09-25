@@ -1,0 +1,88 @@
+[
+ {
+  "phase": "online",
+  "epoch": 0,
+  "i": 0,
+  "question": "Use formula Operating Margin to answer the question. Answer with a numerical answer with 2 decimal places and with no explanations or other text. Formula: Operating Margin = (Operating Income / Revenue) × 100, Explanation: Operating Income: Earnings before interest and taxes (EBIT), Revenue: Total sales. Question:  \"For a landscaping business that earned a revenue of $300,000 and an Operating Income of $45,000 last year, find the Operating Margin.”. Answer:",
+  "target": "15.0",
+  "answer": "15.00",
+  "correct": true,
+  "pick": "best",
+  "pass_at_k": true,
+  "vote": "",
+  "finish": "stop",
+  "output": "Operating Margin = (45,000 / 300,000) × 100 = 15.00\n\nFINAL ANSWER: 15.00",
+  "shown": [],
+  "read": [],
+  "gated": [],
+  "memory_chars": 0,
+  "sec": 20.0,
+  "group": [
+   {
+    "k": 0,
+    "answer": "15.00",
+    "ok": true,
+    "temperature": 0,
+    "finish": "stop",
+    "shown": [],
+    "read": [],
+    "fired": [],
+    "patches": []
+   },
+   {
+    "k": 1,
+    "answer": "15.00",
+    "ok": true,
+    "temperature": 0,
+    "finish": "stop",
+    "shown": [],
+    "read": [],
+    "fired": [],
+    "patches": []
+   }
+  ]
+ },
+ {
+  "phase": "online",
+  "epoch": 0,
+  "i": 1,
+  "question": "Use formula Dividend Discount Model (DDM) to answer the question. Answer with a numerical answer with 2 decimal places and with no explanations or other text. Formula: P_0 = D_1 / (r - g), Explanation: P_0: Current stock price, D_1: Dividend next period, r: Discount rate (or required rate of return), g: Growth rate of the dividend. Question:  \"An aerospace company's next dividend (D_1) is estimated to be $4, growing annually at a rate of 3%, and the required rate of return is 13%. Compute the current stock price using the Dividend Discount Model.\". Answer:",
+  "target": "40.0",
+  "answer": "40.00",
+  "correct": true,
+  "pick": "best",
+  "pass_at_k": true,
+  "vote": "",
+  "finish": "stop",
+  "output": "Using the DDM formula: P_0 = D_1 / (r - g) = 4 / (0.13 - 0.03) = 4 / 0.10 = 40.00\n\nFINAL ANSWER: 40.00",
+  "shown": [],
+  "read": [],
+  "gated": [],
+  "memory_chars": 0,
+  "sec": 21.6,
+  "group": [
+   {
+    "k": 0,
+    "answer": "40.00",
+    "ok": true,
+    "temperature": 0,
+    "finish": "stop",
+    "shown": [],
+    "read": [],
+    "fired": [],
+    "patches": []
+   },
+   {
+    "k": 1,
+    "answer": "40.00",
+    "ok": true,
+    "temperature": 0,
+    "finish": "stop",
+    "shown": [],
+    "read": [],
+    "fired": [],
+    "patches": []
+   }
+  ]
+ }
+]
