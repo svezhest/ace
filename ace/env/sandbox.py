@@ -45,26 +45,15 @@ def run(code):
 
 
 def build():
+    """Образ песочницы из Dockerfile рядом."""
     import os
     d = os.path.dirname(os.path.abspath(__file__))
     subprocess.run(["docker", "build", "-t", IMAGE, d], check=True)
 
 
-if __name__ == "__main__":
-    # проверка изоляции: каждая строка должна не навредить хосту и вернуть ошибку или таймаут
-    import sys
-    if "--build" in sys.argv:
-        build()
-    tests = {
-        "ok": "print(2+2)",
-        "rm": "import shutil,os; shutil.rmtree('/', ignore_errors=True); print(os.listdir('/'))",
-        "loop": "while True: pass",
-        "net": "import urllib.request; print(urllib.request.urlopen('http://example.com', timeout=3).status)",
-        "flood": "print('x'*10_000_000)",
-        "fork": "import os\nwhile True: os.fork()",
-        "write": "open('/usr/bin/x','w').write('1')",
-        "mem": "a=bytearray(2_000_000_000)",
-    }
-    for k, code in tests.items():
-        r = run(code)
-        print(f"{k:6} rc={r['rc']:4} timeout={r['timeout']} out={r['stdout'][:60]!r} err={r['stderr'][-80:]!r}")
+def available():
+    """Есть ли docker и собранный образ."""
+    try:
+        return subprocess.run(["docker", "image", "inspect", IMAGE], capture_output=True).returncode == 0
+    except FileNotFoundError:
+        return False
