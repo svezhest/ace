@@ -3,8 +3,12 @@ run.json): MathEquationBalancer, первые 5 вопросов после shuf
 (DC-RS), dc_retrieval, dc_history (без исполнения кода) и dc_code (DC-Cu с кодом, апстрим в контейнере). Запись
 воспроизводится без модели (tools/record/replay): каждый запрос нашего метода побайтно совпадает с записанным, все
 записанные ответы востребованы; cheatsheet после каждого вопроса (у пар — что стояло в [[CHEATSHEET]]), пары,
-ответы генератора, ответы в зачёт и число верных — как у апстрима."""
+ответы генератора, ответы в зачёт и число верных — как у апстрима.
+
+dc_code: при воспроизведении вывод исполнения берётся из записи (у апстрима в traceback — случайное имя tempfile,
+DC4), а test_sandbox сверяет вывод нашей песочницы на тех же блоках кода с записанным."""
 import json
+import re
 import threading
 from pathlib import Path
 
@@ -16,6 +20,7 @@ from ace.loop import run
 from ace.memory.dc import Cheatsheet, Pairs
 from ace.methods.dc import dc, dc_code, dc_history, dc_retrieval, dc_rs
 from ace.model import Model
+from ace.show import dc as show
 from ace.tasks import TASKS
 from tools.record.replay import Replayer
 
@@ -42,19 +47,31 @@ METHODS = {"dc": swap(dc, memory=WatchedSheet()), "dc_code": swap(dc_code, memor
 RECORDED = [name for name in METHODS if (LIVE / name / "rec.jsonl").exists()]
 
 
+def executed(name):
+    """Блок кода -> вывод его исполнения у апстрима, из сообщений assistant записанных запросов."""
+    out = {}
+    for line in open(LIVE / name / "rec.jsonl"):
+        for m in json.loads(json.loads(line)["request"])["messages"]:
+            if m["role"] == "assistant":
+                head, ran = m["content"].split(f"\n{show.FLAG}\n\n", 1)
+                out[head] = ran
+    return out
+
+
 @pytest.fixture(scope="module", params=RECORDED)
 def replayed(request, tmp_path_factory):
     name = request.param
-    if name == "dc_code" and not sandbox.available():
-        pytest.skip("нет docker-образа песочницы")
     out = tmp_path_factory.mktemp(name)
     srv = Replayer(("127.0.0.1", 0), LIVE / name / "rec.jsonl")
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     STEPS.clear()
+    patch = pytest.MonkeyPatch()
     try:
+        patch.setattr(show, "run_block", executed(name).__getitem__)
         model = Model("ornith15-9b", f"http://127.0.0.1:{srv.server_address[1]}/v1", backend="wire")
         run(TASKS["meb"], METHODS[name], model, N, str(out))
     finally:
+        patch.undo()
         srv.shutdown()
     theirs = [json.loads(line) for line in open(LIVE / name / "outputs.jsonl")]
     return name, srv.status(), json.load(open(out / "log.json")), list(STEPS), theirs
@@ -87,3 +104,13 @@ def test_correct(replayed):
     """Число верных — как у eval_equation_balancer апстрима в его прогоне (run.json)."""
     name, _, log, _, _ = replayed
     assert sum(r["correct"] for r in log) == json.load(open(LIVE / name / "run.json"))["correct"]
+
+
+@pytest.mark.skipif(not sandbox.available(), reason="нет docker-образа песочницы")
+def test_sandbox():
+    """Наша песочница на блоках кода записи dc_code даёт тот же вывод, что python3 апстрима; в traceback вместо
+    случайного файла tempfile — наш файл (DC4)."""
+    ran = executed("dc_code")
+    assert ran
+    for head, theirs in ran.items():
+        assert show.run_block(head).strip() == re.sub(r"/tmp/tmp\w+\.py", show.CODE_FILE, theirs)

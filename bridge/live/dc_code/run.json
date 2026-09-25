@@ -1,0 +1,13 @@
+{
+  "upstream": "dynamic-cheatsheet",
+  "commit": "5cfe3c37e8e52b1d858d0f3df46e7f17c50991b9",
+  "date": "2026-09-25",
+  "model": "ornith15-9b (ornith15-9b-mlx-8bit через шлюз :8080)",
+  "slice": "MathEquationBalancer (data/ апстрима), shuffle(seed=10), --max_n_samples 5",
+  "env": "апстрим целиком в контейнере dc-upstream (Dockerfile: python 3.11 и версии .venvs/light), cwd /up = корень апстрима только на чтение; сеть — внутренняя dcnet без выхода наружу, единственный выход — контейнер записи dcrec к шлюзу host.docker.internal:8080; OPENAI_BASE_URL=http://dcrec:8080/v1; код модели исполняется только в контейнере",
+  "record": "tools.record.record.Recorder внутри dcrec (seed подставляется); запуск целиком — run.sh",
+  "command": "python run_benchmark.py --task MathEquationBalancer --approach_name DynamicCheatsheet_Cumulative --model_name openai/ornith15-9b --generator_prompt_path prompts/generator_prompt.txt --cheatsheet_prompt_path prompts/curator_prompt_for_dc_cumulative.txt --max_n_samples 5 --save_directory /out",
+  "note": "исполнение кода включено (по умолчанию); outputs.jsonl — выход апстрима",
+  "calls": 19,
+  "correct": 5
+}
