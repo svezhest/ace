@@ -3,7 +3,8 @@
 возвращением по весу; к системному промпту — просьба решать подзадачами.
 
 Вес задаёт показ, библиотека его не знает: skill — w_IG * max(IG, eps) + (среднее fig или 0.5), при w_IG от 100
-без Future IG; insight — max(среднее fig или 0.5, eps)."""
+без Future IG; insight — max(среднее fig или 0.5, eps). Пола у веса skill, как у апстрима, нет: IG и Future IG по
+построению не меньше нуля."""
 from .. import prompts, render
 from ..extract.evolib import EPS
 from . import Choose, Hint, Part, Sample
@@ -20,7 +21,7 @@ def future(r):
 
 def skill_weight(r, w_ig=W_IG):
     w = w_ig * max(r.ig, EPS)
-    return max(w + future(r) if w_ig < LEGACY_W_IG else w, EPS)
+    return w + future(r) if w_ig < LEGACY_W_IG else w
 
 
 def insight_weight(r):

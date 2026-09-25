@@ -2,7 +2,7 @@
 
     skills      подзадачи целиком (<subtask> с description, solution, result) из лучшего решения, если оно улучшает
     insights    «If ..., then ...»
-    solutions   лучшее решение каждого вопроса — скрыто от решателя (его читает извлечение для сравнения)
+    solutions   лучшее решение каждого вопроса — скрыто от решателя; меняется, только если новое улучшает
 
 Журнал исходов записи — Future IG (fig), оценка при рождении — IG вопроса (ig, у skill). Похожие (косинус
 строго больше 0.8 по условию insight или description skill) сливает модель; одна слитая запись наследует журнал
@@ -12,10 +12,10 @@ from dataclasses import dataclass, field
 from .. import embed, parse, prompts
 from ..model import Call, Reader, messages, params
 from ..extract import ATTRIBUTION, BEST_ANSWER, IG
-from ..extract.evolib import future_gains
+from ..extract.evolib import future_gains, second_better
 from . import Container, Ids, Lessons, Operation, Record
 
-P = {n: prompts.load(f"evolib_{n}") for n in ("merge_skills", "merge_insights")}
+P = {n: prompts.load(f"evolib_{n}") for n in ("merge_skills", "merge_insights", "compare")}
 SIM, RATE = 0.8, 0.5        # порог слияния похожих, доля нового IG у слитого skill
 
 
@@ -63,18 +63,29 @@ class Library(Container):
         return self.solutions.get(question)
 
     def learn(self, ex, extractions):
-        """insight, лучшее решение и skills из него (если улучшает), Future IG — в таком порядке, как в апстриме."""
+        """insight, улучшение, лучшее решение и skills из него, Future IG — в таком порядке, как в run_iteration."""
         for x in extractions:
             for text in x.lessons:
                 self.add_insight(ex, text)
             best = x.extras[BEST_ANSWER]
-            if best:
+            if best is not None and self.improves(ex, x.group, best):
                 self.solutions[x.group.question] = best
                 for block, doc in parse.subtasks(best.output):
                     self.add_skill(ex, block, doc, x.extras[IG])
             for rid, gain in future_gains(x.extras[ATTRIBUTION], x.scores):
                 if self.get(rid):
                     self.get(rid).outcomes.append(gain)
+
+    def improves(self, ex, group, best):
+        """is_improving апстрима: лучшего решения вопроса ещё нет или новое строго лучше по баллу; не лучше, но есть
+        ответ большинства (без внешней оценки), а старое с ним не сходится — решает сравнение решений моделью."""
+        before = self.best(group.question)
+        if before is None or best.score > before.score:
+            return True
+        if not group.vote or ex.task.check(before.answer, group.vote):
+            return False
+        prompt = P["compare"].fill(question=group.question, a=before.output, b=best.output)
+        return ex.model.ask(Call(messages(prompt), params(), Reader(text=second_better))).output
 
     def add_insight(self, ex, text):
         def merge(old):

@@ -5,13 +5,10 @@
     лучшая      первая с наибольшим баллом; IG = log(лучший) - log(средний), оба снизу eps (compute_IG)
     insight     модель по вопросу и лучшему решению («If ..., then ...»; N/A — нет). Без оценки — всегда, и
                 если insight есть, баллы делятся пополам; с оценкой — только при неудаче лучшей, с её вердиктом
-    улучшение   лучшего решения вопроса ещё нет или оно строго хуже по баллу (после деления); без оценки, если
-                старое решение не сходится с ответом большинства, решает сравнение решений моделью
 
-Даёт: ig (до деления баллов), best_answer (лучшее решение, если оно улучшает, иначе None; skills память
-берёт из него), attribution (записи в промпте каждой попытки и номер лучшей — для Future IG). Лучшее
-решение вопроса память хранит скрытым от решателя (memory.best(вопрос)); извлечение читает его для
-сравнения."""
+Даёт: ig (до деления баллов), best_answer (лучшее решение попытки с баллом после деления: улучшает ли оно
+лучшее решение вопроса, решает память — после слияния insight, как в апстриме), attribution (записи в промпте
+каждой попытки и номер лучшей — для Future IG)."""
 import math
 from dataclasses import dataclass
 
@@ -21,7 +18,7 @@ from . import ATTRIBUTION, BEST_ANSWER, IG, Extraction, Extractor
 
 EPS = 0.01                  # пол логарифма в IG
 UNEVALUATED = 0.5           # множитель баллов без внешней оценки, когда insight есть
-P = {n: prompts.load(f"evolib_{n}") for n in ("insight", "compare")}
+INSIGHT = prompts.load("evolib_insight")
 
 
 @dataclass
@@ -73,7 +70,7 @@ class Gains(Extractor):
         self.evaluated = evaluated
 
     def insight(self, ex, group, best, evaluation):
-        prompt = P["insight"].fill(question=group.question, solution=best.output, evaluation=evaluation)
+        prompt = INSIGHT.fill(question=group.question, solution=best.output, evaluation=evaluation)
         return ex.model.ask(Call(messages(prompt), params(), Reader(text=insight_of))).output
 
     def __call__(self, ex, group, memory):
@@ -90,11 +87,6 @@ class Gains(Extractor):
             insight = self.insight(ex, group, best, "")
             if insight:
                 scores = [s * UNEVALUATED for s in scores]
-        before = memory.best(group.question)
-        improving = before is None or scores[b] > before.score
-        if not improving and not self.evaluated and group.vote and not ex.task.check(before.answer, group.vote):
-            prompt = P["compare"].fill(question=group.question, a=before.output, b=best.output)
-            improving = ex.model.ask(Call(messages(prompt), params(), Reader(text=second_better))).output
         return Extraction(group, [insight] if insight else [], scores,
-                          {IG: ig, BEST_ANSWER: Best(best.output, best.answer, scores[b]) if improving else None,
+                          {IG: ig, BEST_ANSWER: Best(best.output, best.answer, scores[b]),
                            ATTRIBUTION: Attribution([e.shown for e in eps], b)})

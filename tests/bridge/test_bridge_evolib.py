@@ -380,7 +380,8 @@ def test_run_iteration(monkeypatch, case):
     x = Gains(evaluated=gold)(ex, g, m)
     m.learn(ex, [x])
     r, b = want["result"], x.extras[ATTRIBUTION].best
-    assert (x.scores[b], eps[b].output, x.extras[BEST_ANSWER] is not None) == (r["best_score"], r["best_solution"], r["is_improving"])
+    improving = m.best(g.question) is x.extras[BEST_ANSWER]
+    assert (x.scores[b], eps[b].output, improving) == (r["best_score"], r["best_solution"], r["is_improving"])
     assert math.isclose(x.extras[IG], r["IG_score"]) and x.lessons == r["best_insights"]
     assert [blk for blk, _ in parse.subtasks(eps[b].output)] == r["best_skills"]
     assert state(m) == upstream_state(want["lib"]["skill_lib"], figs(want["lib"]["insight_lib"]))
@@ -425,8 +426,7 @@ def loop_model():
 
 
 def calls_of(model, calls):
-    """Вызовы итерации: у решателя — раздел памяти, у остальных — промпт; сравнение решений у нас идёт до слияния
-    insight (D18), поэтому сравнения сверяются отдельно."""
+    """Вызовы итерации: у решателя — раздел памяти, у остальных — промпт."""
     solver = [shown(c["system"]) for c in calls if c["name"] == "solver"]
     rest = [c["user"] for c in calls if c["name"] != "solver"]
     return solver, rest
@@ -459,8 +459,5 @@ def test_loop(monkeypatch, mode):
         up_rest = [no_math(u) for u in up if not u.startswith("You are a math expert. For the following math problem")]
         solver, rest = calls_of(model, model.calls[start:end])
         rest = [no_evaluation(u) for u in rest]
-        deviation("EV5")
-        assert solver == up_solver, it["kiter"]
-        assert sorted(rest) == sorted(up_rest) and [u for u in rest if "two solutions" not in u] == \
-               [u for u in up_rest if "two solutions" not in u], it["kiter"]
+        assert solver == up_solver and rest == up_rest, it["kiter"]
         start = end

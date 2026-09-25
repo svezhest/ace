@@ -59,17 +59,22 @@ def test_no_insight_keeps_scores():
 
 
 def test_improving_and_compare():
-    """Старое решение не хуже по баллу: не улучшает; если оно не сходится с большинством — решает сравнение."""
-    memory = Library()
-    memory.solutions["q"] = Best("old solution", "2", 1.0)
-    model = Stub(lambda call: "```judgment\nSolution 2 is better.\n```" if "two solutions" in call["user"] else "N/A")
-    x = Gains()(Ex(model), group(["2", "2", "3"]), memory)
-    assert x.extras[BEST_ANSWER] is None and len(model.calls) == 1        # ответ тот же: сравнения нет
-    memory.solutions["q"] = Best("old solution", "7", 1.0)
-    x = Gains()(Ex(model), group(["2", "2", "3"]), memory)
-    assert "old solution" in model.calls[-1]["user"] and x.extras[BEST_ANSWER].answer == "2"
-    model = Stub(lambda call: "```judgment\nSolution 1\n```" if "two solutions" in call["user"] else "N/A")
-    assert Gains()(Ex(model), group(["2", "2", "3"]), memory).extras[BEST_ANSWER] is None
+    """Память решает, улучшает ли лучшее решение: старого нет или новое строго лучше по баллу; старое не хуже и
+    сходится с большинством — нет; не сходится — решает сравнение (после слияния insight)."""
+    def learn(old, judgment):
+        memory = Library()
+        memory.solutions["q"] = old
+        model = Stub(lambda call: judgment if "two solutions" in call["user"] else "N/A")
+        g = group(["2", "2", "3"])
+        new = Gains()(Ex(model), g, memory).extras[BEST_ANSWER]
+        memory.learn(Ex(model), [Extraction(g, [], [1, 1, 0], {IG: 0, BEST_ANSWER: new, ATTRIBUTION: Attribution([[]] * 3, 0)})])
+        return memory.best("q") is new, [c["user"] for c in model.calls]
+    improved, calls = learn(Best("old", "2", 1.0), "")
+    assert not improved and len(calls) == 1                            # только insight: сравнения нет
+    improved, calls = learn(Best("old solution", "7", 1.0), "```judgment\nSolution 2 is better.\n```")
+    assert improved and "old solution" in calls[-1]
+    assert not learn(Best("old solution", "7", 1.0), "```judgment\nSolution 1\n```")[0]
+    assert learn(Best("old", "7", 0.5), "") == (True, calls[:1])     # новое лучше по баллу
 
 
 def test_evaluated():
@@ -135,7 +140,7 @@ def test_merge_skill(monkeypatch):
 
 def test_weights_and_show():
     s = Skill("r1", "x", outcomes=[], ig=-1.0)
-    assert math.isclose(skill_weight(s), 0.51) and skill_weight(Skill("r2", "x", outcomes=[-5.0], ig=-1.0)) == 0.01
+    assert math.isclose(skill_weight(s), 0.51) and skill_weight(Skill("r2", "x", outcomes=[-5.0], ig=-1.0)) == 0.01 - 5.0
     assert math.isclose(insight_weight(Skill("r3", "x", outcomes=[0.2, 0.4])), 0.3)
     m = Library()
     m.insights.add("If a, then b.")
@@ -146,7 +151,7 @@ def test_weights_and_show():
 
 
 def test_judge_after_each_attempt():
-    """Судья ставит вердикт сразу после попытки (DEVIATIONS D7), в зачёт — ответ большинства."""
+    """Судья ставит вердикт сразу после попытки (масштабы не смешиваются), в зачёт — ответ большинства."""
     model = Stub(lambda call: "VERDICT: correct" if call["system"] == "You are a strict grader." else "N/A")
     run(TASK, evolib_judge, model, 1)
     kinds = ["judge" if c["system"] == "You are a strict grader." else "solver" if c["system"].startswith(TASK.system)
