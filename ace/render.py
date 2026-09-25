@@ -103,8 +103,8 @@ def transcript(messages):
 
 
 def retry_error(content):
-    """Отбивка инструмента: строка ModelRetry или список ошибок валидации pydantic (первая)."""
-    return f"Error: {content if isinstance(content, str) else content[0]['msg']}"
+    """Отбивка инструмента: строка ModelRetry или список ошибок валидации pydantic (все, через «; »)."""
+    return f"Error: {content if isinstance(content, str) else '; '.join(e['msg'] for e in content)}"
 
 
 def verdict(ok, target=""):
