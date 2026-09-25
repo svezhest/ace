@@ -6,7 +6,10 @@
     meta_agent(шаблон)      author: мета-агент с файлами (корень /workspace, как E2B-пути апстрима) читает
                             meta_agent/ (train.jsonl, evaluations.json, skills/iter*/SKILL.md) и папки прошлых
                             под-итераций и пишет SKILL.md в iter{k}_sub0/.agent/skills/learning-context/"""
+import atexit
+import os
 import random
+import shutil
 import tempfile
 from dataclasses import dataclass, field
 from functools import partial
@@ -207,7 +210,8 @@ class Iterations(Wrapper):
     (у sub0 context/ и interfaces/ — из последней папки лучшей по val итерации, у iter1 — пустые; дальше — из
     прошлой под-итерации вместе с навыком), вопросы батча, train.json и базовый агент (Folder.learn). В конце
     прохода — val последней папкой, итерация — в meta_agent/evaluations.json и архив навыков, откат к лучшей по val
-    (строго больше, при равенстве первая; iter0 не участвует). Workspace — root/workspace/<name>."""
+    (строго больше, при равенстве первая; iter0 не участвует). Workspace — root/workspace/<name>, по умолчанию
+    <задача>-<pid>; без корня — временная папка, удаляется при выходе."""
     def __init__(self, inner, root=None, workspace=None, name=None):
         super().__init__(inner, name)
         self.root, self.workspace = root, workspace
@@ -218,8 +222,12 @@ class Iterations(Wrapper):
 
     def sample(self, ex, split, n):
         if self.ws is None:
-            root = self.root or config.MCE_ROOT or tempfile.mkdtemp(prefix="mce-")
-            self.ws = Workspace(root, self.workspace or ex.task.name)
+            root = self.root or config.MCE_ROOT
+            if root is None:
+                root = tempfile.mkdtemp(prefix="mce-")
+                atexit.register(shutil.rmtree, root, ignore_errors=True)
+            # свой workspace на процесс: параллельные прогоны с общим корнем не стирают друг друга
+            self.ws = Workspace(root, self.workspace or f"{ex.task.name}-{os.getpid()}")
             claude.prepare(root)
             self.ws.start(ex.task)
         samples = [dict(item, id=i) for i, item in enumerate(ex.task.load(split, whole=True))]

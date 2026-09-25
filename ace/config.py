@@ -8,7 +8,7 @@ API_KEY = os.getenv("OPENAI_API_KEY", "local")
 MODEL = os.getenv("MODEL", "ornith15-9b")
 BACKEND = os.getenv("BACKEND", "pydantic-ai")     # доступ к модели: pydantic-ai | wire (ace/model)
 MAX_TOKENS = int(os.getenv("MAX_TOKENS", 4096))
-SEED = int(os.getenv("SEED", 0))
+SEED = int(os.getenv("SEED", 0))    # сид random стенда (выборки, порядок); вызовы модели при T > 0 идут без seed
 
 # размер выборки входит в имя файла данных: formula40.jsonl, formula_train40.jsonl, formula_val10.jsonl
 SIZE = int(os.getenv("SIZE", 40))
@@ -29,4 +29,4 @@ RESULTS = Path(os.getenv("RESULTS", "results"))
 CLAUDE_BASE_URL = os.getenv("CLAUDE_BASE_URL", "http://127.0.0.1:4000")
 UPSTREAMS = Path(os.getenv("UPSTREAMS", Path.home() / "Projects" / "upstreams"))
 MCE_VENV = Path(os.getenv("MCE_VENV", UPSTREAMS / ".venvs" / "mce"))
-MCE_ROOT = os.getenv("MCE_ROOT")        # не задан — временная папка на прогон
+MCE_ROOT = os.getenv("MCE_ROOT")        # не задан — временная папка на прогон, удаляется при выходе
