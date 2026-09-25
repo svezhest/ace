@@ -195,10 +195,10 @@ class Book(Container):
         new = lambda x: Strategic(self.ids.next(), x["rule"], domain, x["rationale"], x["confidence"])
         self.domains[domain] = compress(ex.model, rules, self.optimizer, TARGET, CAP, new)
 
-    def dump(self):
-        """tactical, затем strategic по доменам."""
-        return ([dict(kind="tactical", perspective=self.name, **r.dump()) for r in self.tactical] +
-                [dict(kind="strategic", perspective=self.name, **r.dump()) for r in self.records()])
+    def dump(self, suffix=""):
+        """tactical, затем strategic по доменам; suffix — перспектива в имени вида, когда их несколько."""
+        return ([dict(kind="tactical" + suffix, **r.dump()) for r in self.tactical] +
+                [dict(kind="strategic" + suffix, **r.dump()) for r in self.records()])
 
 
 class Perspectives(Container):
@@ -218,7 +218,7 @@ class Perspectives(Container):
         return tuple(b.key() for b in self.books)
 
     def dump(self):
-        return [row for b in self.books for row in b.dump()]
+        return [row for b in self.books for row in b.dump(f":{b.name}" if len(self.books) > 1 else "")]
 
 # показ
 
