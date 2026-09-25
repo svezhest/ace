@@ -19,32 +19,44 @@ Each skill you create should be a complete learning procedure that can be unders
 **Meta-Level (You)**:
 - Analyze iteration history (skills → implementations → results)
 - Perform agentic crossover to evolve better skills
-- Output: the new SKILL.md
+- Output: `{{ skill_output_path }}`
 
 {% block base %}**Base-Level (Context Engineer)**:
 - Receives your skill + training data + prior best context
-- Executes the skill with file tools over `context/` and `data/`
-- Output: `context/` files
+- Executes the skill to implement required interfaces
+- Output: `interfaces/` functions + `context/` files
 
 **Key Flow**: Base-agent starts with the BEST context from previous iterations and UPDATES it based on your skill's instructions.
-{% endblock %}
+
+{% endblock %}## Working Directory
+
+**Working Directory**: `{{ workspace }}`
+
+```
+{{ workspace }}/
+  meta_agent/                                # Reference data (read-only)
+    train.jsonl                              # Full training dataset
+    evaluations.json                         # Aggregated metrics per iteration
+    skills/iter*/SKILL.md                    # Archived skills from each iteration
+  {{ iter_name }}/                               # YOUR OUTPUT DIRECTORY
+    .claude/skills/learning-context/SKILL.md # <-- WRITE YOUR SKILL HERE
+    context/                                  # Static resources (base-agent writes)
+    interfaces/                               # Implemented interfaces (base-agent writes)
+    data/train.json                           # Training results
+```
+
+**Write Access**: Only `{{ workspace }}/{{ iter_name }}/.claude/skills/`
+**IMPORTANT**: Write SKILL.md to `{{ skill_output_path }}`
+
 ## Skill Database (Iteration History)
 
 {{ skill_database }}
 
-## Evaluations
-
-{{ evaluations }}
-
-## Archived Skills
-
-{{ skills }}
-
 ## Your Task
 
-1. **Review Iteration History**:
-   - Read the evaluations for performance metrics
-   - Read the archived skills
+1. **Review Iteration History**: 
+   - Read `meta_agent/evaluations.json` for performance metrics
+   - Read skills from `meta_agent/skills/iter*/SKILL.md`
    - Analyze: What strategies worked? What failed?
    - **Overfitting Check**: Is train >> val accuracy?
    - **Underfitting Check**: Are both accuracies low?
@@ -63,9 +75,10 @@ Directly analyze training data and curate context in a fully agentic manner.
 
 ## Methodology
 1. **Load prior context**: Read existing `context/` files
-2. **Scan evaluation results**: Read the files in `data/`
+2. **Scan evaluation results**: Load `data/train.json`
 3. **Analyze incorrect patterns**: Group by mistake type
 4. **Update context incrementally**: ADD/UPDATE/REMOVE sections
+5. **Implement interfaces**: Create functions in `interfaces/`
 
 ## Key Principles
 - Build upon existing context
@@ -75,12 +88,16 @@ Directly analyze training data and curate context in a fully agentic manner.
 
 {% endblock %}## Output Requirements
 
-Reply with the full content of the new SKILL.md and nothing else.
+**Write SKILL.md to**: `{{ skill_output_path }}`
 
 Requirements:
 - MUST include `## Skill Overview` section
 - Describe a complete learning procedure
 - NO iteration-specific references
 - Include clear methodology and implementation guidance
+
+**Before finishing, verify**:
+- SKILL.md exists at `{{ skill_output_path }}`
+- SKILL.md has a clear `## Skill Overview` section
 
 Begin by analyzing the skill database and evolving the next generation skill.

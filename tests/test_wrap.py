@@ -3,6 +3,7 @@ train за проход, откат к лучшей по val, при равен�
 базовый агент MCE (context/ на запись, итоги только текущего батча в data/ на чтение), навык в промптах ACE."""
 import copy
 import json
+from types import SimpleNamespace
 
 from stub import TASK, Stub, episode, right
 
@@ -13,7 +14,7 @@ from ace.learner import Learner, swap
 from ace.loop import Group, run
 from ace.memory import Lessons
 from ace.methods.ace import Ops
-from ace.methods.mce import Context, mce, mce_ace
+from ace.methods.mce import META, MISSING, Context, mce, mce_ace, meta_agent
 from ace.wrap import Gate, Meta, Wrapper, skilled
 
 
@@ -100,14 +101,43 @@ def test_swap_wrapper():
     assert isinstance(Wrapper(mce.inner).inner, Learner)
 
 
+class FileAgent(Stub):
+    """Заглушка-агент: как агент с файлами, правит FS из deps (act(call, deps)) и отвечает "done"."""
+    def __init__(self, act, answer=lambda call: "done", schemas=None):
+        super().__init__(answer, schemas)
+        self.act = act
+
+    def run(self, system, user, output=str, tools=(), deps=None, **kw):
+        reply = super().run(system, user, output, tools, deps, **kw)
+        self.calls[-1]["deps"], self.calls[-1]["history"] = deps, kw.get("history")
+        if isinstance(deps, fs.FS):
+            self.act(self.calls[-1], deps)
+        return reply
+
+
+def write(path, text):
+    """act: записать файл, как агент инструментом create."""
+    return lambda call, deps: fs.create(SimpleNamespace(deps=deps), path, text)
+
+
+def meta_writes(skill):
+    """Мета-агент пишет SKILL.md по пути из промпта; остальные агенты ничего не делают."""
+    def act(call, deps):
+        if "Meta-Level Agent" in call["user"]:
+            path = call["user"].split("**Write SKILL.md to**: `", 1)[1].split("`", 1)[0]
+            fs.create(SimpleNamespace(deps=deps), path, skill)
+    return act
+
+
+class Ex:
+    task, epoch, i = TASK, 0, 1
+
+    class learner:
+        skill, every = "## Skill Overview\nCurate.", 2
+
+
 def test_mce_base_agent():
-    model = Stub(lambda call: "done")
-
-    class Ex:
-        task = TASK
-
-        class learner:
-            skill = "## Skill Overview\nCurate."
+    model = FileAgent(write("/workspace/iter1_sub0/context/new.md", "lesson"))
     ex = Ex()
     ex.model = model
     context = Context()
@@ -116,28 +146,46 @@ def test_mce_base_agent():
               Group("q2", [episode("2", ok=False, target="3", question="q2")], target="3")]
     context.learn(ex, [Raw()(ex, g, context) for g in groups])
     call = model.calls[0]
-    assert call["tools"] == fs.TOOLS and "## Skill Overview\nCurate." in call["user"] and "train_accuracy 1/2" in call["user"]
-    assert call["system"] == "You are a context engineer working with file tools."
+    assert call["tools"] == fs.TOOLS and call["system"] == ""
+    assert "**Working Directory**: `/workspace/iter1_sub0`" in call["user"] and "Summary" not in call["user"]
+    deps = call["deps"]
+    assert deps.mounts["context"].store is context and deps.mounts["data"].mode == deps.mounts[".claude"].mode == "ro"
+    assert deps.mounts[".claude"].store.files == {"skills/learning-context/SKILL.md": "## Skill Overview\nCurate."}
+    train = json.loads(deps.mounts["data"].store.files["train.json"])
+    assert train["summary"] == dict(train_accuracy=0.5, train_metrics=dict(accuracy=0.5), train_total=2, train_errors=0,
+                                    batch_idx=0, cumulative_rollouts=2)
+    assert train["detailed_results"][1] == dict(id=1, question="q2", ground_truth="3", llm_prediction="2", is_correct=False)
+    assert context.files == {"notes.md": "old", "new.md": "lesson"}
+    assert context.folder() == {"context/notes.md": "old", "context/new.md": "lesson", "data/train.json": context.train}
 
 
-def test_mce_base_data_mounts():
-    captured = []
+def test_meta_agent_asks_for_skill():
+    """SKILL.md не записан: просьба в том же разговоре (история прошлого прогона), до трёх раз; потом навык прошлой
+    итерации."""
+    model = FileAgent(lambda call, deps: None)
+    ex = Ex()
+    ex.model = model
+    author = meta_agent(META)
+    assert author(ex, []) == ""
+    assert len(model.calls) == 3 and model.calls[1]["user"] == MISSING.fill(
+        expected_path="/workspace/iter1_sub0/.claude/skills/learning-context/SKILL.md")
+    assert "VALIDATION ERROR" in model.calls[2]["user"] and model.calls[0]["history"] is None
+    # записал со второго раза
+    model = FileAgent(lambda call, deps: len(model.calls) == 2 and write(
+        "/workspace/iter1_sub0/.claude/skills/learning-context/SKILL.md", "S")(call, deps))
+    ex.model = model
+    assert author(ex, []) == "S" and len(model.calls) == 2
 
-    class Model:
-        def run(self, system, user, tools=(), deps=None, rounds=0, **kw):
-            captured.append((deps, rounds))
 
-    class Ex:
-        task, model = TASK, Model()
-
-        class learner:
-            skill = "s"
-    context = Context()
-    g = Group("q", [episode("7", ok=False, target="8", question="q")], target="8")
-    context.learn(Ex(), [Raw()(Ex(), g, context)])
-    deps, rounds = captured[0]
-    assert rounds == 30 and deps.mounts["context"].store is context and deps.mounts["data"].mode == "ro"
-    assert deps.mounts["data"].store.files == {"r1": "is_correct: False\nllm_answer: 7\ntarget: 8\nquestion:\nq"}
+def test_mce_run():
+    model = FileAgent(meta_writes("## Skill Overview\nS"), lambda call: right(call) if call["system"].startswith(TASK.system)
+                      else "done")
+    run(TASK, swap(mce, every=2), model, 3, epochs=1, offline=True)
+    base = [c for c in model.calls if c["user"].startswith("# Context Engineer")]
+    assert len(base) == 2                                   # батч из двух и неполный в конце прохода
+    summaries = [json.loads(c["deps"].mounts["data"].store.files["train.json"])["summary"] for c in base]
+    assert [(s["batch_idx"], s["train_total"], s["cumulative_rollouts"]) for s in summaries] == [(0, 2, 2), (1, 1, 3)]
+    assert "`/workspace/iter1_sub1`" in base[1]["user"]
 
 
 def test_skill_in_ace_prompts():
@@ -158,18 +206,10 @@ def test_skill_in_ace_prompts():
 
 
 def test_mce_ace_run():
-    model = Stub(lambda call: "SKILL" if "Meta-Level Agent" in call["user"] else right(call),
-                 schemas={"Reflection": Reflection(lessons=["l"]), "Ops": Ops(ops=[])})
+    model = FileAgent(meta_writes("SKILL"), lambda call: right(call) if call["system"].startswith(TASK.system) else "done",
+                      schemas={"Reflection": Reflection(lessons=["l"]), "Ops": Ops(ops=[])})
     run(TASK, mce_ace, model, 2, epochs=2, offline=True)
     metas = [c for c in model.calls if "Meta-Level Agent" in c["user"]]
     assert len(metas) == 2 and "Base-Level (Reflector and Curator)" in metas[0]["user"]
     learning = [c for c in model.calls if c["output"] in (Reflection, Ops)]
     assert len(learning) == 8 and all(c["system"].endswith("\n\nSKILL") for c in learning)
-
-
-def test_mce_run():
-    model = Stub(lambda call: right(call) if call["system"].startswith(TASK.system) else "SKILL")
-    run(TASK, swap(mce, every=2), model, 3, epochs=1, offline=True)
-    base = [c for c in model.calls if c["tools"] == fs.TOOLS]
-    assert len(base) == 2                                   # батч из двух и неполный в конце прохода
-    assert "train_accuracy 2/2" in base[0]["user"] and "train_accuracy 1/1" in base[1]["user"]

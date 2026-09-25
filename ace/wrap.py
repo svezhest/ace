@@ -9,7 +9,7 @@
 Навык ученик подставляет в свои промпты обучения сам (skilled): у базового агента MCE — инструкция правки
 файлов, у ACE — добавка к системным промптам рефлектора и куратора."""
 import copy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from . import prompts
 from .learner import swap
@@ -66,29 +66,51 @@ class Gate(Wrapper):
         self.gated.append(ok)
 
 
+SKILL = ".claude/skills/learning-context/SKILL.md"     # навык в папке под-итерации MCE
+
+
+def sub_folder(ex):
+    """Папка под-итерации MCE (get_sub_iteration_folder_name): итерация = проход, под-итерация = батч."""
+    return f"iter{ex.epoch + 1}_sub{ex.i // ex.learner.every}"
+
+
 @dataclass
 class Iteration:
-    """Итерация меты: навык (text), точность на train за проход и на val, версия памяти ученика после неё."""
+    """Итерация меты: навык (text), точность на train за проход и на val, версия памяти ученика после неё, сколько
+    вопросов val и train (rollouts), папки под-итераций: имя -> {путь: текст} (их видит мета-агент)."""
     text: str
     train: float
     val: float
     memory: object
+    val_total: int = 0
+    rollouts: int = 0
+    folders: dict = field(default_factory=dict)
 
 
 def accuracy(results):
     return correct(results) / len(results) if results else 0.0
 
 
+def best_iteration(vals):
+    """_find_best_iteration: номер лучшей по val итерации; строго больше, при равенстве первая."""
+    best, top = None, -1e9
+    for i, v in enumerate(vals):
+        if v > top:
+            best, top = i, v
+    return best
+
+
 class Meta(Wrapper):
-    """MCE (mce/main.py): итерация = проход по train батчами ученика. Перед первой попыткой прохода
-    author(ex, история) пишет навык; train итерации — доля верных за весь проход (среднее по батчам с весом, как
-    aggregate_iteration_results). В конце прохода val, итерация — в историю, следующая начинается с лучшей по
-    val из уже пройденных (строго больше, при равенстве первая: _find_best_iteration). Нулевой итерации
-    (val пустой памяти) нет: апстрим по умолчанию начинает с iter1, а iter0 в выборе не участвует."""
+    """MCE (mce/main.py): итерация = проход по train батчами ученика (батч — под-итерация). Перед первой попыткой
+    прохода author(ex, история) пишет навык; train итерации — доля верных за весь проход (среднее по батчам с весом,
+    как aggregate_iteration_results). После каждого батча — снимок папки под-итерации: навык и то, что память
+    ученика отдаёт как папку (folder()). В конце прохода val, итерация — в историю, следующая начинается с лучшей
+    по val из уже пройденных (_find_best_iteration). Нулевой итерации (val пустой памяти) нет: апстрим по
+    умолчанию начинает с iter1, а iter0 в выборе не участвует."""
     def __init__(self, inner, author, name=None):
         super().__init__(inner, name)
         self.author, self.history = author, []
-        self.fresh, self.right, self.seen = True, 0, 0
+        self.fresh, self.right, self.seen, self.folders = True, 0, 0, {}
 
     def prompt(self, ex, item, k, memory=None):
         """Первая попытка прохода при обучении открывает итерацию: навык до всего обучения прохода."""
@@ -101,17 +123,16 @@ class Meta(Wrapper):
         self.right += sum(bool(g.episodes[g.chosen].ok) for g in groups)
         self.seen += len(groups)
         self.inner.on_batch(ex, groups)
+        folder = getattr(self.inner.memory, "folder", dict)()
+        self.folders[sub_folder(ex)] = {SKILL: self.inner.skill, **folder} if self.inner.skill else folder
 
     def on_pass(self, ex):
         self.inner.on_pass(ex)
-        self.history.append(Iteration(self.inner.skill, self.right / self.seen if self.seen else 0.0,
-                                      accuracy(ex.evaluate()), self.inner.snapshot()))
-        best = self.history[0]
-        for h in self.history[1:]:
-            if h.val > best.val:
-                best = h
-        self.inner.restore(best.memory)
-        self.fresh, self.right, self.seen = True, 0, 0
+        val = ex.evaluate()
+        self.history.append(Iteration(self.inner.skill, self.right / self.seen if self.seen else 0.0, accuracy(val),
+                                      self.inner.snapshot(), len(val), self.seen, self.folders))
+        self.inner.restore(self.history[best_iteration([h.val for h in self.history])].memory)
+        self.fresh, self.right, self.seen, self.folders = True, 0, 0, {}
 
     def dump(self):
         return self.inner.dump() + [dict(kind="iterations", id=f"iter{i}", text=h.text, train=h.train, val=h.val)
