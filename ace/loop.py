@@ -1,12 +1,5 @@
-"""Цикл, один на все методы. Эксперимент — проходы по задачам; вопрос — группа попыток; попытка — шаги
-решателя. Ученик (learner.py) даёт промпт попытки и отвечает на события своих масштабов:
-
-    шаг       on_step(ex, attempt, step) -> Patch | None     при обучении и на val / тесте
-    попытка   prompt(ex, item, k) -> Prompt до, on_attempt(ex, episode) после
-    вопрос    on_question(ex, group)                        группа есть всегда, обычно из одной попытки
-    батч      on_batch_start(ex) перед первым вопросом батча (ex.batch — его номер в проходе); on_batch(ex, groups)
-              раз в learner.every вопросов; неполный в конце прохода — если learner.flush
-    проход    on_pass_start(ex) после выборки вопросов прохода; on_pass(ex) в конце; ex.evaluate() — точность на val
+"""Цикл, один на все методы. Эксперимент — метод на задаче: проходы по вопросам задачи; вопрос — группа попыток;
+попытка — шаги решателя. Хуки ученика по масштабам (шаг, попытка, вопрос, батч, проход) — docs/architecture.md.
 
 На val и тесте (training = False) цикл зовёт только prompt и on_step. Сам цикл делает: среду попытки,
 вердикты (верный ответ в эпизоде только при golden), выбор ответа в зачёт, запись прочитанного
@@ -16,8 +9,11 @@ import json
 import random
 import time
 import traceback
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
+from functools import partial
 from pathlib import Path
+from typing import Callable
 
 from . import config, render
 from .model import Call, Outcome, messages, params
@@ -31,9 +27,9 @@ class Solver:
     """Решатель метода вместо общего (генератор ACE, DC): call(заметка) -> Call — запрос целиком, заметка рефлектора
     внутри него; answer(ответ текстом) -> ответ в зачёт; talk(модель, Call) -> Reply — свой разговор метода вместо
     одного вызова (DC: исполнение кода между вызовами)."""
-    call: callable
-    answer: callable
-    talk: callable = None
+    call: Callable
+    answer: Callable
+    talk: Callable = None
 
 
 @dataclass
@@ -45,7 +41,6 @@ class Prompt:
     rounds: int = 0             # лишних шагов решателю на чтение
     shown: list = field(default_factory=list)   # id показанных записей
     temperature: float = 0
-    top_p: float = None         # None — по умолчанию сервера (TF-GRPO: итоговый агент апстрима с top_p 0.95)
     note: str = ""              # заметка к сообщению решателю (раунды рефлексии ACE)
     solver: Solver = None       # свой решатель метода; тогда системного промпта задачи и среды нет
     seen: dict = field(default_factory=dict)    # что ещё решатель показал (DC: вход задачи, cheatsheet) — для извлечения
@@ -75,11 +70,11 @@ class Episode:
     output: str                 # вся траектория текстом: ответы, вызовы инструментов, их результаты
     final: str                  # последний ответ модели
     answer: str
-    steps: list
-    truncated: bool
-    used: list                  # id записей, прочитанных инструментами показа
-    fired: list
-    patches: list
+    steps: list = field(default_factory=list)
+    truncated: bool = False
+    used: list = field(default_factory=list)        # id записей, прочитанных инструментами показа
+    fired: list = field(default_factory=list)
+    patches: list = field(default_factory=list)
     ok: bool = None             # вердикт попытки; None — его нет
     target: str = ""            # верный ответ — только при golden
     system: str = ""            # системный промпт при запуске попытки (роль задачи, подсказка среды, показ)
@@ -116,31 +111,37 @@ def first(group, check):
 def vote(group, check):
     """Ответ большинства (self-consistency); при равенстве первый встреченный."""
     top = majority(e.answer for e in group.episodes)
-    return next((i for i, e in enumerate(group.episodes) if top and e.answer == top), 0)
+    if not top:
+        return 0
+    return next(i for i, e in enumerate(group.episodes) if e.answer == top)
 
 
 def best(group, check):
     """Первая верная по метке, иначе первая (SCOPE K=2). Это pass@k — помечается в логе."""
     return next((i for i, e in enumerate(group.episodes) if check(e.answer)), 0)
 
+# температура попытки k
 
-def at_zero(k):
+
+SPREAD = 0.7                # попытки после первой (self-consistency, группа контраста)
+
+
+def greedy(k):
     return 0
 
 
-def default(k):
-    """Настройка по умолчанию сервера (top_p)."""
-    return None
+def spread(k):
+    """Первая попытка жадная, остальные при SPREAD."""
+    return 0 if k == 0 else SPREAD
 
 
 @dataclass
 class Attempts:
-    """Сколько попыток на вопрос и что в зачёт. Различие попыток: температура и top_p попытки k; выборка
-    показа и разделённая память — в prompt(ex, item, k) ученика; заметка рефлектора — ex.retry из извлечения."""
+    """Сколько попыток на вопрос и что в зачёт. Различие попыток: температура попытки k; выборка показа и
+    разделённая память — в prompt(ex, item, k) ученика; заметка рефлектора — ex.retry из извлечения."""
     n: int = 1
-    temperature: callable = at_zero
-    top_p: callable = default
-    pick: callable = first
+    temperature: Callable = greedy
+    pick: Callable = first
 
     def count(self, training):
         """Попыток на вопрос: при обучении вся группа; на val и тесте — сколько нужно выбору в зачёт (first — одна:
@@ -169,8 +170,14 @@ class Protocol:
 
     @property
     def name(self):
-        kind = "final" if self.final else "offline" if self.offline else "online"
-        return f"{kind}{f'-w{self.window}' if self.window else ''}-e{self.epochs}"
+        if self.final:
+            kind = "final"
+        elif self.offline:
+            kind = "offline"
+        else:
+            kind = "online"
+        window = f"-w{self.window}" if self.window else ""
+        return f"{kind}{window}-e{self.epochs}"
 
     def check(self, name, verdict=None, split=""):
         """Ошибка сборки: несовместимые части. С вердиктом — ошибка запуска при утечке метки: онлайн с несколькими
@@ -189,84 +196,106 @@ class Experiment:
     """Метод × задача. Хукам ученика — как ex: модель, задача, флаг обучения, номер прохода, батча и вопроса и
     число вопросов, навык меты (skill), evaluate() и retry()."""
     def __init__(self, task, learner, model):
-        self.task, self.learner, self.model = task, learner, model
-        self.training, self.epoch, self.batch, self.i, self.total, self.item = True, 0, 0, 0, 0, None
+        self.task = task
+        self.learner = learner
+        self.model = model
+        self.training = True
+        self.epoch = 0          # номер прохода
+        self.batch = 0          # номер батча в проходе
+        self.i = 0              # номер вопроса в проходе
+        self.total = 0          # вопросов в проходе
+        self.item = None        # текущий вопрос
         self.skill = ""         # навык от мета-уровня (MCE): уровни ученика подставляют его в промпты обучения
         self.retried = []       # попытки из извлечения (retry) на текущем вопросе — в лог по вопросу
         self.scores = {}        # кэш val по ключу памяти
 
+    @contextmanager
+    def frozen(self):
+        """Без обучения: val, тест, новая попытка из извлечения; флаг обучения потом прежний."""
+        training = self.training
+        self.training = False
+        try:
+            yield
+        finally:
+            self.training = training
+
     def attempt(self, item, k, prompt):
         if prompt.solver is not None:
-            return self.solved(item, k, prompt)
+            return self.attempt_by_solver(item, k, prompt)
         env = self.learner.env.open()
-        a = Attempt(item["question"], k, self.training, prompt, self.task.system + env.hint + prompt.system)
         try:
+            running = Attempt(item["question"], k, self.training, prompt, self.task.system + env.hint + prompt.system)
             tools = env.tools + prompt.tools
-            reply = self.model.ask(Call(messages(render.user_message(self.task.instr, item["question"], prompt.note), a.system),
-                                        params(prompt.temperature, prompt.top_p), tools=tools, deps=prompt.deps,
-                                        rounds=env.rounds + prompt.rounds,
-                                        on_step=self.stepper(a) if tools and self.learner.watches_steps() else None))
+            watch = self.stepper(running) if tools and self.learner.watches_steps else None
+            user = render.user_message(self.task.instr, item["question"], prompt.note)
+            call = Call(messages(user, running.system), params(prompt.temperature), tools=tools, deps=prompt.deps,
+                        rounds=env.rounds + prompt.rounds, on_step=watch)
+            reply = self.model.ask(call)
         finally:
             env.close()
         final = reply.output or ""
-        ep = Episode(a.question, k, prompt, reply.text, final, final_answer(final), reply.steps, reply.truncated,
-                     list(prompt.deps.reads) if prompt.deps is not None else [], a.fired, a.patches, system=a.system,
-                     outcome=reply.outcome)
+        used = list(prompt.deps.reads) if prompt.deps is not None else []
+        ep = Episode(running.question, k, prompt, output=reply.text, final=final, answer=final_answer(final),
+                     steps=reply.steps, truncated=reply.truncated, used=used, fired=running.fired,
+                     patches=running.patches, system=running.system, outcome=reply.outcome)
         self.learner.verdict(self, ep, item["target"])
         return ep
 
-    def solved(self, item, k, prompt):
+    def attempt_by_solver(self, item, k, prompt):
         """Попытка своим решателем метода: без инструментов, один вызов или разговор метода."""
         solver = prompt.solver
         call = solver.call(prompt.note)
-        reply = solver.talk(self.model, call) if solver.talk else self.model.ask(call)
+        if solver.talk:
+            reply = solver.talk(self.model, call)
+        else:
+            reply = self.model.ask(call)
         final = reply.output or ""
-        ep = Episode(item["question"], k, prompt, reply.text, final, solver.answer(final), [], reply.truncated,
-                     [], [], [], outcome=reply.outcome)
+        ep = Episode(item["question"], k, prompt, output=reply.text, final=final, answer=solver.answer(final),
+                     truncated=reply.truncated, outcome=reply.outcome)
         self.learner.verdict(self, ep, item["target"])
         return ep
 
-    def stepper(self, a):
+    def stepper(self, running):
         """on_step для модели: каждый новый шаг — ученику; его Patch-и одного запроса сливаются."""
         def on_step(new):
-            patch, turn = None, (a.turns[-1] + 1 if a.turns else 0)
+            turn = running.turns[-1] + 1 if running.turns else 0
+            patch = None
             for step in new:
-                a.steps.append(step)
-                a.turns.append(turn)
-                p = self.learner.on_step(self, a, step)
-                if p:
-                    a.patches.append(p)
-                    patch = p if patch is None else patch.merge(p)
+                running.steps.append(step)
+                running.turns.append(turn)
+                mine = self.learner.on_step(self, running, step)
+                if mine:
+                    running.patches.append(mine)
+                    patch = combine(patch, mine)
             return patch
         return on_step
 
     def question(self, item):
         """Группа попыток одного вопроса; при обучении — события попытки и вопроса."""
-        learner, eps = self.learner, []
+        learner = self.learner
+        eps = []
         for k in range(learner.attempts.count(self.training)):
             ep = self.attempt(item, k, learner.prompt(self, item, k))
             eps.append(ep)
             if self.training:
                 learner.on_attempt(self, ep)
-        g = Group(item["question"], eps, target=eps[0].target, item=item)
-        learner.group_verdict(self, g)
-        g.pick = learner.attempts.pick.__name__
-        g.pass_at_k = learner.attempts.pick is best
-        g.chosen = learner.attempts.pick(g, lambda answer: self.task.check(answer, item["target"]))
+        group = Group(item["question"], eps, target=eps[0].target, item=item)
+        learner.group_verdict(self, group)
+        pick = learner.attempts.pick
+        group.pick = pick.__name__
+        group.pass_at_k = pick is best
+        group.chosen = pick(group, lambda answer: self.task.check(answer, item["target"]))
         if self.training:
-            learner.on_question(self, g)
-        return g
+            learner.on_question(self, group)
+        return group
 
     def retry(self, memory, note):
         """Новая попытка текущего вопроса с показом из memory и заметкой — стрелка извлечение -> попытки
         (раунды рефлексии ACE). На её шагах не учатся."""
-        p = self.learner.prompt(self, self.item, 0, memory)
-        p.note = note
-        training, self.training = self.training, False
-        try:
-            ep = self.attempt(self.item, 0, p)
-        finally:
-            self.training = training
+        prompt = self.learner.prompt(self, self.item, 0, memory)
+        prompt.note = note
+        with self.frozen():
+            ep = self.attempt(self.item, 0, prompt)
         self.retried.append(ep)
         return ep
 
@@ -276,19 +305,30 @@ class Experiment:
         key = self.learner.key()
         if key is not None and key in self.scores:
             return self.scores[key]
-        saved, self.training = (self.training, self.i, self.item), False
+        i, item = self.i, self.item
+        out = []
         try:
-            out = []
-            for self.i, self.item in enumerate(self.task.load("val")):
-                out.append(self.result(self.question(self.item), self.item))
+            with self.frozen():
+                for n, row in enumerate(self.task.load("val")):
+                    self.i, self.item = n, row
+                    out.append(self.result(self.question(row), row))
         finally:
-            self.training, self.i, self.item = saved
+            self.i, self.item = i, item
         if key is not None:
             self.scores[key] = out
         return out
 
     def result(self, group, item):
         return self.task.check(group.answer, item["target"]), group.episodes[group.chosen].truncated
+
+
+def combine(patch, mine):
+    """Два Patch одного шага (или None) в один."""
+    if patch is None:
+        return mine
+    if mine is None:
+        return patch
+    return patch.merge(mine)
 
 
 def best_index(values):
@@ -308,38 +348,53 @@ def finish(ep):
     return {Outcome.step: "rounds", Outcome.broken: "broken"}.get(ep.outcome, "stop")
 
 
-def entry(phase, epoch, i, g, item, correct, gated, memory_chars, sec, retried=()):
+def in_score(row, last_epoch):
+    """Запись лога в зачёт: тест или онлайн-проход last_epoch (старые логи — без phase и epoch)."""
+    phase = row.get("phase", "online")
+    return phase == "test" or (phase == "online" and row.get("epoch", 0) == last_epoch)
+
+
+def attempt_entry(ep):
+    return dict(k=ep.k, answer=ep.answer, ok=ep.ok, temperature=ep.prompt.temperature, finish=finish(ep), shown=ep.shown,
+                read=ep.used, fired=ep.fired, patches=[asdict(p) for p in ep.patches])
+
+
+def retry_entry(ep):
+    return dict(answer=ep.answer, ok=ep.ok, finish=finish(ep), note=ep.prompt.note, output=ep.output)
+
+
+def entry(phase, epoch, i, group, item, correct, gated, memory_chars, sec, retried=()):
     """Запись лога по вопросу: ответ в зачёт, как выбран, вся группа и попытки из извлечения (раунды ACE)."""
-    chosen = g.episodes[g.chosen]
-    return dict(phase=phase, epoch=epoch, i=i, question=g.question, target=item["target"], answer=g.answer, correct=correct,
-                pick=g.pick, pass_at_k=g.pass_at_k, vote=g.vote, finish=finish(chosen), output=chosen.output,
-                shown=chosen.shown, read=chosen.used, gated=gated, memory_chars=memory_chars, sec=sec,
-                group=[dict(k=e.k, answer=e.answer, ok=e.ok, temperature=e.prompt.temperature, finish=finish(e),
-                            shown=e.shown, read=e.used, fired=e.fired, patches=[asdict(p) for p in e.patches])
-                       for e in g.episodes],
-                retries=[dict(answer=e.answer, ok=e.ok, finish=finish(e), note=e.prompt.note, output=e.output) for e in retried])
+    chosen = group.episodes[group.chosen]
+    return dict(phase=phase, epoch=epoch, i=i, question=group.question, target=item["target"], answer=group.answer,
+                correct=correct, pick=group.pick, pass_at_k=group.pass_at_k, vote=group.vote, finish=finish(chosen),
+                output=chosen.output, shown=chosen.shown, read=chosen.used, gated=gated, memory_chars=memory_chars,
+                sec=sec, group=[attempt_entry(e) for e in group.episodes], retries=[retry_entry(e) for e in retried])
 
 
 def failed(phase, epoch, i, item, error):
     """Запись лога о вопросе (или событии прохода), на котором прогон упал: неверно, с текстом ошибки."""
-    return dict(phase=phase, epoch=epoch, i=i, question=item["question"] if item else "", target=item["target"] if item else "",
-                answer="", correct=False, finish="error", error="".join(traceback.format_exception(error)), group=[])
+    return dict(phase=phase, epoch=epoch, i=i, question=item["question"] if item else "",
+                target=item["target"] if item else "", answer="", correct=False, finish="error",
+                error="".join(traceback.format_exception(error)), group=[])
 
 
 def folder(task, n, learner, model):
     """Папка результатов: задача и размер, метод, протокол, модель и бэкенд — прогоны разных настроек не затирают
     друг друга."""
-    tag = "_".join(x for x in (learner.protocol.name, model.name, getattr(model, "backend", "")) if x)
+    parts = (learner.protocol.name, model.name, getattr(model, "backend", ""))
+    tag = "_".join(x for x in parts if x)
     return Path(config.RESULTS) / f"{task.name}{n}" / learner.name / tag
 
 
 def run(task, learner, model, n=config.SIZE, out=None, split=""):
-    """Прогон метода на задаче по протоколу ученика (learner.protocol). Онлайн: поток split, память учится по ходу,
-    epochs проходов, в зачёт последний: первая попытка обучения, а с window — тест окна; до первого прохода —
-    начальный тест всего потока (в лог). Офлайн: обучение на train, после каждого прохода val; тест на split с
-    лучшей по val версией памяти (строго больше, при равенстве ранняя), без обучения. final — офлайн без val: тест
-    памятью после последнего прохода, как итоговый агент апстрима. recheck — после обучения на вопросе ещё
-    попытка новой памятью, только в лог.
+    """Прогон метода на задаче по протоколу ученика (learner.protocol).
+        онлайн    поток split, память учится по ходу, epochs проходов, в зачёт последний: первая попытка обучения,
+                  а с window — тест окна; до первого прохода — начальный тест всего потока (в лог)
+        офлайн    обучение на train, после каждого прохода val; тест на split с лучшей по val версией памяти (строго
+                  больше, при равенстве ранняя), без обучения
+        final     офлайн без val: тест памятью после последнего прохода, как итоговый агент апстрима
+        recheck   после обучения на вопросе ещё попытка новой памятью, только в лог
     Лог и итог пишутся после каждого вопроса, память — в конце. Исключение на вопросе (или в событии прохода)
     уходит в лог записью finish="error", вопрос засчитывается неверным, прогон идёт дальше; в итоге — errors.
     Нарушение стыка сборки (Contract) прогон останавливает."""
@@ -347,106 +402,156 @@ def run(task, learner, model, n=config.SIZE, out=None, split=""):
     learner = copy.deepcopy(learner)        # в реестре память ученика пуста: каждый прогон с чистой
     proto = learner.protocol
     proto.check(learner.name, learner.verdict, split)
-    for part in ["train"] * proto.offline + ["val"] * (proto.val or learner.needs_val):
+    parts = []
+    if proto.offline:
+        parts.append("train")
+    if proto.val or learner.needs_val:
+        parts.append("val")
+    for part in parts:
         try:
             task.load(part)
         except (FileNotFoundError, ValueError) as error:
             raise ValueError(f"{learner.name}: протоколу {proto.name} нужна выборка {part} задачи {task.name} — {error}")
-    ex = Experiment(task, learner, model)
-    log = []
+    return Run(task, learner, model, n, out, split).everything()
 
-    def summary(done):
-        final = [r for r in log if r["phase"] == "test" or r["phase"] == "online" and r["epoch"] == proto.epochs - 1]
-        return dict(task=task.name, method=learner.name, model=model.name, backend=getattr(model, "backend", ""),
-                    n=len(final), protocol=proto.name, epochs=proto.epochs, offline=proto.offline, done=done,
-                    errors=sum(r["finish"] == "error" for r in log), correct=sum(r["correct"] for r in final),
-                    truncated=sum(r["finish"] == "length" for r in final),
-                    accuracy=accuracy(task, [r["answer"] for r in final], [r["target"] for r in final]), **model.usage())
 
-    def save(done=False, last=False):
-        if out:
-            Path(out).mkdir(parents=True, exist_ok=True)
-            json.dump(log, open(f"{out}/log.json", "w"), ensure_ascii=False, indent=1)
-            json.dump(summary(done), open(f"{out}/summary.json", "w"), indent=1)
-            if last:
-                json.dump(learner.dump(), open(f"{out}/memory.json", "w"), ensure_ascii=False, indent=1)
+class Run:
+    """Один прогон: эксперимент, лог по вопросам и версии памяти после проходов (офлайн)."""
+    def __init__(self, task, learner, model, n, out, split):
+        self.task = task
+        self.learner = learner
+        self.model = model
+        self.n = n
+        self.out = out
+        self.split = split
+        self.proto = learner.protocol
+        self.ex = Experiment(task, learner, model)
+        self.log = []
+        self.versions = []      # (верных на val, версия памяти) после каждого прохода
 
-    def guarded(phase, i, item, step):
+    def everything(self):
+        done = False
+        try:
+            if self.proto.window:
+                self.initial_test()
+            for epoch in range(self.proto.epochs):
+                self.train_pass(epoch)
+            if self.proto.offline:
+                self.final_test()
+            done = True
+        finally:
+            self.save(done, last=True)          # прерванный прогон (Ctrl-C) — done=False, память на момент обрыва
+        return self.summary(True)
+
+    def initial_test(self):
+        for i, item in enumerate(self.task.load(self.split, self.n)):
+            self.test("initial", i, item)
+
+    def train_pass(self, epoch):
+        ex, learner, proto = self.ex, self.learner, self.proto
+        items = learner.sample(ex, "train" if proto.offline else self.split, self.n)
+        ex.epoch = epoch
+        ex.total = len(items)
+        ex.batch = 0
+        batch = []
+        self.guarded("pass", 0, None, partial(learner.on_pass_start, ex))
+        phase = "train" if proto.offline or proto.window else "online"
+        for i, item in enumerate(items):
+            if proto.window and i % proto.window == 0:
+                for j in range(i, min(i + proto.window, len(items))):
+                    self.test("online", j, items[j])
+            self.guarded(phase, i, item, partial(self.train, phase, i, item, batch))
+            if proto.recheck:
+                self.test("post", i, item)
+        self.guarded("pass", len(items), None, partial(self.end_pass, epoch, batch))
+
+    def final_test(self):
+        """Тест с лучшей по val версией памяти (без val — с последней)."""
+        if self.versions:
+            best = best_index([score for score, _ in self.versions])
+            self.learner.restore(self.versions[best][1])
+        self.ex.training = False
+        self.ex.epoch = 0
+        for i, item in enumerate(self.task.load(self.split, self.n)):
+            self.test("test", i, item)
+
+    def train(self, phase, i, item, batch):
+        ex, learner = self.ex, self.learner
+        t0 = time.time()
+        gates = len(learner.gated)
+        ex.retried = []
+        ex.i, ex.item = i, item
+        if i % learner.every == 0:
+            ex.batch = i // learner.every
+            learner.on_batch_start(ex)
+        group = ex.question(item)
+        batch.append(group)
+        if len(batch) == learner.every:
+            learner.on_batch(ex, batch)
+            batch.clear()
+        self.record(phase, i, group, item, t0, gated=learner.gated[gates:], retried=ex.retried)
+
+    def end_pass(self, epoch, batch):
+        learner = self.learner
+        if batch and learner.flush:
+            learner.on_batch(self.ex, batch)
+        learner.on_pass(self.ex)
+        if self.proto.val:
+            score = sum(correct for correct, _ in self.ex.evaluate())
+            print(f"val after epoch {epoch}: {score}", flush=True)
+            self.versions.append((score, learner.snapshot()))
+
+    def test(self, phase, i, item):
+        self.guarded(phase, i, item, partial(self.tested, phase, i, item))
+
+    def tested(self, phase, i, item):
+        """Вопрос без обучения, в лог."""
+        t0 = time.time()
+        self.ex.i, self.ex.item = i, item
+        with self.ex.frozen():
+            group = self.ex.question(item)
+        self.record(phase, i, group, item, t0)
+
+    def guarded(self, phase, i, item, step):
         """step() — вопрос или событие прохода; исключение — в лог, прогон дальше."""
         try:
             step()
         except Contract:
             raise
         except Exception as error:
-            log.append(failed(phase, ex.epoch, i, item, error))
-            print(f"{task.name} {learner.name} {phase}{ex.epoch} {i:3} ОШИБКА {error!r}", flush=True)
-        save()
+            self.log.append(failed(phase, self.ex.epoch, i, item, error))
+            print(f"{self.task.name} {self.learner.name} {phase}{self.ex.epoch} {i:3} ОШИБКА {error!r}", flush=True)
+        self.save()
 
-    def record(phase, i, g, item, t0, gated, retried=()):
-        correct = task.check(g.answer, item["target"])
-        log.append(entry(phase, ex.epoch, i, g, item, correct, gated, learner.memory.chars(), round(time.time() - t0, 1),
-                         retried))
-        done = [r for r in log if r["phase"] == phase and r["epoch"] == ex.epoch]
-        print(f"{task.name} {learner.name} {phase}{ex.epoch} {i:3} {'+' if correct else '-'} "
-              f"{sum(r['correct'] for r in done)}/{len(done)} mem={learner.memory.chars()}", flush=True)
+    def record(self, phase, i, group, item, t0, gated=(), retried=()):
+        epoch = self.ex.epoch
+        correct = self.task.check(group.answer, item["target"])
+        chars = self.learner.memory.chars()
+        self.log.append(entry(phase, epoch, i, group, item, correct, gated=list(gated), memory_chars=chars,
+                              sec=round(time.time() - t0, 1), retried=retried))
+        done = [r for r in self.log if r["phase"] == phase and r["epoch"] == epoch]
+        right = sum(r["correct"] for r in done)
+        mark = "+" if correct else "-"
+        print(f"{self.task.name} {self.learner.name} {phase}{epoch} {i:3} {mark} {right}/{len(done)} mem={chars}",
+              flush=True)
 
-    def test(phase, i, item):
-        def step():
-            t0, training = time.time(), ex.training
-            ex.i, ex.item, ex.training = i, item, False
-            try:
-                record(phase, i, ex.question(item), item, t0, [])
-            finally:
-                ex.training = training
-        guarded(phase, i, item, step)
+    def summary(self, done):
+        proto, model = self.proto, self.model
+        final = [r for r in self.log if in_score(r, proto.epochs - 1)]
+        answers = [r["answer"] for r in final]
+        targets = [r["target"] for r in final]
+        return dict(task=self.task.name, method=self.learner.name, model=model.name,
+                    backend=getattr(model, "backend", ""), n=len(final), protocol=proto.name, epochs=proto.epochs,
+                    offline=proto.offline, done=done, errors=sum(r["finish"] == "error" for r in self.log),
+                    correct=sum(r["correct"] for r in final), truncated=sum(r["finish"] == "length" for r in final),
+                    accuracy=accuracy(self.task, answers, targets), **model.usage())
 
-    def train(i, item, batch):
-        t0, gates, ex.retried = time.time(), len(learner.gated), []
-        ex.i, ex.item = i, item
-        if i % learner.every == 0:
-            ex.batch = i // learner.every
-            learner.on_batch_start(ex)
-        g = ex.question(item)
-        batch.append(g)
-        if len(batch) == learner.every:
-            learner.on_batch(ex, batch)
-            batch.clear()
-        record("train" if proto.offline or proto.window else "online", i, g, item, t0, learner.gated[gates:], ex.retried)
-
-    def end_pass(epoch, batch):
-        if batch and learner.flush:
-            learner.on_batch(ex, batch)
-        learner.on_pass(ex)
-        if proto.val:
-            score = sum(c for c, _ in ex.evaluate())
-            print(f"val after epoch {epoch}: {score}", flush=True)
-            versions.append((score, learner.snapshot()))
-
-    done = False
-    try:
-        if proto.window:
-            for i, item in enumerate(task.load(split, n)):
-                test("initial", i, item)
-        versions = []           # (верных на val, версия памяти) после каждого прохода
-        for epoch in range(proto.epochs):
-            items = learner.sample(ex, "train" if proto.offline else split, n)
-            ex.epoch, ex.total, ex.batch, batch = epoch, len(items), 0, []
-            guarded("pass", 0, None, lambda: learner.on_pass_start(ex))
-            for i, item in enumerate(items):
-                if proto.window and i % proto.window == 0:
-                    for j in range(i, min(i + proto.window, len(items))):
-                        test("online", j, items[j])
-                guarded("train" if proto.offline or proto.window else "online", i, item, lambda: train(i, item, batch))
-                if proto.recheck:
-                    test("post", i, item)
-            guarded("pass", len(items), None, lambda: end_pass(epoch, batch))
-        if proto.offline:
-            if versions:
-                learner.restore(versions[best_index([v for v, _ in versions])][1])
-            ex.training, ex.epoch = False, 0
-            for i, item in enumerate(task.load(split, n)):
-                test("test", i, item)
-        done = True
-    finally:
-        save(done, last=True)           # прерванный прогон (Ctrl-C) — done=False, память на момент обрыва
-    return summary(True)
+    def save(self, done=False, last=False):
+        if not self.out:
+            return
+        out = Path(self.out)
+        out.mkdir(parents=True, exist_ok=True)
+        (out / "log.json").write_text(json.dumps(self.log, ensure_ascii=False, indent=1))
+        (out / "summary.json").write_text(json.dumps(self.summary(done), indent=1))
+        if last:
+            (out / "memory.json").write_text(json.dumps(self.learner.dump(), ensure_ascii=False, indent=1))

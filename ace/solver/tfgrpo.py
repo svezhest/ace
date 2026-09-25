@@ -104,7 +104,7 @@ class Agent(OwnSolver):
 
         def call(note):
             return Call(messages(user, system), params)
-        return Prompt(shown=[r.id for r in recs], temperature=temperature, top_p=TOP_P,
+        return Prompt(shown=[r.id for r in recs], temperature=temperature,
                       solver=Solver(call, answer(ex.task), talk))
 
 

@@ -367,7 +367,7 @@ def test_run_iteration(monkeypatch, case):
     table_embed(monkeypatch, [("Add numbers", unit(1.0))])
     sols = [solution(f"Add numbers variant {i}.", a, a) if a is not None else
             f"<subtask><description>Add numbers variant {i}.</description></subtask> no tags" for i, a in enumerate(answers)]
-    eps = [Episode("Compute 2+3.", k, Prompt(), s, s, upstream_answer(s), [], False, [], [], []) for k, s in enumerate(sols)]
+    eps = [Episode("Compute 2+3.", k, Prompt(), output=s, final=s, answer=upstream_answer(s)) for k, s in enumerate(sols)]
     g = Group("Compute 2+3.", eps)
     ex = Ex(Fake([("insight", "grain of salt, they might be wrong or incomplete. Try to spot", insight),
                   ("compare", "and two solutions", judge or ""), ("merge", "consolidate these", "no block")]))

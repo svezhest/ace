@@ -40,6 +40,7 @@ class Hooks(Wrapper):
             p.shown = p.shown + mine.shown
         return p
 
+    @property
     def watches_steps(self):
         return True
 

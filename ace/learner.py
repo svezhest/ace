@@ -1,30 +1,13 @@
-"""Ученик: метод, собранный из уровней (docs/architecture.md).
-
-    попытки и в зачёт   attempts: Attempts(n, temperature(k), pick)             loop.py
-    вердикт попытки     verdict: golden | yes_no | judge | none                 verdict.py
-    вердикт группы      group_verdict: vote | none                              verdict.py
-    извлечение          extract(ex, group, memory) -> Extraction; gives         extract/
-    память              контейнер + learn(ex, extractions); requires            memory/
-    решатель            solver: None — общий (показ, среда, шаги); свой решатель метода   solver/
-    показ               show.prompt -> Prompt, show.on_step -> Patch; только у общего решателя   show/
-    когда учится        every (раз в сколько вопросов), flush (неполный батч в конце прохода)
-    протокол            protocol: Protocol(offline, epochs, window, recheck, final) — по апстриму метода  loop.py
-    среда попытки       env: Env | Sandbox(per="call" | "attempt")              env/
-
-Хуки: перед попыткой память узнаёт о новой попытке (begin: срок жизни «попытка»), показ даёт промпт; на шаге
-при обучении извлечение может дать урок сразу (extract.step, SCOPE) — память принимает его тут же, затем показ
-может вмешаться (Patch); извлечение — на конце вопроса (или стадиями на батче: scale="batch"), память
-принимает извлечённое на батче. Обёртки
-(ace/wrap/) перехватывают хуки поверх ученика.
-Стык с проверкой один: память требует добавки (requires), извлечение их даёт (gives); сверка при сборке.
-Абляция — swap(ученик, name, уровень=замена)."""
+"""Ученик: метод, собранный из уровней — попытки, вердикты, решатель, показ, извлечение, память, когда учится,
+протокол, среда (таблица уровней и хуки по масштабам — docs/architecture.md). Стык с проверкой один: память требует
+добавки (requires), извлечение их даёт (gives); сверка при сборке. Абляция — swap(ученик, name, уровень=замена)."""
 import copy
 from dataclasses import dataclass, field, replace
 
 from . import verdict as verdicts
 from .env import Env
 from .extract import Contract, missing
-from .loop import Attempts, Protocol, at_zero, default
+from .loop import Attempts, Protocol, greedy
 from .memory import Lessons
 from .show import Show, Whole
 
@@ -72,7 +55,7 @@ class Learner:
             return
         dead = [name for name, on in (
             ("показ", self.show is not None),
-            ("температура и top_p попыток", self.attempts.temperature is not at_zero or self.attempts.top_p is not default),
+            ("температура попыток", self.attempts.temperature is not greedy),
             ("среда", bool(self.env.tools or self.env.hint)),
             ("извлечение на шаге", self.extract is not None and self.extract.steps)) if on]
         if dead:
@@ -90,9 +73,9 @@ class Learner:
         memory.begin(k)
         if self.solver is not None:
             return self.solver.prompt(ex, memory, item, k)
-        p = self.viewer().prompt(ex, memory, item, k)
-        p.temperature, p.top_p = self.attempts.temperature(k), self.attempts.top_p(k)
-        return p
+        prompt = self.viewer().prompt(ex, memory, item, k)
+        prompt.temperature = self.attempts.temperature(k)
+        return prompt
 
     def sample(self, ex, split, n):
         """Вопросы прохода: первые n (MCE апстрима — случайная выборка на каждой итерации, wrap/mce.py)."""
@@ -140,7 +123,9 @@ class Learner:
 
     # протокол и обёртки
 
+    @property
     def watches_steps(self):
+        """Показу нужны шаги попытки (цикл идёт шагами); у своего решателя шагов нет."""
         return self.solver is None and self.viewer().watches_steps
 
     def snapshot(self):

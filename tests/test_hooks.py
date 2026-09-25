@@ -155,7 +155,7 @@ def test_hooks_run(tmp_path):
 
 
 def test_ace_hooks_levels():
-    assert ace_stand_hooks.env.tools and ace_stand_hooks.watches_steps() and ace_stand_hooks.name == "ace_stand_hooks"
+    assert ace_stand_hooks.env.tools and ace_stand_hooks.watches_steps and ace_stand_hooks.name == "ace_stand_hooks"
 
 
 def test_ace_bo2_selects():

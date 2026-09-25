@@ -14,7 +14,7 @@ from ace import verdict
 from ace.env import Env
 from ace.extract import Extraction, Extractor, Raw
 from ace.learner import Learner, swap
-from ace.loop import Attempts, Experiment, Protocol, best, first, run, vote
+from ace.loop import SPREAD, Attempts, Experiment, Protocol, best, first, run, spread, vote
 from ace.memory import Lessons
 from ace.tasks import TASKS
 from ace.model import Model, Patch
@@ -269,11 +269,10 @@ def test_report_without_log(tmp_path):
     assert r.returncode == 0 and "formula4/x" in r.stdout
 
 
-def test_top_p_reaches_model():
+def test_attempt_temperature_reaches_model():
     model = Stub()
-    attempts = Attempts(2, temperature=lambda k: 0.3 if k == 0 else 0.7, top_p=lambda k: 0.95 if k == 0 else None)
-    run(TASK, Learner("t", attempts=attempts), model, 1)
-    assert [(c["temperature"], c["top_p"]) for c in model.calls] == [(0.3, 0.95), (0.7, None)]
+    run(TASK, Learner("t", attempts=Attempts(2, temperature=spread)), model, 1)
+    assert [(c["temperature"], c["top_p"]) for c in model.calls] == [(0, None), (SPREAD, None)]
 
 
 @pytest.mark.parametrize("text, word", [

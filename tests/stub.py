@@ -59,4 +59,4 @@ def right(call):
 
 def episode(answer="1", ok=None, target="", final=None, shown=(), k=0, question="q"):
     final = final if final is not None else f"FINAL ANSWER: {answer}"
-    return Episode(question, k, Prompt(shown=list(shown)), final, final, answer, [], False, [], [], [], ok, target)
+    return Episode(question, k, Prompt(shown=list(shown)), output=final, final=final, answer=answer, ok=ok, target=target)

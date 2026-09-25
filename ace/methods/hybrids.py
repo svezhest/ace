@@ -15,15 +15,15 @@ from ..extract.best import BestOf, one_of_two
 from ..extract.scope import BEST_OF_TEMPERATURE
 from ..extract.tfgrpo import Contrast
 from ..learner import swap
-from ..loop import Attempts
+from ..loop import Attempts, spread
 from ..memory.ace import CappedPlaybook, Playbook
 from ..wrap.hooks import Hooks
 from .ace import ace_stand
 
-GROUP, GROUP_TEMPERATURE = 3, 0.7
+GROUP = 3
 
 ace_stand_bo2 = swap(ace_stand, "ace_stand_bo2", extract=BestOf(Reflector(temperature=BEST_OF_TEMPERATURE), 2, one_of_two))
 ace_stand_opt = swap(ace_stand, "ace_stand_opt", memory=CappedPlaybook())
 ace_stand_hooks = Hooks(swap(ace_stand, env=Sandbox()), "ace_stand_hooks")
 ace_stand_group = swap(ace_stand, "ace_stand_group", extract=Contrast(library=False, scored=True),
-                       memory=Playbook(prune=None), attempts=Attempts(1 + GROUP, lambda k: 0 if k == 0 else GROUP_TEMPERATURE))
+                       memory=Playbook(prune=None), attempts=Attempts(1 + GROUP, spread))

@@ -390,7 +390,7 @@ def test_limit_per_agent_across_tasks():
     got = []
     for i, k in [(i, 0) for i in range(22)] + [(99, 1)]:
         learner.prompt(ex(model), {"question": TASK}, k)
-        ep = Episode(TASK, k, Prompt(), "x", "x", f"n{i}", [], False, [], [], [], ok=False, target="t", system=BASE)
+        ep = Episode(TASK, k, Prompt(), output="x", final="x", answer=f"n{i}", ok=False, target="t", system=BASE)
         learner.on_question(ex(model), Group(TASK, [ep], target="t"))
         learner.on_batch(ex(model), [])
         got.append([r.text for r in memory.book(k).tactical] or None)
@@ -434,7 +434,7 @@ def run_steps(learner, model, steps):
         err = step["error"]
         answer, target = (re.findall(r"'([^']*)'", err) if err else ["", ""])
         out_text = LOOP_OUTPUT[step["task_id"]]
-        ep = Episode(TASK, 0, p, out_text, out_text, answer, [], False, [], [], [], ok=err is None, target=target,
+        ep = Episode(TASK, 0, p, output=out_text, final=out_text, answer=answer, ok=err is None, target=target,
                      system=BASE + p.system)
         learner.on_question(ex(model), Group(TASK, [ep], target=target))
         learner.on_batch(ex(model), [])
@@ -468,7 +468,7 @@ def check_steps(done, model):
 def test_loop():
     """Цикл эталона на 7 задачах: запросы синтезатора и классификатора, принятые правила, strategic память;
     второй прогон со strategic из первого."""
-    assert answer_step(Episode(TASK, 0, Prompt(), "o", "o", "Revenues", [], False, [], [], [], ok=False,
+    assert answer_step(Episode(TASK, 0, Prompt(), output="o", final="o", answer="Revenues", ok=False,
                                target="GainLossOnSale"))[1][1] == LOOP["run1"]["steps"][0]["error"]
     model = loop_model()
     memory = Perspectives()

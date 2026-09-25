@@ -6,7 +6,7 @@ import sys
 from ace import config, prompts, verdict
 from ace.env import Sandbox
 from ace.learner import swap
-from ace.loop import Attempts, Protocol, folder, run, vote
+from ace.loop import Attempts, Protocol, folder, run, spread, vote
 from ace.methods import METHODS
 from ace.methods.mce import ITERATIONS
 from ace.model import Model
@@ -16,13 +16,6 @@ from ace.show.scope import StrategicRules
 from ace.tasks import TASKS
 from ace.wrap import Gate
 from ace.wrap.hooks import Hooks
-
-SPREAD = 0.7                # температура попыток после первой (self-consistency)
-
-
-def spread(k):
-    return 0 if k == 0 else SPREAD
-
 
 m = METHODS
 ace_stand, baseline, evolib, scope_code = m["ace_stand"], m["baseline"], m["evolib"], m["scope_code"]

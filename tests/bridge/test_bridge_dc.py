@@ -94,7 +94,7 @@ def test_cumulative_curator_request():
     rec = PROMPTS["cumulative"]
     model = Model([rec["curator"]])
     output = rec["generator"]["response"].strip()
-    ep = Episode(rec["input"], 0, Prompt(seen={INPUT: rec["input"], SHEET: ""}), output, output, "", [], False, [], [], [])
+    ep = Episode(rec["input"], 0, Prompt(seen={INPUT: rec["input"], SHEET: ""}), output=output, final=output, answer="")
     MEM.Cheatsheet().learn(Ex(model), [EXTRACT.Seen()(None, Group(rec["input"], [ep]), None)])
     assert model.calls == [request(rec["curator"])]
 

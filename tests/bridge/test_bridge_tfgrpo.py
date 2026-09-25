@@ -78,7 +78,7 @@ def trajectory(case, i, reward):
 
 def group(case, rewards, target="42", output=trajectory):
     """Группа rollout с наградами rewards (в зачёт у TF-GRPO — итоговый агент, не попытка группы)."""
-    eps = [Episode(f"Problem {case}", k, Prompt(), output(case, k, r), "", "", [], False, [], [], [], ok=bool(r),
+    eps = [Episode(f"Problem {case}", k, Prompt(), output=output(case, k, r), final="", answer="", ok=bool(r),
                    target=target) for k, r in enumerate(rewards)]
     return Group(f"Problem {case}", eps, target=target)
 
