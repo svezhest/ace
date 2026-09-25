@@ -5,9 +5,8 @@
     brackets    [[NAME]]                    Dynamic Cheatsheet
     jinja       {{ name }}                  TF-GRPO (yaml с парами _SP / _UP)"""
 from dataclasses import dataclass
-from pathlib import Path
 
-DIR = Path(__file__).parent / "methods" / "prompts"
+from .config import PROMPTS as DIR
 
 
 @dataclass

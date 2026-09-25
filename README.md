@@ -42,4 +42,6 @@ python ace/tasks.py meb results/meb40/ace/log.json   # переоценить л
 ace_exact и ace_exact_dedup (как в апстриме); scope, scope_code (с исполнением python), scope_bo2, scope_k2; tfgrpo;
 evolib, evolib_judge; mce; proto. Гибриды (`hybrids.py`): ace_bo2, ace_group, ace_opt, proto_opt, ace_hooks, proto_hooks и proto_hooks_raw (хуки по ошибкам инструментов: уроки моделью или из траектории, счётчики исходов).
 В docstring каждого метода: что взято из апстрима (файлы) и где расходимся. Retrieval-варианты считают эмбеддинги BGE-M3 (`ace/embed.py`). Ступени абляции в `ablate.py`.
-Окружение: `LOCAL_BASE_URL`, `MODEL`, `MAX_TOKENS` (MEB: 8192), `SEED`.
+Настройки (`ace/config.py`, из окружения): `OPENAI_BASE_URL` (по умолчанию `http://localhost:8080/v1`; старое
+`LOCAL_BASE_URL` тоже читается), `OPENAI_API_KEY` (`local`), `MODEL`, `MAX_TOKENS` (MEB: 8192), `SEED`, размеры
+выборок `SIZE` и `VAL_SIZE` (40 и 10, входят в имя файла данных), `EPOCHS`, `OFFLINE`, `RESULTS`.

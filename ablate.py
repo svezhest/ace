@@ -1,9 +1,8 @@
 """Цепочка абляций: каждая ступень отличается от предыдущей одной частью.
 python ablate.py TASK [N] [STEP ...]"""
-import os
 import sys
 
-from ace import bound, inject
+from ace import bound, config, inject
 from ace.env import Sandbox
 from ace.loop import Solver, run, swap
 from ace.methods import ace, baseline, proto
@@ -38,6 +37,6 @@ CHAIN = {
 }
 
 task = TASKS[sys.argv[1]]
-n = int(sys.argv[2]) if len(sys.argv) > 2 else 40
+n = int(sys.argv[2]) if len(sys.argv) > 2 else config.SIZE
 for name in sys.argv[3:] or CHAIN:
-    print(run(task, swap(CHAIN[name], name), Model(), n, f"{os.getenv('RESULTS', 'results')}/{task.name}{n}/{name}"))
+    print(run(task, swap(CHAIN[name], name), Model(), n, f"{config.RESULTS}/{task.name}{n}/{name}"))

@@ -12,6 +12,8 @@ from pydantic_ai.messages import (ModelRequest, ModelResponse, RetryPromptPart, 
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
 
+from . import config
+
 
 @dataclass
 class Reply:
@@ -23,10 +25,10 @@ class Reply:
 
 class Model:
     def __init__(self, name=None, max_tokens=None, base_url=None):
-        self.name = name or os.getenv("MODEL", "ornith15-9b")
-        self.max_tokens = max_tokens or int(os.getenv("MAX_TOKENS", 4096))
-        self.llm = OpenAIChatModel(self.name, provider=OpenAIProvider(
-            base_url=base_url or os.getenv("LOCAL_BASE_URL", "http://localhost:8080/v1"), api_key="local"))
+        self.name = name or config.MODEL
+        self.max_tokens = max_tokens or config.MAX_TOKENS
+        self.llm = OpenAIChatModel(self.name, provider=OpenAIProvider(base_url=base_url or config.OPENAI_BASE_URL,
+                                                                      api_key=config.API_KEY))
         self.calls = self.prompt_tokens = self.completion_tokens = 0
 
     def run(self, system, user, output=str, tools=(), deps=None, rounds=0, temperature=0, max_tokens=None, on_step=None):

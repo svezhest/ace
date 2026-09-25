@@ -12,13 +12,13 @@
 При сборке метод сверяет, что блоки инжекта и обновления требуют от памяти (needs), со схемой памяти.
 """
 import json
-import os
 import random
 import time
 from collections import Counter
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 
+from . import config
 from . import inject as injects
 from .env import Env
 from .feedback import Episode, Feedback, failed
@@ -163,11 +163,11 @@ def majority(attempts):
     return votes.most_common(1)[0][0] if votes else ""
 
 
-def run(task, method, model, n=40, out=None, split="", epochs=None, offline=False):
+def run(task, method, model, n=config.SIZE, out=None, split="", epochs=None, offline=False):
     """Онлайн: поток split, память обновляется по ходу, epochs проходов, в зачёт последний.
     Офлайн (ACE offline, MCE): обучение на train, после каждого прохода val, затем split
     с лучшей по val памятью без обновлений."""
-    random.seed(int(os.getenv("SEED", 0)))
+    random.seed(config.SEED)
     epochs = epochs or method.epochs
     memory = Memory(dict(method.memory))
     item = None

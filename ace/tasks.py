@@ -1,9 +1,8 @@
 """Задачи: данные, инструкция решателю и проверка ответа. Чекеры повторяют ACE, чтобы числа были сравнимы."""
 import json
 from dataclasses import dataclass
-from pathlib import Path
 
-DATA = Path(__file__).parent.parent / "data"
+from . import config
 
 
 @dataclass
@@ -12,8 +11,10 @@ class Task:
     system: str
     instr: str
 
-    def load(self, split=""):                       # split: "" | "train" | "val"
-        file = DATA / f"{self.name}{'_' + split if split else ''}{'40' if split != 'val' else '10'}.jsonl"
+    def load(self, split="", size=None):
+        """split: "" | "train" | "val"; size — размер выборки в имени файла (по умолчанию из config)."""
+        size = size or (config.VAL_SIZE if split == "val" else config.SIZE)
+        file = config.DATA / f"{self.name}{'_' + split if split else ''}{size}.jsonl"
         rows = [json.loads(l) for l in file.open() if l.strip()]
         return [{"context": r.get("context") or r["input"], "target": r["target"]} for r in rows]
 
