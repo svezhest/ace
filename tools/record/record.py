@@ -4,8 +4,8 @@
 Клиенту — base_url http://127.0.0.1:PORT/v1. Каждая пара пишется строкой JSONL:
 {"path", "request": канонический JSON, "n": номер повтора такого же запроса, "seed", "status", "response"}.
 --seed: если в запросе chat/completions нет seed, подставить seed_for(запрос, n).
-Клиенту, просившему stream, ответ идёт кадрами SSE по мере генерации (наверх тоже stream), в запись — ответ,
-собранный из кадров (wire.assemble); остальные запросы уходят наверх без stream.
+Клиенту, просившему stream, заголовки ответа идут сразу, наверх — тоже stream; в запись — ответ, собранный из
+кадров (wire.assemble), клиенту — он же кадрами wire.sse, как у воспроизведения. Остальное наверх — без stream.
 --cache: ответ прошлой записи на запрос, совпавший с её запросом после normalize (k-й такой же запрос — её k-й
 ответ, как у replay), в модель не идёт, но пишется в новую запись как есть; остальное — как обычно. Так запись
 переснимается без повторных вызовов модели (MCE: вывод Bash хоста меняется от прогона к прогону, DEVIATIONS MCE7)."""
@@ -95,8 +95,9 @@ class Recorder(wire.Server):
         return status, resp
 
     def stream(self, path: str, body: dict, headers, out: wire.Handler):
-        """Клиент просит stream: наверх тоже stream, кадры идут клиенту по мере генерации (долгий ответ не
-        упирается в таймауты клиента), в запись — ответ, собранный из кадров, как без stream."""
+        """Клиент просит stream: заголовки ответа — сразу (долгий ответ не упирается в таймаут клиента: CLI
+        Claude через LiteLLM иначе бросает его и шлёт заново), наверх тоже stream; в запись — ответ, собранный из
+        кадров, как без stream, клиенту — он же кадрами wire.sse, как их отдаст воспроизведение."""
         c = wire.canon(body)
         with self.lock:
             n = self.count[wire.key(path, c)]
@@ -106,7 +107,6 @@ class Recorder(wire.Server):
                                  "text/event-stream" if hit[0] == 200 else "application/json")
             sent, seed = self.prepare(path, body, c, n)
             sent.update(stream=True, stream_options={"include_usage": True})
-            usage = (body.get("stream_options") or {}).get("include_usage")
             req = urllib.request.Request(self.upstream + path, json.dumps(sent).encode(), method="POST",
                                          headers={"Content-Type": "application/json",
                                                   "Authorization": headers.get("Authorization") or "Bearer none"})
@@ -127,15 +127,12 @@ class Recorder(wire.Server):
             with up:
                 for line in up:
                     line = line.strip()
-                    if not line.startswith(b"data: ") or line == b"data: [DONE]":
-                        continue
-                    frame = json.loads(line[6:])
-                    frames.append(frame)
-                    if frame.get("choices") or usage:
-                        out.send(line + b"\n\n")
-            out.send(b"data: [DONE]\n\n")
+                    if line.startswith(b"data: ") and line != b"data: [DONE]":
+                        frames.append(json.loads(line[6:]))
+            resp = wire.assemble(frames)
+            out.send(wire.sse(resp, body))
             out.end_stream()
-            self.write(path, c, n, seed, 200, wire.assemble(frames))
+            self.write(path, c, n, seed, 200, resp)
 
 
 class RecordHandler(wire.Handler):

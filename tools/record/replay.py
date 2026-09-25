@@ -25,7 +25,8 @@ class Replayer(wire.Server):
         for line in rec.read_text().splitlines():
             r = json.loads(line)
             got = self.rec[wire.key(r["path"], self.normalize(r["request"]))]
-            assert r["n"] == len(got), f"запись {r['path']} n={r['n']} не по порядку"
+            # n — повтор того же запроса побайтно; после normalize совпавшие запросы идут в порядке записи
+            assert normalize or r["n"] == len(got), f"запись {r['path']} n={r['n']} не по порядку"
             got.append((r["status"], r["response"]))
         self.used = Counter()
         self.misses = 0
