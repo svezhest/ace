@@ -1,6 +1,7 @@
 """Разбор ответов модели, общий для всех уровней. Каждая функция берёт текст (или None) и не падает.
 
-    opened(tag)         после <tag> до </tag> или конца; None без <tag> (DC: cheatsheet)
+    opened(tag)         после первого <tag> до </tag>, следующего <tag> или конца; None без <tag>
+                        (DC: extract_cheatsheet апстрима)
     enclosed(tag)       между <tag> и </tag> без учёта регистра; "" без пары (TF-GRPO: Experiences)
     between(text, a, b) между первым a и следующим b; "" без них (EvoLib)
     fenced(text, tag)   все блоки ```tag подряд (EvoLib)
@@ -14,7 +15,7 @@ def opened(tag):
     def parse(text):
         if not text or f"<{tag}>" not in text:
             return None
-        return text.split(f"<{tag}>", 1)[1].strip().split(f"</{tag}>")[0].strip()
+        return text.split(f"<{tag}>")[1].strip().split(f"</{tag}>")[0].strip()
     return parse
 
 
