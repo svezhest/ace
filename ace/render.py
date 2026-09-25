@@ -256,14 +256,20 @@ def attempts(pairs, labeled):
     return "\n\n".join(f"Attempt {i + 1} (Reward {float(bool(g.ok)) if labeled else REDACTED}):\n{s}" for i, (g, s) in enumerate(pairs))
 
 
+def label(i, r):
+    """Опыт по месту в библиотеке: G0, G1, ... — ключи апстрима, которые он заново раздаёт после каждого батча."""
+    return f"G{i}"
+
+
 def experiences(records):
-    return "\n".join(f"[{r.id}]. {r.text}" for r in records) or "None"
+    return "\n".join(f"[{label(i, r)}]. {r.text}" for i, r in enumerate(records)) or "None"
 
 
 def batch_table(records, ops):
     """Опыты с относящимися к ним операциями, затем операции без id."""
     dump = lambda op: json.dumps(op, ensure_ascii=False, indent=2)
-    table = [dict(id=r.id, text=r.text, related=[dump(op) for op in ops if op.get("id") == r.id]) for r in records]
+    table = [dict(id=label(i, r), text=r.text, related=[dump(op) for op in ops if op.get("id") == label(i, r)])
+             for i, r in enumerate(records)]
     return prompts.text("tfgrpo_batch_table", ops=bool(ops), experiences=table, loose=[dump(op) for op in ops if not op.get("id")])
 
 # EvoLib
