@@ -10,10 +10,10 @@ from ace import verdict
 from ace.extract import ATTRIBUTION, BEST_ANSWER, IG, Extraction
 from ace.extract.evolib import Attribution, Best, Gains
 from ace.upstream.evolib import future_gains, log_gain
-from ace.learner import Learner
+from ace.learner import swap
 from ace.loop import Group, run
 from ace.memory.evolib import Library, Skill
-from ace.methods.evolib import evolib_judge
+from ace.methods.evolib import evolib, evolib_judge
 from ace.solver.evolib import SAMPLER, insight_weight, skill_weight
 
 SKILL = "<subtask>\n<description>{}</description>\n<solution>s</solution>\n<result>r</result>\n</subtask>"
@@ -150,7 +150,7 @@ def test_weights_and_show():
     p = SAMPLER.prompt(Ex(Stub()), m, {"context": "q"}, 0)
     user = p.solver.call("").messages[0]["content"]
     assert "Problem: q\n\nHere are some insights that may help you solve the problem:\nIf a, then b.\n" in user
-    assert p.shown == ["r1"] and SAMPLER.random and Learner("x", memory=m, solver=SAMPLER).key() is None
+    assert p.shown == ["r1"] and SAMPLER.random and swap(evolib, solver=SAMPLER).key() is None
     random.seed(0)                  # первое число 0.84: выше обоих порогов — ничего
     assert SAMPLER.prompt(Ex(Stub()), m, {"context": "q"}, 0).shown == []
 
