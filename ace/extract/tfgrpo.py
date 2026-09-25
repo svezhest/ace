@@ -14,7 +14,7 @@ tfgrpo_*.j2 дословно, пара системный / пользовате
 параметров запроса, как у апстрима (model_params = {}: температура и предел генерации — сервера)."""
 from .. import parse, prompts, render
 from ..model import Reader
-from ..upstream.tfgrpo import ADVANTAGE, GROUP_UPDATE, SUMMARY, ask
+from ..upstream.tfgrpo import ADVANTAGE, GROUP_UPDATE, SUMMARY, ask_stage
 from . import OPERATIONS, Extraction, Extractor, scores
 
 TFGRPO = prompts.macros("tfgrpo_strings")
@@ -61,7 +61,7 @@ class Contrast(Extractor):
         answer = group.target or TFGRPO.redacted()
         out = []
         for e in eps:
-            summary = ask(ex, SUMMARY, question=e.question, trajectory=e.output, answer=answer,
+            summary = ask_stage(ex, SUMMARY, question=e.question, trajectory=e.output, answer=answer,
                           critique=TFGRPO.no_critique())
             if summary is not None:
                 out.append((e, summary))
@@ -72,11 +72,11 @@ class Contrast(Extractor):
         labeled = bool(group.target)
         if summaries is None or not partial([e for e, _ in summaries], labeled):
             return None
-        return ask(ex, ADVANTAGE, EXPERIENCES, question=group.question,
+        return ask_stage(ex, ADVANTAGE, EXPERIENCES, question=group.question,
                    answer=group.target or TFGRPO.redacted(), trajectories=render.attempts(summaries, labeled))
 
     def update(self, ex, memory, found):
-        return ask(ex, GROUP_UPDATE, Reader(text=operations),
+        return ask_stage(ex, GROUP_UPDATE, Reader(text=operations),
                    existing_experiences=render.experiences(memory.records()), new_experiences=found)
 
     def batch(self, ex, groups, memory):

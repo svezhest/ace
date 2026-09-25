@@ -6,7 +6,7 @@
 метки, память переводит их в свои id."""
 from .. import parse, render
 from ..extract import OPERATIONS
-from ..upstream.tfgrpo import BATCH_UPDATE, ask
+from ..upstream.tfgrpo import BATCH_UPDATE, ask_stage
 from ..model import Reader
 from . import Lessons
 
@@ -24,7 +24,7 @@ class Experiences(Lessons):
         ops = [op for x in extractions for op in x.extras[OPERATIONS] if isinstance(op, dict)]
         plan = None
         for _ in range(PLAN_RETRIES):
-            plan = ask(ex, BATCH_UPDATE, PLAN,
+            plan = ask_stage(ex, BATCH_UPDATE, PLAN,
                        experiences_and_operations=render.batch_table(self.records(), ops))
             if plan is not None:
                 break

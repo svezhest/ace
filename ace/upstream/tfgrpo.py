@@ -32,7 +32,7 @@ GROUP_UPDATE = stage("group_experience_update_template")    # сверка оп�
 BATCH_UPDATE = stage("batch_experience_update_template")    # план батча
 
 
-def ask(ex, stage, read=TEXT, **fields):
+def ask_stage(ex, stage, read=TEXT, **fields):
     """Стадия апстрима: системный промпт с целями агента и обучения, пользовательский с полями; параметров нет."""
     learning = LEARNING_DAPO if variant("tfgrpo", ex.task) == "math" else LEARNING
     system = stage.system.fill(agent_objective=objective(ex.task), learning_objective=learning, num_experiences=NUM)

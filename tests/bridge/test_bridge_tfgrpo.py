@@ -119,7 +119,7 @@ def test_summary_requests():
         g = group("A", [1, 0][:len(calls)], target="42" if labeled else "")
         # критика эталона: у первой попытки "Correct.", у второй нет; у math апстрима её нет никогда (test_loop)
         for e, critique, call in zip(T.rollouts(g, False), ["Correct.", render.TFGRPO.no_critique()], calls):
-            U.ask(Ex(model), STAGES[0], question=e.question, trajectory=e.output, answer=g.target or render.TFGRPO.redacted(),
+            U.ask_stage(Ex(model), STAGES[0], question=e.question, trajectory=e.output, answer=g.target or render.TFGRPO.redacted(),
                   critique=critique)
             assert model.calls[-1]["user"] == messages(call)[1]
         assert model.calls[0]["system"] == messages(calls[0])[0]
@@ -139,7 +139,7 @@ def test_group_update_requests():
                         ("group_update_library", ["Units: check units.", "Verify: recompute."])):
         call = PROMPTS["requests"][case][0]
         model = Fake([call])
-        ops = T.operations(U.ask(Ex(model), STAGES[2], existing_experiences=render.experiences(library(texts).records()),
+        ops = T.operations(U.ask_stage(Ex(model), STAGES[2], existing_experiences=render.experiences(library(texts).records()),
                                  new_experiences="1. Rule A: check the arithmetic of A."))
         assert model.calls[0]["user"] == messages(call)[1]
         assert ops == [{"operation": "ADD", "id": None, "content": "Rule A: check the arithmetic of A."}]
