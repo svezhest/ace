@@ -22,6 +22,7 @@ from . import config, prompts, render
 from . import inject as injects
 from .env import Env
 from .feedback import Episode, Feedback, failed
+from .model import Patch
 from .memory import Hook, Kind, Memory, check, requirements
 from .tasks import final_answer
 from .update import Ctx, Update, snapshot
@@ -96,7 +97,8 @@ def solve(model, task, method, memory, item, temperature=0, note="", ctx=None):
     learn = ctx is not None and method.update.step
     events = Steps(ctx, method, memory, item, view) if env.tools + view.tools and (learn or view.hook) else None
     r = model.run(system, user, tools=env.tools + view.tools, deps=view.fs,
-                  rounds=env.rounds + view.rounds, temperature=temperature, on_step=events)
+                  rounds=env.rounds + view.rounds, temperature=temperature,
+                  on_step=events and (lambda new: (t := events(new)) and Patch(system=system + "\n\n" + t)))
     fired = events.finish() if events else []
     answer = final_answer(r.output or "")
     reported = [i for i in used_line(r.output or "") if memory.get(i)] if self_report else []

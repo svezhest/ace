@@ -1,14 +1,16 @@
 """Модель через pydantic-ai: один агент на вызов, tools и схема ответа передаются явно.
 С on_step прогон идёт по одному запросу к модели: после шага с инструментами on_step(новые шаги) может
-вернуть текст, и он дописывается к системному промпту до следующего запроса (события шага, хуки инжекта)."""
+вернуть Patch, и он применяется к истории до следующего запроса."""
 import os
 os.environ.setdefault("PYDANTIC_AI_NO_BANNER", "1")
 from dataclasses import dataclass
 from enum import Enum
+from typing import NamedTuple
 
 from pydantic_ai import Agent, UsageLimits, capture_run_messages
 from pydantic_ai.exceptions import UnexpectedModelBehavior, UsageLimitExceeded
-from pydantic_ai.messages import ModelRequest, ModelResponse, RetryPromptPart, SystemPromptPart, ToolCallPart, ToolReturnPart
+from pydantic_ai.messages import (ModelRequest, ModelResponse, RetryPromptPart, SystemPromptPart, ToolCallPart, ToolReturnPart,
+                                  UserPromptPart)
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
 
@@ -26,12 +28,53 @@ class Outcome(Enum):
     broken = "broken"       # модель сломалась: вывод не прошёл схему после всех попыток (UnexpectedModelBehavior)
 
 
+class Step(NamedTuple):
+    """Шаг попытки: вызов инструмента и его результат (отбивка — «Error: ...»)."""
+    tool: str
+    args: str
+    result: str
+
+
+@dataclass
+class Patch:
+    """Вмешательство посреди попытки, до следующего запроса к модели.
+    system — новый системный промпт целиком (SCOPE, как в апстриме; префикс истории меняется);
+    append — сообщение в конец истории, после результатов инструментов (префикс цел);
+    tool_result — текст к результату последнего инструмента (урок прямо в отбивке)."""
+    system: str = None
+    append: str = None
+    tool_result: str = None
+
+    def merge(self, other):
+        """Два вмешательства одного шага: системный промпт — последний, дописывания — подряд."""
+        join = lambda a, b: "\n\n".join(x for x in (a, b) if x) or None
+        return Patch(other.system if other.system is not None else self.system,
+                     join(self.append, other.append), join(self.tool_result, other.tool_result))
+
+
+def apply(messages, patch):
+    """Patch к истории: последнее сообщение — запрос с результатами инструментов шага."""
+    if patch.system is not None:
+        for p in (p for m in messages if isinstance(m, ModelRequest) for p in m.parts):
+            if isinstance(p, SystemPromptPart):
+                p.content = patch.system
+    last = messages[-1]
+    if patch.tool_result:
+        results = [p for p in last.parts if isinstance(p, (ToolReturnPart, RetryPromptPart)) and isinstance(p.content, str)]
+        if results:
+            results[-1].content += "\n\n" + patch.tool_result
+        else:
+            last.parts.append(UserPromptPart(patch.tool_result))
+    if patch.append:
+        last.parts.append(UserPromptPart(patch.append))
+
+
 @dataclass
 class Reply:
     output: object          # str или объект схемы; None, если модель не справилась
     text: str               # вся траектория текстом: ответы, вызовы tools, их результаты
     truncated: bool
-    steps: list             # вызовы tools: (имя, аргументы, результат)
+    steps: list             # шаги: Step(имя, аргументы, результат)
     outcome: Outcome = Outcome.answer
 
 
@@ -49,23 +92,22 @@ class Model:
         if on_step is None:
             result, messages, outcome = self.request(system, user, None, output, tools, deps, limit, settings)
         else:
-            # ШАГОВЫЙ РЕЖИМ. Нужен тем, кто вмешивается посреди попытки: событию шага (SCOPE учится на шаге
-            # и его правило действует со следующего шага) и хукам инжекта (урок после ошибки). Прогон идёт
-            # по одному запросу; после шага с инструментами on_step получает новые шаги и может вернуть текст
-            # к системному промпту до следующего запроса. История сообщений переходит из запроса в запрос.
-            result, messages, extra = None, None, ""
+            # ШАГОВЫЙ РЕЖИМ. Нужен тем, кто вмешивается посреди попытки: показу после ошибки (урок в конец истории)
+            # и SCOPE (правило, выученное на шаге, переписывает системный промпт). Прогон идёт по одному запросу;
+            # после шага с инструментами on_step получает новые шаги и может вернуть Patch, он применяется к
+            # истории до следующего запроса. История сообщений переходит из запроса в запрос.
+            result, messages = None, None
             for _ in range(limit):
                 before = steps(messages or [])
-                result, messages, outcome = self.request(system + extra, user, messages, output, tools, deps, 1, settings)
+                result, messages, outcome = self.request(system, user, messages, output, tools, deps, 1, settings)
                 new = steps(messages)[len(before):]
                 if outcome is not Outcome.step:
                     break
-                text = on_step(new) if new else None
-                if text:
-                    extra = "\n\n" + text
-                    for p in (p for m in messages if isinstance(m, ModelRequest) for p in m.parts):
-                        if isinstance(p, SystemPromptPart):
-                            p.content = system + extra
+                patch = on_step(new) if new else None
+                if patch:
+                    apply(messages, patch)
+                    if patch.system is not None:
+                        system = patch.system
         responses = [m for m in messages if isinstance(m, ModelResponse)]
         return Reply(result, render.transcript(messages), any(m.finish_reason == "length" for m in responses), steps(messages),
                      outcome)
@@ -98,7 +140,7 @@ class Model:
 
 
 def steps(messages):
-    """Вызовы инструментов: (имя, аргументы, результат); отбивка (ModelRetry или ошибки валидации аргументов) —
+    """Шаги: вызов инструмента и результат; отбивка (ModelRetry или ошибки валидации аргументов) —
     результат «Error: ...»."""
     calls, out = {}, []
     for m in messages:
@@ -106,7 +148,7 @@ def steps(messages):
             if isinstance(p, ToolCallPart):
                 calls[p.tool_call_id] = (p.tool_name, p.args_as_json_str())
             elif isinstance(p, ToolReturnPart) and p.tool_call_id in calls:
-                out.append((*calls[p.tool_call_id], str(p.content)))
+                out.append(Step(*calls[p.tool_call_id], str(p.content)))
             elif isinstance(p, RetryPromptPart) and p.tool_call_id in calls:
-                out.append((*calls[p.tool_call_id], render.retry_error(p.content)))
+                out.append(Step(*calls[p.tool_call_id], render.retry_error(p.content)))
     return out

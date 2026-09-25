@@ -1,9 +1,11 @@
-"""Прогон модели на модели-функции: исходы, отбивки инструментов, шаговый режим."""
+"""Прогон модели на модели-функции: исходы, отбивки инструментов, шаговый режим и Patch."""
+import copy
+
 from pydantic import BaseModel
-from pydantic_ai.messages import ModelRequest, ModelResponse, SystemPromptPart, TextPart, ToolCallPart
+from pydantic_ai.messages import ModelRequest, ModelResponse, SystemPromptPart, TextPart, ToolCallPart, ToolReturnPart, UserPromptPart
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 
-from ace.model import EXTRA_REQUESTS, Model, Outcome
+from ace.model import EXTRA_REQUESTS, Model, Outcome, Patch, Step
 
 
 def model_of(fn):
@@ -59,20 +61,48 @@ def test_all_validation_errors():
     assert result.count("valid integer") == 2
 
 
-def test_step_mode():
-    """on_step после шага с инструментом дописывает текст к системному промпту следующего запроса."""
-    systems = []
+def stepping():
+    """Модель: два вызова add, затем ответ; запоминает, что видела перед каждым запросом."""
+    seen = []
 
     def fn(messages, info: AgentInfo):
-        systems.append(next(p.content for m in messages if isinstance(m, ModelRequest) for p in m.parts
-                            if isinstance(p, SystemPromptPart)))
+        seen.append(copy.deepcopy(messages))
         if responses(messages) < 2:
             return ModelResponse(parts=[ToolCallPart("add", {"a": 1, "b": 1})])
         return ModelResponse(parts=[TextPart("FINAL ANSWER: 2")])
+    return model_of(fn), seen
 
-    seen = []
-    on_step = lambda new: seen.append(new) or f"note {len(seen)}"
-    r = model_of(fn).run("sys", "q", tools=(add,), rounds=3, on_step=on_step)
+
+def system_of(messages):
+    return next(p.content for m in messages if isinstance(m, ModelRequest) for p in m.parts if isinstance(p, SystemPromptPart))
+
+
+def test_patch_system():
+    """Patch(system) переписывает системный промпт следующего запроса; история та же."""
+    m, seen = stepping()
+    got = []
+    on_step = lambda new: got.append(new) or Patch(system=f"sys\n\nnote {len(got)}")
+    r = m.run("sys", "q", tools=(add,), rounds=3, on_step=on_step)
     assert r.outcome is Outcome.answer and r.output == "FINAL ANSWER: 2"
-    assert systems == ["sys", "sys\n\nnote 1", "sys\n\nnote 2"]
-    assert seen == [[("add", '{"a":1,"b":1}', "2")]] * 2
+    assert [system_of(s) for s in seen] == ["sys", "sys\n\nnote 1", "sys\n\nnote 2"]
+    assert got == [[Step("add", '{"a":1,"b":1}', "2")]] * 2
+
+
+def test_patch_append():
+    """Patch(append): сообщение в конец истории после результата инструмента, системный промпт цел."""
+    m, seen = stepping()
+    m.run("sys", "q", tools=(add,), rounds=3, on_step=lambda new: Patch(append="lesson"))
+    last = seen[1][-1]
+    assert [type(p) for p in last.parts] == [ToolReturnPart, UserPromptPart] and last.parts[1].content == "lesson"
+    assert [system_of(s) for s in seen] == ["sys"] * 3
+
+
+def test_patch_tool_result():
+    m, seen = stepping()
+    m.run("sys", "q", tools=(add,), rounds=3, on_step=lambda new: Patch(tool_result="lesson"))
+    assert seen[1][-1].parts[0].content == "2\n\nlesson"
+
+
+def test_patch_merge():
+    p = Patch(system="a", append="x").merge(Patch(append="y", tool_result="t"))
+    assert p == Patch(system="a", append="x\n\ny", tool_result="t")
