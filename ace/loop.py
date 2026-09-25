@@ -125,6 +125,11 @@ class Attempts:
     top_p: callable = default
     pick: callable = first
 
+    def count(self, training):
+        """Попыток на вопрос: при обучении вся группа; на val и тесте — сколько нужно выбору в зачёт (first — одна:
+        остальные попытки нужны только обучению, TF-GRPO оценивает итогового агента)."""
+        return self.n if training or self.pick is not first else 1
+
 
 class Experiment:
     """Метод × задача. Хукам ученика — как ex: модель, задача, флаг обучения, номер вопроса и их число,
@@ -167,7 +172,7 @@ class Experiment:
     def question(self, item):
         """Группа попыток одного вопроса; при обучении — события попытки и вопроса."""
         learner, eps = self.learner, []
-        for k in range(learner.attempts.n):
+        for k in range(learner.attempts.count(self.training)):
             ep = self.attempt(item, k, learner.prompt(self, item, k))
             eps.append(ep)
             if self.training:
