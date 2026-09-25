@@ -121,7 +121,6 @@ def vote(group, check):
 
 def best(group, check):
     """Первая верная по метке, иначе первая (SCOPE K=2). Это pass@k — помечается в логе."""
-    group.pass_at_k = True
     return next((i for i, e in enumerate(group.episodes) if check(e.answer)), 0)
 
 
@@ -252,6 +251,7 @@ class Experiment:
         g = Group(item["context"], eps, target=eps[0].target, item=item)
         learner.group_verdict(self, g)
         g.pick = learner.attempts.pick.__name__
+        g.pass_at_k = learner.attempts.pick is best
         g.chosen = learner.attempts.pick(g, lambda answer: self.task.check(answer, item["target"]))
         if self.training:
             learner.on_question(self, g)
