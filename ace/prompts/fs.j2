@@ -1,0 +1,21 @@
+{#- Файловые инструменты стенда (ace/fs.py): описания для модели и отбивки (ModelRetry). -#}
+{% macro ls() %}List a directory. Without a path lists the top-level directories; with a directory lists its
+subdirectories and files, each file with its first line.{% endmacro %}
+{% macro read() %}Read a file from line `offset` (1-based), at most `limit` lines. Lines are numbered `N: text`;
+never copy the `N: ` prefix into an edit. A directory path lists the directory.{% endmacro %}
+{% macro create() %}Create a new file; folders in the path are created with it. Returns its path.{% endmacro %}
+{% macro append() %}Append text as new lines at the end of a file.{% endmacro %}
+{% macro edit() %}Replace old_string with new_string. old_string must occur exactly once unless replace_all.
+An empty new_string deletes the fragment. Read the file before editing it.{% endmacro %}
+{% macro delete() %}Delete a file.{% endmacro %}
+
+{% macro no_directory(name, available) %}no such directory: {{ name }}. Available: {{ available }}{% endmacro %}
+{% macro no_file(path) %}no such file: {{ path }}{% endmacro %}
+{% macro read_only(name) %}{{ name }} is read-only{% endmacro %}
+{% macro need_file_path() %}give a file path inside a directory, e.g. context/notes.md{% endmacro %}
+{% macro exists(path) %}{{ path }} already exists; use edit or append{% endmacro %}
+{% macro read_first(path) %}read {{ path }} before editing it{% endmacro %}
+{% macro not_found() %}old_string not found in the file{% endmacro %}
+{% macro occurs(n) %}old_string occurs {{ n }} times; add surrounding context or set replace_all{% endmacro %}
+{% macro more_lines(left, offset) %}... {{ left }} more lines; read with offset={{ offset }}{% endmacro %}
+{% macro done() %}ok{% endmacro %}

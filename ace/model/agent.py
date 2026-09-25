@@ -90,7 +90,8 @@ class PydanticAI:
         (None: история уже кончается запросом). Сообщения сохраняются и при сбое: траектория и токены не теряются.
         Пустой системный промпт не отправляется: апстримы шлют промпт одним сообщением user."""
         # отбивка инструмента (ModelRetry) — обычный шаг: разговор кончается по раундам, а не на 4-й отбивке подряд
-        tools = [Tool(t, max_retries=max(RETRIES, call.rounds)) for t in call.tools]
+        tools = [Tool(t, max_retries=max(RETRIES, call.rounds), description=getattr(t, "description", None))
+                 for t in call.tools]
         agent = Agent(self.llm, system_prompt=system or (), output_type=output, tools=tools, retries=RETRIES)
         result, outcome = None, Outcome.answer
         with capture_run_messages() as messages:

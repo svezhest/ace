@@ -1,6 +1,6 @@
-"""Файловые инструменты над миром документов (memory.Files) и каталог записей только на чтение (показ).
-Точка монтирования — папка верхнего уровня: Files (rw или ro) или Catalog (всегда ro). Инструменты получают
-FS через deps и чужую память не видят.
+"""Файловые инструменты над миром документов (memory.Files) и записи памяти как файлы только на чтение (показ
+каталогом). Точка монтирования — папка верхнего уровня: Files (rw или ro) или Records (всегда ro). Инструменты
+получают FS через deps и чужую память не видят. Что видит модель (описания инструментов, отбивки) — prompts/fs.j2.
 
 Правила как у агентских харнесов: читать обязательно только перед edit (видеть текущий текст для точной
 замены: литеральная замена, old_string один раз, replace_all явно); create, append и delete — без чтения;
@@ -11,19 +11,22 @@ from dataclasses import dataclass, field
 
 from pydantic_ai import ModelRetry, RunContext
 
-from . import render
+from . import prompts, render
 
 READ_LIMIT = 2000           # строк за один read по умолчанию, как у харнесов
+TEXT = prompts.macros("fs")
 
 
-class Catalog:
-    """Записи как файлы только на чтение: имя — id, строка каталога — head(); прочитанное — в reads."""
+class Records:
+    """Записи памяти как файлы только на чтение: имя — id, строка листинга — head(); прочитанное — в reads."""
     def __init__(self, records):
         self.by_id = {r.id: r for r in records}
         self.reads = []
 
     def ls(self, folder=""):
-        return [], [] if folder else [(id, r.head()) for id, r in self.by_id.items()]
+        if folder:
+            return [], []
+        return [], [(rid, r.head()) for rid, r in self.by_id.items()]
 
     def read(self, name):
         r = self.by_id.get(name)
@@ -36,7 +39,7 @@ class Catalog:
 
 @dataclass
 class Mount:
-    store: object               # memory.Files или Catalog
+    store: object               # memory.Files или Records
     mode: str = "rw"            # rw | ro
 
 
@@ -49,8 +52,12 @@ class FS:
 
     @property
     def reads(self):
-        """id записей, прочитанных из каталогов (что решатель прочёл: episode.used)."""
-        return [id for m in self.mounts.values() if isinstance(m.store, Catalog) for id in m.store.reads]
+        """id записей, прочитанных из Records (что решатель прочёл: episode.used)."""
+        out = []
+        for m in self.mounts.values():
+            if isinstance(m.store, Records):
+                out += m.store.reads
+        return out
 
     def norm(self, path):
         """Путь без корня root и крайних слешей: «/workspace/iter1_sub0/context/a.md» -> «context/a.md»."""
@@ -59,52 +66,54 @@ class FS:
             path = path[len(root):]
         return path.strip("/")
 
-    def split(self, path):
+    def resolve(self, path):
         """Путь -> (точка монтирования, её Mount, путь внутри)."""
         name, _, rest = self.norm(path).partition("/")
         if name not in self.mounts:
-            raise ModelRetry(f"no such directory: {name}. Available: {', '.join(self.mounts)}")
+            raise ModelRetry(TEXT.no_directory(name=name, available=", ".join(self.mounts)))
         return name, self.mounts[name], rest.strip("/")
 
     def text(self, path):
-        _, m, rest = self.split(path)
+        _, m, rest = self.resolve(path)
         text = m.store.read(rest) if rest else None
         if text is None:
-            raise ModelRetry(f"no such file: {path}")
+            raise ModelRetry(TEXT.no_file(path=path))
         return text
 
     def writable(self, path):
-        name, m, rest = self.split(path)
+        name, m, rest = self.resolve(path)
         if m.mode != "rw":
-            raise ModelRetry(f"{name} is read-only")
+            raise ModelRetry(TEXT.read_only(name=name))
         return m, rest
 
 
 def listing(fs, path):
     """Содержимое папки строками: подпапки со слешем, файлы с краткой строкой."""
-    name, m, rest = fs.split(path)
+    name, m, rest = fs.resolve(path)
     folders, files = m.store.ls(rest)
-    base = f"{name}/{rest}" if rest else name
-    return "\n".join([f"{base}/{d}/" for d in folders] + [f"{base}/{f}  {head}" for f, head in files]) or render.EMPTY
+    return render.listing(f"{name}/{rest}" if rest else name, folders, files)
 
 
 def is_folder(fs, path):
-    _, m, rest = fs.split(path)
-    return not rest or m.store.read(rest) is None and m.store.ls(rest) != ([], [])
+    _, m, rest = fs.resolve(path)
+    if not rest:
+        return True
+    return m.store.read(rest) is None and m.store.ls(rest) != ([], [])
 
 
+@prompts.tool(TEXT.ls())
 def ls(ctx: RunContext[FS], path: str = "") -> str:
-    """List a directory. Without a path lists the top-level directories; with a directory lists its
-    subdirectories and files, each file with its first line."""
+    """Без пути — точки монтирования с режимом, с папкой — её содержимое."""
     fs = ctx.deps
     if not fs.norm(path):
-        return "\n".join(f"{n}/  ({m.mode})" for n, m in fs.mounts.items())
+        return render.mounts((name, m.mode) for name, m in fs.mounts.items())
     return listing(fs, path)
 
 
+@prompts.tool(TEXT.read())
 def read(ctx: RunContext[FS], path: str, offset: int = 1, limit: int = READ_LIMIT) -> str:
-    """Read a file from line `offset` (1-based), at most `limit` lines. Lines are numbered `N: text`;
-    never copy the `N: ` prefix into an edit. A directory path lists the directory."""
+    """Страница файла с номерами строк; если файл длиннее — в конце сколько осталось и откуда читать. Папка —
+    листинг."""
     fs = ctx.deps
     if is_folder(fs, path):
         return listing(fs, path)
@@ -112,56 +121,57 @@ def read(ctx: RunContext[FS], path: str, offset: int = 1, limit: int = READ_LIMI
     fs.seen.add(fs.norm(path))
     start = max(offset, 1)
     shown = lines[start - 1:start - 1 + limit]
-    out = "\n".join(f"{i}: {l}" for i, l in enumerate(shown, start))
+    page = render.numbered_lines(shown, start)
     left = len(lines) - (start - 1 + len(shown))
-    return out + "\n" + render.more_lines(left, start + len(shown)) if left > 0 else out
+    if left <= 0:
+        return page
+    return page + "\n" + TEXT.more_lines(left=left, offset=start + len(shown))
 
 
+@prompts.tool(TEXT.create())
 def create(ctx: RunContext[FS], path: str, content: str) -> str:
-    """Create a new file; folders in the path are created with it. Returns its path."""
     m, rest = ctx.deps.writable(path)
     if not rest:
-        raise ModelRetry("give a file path inside a directory, e.g. context/notes.md")
+        raise ModelRetry(TEXT.need_file_path())
     with ctx.deps.lock:
         if m.store.read(rest) is not None:
-            raise ModelRetry(f"{path} already exists; use edit or append")
+            raise ModelRetry(TEXT.exists(path=path))
         m.store.write(rest, content.strip())
     return path.strip("/")
 
 
+@prompts.tool(TEXT.append())
 def append(ctx: RunContext[FS], path: str, text: str) -> str:
-    """Append text as new lines at the end of a file."""
     m, rest = ctx.deps.writable(path)
     with ctx.deps.lock:
         old = ctx.deps.text(path)
         m.store.write(rest, old.rstrip("\n") + "\n" + text.strip())
-    return "ok"
+    return TEXT.done()
 
 
+@prompts.tool(TEXT.edit())
 def edit(ctx: RunContext[FS], path: str, old_string: str, new_string: str, replace_all: bool = False) -> str:
-    """Replace old_string with new_string. old_string must occur exactly once unless replace_all.
-    An empty new_string deletes the fragment. Read the file before editing it."""
     m, rest = ctx.deps.writable(path)
     with ctx.deps.lock:
         text = ctx.deps.text(path)
         if ctx.deps.norm(path) not in ctx.deps.seen:
-            raise ModelRetry(f"read {path} before editing it")
+            raise ModelRetry(TEXT.read_first(path=path))
         n = text.count(old_string)
         if n == 0:
-            raise ModelRetry("old_string not found in the file")
+            raise ModelRetry(TEXT.not_found())
         if n > 1 and not replace_all:
-            raise ModelRetry(f"old_string occurs {n} times; add surrounding context or set replace_all")
+            raise ModelRetry(TEXT.occurs(n=n))
         m.store.write(rest, text.replace(old_string, new_string).strip())
-    return "ok"
+    return TEXT.done()
 
 
+@prompts.tool(TEXT.delete())
 def delete(ctx: RunContext[FS], path: str) -> str:
-    """Delete a file."""
     m, rest = ctx.deps.writable(path)
     with ctx.deps.lock:
         ctx.deps.text(path)
         m.store.delete(rest)
-    return "ok"
+    return TEXT.done()
 
 
 READ_TOOLS = (ls, read)

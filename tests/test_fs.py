@@ -68,7 +68,7 @@ def test_read_only_and_errors():
 
 def test_catalog_read_only_and_tracked():
     records = [Lesson("r1", "Check units.\nMore."), Record("r2", "Guard division.")]
-    ctx = Ctx(fs.FS({"skills": fs.Mount(fs.Catalog(records), "ro")}))
+    ctx = Ctx(fs.FS({"skills": fs.Mount(fs.Records(records), "ro")}))
     assert fs.listing(ctx.deps, "skills") == "skills/r1  Check units.\nskills/r2  Guard division."
     assert fs.read(ctx, "skills/r2") == "1: Guard division."
     fs.read(ctx, "skills/r2")
@@ -78,7 +78,7 @@ def test_catalog_read_only_and_tracked():
 
 
 def test_empty_listing():
-    ctx = Ctx(fs.FS({"skills": fs.Mount(fs.Catalog([]), "ro")}))
+    ctx = Ctx(fs.FS({"skills": fs.Mount(fs.Records([]), "ro")}))
     assert fs.listing(ctx.deps, "skills") == "(empty)"
 
 

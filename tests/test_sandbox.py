@@ -2,7 +2,7 @@
 cestand-sandbox (docker build -t cestand-sandbox ace/env)."""
 import pytest
 
-from ace.env import Sandbox, run_python, sandbox
+from ace.env import Sandbox, sandbox
 
 docker = pytest.mark.skipif(not sandbox.available(), reason="нет docker или образа песочницы")
 
@@ -19,7 +19,7 @@ def test_trim():
 def test_ok():
     r = sandbox.run("print(2+2)")
     assert (r["stdout"], r["rc"], r["timeout"]) == ("4\n", 0, False)
-    assert run_python("print(2+2)") == "[stdout]\n4\n\n[stderr]"
+    assert Sandbox().run_python("print(2+2)") == "[stdout]\n4\n\n[stderr]"
 
 
 @docker
@@ -86,7 +86,7 @@ def test_attempt_container():
 def test_call_container_is_shared_env():
     """Контейнер на вызов: среда попытки — сама песочница, без состояния."""
     env = Sandbox()
-    assert env.open() is env and env.tools == (run_python,)
+    assert env.open() is env and [t.__name__ for t in env.tools] == ["run_python"]
 
 
 @docker

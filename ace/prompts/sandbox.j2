@@ -1,0 +1,5 @@
+{#- Песочница стенда (ace/env): описание run_python для модели и строки в её выводе. -#}
+{% macro run_python() %}Run Python code in a sandbox and return its stdout and stderr.{% endmacro %}
+{% macro no_response() %}sandbox: the container did not respond{% endmacro %}
+{% macro time_limit(seconds) %}sandbox: time limit of {{ seconds }} s exceeded{% endmacro %}
+{% macro omitted(n) %}... {{ n }} lines omitted ...{% endmacro %}

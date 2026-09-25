@@ -5,9 +5,10 @@ import subprocess
 import time
 import uuid
 
-from .. import render
+from .. import prompts
 
 IMAGE = "cestand-sandbox"
+TEXT = prompts.macros("sandbox")
 TIMEOUT = 10                # секунд на запуск кода внутри контейнера
 DOCKER_GRACE = 15           # сверх TIMEOUT на старт и остановку контейнера
 HEAD_LINES = 20             # длинный вывод: начало и конец, середина вырезается
@@ -46,7 +47,7 @@ def trim(text, head=HEAD_LINES, tail=TAIL_LINES):
     lines = text.splitlines()
     if len(lines) <= head + tail:
         return text
-    return "\n".join(lines[:head] + [render.omitted(len(lines) - head - tail)] + lines[-tail:])
+    return "\n".join(lines[:head] + [TEXT.omitted(n=len(lines) - head - tail)] + lines[-tail:])
 
 
 def run(code, container=None, limit=TIMEOUT, path=None):
@@ -63,11 +64,11 @@ def run(code, container=None, limit=TIMEOUT, path=None):
         p = subprocess.run(args, input=code.encode(), capture_output=True, timeout=limit + DOCKER_GRACE)
     except subprocess.TimeoutExpired:       # клиент docker убит, контейнер — ещё нет
         subprocess.run(["docker", "kill", container or name], capture_output=True, timeout=DOCKER_GRACE)
-        return {"stdout": "", "stderr": render.NO_RESPONSE, "rc": -1, "timeout": True}
+        return {"stdout": "", "stderr": TEXT.no_response(), "rc": -1, "timeout": True}
     out, err = p.stdout.decode(errors="replace"), p.stderr.decode(errors="replace")
     timed_out = p.returncode == TIMEOUT_RC or p.returncode == KILLED_RC and time.time() - t0 >= limit
     if timed_out:
-        err += "\n" + render.time_limit(limit)
+        err += "\n" + TEXT.time_limit(seconds=limit)
     return {"stdout": trim(out), "stderr": trim(err), "rc": p.returncode, "timeout": timed_out}
 
 

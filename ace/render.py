@@ -64,6 +64,24 @@ def lessons(items):
     """Уроки дельты для куратора."""
     return "\n".join(f"- {l}" for l in items)
 
+# файловые инструменты (fs.py)
+
+
+def listing(base, folders, files):
+    """Содержимое папки base: подпапки со слешем, затем файлы (имя, краткая строка); пустая — EMPTY."""
+    lines = [f"{base}/{name}/" for name in folders] + [f"{base}/{name}  {head}" for name, head in files]
+    return "\n".join(lines) or EMPTY
+
+
+def mounts(modes):
+    """Точки монтирования с режимом: «context/  (rw)»; modes — пары (имя, режим)."""
+    return "\n".join(f"{name}/  ({mode})" for name, mode in modes)
+
+
+def numbered_lines(lines, start):
+    """Строки файла с номерами «N: текст» от start."""
+    return "\n".join(f"{i}: {line}" for i, line in enumerate(lines, start))
+
 # решатель и его траектория
 
 
@@ -102,22 +120,6 @@ def verdict(ok, target=""):
 def python_output(stdout, stderr):
     return f"[stdout]\n{stdout}\n[stderr]\n{stderr}".strip()
 
-
-NO_RESPONSE = "sandbox: the container did not respond"
-
-
-def omitted(n):
-    """Строка на месте вырезанной середины длинного вывода."""
-    return f"... {n} lines omitted ..."
-
-
-def more_lines(left, offset):
-    """Хвост постраничного read: сколько строк осталось и откуда читать дальше."""
-    return f"... {left} more lines; read with offset={offset}"
-
-
-def time_limit(seconds):
-    return f"sandbox: time limit of {seconds} s exceeded"
 
 # TF-GRPO: ответ инструмента execute_python_code, когда ядро не ответило — str(dict) как у python_executor апстрима
 

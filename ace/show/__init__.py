@@ -96,7 +96,7 @@ class Catalog(Show):
         entries = self.listed(memory)
         if not entries:
             return Prompt()
-        files = fs.FS({"skills": fs.Mount(fs.Catalog(entries), "ro")})
+        files = fs.FS({"skills": fs.Mount(fs.Records(entries), "ro")})
         return Prompt("\n\n" + self.head + CATALOG.fill(listing=fs.listing(files, "skills")), fs.READ_TOOLS, files, self.rounds)
 
 
