@@ -44,6 +44,16 @@ ENVIRONMENT = "## Environment\n\nUse `uv run python ...` for all Python executio
 MENTION_UTILS = "- Mention useful utilities (`utils/llm.py`, `utils/embedding.py`)\n"
 
 
+# папка навыка апстрима — из его промпта; у нас своя (MCE5)
+UPSTREAM_SKILL = re.search(r"(\.\w+)/skills/learning-context/SKILL\.md", PROMPTS["base_agent_variants"]["no_signatures"]).group(1)
+
+
+def skill_dir(text):
+    """Путь навыка апстрима -> наш (MCE5)."""
+    deviation("MCE5")
+    return text.replace(UPSTREAM_SKILL + "/", SKILL.split("/", 1)[0] + "/")
+
+
 def cut(text, start, end):
     """Текст без куска от start до end (end остаётся)."""
     a = text.index(start)
@@ -53,13 +63,13 @@ def cut(text, start, end):
 def without_utilities_base(text):
     deviation("MCE2")
     assert UTILS_TREE in text and ENVIRONMENT in text
-    return cut(text.replace(UTILS_TREE, "").replace(ENVIRONMENT, ""), "## Available Utilities", "## Core Objective")
+    return skill_dir(cut(text.replace(UTILS_TREE, "").replace(ENVIRONMENT, ""), "## Available Utilities", "## Core Objective"))
 
 
 def without_utilities_meta(text):
     deviation("MCE2")
     assert MENTION_UTILS in text
-    return cut(text.replace(MENTION_UTILS, ""), "### Example Skill B", "## Output Requirements")
+    return skill_dir(cut(text.replace(MENTION_UTILS, ""), "### Example Skill B", "## Output Requirements"))
 
 
 def database(prompt):
@@ -109,7 +119,7 @@ def test_skill_missing_feedback():
     """Просьба записать SKILL.md (mce/meta_agent.py:282, в fixtures не снята — текст из исходника), инструмент
     create вместо Write (MCE3)."""
     deviation("MCE3")
-    path = "/ws/t/iter1_sub0/.claude/skills/learning-context/SKILL.md"
+    path = f"/ws/t/iter1_sub0/{UPSTREAM_SKILL}/skills/learning-context/SKILL.md"
     upstream = (f"\n⚠️ VALIDATION ERROR\n\nYour SKILL.md file was not found at the expected location:\n{path}\n\n"
                 f"Please create the SKILL.md file at this EXACT path using the Write tool.\n\nRequired:\n"
                 f"1. Write to path: {path}\n2. Include ## Skill Overview section\n3. Provide complete learning methodology\n\n"
@@ -222,7 +232,7 @@ class Agents:
 def upstream_files(files):
     """Файлы папки апстрима без interfaces/ (MCE1) и utils/ (MCE2)."""
     deviation("MCE1", "MCE2")
-    return sorted(f for f in files if not re.match(r"(iter\d+_sub\d+/)?(interfaces|utils)/", f))
+    return sorted(skill_dir(f) for f in files if not re.match(r"(iter\d+_sub\d+/)?(interfaces|utils)/", f))
 
 
 def test_loop(tmp_path):

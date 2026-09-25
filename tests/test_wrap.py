@@ -149,8 +149,8 @@ def test_mce_base_agent():
     assert call["tools"] == fs.TOOLS and call["system"] == ""
     assert "**Working Directory**: `/workspace/iter1_sub0`" in call["user"] and "Summary" not in call["user"]
     deps = call["deps"]
-    assert deps.mounts["context"].store is context and deps.mounts["data"].mode == deps.mounts[".claude"].mode == "ro"
-    assert deps.mounts[".claude"].store.files == {"skills/learning-context/SKILL.md": "## Skill Overview\nCurate."}
+    assert deps.mounts["context"].store is context and deps.mounts["data"].mode == deps.mounts[".agent"].mode == "ro"
+    assert deps.mounts[".agent"].store.files == {"skills/learning-context/SKILL.md": "## Skill Overview\nCurate."}
     train = json.loads(deps.mounts["data"].store.files["train.json"])
     assert train["summary"] == dict(train_accuracy=0.5, train_metrics=dict(accuracy=0.5), train_total=2, train_errors=0,
                                     batch_idx=0, cumulative_rollouts=2)
@@ -168,11 +168,11 @@ def test_meta_agent_asks_for_skill():
     author = meta_agent(META)
     assert author(ex, []) == ""
     assert len(model.calls) == 3 and model.calls[1]["user"] == MISSING.fill(
-        expected_path="/workspace/iter1_sub0/.claude/skills/learning-context/SKILL.md")
+        expected_path="/workspace/iter1_sub0/.agent/skills/learning-context/SKILL.md")
     assert "VALIDATION ERROR" in model.calls[2]["user"] and model.calls[0]["history"] is None
     # записал со второго раза
     model = FileAgent(lambda call, deps: len(model.calls) == 2 and write(
-        "/workspace/iter1_sub0/.claude/skills/learning-context/SKILL.md", "S")(call, deps))
+        "/workspace/iter1_sub0/.agent/skills/learning-context/SKILL.md", "S")(call, deps))
     ex.model = model
     assert author(ex, []) == "S" and len(model.calls) == 2
 

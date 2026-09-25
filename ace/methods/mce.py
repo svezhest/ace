@@ -4,11 +4,11 @@ ace/prompts/mce_*.j2 — апстрим дословно в режиме без 
 mce = Meta(базовый агент с файлами):
     мета        итерация = проход; в начале итерации мета-агент с файлами (корень /workspace, как E2B-пути
                 апстрима) читает meta_agent/ (train.jsonl, evaluations.json, skills/iter*/SKILL.md) и папки прошлых
-                под-итераций и пишет SKILL.md в iter{k}_sub0/.claude/skills/learning-context/ (wrap.Meta); в конце
+                под-итераций и пишет SKILL.md в iter{k}_sub0/.agent/skills/learning-context/ (wrap.Meta); в конце
                 прохода val, следующая итерация начинается с лучшей по val из пройденных (строго больше, при
                 равенстве первая)
     память      файлы context/ (мир документов); их заводит и правит базовый агент по навыку файловыми
-                инструментами, до 30 раундов; под-итерация = батч: папка iter{k}_sub{j} с навыком (.claude/, только
+                инструментами, до 30 раундов; под-итерация = батч: папка iter{k}_sub{j} с навыком (.agent/, только
                 чтение), context/ и data/train.json — итоги только текущего батча (только чтение)
     показ       все файлы context/ (интерфейса get_context, который апстрим пишет кодом, нет: MCE1)
     извлечение  нет: память читает сырое
@@ -93,7 +93,7 @@ def meta_agent(template):
 
 class Context(Files):
     """Файлы context/ базового агента. На батче (под-итерации) агент по навыку правит их инструментами; итоги
-    батча — data/train.json (только текущий батч), навык — .claude/skills/learning-context/SKILL.md."""
+    батча — data/train.json (только текущий батч), навык — .agent/skills/learning-context/SKILL.md."""
     def __init__(self, rounds=ROUNDS):
         super().__init__("context")
         self.rounds, self.train = rounds, ""
@@ -111,7 +111,8 @@ class Context(Files):
         name = sub_folder(ex)
         mounts = {"context": fs.Mount(self), "data": fs.Mount(store({"train.json": self.train}), "ro")}
         if ex.learner.skill:
-            mounts = {".claude": fs.Mount(store({SKILL.split("/", 1)[1]: ex.learner.skill}), "ro"), **mounts}
+            top, rest = SKILL.split("/", 1)
+            mounts = {top: fs.Mount(store({rest: ex.learner.skill}), "ro"), **mounts}
         prompt = BASE.fill(task_instruction=render.task_instruction(ex.task), iter_dir=f"{WORKSPACE}/{name}", iter_name=name)
         ex.model.run("", prompt, tools=fs.TOOLS, deps=fs.FS(mounts, root=f"{WORKSPACE}/{name}"), rounds=self.rounds)
 

@@ -66,7 +66,7 @@ class Gate(Wrapper):
         self.gated.append(ok)
 
 
-SKILL = ".claude/skills/learning-context/SKILL.md"     # навык в папке под-итерации MCE
+SKILL = ".agent/skills/learning-context/SKILL.md"      # навык в папке под-итерации MCE (MCE5)
 
 
 def sub_folder(ex):

@@ -39,13 +39,13 @@ Each skill you create should be a complete learning procedure that can be unders
     evaluations.json                         # Aggregated metrics per iteration
     skills/iter*/SKILL.md                    # Archived skills from each iteration
   {{ iter_name }}/                               # YOUR OUTPUT DIRECTORY
-    .claude/skills/learning-context/SKILL.md # <-- WRITE YOUR SKILL HERE
+    .agent/skills/learning-context/SKILL.md # <-- WRITE YOUR SKILL HERE
     context/                                  # Static resources (base-agent writes)
     interfaces/                               # Implemented interfaces (base-agent writes)
     data/train.json                           # Training results
 ```
 
-**Write Access**: Only `{{ workspace }}/{{ iter_name }}/.claude/skills/`
+**Write Access**: Only `{{ workspace }}/{{ iter_name }}/.agent/skills/`
 **IMPORTANT**: Write SKILL.md to `{{ skill_output_path }}`
 
 ## Skill Database (Iteration History)
