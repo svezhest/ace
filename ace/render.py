@@ -235,6 +235,12 @@ def strategic(intro, text):
     return "\n" + intro + text if text else ""
 
 
+def domains(groups):
+    """Strategic правила по доменам (get_strategic_rules_text): groups — пары (домен, правила), пустые
+    домены пропускаются; tool_usage -> Tool Usage."""
+    return titled([(d.replace("_", " ").title(), rules) for d, rules in groups if rules], dashed, header="### {}:")
+
+
 def rule_list(rules):
     """Правила для анализа оптимизатором."""
     return "".join(f"Rule {x['id']}: {x['rule']}\n" for x in rules)
