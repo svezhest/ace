@@ -14,12 +14,12 @@ from ace import parse, render
 from ace.extract import CONFIDENCE, DOMAIN
 from ace.extract.scope import DOMAINS, Proposal, Rules, answer_step
 from ace.show.scope import strategic_text
-from ace.extract.scope import P as EXTRACT_P
+from ace.extract import scope as EXTRACT
 from ace.loop import Episode, Group, Prompt
 from ace.memory import Record
-from ace.memory.scope import P as OPTIMIZER_P
+from ace.memory import scope as OPTIMIZER
 from ace.learner import Learner
-from ace.memory.scope import Book, PER_RUN, Perspectives, duplicate_words, rule_optimizer
+from ace.memory.scope import Book, PER_RUN, Perspectives, duplicate_words, optimize
 from ace.methods.scope import scope
 from ace.model import roles, text_reply
 
@@ -27,11 +27,11 @@ PROMPTS, PARSERS, MEMORY, LOOP = (fixture("scope", n) for n in ("prompts", "pars
 AGENT, ROLE = "finer_agent", "Expert tagging financial entities with US GAAP XBRL tags"
 TASK = "Assign the best US GAAP tag to each numeric entity"
 BASE = "You are a financial tagging assistant. End with FINAL ANSWER: <tag>."
-TEMPLATES = {"ERROR_REFLECTION_PROMPT": EXTRACT_P["error"], "QUALITY_REFLECTION_PROMPT_EFFICIENCY": EXTRACT_P["efficiency"],
-             "QUALITY_REFLECTION_PROMPT_THOROUGHNESS": EXTRACT_P["thoroughness"], "SELECTOR_PROMPT": EXTRACT_P["selector"],
-             "CLASSIFICATION_PROMPT": EXTRACT_P["classify"], "RULE_ANALYSIS_PROMPT": OPTIMIZER_P["analyze"],
-             "RULE_MERGE_PROMPT": OPTIMIZER_P["merge"], "SUBSUMPTION_VERIFY_PROMPT": OPTIMIZER_P["subsumed"],
-             "CONFLICT_RESOLVE_PROMPT": OPTIMIZER_P["conflict"]}
+TEMPLATES = {"ERROR_REFLECTION_PROMPT": EXTRACT.ERROR, "QUALITY_REFLECTION_PROMPT_EFFICIENCY": EXTRACT.QUALITY["efficiency"],
+             "QUALITY_REFLECTION_PROMPT_THOROUGHNESS": EXTRACT.QUALITY["thoroughness"], "SELECTOR_PROMPT": EXTRACT.SELECTOR,
+             "CLASSIFICATION_PROMPT": EXTRACT.CLASSIFY, "RULE_ANALYSIS_PROMPT": OPTIMIZER.ANALYZE,
+             "RULE_MERGE_PROMPT": OPTIMIZER.MERGE, "SUBSUMPTION_VERIFY_PROMPT": OPTIMIZER.SUBSUMED,
+             "CONFLICT_RESOLVE_PROMPT": OPTIMIZER.CONFLICT}
 
 
 class Model:
@@ -108,8 +108,8 @@ def test_synthesizer_requests():
     fields = dict(agent_name=AGENT, agent_role=ROLE, task=TASK, last_step_summary=SUMMARY, current_system_prompt=BASE)
     # с правилами — из наших полей (applied_rules); у нас tactical всегда и в системном промпте, это проверяет цикл
     rules = render.rules(["Always read the full sentence."])
-    assert EXTRACT_P["error"].fill(**fields, error_type=ERROR[0], error_message=ERROR[1], applied_rules=rules) == user(calls[0])
-    assert EXTRACT_P["thoroughness"].fill(**fields, applied_rules=rules) == user(calls[2])
+    assert EXTRACT.ERROR.fill(**fields, error_type=ERROR[0], error_message=ERROR[1], applied_rules=rules) == user(calls[0])
+    assert EXTRACT.QUALITY["thoroughness"].fill(**fields, applied_rules=rules) == user(calls[2])
     model = Model(lambda prompt: calls[1]["response"])
     got = [Rules().propose(ex(model), attempt(), Book(), SUMMARY, ERROR),
            Rules().propose(ex(model), attempt(), Book("efficiency"), SUMMARY, None)]
@@ -133,7 +133,7 @@ def test_best_of_n_selector():
     second = Proposal(**parse.scope_guideline(cand["response"]))
     selector = dict(agent_name=AGENT, agent_role=ROLE, task=TASK, current_system_prompt=BASE, issue_type="error",
                     issue_details=render.issue(SUMMARY, ERROR), candidates=render.candidates([first, second]))
-    assert EXTRACT_P["selector"].fill(**selector) == user(calls[5])
+    assert EXTRACT.SELECTOR.fill(**selector) == user(calls[5])
     answers = iter([calls[4]["response"], cand["response"], calls[5]["response"]])
     model = Model(lambda prompt: next(answers))
     best = Rules(n=2).propose(ex(model), attempt(), Book(), SUMMARY, ERROR)
@@ -160,7 +160,7 @@ def test_memory_optimizer_requests():
     m = PROMPTS["memory_optimizer"]
     model = by_kind(m["calls"])
     six = [dict(rule=f"Rule text {i}.", rationale=f"why {i}", confidence=0.85 + i / 100) for i in range(6)]
-    out = rule_optimizer()(model, six, 3)
+    out = optimize(model, six, 3)
     assert [c["user"] for c in model.calls] == [user(c) for c in m["calls"]]
     assert [(x["rule"], x["rationale"], x["confidence"]) for x in out] == [(x["rule"], x["rationale"], x["confidence"])
                                                                           for x in m["result"]]
@@ -371,7 +371,7 @@ def test_optimize_rules_two_passes():
             return second if "Merged A" in prompt else first
         return merge if "merging similar" in prompt else subsumed
     model = Model(reply)
-    out = rule_optimizer()(model, [dict(x) for x in case["input"]], 3)
+    out = optimize(model, [dict(x) for x in case["input"]], 3)
     assert [c["user"] for c in model.calls] == [user(c) for c in case["calls"]]
     assert [(x["rule"], x["rationale"], x["confidence"]) for x in out] == [(x["rule"], x["rationale"], x["confidence"])
                                                                           for x in case["result"]]

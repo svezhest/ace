@@ -16,7 +16,7 @@ from ..model import Call, Reader, messages, params
 from ..upstream.ace import ace_params, question_context
 from . import Ids, Lessons, Sections
 from .counters import HARMFUL, HELPFUL, Counted, count, prune_harmful
-from .scope import CAP, compress, rule_optimizer, target_count
+from .scope import CAP, compress, optimize, target_count
 
 # стенд
 
@@ -79,7 +79,7 @@ class CappedPlaybook(Playbook):
         super().__init__(prune=None)
         self.cap = cap
         self.target = target_count(cap)
-        self.optimizer = rule_optimizer()
+        self.optimizer = optimize
 
     def learn(self, ex, extractions):
         super().learn(ex, extractions)

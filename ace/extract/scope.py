@@ -13,14 +13,17 @@ tactical правила (applied_rules и текущий системный пр
 Запросы — как у OpenAIAdapter апстрима (create_openai_model): одно сообщение user частями, без параметров. Модель
 отвечает текстом, разбор — функции апстрима в parse.py (scope_*), с его откатами."""
 from dataclasses import dataclass
+from functools import partial
 
 from .. import parse, prompts, render
 from ..model import Call, Reader, parts
 from ..upstream.scope import current_system, strategic_text
 from . import ATTEMPT, CONFIDENCE, DOMAIN, RATIONALE, Extraction, Extractor
 
-P = {n: prompts.load(f"scope_{n}") for n in ("error", "efficiency", "thoroughness", "selector", "classify")}
-
+ERROR = prompts.load("scope_error")
+QUALITY = {"thoroughness": prompts.load("scope_thoroughness"), "efficiency": prompts.load("scope_efficiency")}
+SELECTOR = prompts.load("scope_selector")
+CLASSIFY = prompts.load("scope_classify")
 DOMAINS = prompts.text("scope_domains").split()
 STAND = prompts.macros("stand")
 LEVEL = {"low": 0.3, "medium": 0.6, "high": 0.9}    # метка кандидата -> начальная confidence
@@ -41,13 +44,16 @@ class Proposal:
         c = self.confidence
         if isinstance(c, str):
             return LEVEL.get(c.lower(), DEFAULT_CONFIDENCE)
-        return float(c) if isinstance(c, (int, float)) and not isinstance(c, bool) else DEFAULT_CONFIDENCE
+        if isinstance(c, (int, float)) and not isinstance(c, bool):
+            return float(c)
+        return DEFAULT_CONFIDENCE
 
 
 def tool_step(step):
     """Шаг с инструментом -> сводка и ошибка (тип, сообщение) или None."""
     summary = render.step_summary(tools=render.tool_call(step.tool, step.args), observations=step.result)
-    return summary, render.tool_error(step.result) if step.failed else None
+    error = render.tool_error(step.result) if step.failed else None
+    return summary, error
 
 
 def answer_step(ep):
@@ -82,55 +88,73 @@ class Rules(Extractor):
         fields = dict(agent_context(ex, attempt, book), last_step_summary=summary,
                       applied_rules=render.rules([r.text for r in book.tactical]))
         if error:
-            fields.update(error_type=error[0], error_message=error[1])
-        prompt = (P["error"] if error else P[book.name]).fill(**fields)
-
-        def one(extra, quality):
-            read = Reader(text=lambda text: parse.scope_guideline(text, quality))
-            c = ex.model.ask(Call(parts(prompt), extra, read)).output
-            return Proposal(**c) if c else None
-        if self.n == 1:
-            c = one({}, not error)
-            return c if c and c.update_text else None
-        models = [{}] + [{"temperature": BEST_OF_TEMPERATURE}] * (self.n - 1)
-        cands = [c for c in (one(p, False) for p in models) if c and (error or meaningful(c))]
-        if len(cands) < 2:
-            best = cands[0] if cands else None
+            prompt = ERROR.fill(**fields, error_type=error[0], error_message=error[1])
         else:
-            select = P["selector"].fill(**agent_context(ex, attempt, book), issue_type="error" if error else "quality",
-                                        issue_details=render.issue(summary, error), candidates=render.candidates(cands))
-            read = Reader(text=lambda text: parse.scope_selection(text, len(cands)))
-            best = cands[ex.model.ask(Call(parts(select), {}, read)).output]
+            prompt = QUALITY[book.name].fill(**fields)
+        if self.n == 1:
+            best = self.candidate(ex, prompt, {}, quality=not error)
+        else:
+            best = self.best_of(ex, attempt, book, prompt, summary, error)
         return best if best and best.update_text else None
+
+    def candidate(self, ex, prompt, request, quality):
+        """Кандидат синтезатора или None; quality — правило по качеству: пустое и «no improvement needed» — None."""
+        read = Reader(text=partial(parse.scope_guideline, quality=quality))
+        c = ex.model.ask(Call(parts(prompt), request, read)).output
+        return Proposal(**c) if c else None
+
+    def best_of(self, ex, attempt, book, prompt, summary, error):
+        """Best-of-N: кандидат основной модели и n - 1 от candidate_models (у нас та же модель при
+        BEST_OF_TEMPERATURE), пустые без ошибки отбрасываются, из двух и больше выбирает селектор."""
+        requests = [{}] + [{"temperature": BEST_OF_TEMPERATURE}] * (self.n - 1)
+        cands = []
+        for request in requests:
+            c = self.candidate(ex, prompt, request, quality=False)
+            if c and (error or meaningful(c)):
+                cands.append(c)
+        if len(cands) < 2:
+            return cands[0] if cands else None
+        select = SELECTOR.fill(**agent_context(ex, attempt, book), issue_type="error" if error else "quality",
+                               issue_details=render.issue(summary, error), candidates=render.candidates(cands))
+        read = Reader(text=partial(parse.scope_selection, n=len(cands)))
+        return cands[ex.model.ask(Call(parts(select), {}, read)).output]
 
     def classify(self, ex, proposal, book, k=0, group=None):
         """Классификатор -> Extraction с одним уроком попытки k или None (дубль); сбой разбора — tactical с исходной
         confidence (parse.scope_classification)."""
         initial = proposal.initial()
-        context = prompts.text("scope_rules_context", strategic=strategic_text(book), tactical=[r.text for r in book.tactical])
-        prompt = P["classify"].fill(allowed_domains=render.allowed_domains(DOMAINS), update_text=proposal.update_text,
-                                    rationale=proposal.rationale, initial_confidence=initial, all_rules_context=context)
-        read = Reader(text=lambda text: parse.scope_classification(text, initial, DOMAINS))
+        rules = prompts.text("scope_rules_context", strategic=strategic_text(book), tactical=[r.text for r in book.tactical])
+        prompt = CLASSIFY.fill(allowed_domains=render.allowed_domains(DOMAINS), update_text=proposal.update_text,
+                               rationale=proposal.rationale, initial_confidence=initial, all_rules_context=rules)
+        read = Reader(text=partial(parse.scope_classification, initial=initial, domains=DOMAINS))
         c = ex.model.ask(Call(parts(prompt), {}, read)).output
         if c["is_duplicate"]:
             return None
         domain = c["domain"] if c["scope"] == "strategic" else None
-        return Extraction(group, [proposal.update_text], [], {CONFIDENCE: [c["confidence"]], DOMAIN: [domain],
-                                                              RATIONALE: [proposal.rationale], ATTEMPT: [k]})
+        extras = {CONFIDENCE: [c["confidence"]], DOMAIN: [domain], RATIONALE: [proposal.rationale], ATTEMPT: [k]}
+        return Extraction(group, [proposal.update_text], [], extras)
 
     def step(self, ex, attempt, step, memory):
         """Событие шага с инструментом: правило сразу, посреди попытки."""
         book = memory.book(attempt.k)
-        p = self.propose(ex, attempt, book, *tool_step(step))
-        return self.classify(ex, p, book, attempt.k) if p else None
+        proposal = self.propose(ex, attempt, book, *tool_step(step))
+        return self.classify(ex, proposal, book, attempt.k) if proposal else None
 
     def __call__(self, ex, group, memory):
         """Событие ответа: попытка в зачёт, затем остальные (перспективы); сначала кандидаты всех попыток, потом
         классификация. Правила всех попыток — одно извлечение, в порядке попыток."""
-        eps = [group.episodes[group.chosen]] + [e for i, e in enumerate(group.episodes) if i != group.chosen]
-        proposals = [(e, self.propose(ex, e, memory.book(e.k), *answer_step(e))) for e in eps]
-        xs = [x for x in (self.classify(ex, p, memory.book(e.k), e.k, group) if p else None for e, p in proposals) if x]
-        if not xs:
+        chosen = group.episodes[group.chosen]
+        order = [chosen] + [e for e in group.episodes if e is not chosen]
+        proposals = [(e, self.propose(ex, e, memory.book(e.k), *answer_step(e))) for e in order]
+        lessons = []
+        extras = {name: [] for name in self.gives}
+        for e, proposal in proposals:
+            x = self.classify(ex, proposal, memory.book(e.k), e.k, group) if proposal else None
+            if x is None:
+                continue
+            lessons += x.lessons
+            for name in self.gives:
+                extras[name] += x.extras[name]
+        if not lessons:
             return None
-        return Extraction(group, [t for x in xs for t in x.lessons], [],
-                          {name: [v for x in xs for v in x.extras[name]] for name in self.gives})
+        return Extraction(group, lessons, [], extras)

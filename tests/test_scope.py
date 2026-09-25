@@ -41,7 +41,7 @@ class Ex:
 
 
 def rule(text, confidence=0.9, domain="general", rationale="why"):
-    return Extraction(None, [text], [], {CONFIDENCE: [confidence], DOMAIN: [domain], RATIONALE: [rationale]})
+    return Extraction(None, [text], [], {CONFIDENCE: [confidence], DOMAIN: [domain], RATIONALE: [rationale], ATTEMPT: [0]})
 
 
 def attempt(system="SYS", shown=""):
@@ -99,11 +99,12 @@ def test_classify():
 
 
 def test_admission_and_promotion():
-    book, ex = Book(), Ex(Stub())
-    book.learn(ex, [rule("low", 0.4), rule("tactical only", 0.6, None), rule("mid", 0.8), rule("Always check units.", 0.9)])
+    memory, ex = Perspectives(), Ex(Stub())
+    book = memory.book(0)
+    memory.learn(ex, [rule("low", 0.4), rule("tactical only", 0.6, None), rule("mid", 0.8), rule("Always check units.", 0.9)])
     assert [r.text for r in book.tactical] == ["tactical only", "mid", "Always check units."]
     assert [r.text for r in book.records()] == ["Always check units."]
-    book.learn(ex, [rule("always check units", 0.95), rule("Round at the end.", 0.99, "efficiency")])
+    memory.learn(ex, [rule("always check units", 0.95), rule("Round at the end.", 0.99, "efficiency")])
     assert [r.text for r in book.records()] == ["Always check units.", "Round at the end."]     # дубль по словам не прошёл
     assert list(book.domains) == ["general", "efficiency"]
     book.begin()
@@ -111,18 +112,20 @@ def test_admission_and_promotion():
 
 
 def test_limit_per_run_is_not_reset():
-    book, ex = Book(), Ex(Stub())
+    memory, ex = Perspectives(), Ex(Stub())
+    book = memory.book(0)
     for i in range(PER_RUN + 3):
         book.begin()
-        book.learn(ex, [rule(f"rule number {i} " + "x" * i, 0.6, None)])
+        memory.learn(ex, [rule(f"rule number {i} " + "x" * i, 0.6, None)])
     assert book.accepted == PER_RUN
 
 
 def test_domain_cap_optimizer():
     model = Stub(texts(analyze=js(consolidation=[[0, 1, 2, 3]]), merge=js(rule="merged", rationale="m")))
-    book, ex = Book(), Ex(model)
+    memory, ex = Perspectives(), Ex(model)
+    book = memory.book(0)
     for i in range(CAP + 1):
-        book.learn(ex, [rule(" ".join(f"w{i}{j}" for j in range(5)), 0.86 + i / 1000)])
+        memory.learn(ex, [rule(" ".join(f"w{i}{j}" for j in range(5)), 0.86 + i / 1000)])
     kept = [r.text for r in book.records()]
     assert len(kept) == target_count(CAP) and kept[-1] == "merged"
     assert [MARK["analyze"] in c["user"] for c in model.calls] == [True, False]        # после слияния 8 правил: второго прохода нет
