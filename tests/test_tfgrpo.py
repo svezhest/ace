@@ -62,7 +62,7 @@ def test_contrast_partial():
 
 
 def test_contrast_skips_uniform_group():
-    """С меткой группа, где все попытки верны (или все неверны), ничего не даёт — без вызовов. scored (ace_group):
+    """С меткой группа, где все попытки верны (или все неверны), ничего не даёт — без вызовов. scored (ace_stand_group):
     попытка в зачёт в группу не входит."""
     for oks, scored in (([True] * 3, False), ([False] * 3, False), ([False, True, True], True)):
         model = Stub(by_prompt())

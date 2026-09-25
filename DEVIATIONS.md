@@ -11,11 +11,11 @@ c4b7a7c (MCE). Тесты — `uv run pytest tests/bridge`.
 
 ## Общее
 
-S1. **Решатель общий для всех методов, кроме ace_exact, DC, TF-GRPO, EvoLib и mce на symptom.** Методы сравниваются по памяти при одном решателе:
+S1. **Решатель общий для всех методов, кроме ace, DC, TF-GRPO, EvoLib и mce на symptom.** Методы сравниваются по памяти при одном решателе:
     системный промпт задачи, память — в нём же (после «What you learned so far:» или раздел метода), вопрос — весь
     вход задачи, ответ — строка FINAL ANSWER (`tasks.final_answer`), код — инструмент `run_python`, траектория для
-    обучения — наш транскрипт (`render.transcript`). ace_exact идёт генератором апстрима целиком (`show/ace.py`:
-    GENERATOR, свой решатель попытки `loop.Solver`); общий решатель с playbook — вариант ace_exact_used. Все
+    обучения — наш транскрипт (`render.transcript`). ace идёт генератором апстрима целиком (`show/ace.py`:
+    GENERATOR, свой решатель попытки `loop.Solver`); общий решатель с playbook — вариант ace_used. Все
     варианты DC — генератором апстрима (`show/dc.py`: Generator — `generator_prompt.txt`, вход задачи как в
     `run_benchmark.py`, ответ `extract_answer`, у dc_code код по «EXECUTE CODE!»); TF-GRPO — агентом апстрима
     (`show/tfgrpo.py`: инструкции `math_agent.yaml`, инструмент execute_python_code, траектория — repr списка
@@ -34,7 +34,7 @@ S2. **Задачи стенда, а не бенчмарки апстримов.*
     tactical этой попытки); в data/train.json MCE поле вопроса — `question` (у symptom_diagnosis — `symptoms`),
     метрика одна — accuracy. Мостик подставляет тексты, с которыми
     снят эталон.
-S3. **Протокол стенда один для всех методов.** (а) Онлайн в зачёт — первая попытка обучения. Исключение — ace_exact:
+S3. **Протокол стенда один для всех методов.** (а) Онлайн в зачёт — первая попытка обучения. Исключение — ace:
     протокол online апстрима (`learner.window`, `recheck`): начальный тест потока, в зачёт тест окна из
     `online_eval_frequency` (15) вопросов с playbook начала окна, после куратора ещё генерация (в лог). Офлайн ACE
     (начальный тест, val каждые `eval_steps` шагов) — общим офлайном стенда (val после прохода). (б) Train в одном
@@ -49,7 +49,7 @@ S3. **Протокол стенда один для всех методов.** (
     отчёт берёт сохранённое лучшее решение вопроса (при epochs = 1 одно и то же).
 S4. **Модель одна, параметры запросов — стенда.** Все вызовы идут в одну модель стенда при T = 0 и общем пределе
     генерации (`model.params`, `config.MAX_TOKENS`), если метод не задаёт своё (TF-GRPO: агент при 0.3 / 0.7 и
-    top_p 0.95 без предела генерации, обновление без параметров, как у апстрима; ace_exact: T = 0.0 и `max_completion_tokens` 4096, как
+    top_p 0.95 без предела генерации, обновление без параметров, как у апстрима; ace: T = 0.0 и `max_completion_tokens` 4096, как
     `timed_llm_call` при api_provider openai; DC: T = 0.0 и `max_completion_tokens` 2048, у куратора и синтеза
     4096, как `_generate_openai`; вызовы SCOPE — без параметров, сообщение частями, как `create_openai_model` без
     temperature; EvoLib у hmmt — как у апстрима на модели задачи o4-mini: reasoning API, `max_completion_tokens`

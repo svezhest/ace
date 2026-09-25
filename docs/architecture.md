@@ -46,7 +46,7 @@
 
 Решатель попытки общий (системный промпт задачи, среда, ответ FINAL ANSWER), если показ не дал свой:
 `Prompt.solver = Solver(call, answer, talk)` — `call(заметка) -> Call` целиком, разбор ответа в зачёт и, если нужен,
-свой разговор `talk(модель, Call) -> Reply` вместо одного вызова. Так ace_exact идёт генератором апстрима: playbook,
+свой разговор `talk(модель, Call) -> Reply` вместо одного вызова. Так ace идёт генератором апстрима: playbook,
 рефлексия раунда, вопрос и context одним сообщением user, ответ — `extract_answer` апстрима; заметка `ex.retry`
 встаёт в его поле Reflection. DC — генератором своего апстрима: cheatsheet и вход задачи одним сообщением, у dc_code
 разговор с исполнением кода в песочнице между вызовами. EvoLib — решателем своего апстрима: выборка из библиотеки
@@ -88,8 +88,8 @@
 ## Сборка и абляция
 
 ```python
-ace = Learner("ace", memory=Playbook(), extract=Reflector())
-ace_text = swap(ace, "ace_text", extract=Reflector(free=True), memory=Playbook(prune=None))
+ace_stand = Learner("ace_stand", memory=Playbook(), extract=Reflector())
+ace_stand_text = swap(ace_stand, "ace_stand_text", extract=Reflector(free=True), memory=Playbook(prune=None))
 ```
 
 Абляция — замена уровня через `swap`, проверки сборки идут заново. По умолчанию уровень ведёт себя как апстрим;

@@ -1,9 +1,9 @@
 """Показ ACE: у стенда — все пункты «[id] текст» (Whole по умолчанию); у апстрима — генератор апстрима целиком.
 
-    GENERATOR   решатель ace_exact — Generator.generate апстрима (core/generator.py, промпт ace_generator.j2
+    GENERATOR   решатель ace — Generator.generate апстрима (core/generator.py, промпт ace_generator.j2
                 дословно): одно сообщение user с playbook текстом апстрима, рефлексией («(empty)» без неё),
                 вопросом и context задачи (DataProcessor апстрима); ответ в зачёт — extract_answer
-    PLAYBOOK    ace_exact_used: общий решатель стенда (S1), весь playbook в системном промпте и просьба назвать
+    PLAYBOOK    ace_used: общий решатель стенда (S1), весь playbook в системном промпте и просьба назвать
                 использованные пункты строкой USED"""
 from .. import parse, prompts
 from ..loop import Prompt, Solver

@@ -1,12 +1,12 @@
 """Извлечение ACE: по первой попытке группы уроки и метки записей памяти (labels).
 
     Reflector   рефлектор стенда: уроки и метки одной схемой; free — свободным текстом, без меток;
-                temperature — для кандидатов Best-of-N (ace_bo2)
+                temperature — для кандидатов Best-of-N (ace_stand_bo2)
     Diagnose    рефлектор апстрима (ace/core/reflector.py; промпты ace_reflector*.j2 дословно): диагноз с
                 метками пунктов; при неверном ответе до rounds раундов «диагноз -> метки в копию памяти ->
                 новая попытка с диагнозом как рефлексией генератора» (ex.retry: стрелка извлечение -> попытки).
                 Ответ текстом и разбор, как у апстрима (parse.bullet_tags). Какие пункты решатель использовал —
-                регулярка апстрима по его ответу (parse.bullet_ids); ids=named — строка USED (ace_exact_used)."""
+                регулярка апстрима по его ответу (parse.bullet_ids); ids=named — строка USED (ace_used)."""
 import copy
 
 from pydantic import BaseModel

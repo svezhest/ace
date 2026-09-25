@@ -17,8 +17,8 @@ mce = Iterations(базовый агент апстрима) — метод ап
 mce_fs = Meta(базовый агент стенда) — наш вариант: мета-агент и базовый агент — модель стенда с файловыми
 инструментами fs.py в памяти (без SDK и диска), папка навыка .agent/ (DEVIATIONS MCE3, MCE5), без интерфейсов.
 
-mce_ace = Meta(ACE): тот же мета-агент mce_fs (промпт про рефлектор и куратор ACE), навык идёт в системные промпты
-рефлектора и куратора ACE; в папках под-итераций только навык. Ученик — ace как есть."""
+mce_ace_stand = Meta(ACE): тот же мета-агент mce_fs (промпт про рефлектор и куратор ACE), навык идёт в системные промпты
+рефлектора и куратора ACE; в папках под-итераций только навык. Ученик — ace_stand как есть."""
 from .. import render
 from ..extract import Raw
 from ..learner import Learner, swap
@@ -26,7 +26,7 @@ from ..memory.mce import Context, Folder
 from ..show import Whole
 from ..show.mce import Environment
 from ..wrap.mce import META, META_ACE, Iterations, Meta, meta_agent
-from .ace import ace
+from .ace import ace_stand
 
 BATCH, ITERATIONS = 20, 3
 
@@ -35,4 +35,4 @@ mce = Iterations(Learner("mce", memory=Folder(), show=Environment(), extract=Raw
 base = Learner("mce_base", memory=Context(), show=Whole(line=render.plain, sep="\n\n"), extract=Raw(), every=BATCH,
                flush=True, epochs=ITERATIONS)
 mce_fs = Meta(base, meta_agent(META), "mce_fs")
-mce_ace = Meta(swap(ace, epochs=ITERATIONS), meta_agent(META_ACE), "mce_ace")
+mce_ace_stand = Meta(swap(ace_stand, epochs=ITERATIONS), meta_agent(META_ACE), "mce_ace_stand")

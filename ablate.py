@@ -29,40 +29,40 @@ def later(name):
 
 
 m = METHODS
-ace, baseline, evolib, scope_code = m["ace"], m["baseline"], m["evolib"], m["scope_code"]
-ace_code = swap(ace, "ace_code", env=Sandbox())
+ace_stand, baseline, evolib, scope_code = m["ace_stand"], m["baseline"], m["evolib"], m["scope_code"]
+ace_stand_code = swap(ace_stand, "ace_stand_code", env=Sandbox())
 
 CHAIN = {
     # контроли
     "baseline": baseline,
     "placebo": swap(baseline, "placebo", show=Whole(empty=prompts.text("placebo"))),   # показ: та же длина без знаний
-    "sc3": swap(baseline, "sc3", attempts=Attempts(3, spread, pick=vote)),    # попытки: столько же вызовов, что у ace, без памяти
+    "sc3": swap(baseline, "sc3", attempts=Attempts(3, spread, pick=vote)),    # попытки: столько же вызовов, что у ace_stand, без памяти
 
     # шесть методов, как в апстримах
-    "ace_exact": m["ace_exact"],
+    "ace": m["ace"],
     "dc": m["dc"],
     "scope": m["scope"],
     "tfgrpo": m["tfgrpo"],
     "evolib": evolib,
     "mce": m["mce"],
 
-    # база цепочки — ace стенда: рефлектор с метками, куратор операциями, отсев вредных, показ всего
-    "ace": ace,
-    # извлечение (от ace)
-    "ace_text": m["ace_text"],      # рефлексия свободным текстом; без меток и память без отсева — иначе стык не сойдётся
-    "ace_bo2": m["ace_bo2"],        # Best-of-2: рефлектор дважды при T=0.7, селектор выбирает набор уроков
-    **later("ace_group"),           # контраст TF-GRPO по группе попыток (вердикт группы + извлечение)
-    # память (от ace)
-    "ace_opt": m["ace_opt"],        # предел 10 с оптимизатором SCOPE вместо отсева
-    "ace_rewrite": m["ace_rewrite"],    # куратор переписывает всю память
-    # показ (от ace)
-    "ace_catalog": swap(ace, "ace_catalog", show=Catalog()),   # каталог id и первых строк, тела — read
-    "ace_code": ace_code,           # среда: исполнение python (база хуков)
-    "ace_hooks": Hooks(ace_code, "ace_hooks"),                 # от ace_code: урок после ошибки в конец истории
-    "ace_hooks_system": Hooks(ace_code, "ace_hooks_system", show="system"),   # от ace_code: хуки в системном промпте с начала
-    # мета (от ace)
-    "ace_e3": swap(ace, "ace_e3", epochs=ITERATIONS),          # протокол: 3 прохода, как у меты
-    "mce_ace": m["mce_ace"],        # от ace_e3: MCE над ACE — навык рефлектору и куратору, откат к лучшей по val
+    # база цепочки — ace_stand: рефлектор с метками, куратор операциями, отсев вредных, показ всего
+    "ace_stand": ace_stand,
+    # извлечение (от ace_stand)
+    "ace_stand_text": m["ace_stand_text"],      # рефлексия свободным текстом; без меток и память без отсева — иначе стык не сойдётся
+    "ace_stand_bo2": m["ace_stand_bo2"],        # Best-of-2: рефлектор дважды при T=0.7, селектор выбирает набор уроков
+    **later("ace_stand_group"),           # контраст TF-GRPO по группе попыток (вердикт группы + извлечение)
+    # память (от ace_stand)
+    "ace_stand_opt": m["ace_stand_opt"],        # предел 10 с оптимизатором SCOPE вместо отсева
+    "ace_stand_rewrite": m["ace_stand_rewrite"],    # куратор переписывает всю память
+    # показ (от ace_stand)
+    "ace_stand_catalog": swap(ace_stand, "ace_stand_catalog", show=Catalog()),   # каталог id и первых строк, тела — read
+    "ace_stand_code": ace_stand_code,           # среда: исполнение python (база хуков)
+    "ace_stand_hooks": Hooks(ace_stand_code, "ace_stand_hooks"),                 # от ace_stand_code: урок после ошибки в конец истории
+    "ace_stand_hooks_system": Hooks(ace_stand_code, "ace_stand_hooks_system", show="system"),   # от ace_stand_code: хуки в системном промпте с начала
+    # мета (от ace_stand)
+    "ace_stand_e3": swap(ace_stand, "ace_stand_e3", epochs=ITERATIONS),          # протокол: 3 прохода, как у меты
+    "mce_ace_stand": m["mce_ace_stand"],        # от ace_stand_e3: MCE над ACE — навык рефлектору и куратору, откат к лучшей по val
 
     # вердикт (на EvoLib; evolib — голосование группы)
     "evolib_judge": m["evolib_judge"],  # судья: баллы по вердикту попытки

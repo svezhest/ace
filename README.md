@@ -17,9 +17,9 @@
 | мета: Gate, Meta (MCE), Hooks | `ace/wrap/` |
 
 Методы (`ace/methods/<метод>.py` — только сборка, в docstring — что метод берёт на каждом уровне): baseline;
-ace, ace_text, ace_rewrite (стенд), ace_exact и ace_exact_dedup (как в апстриме), ace_exact_used; dc, dc_code, dc_rs, dc_retrieval,
-dc_history; scope, scope_bo2, scope_code, scope_k2; tfgrpo; evolib, evolib_judge; mce, mce_fs, mce_ace; гибриды ace_bo2,
-ace_opt, ace_hooks, ace_group. По умолчанию уровни ведут себя как апстрим; неустранимые отличия —
+ace и ace_dedup (как в апстриме), ace_used; ace_stand, ace_stand_text, ace_stand_rewrite (стенд); dc, dc_code, dc_rs, dc_retrieval,
+dc_history; scope, scope_bo2, scope_code, scope_k2; tfgrpo; evolib, evolib_judge; mce, mce_fs, mce_ace_stand; гибриды ace_stand_bo2,
+ace_stand_opt, ace_stand_hooks, ace_stand_group. По умолчанию уровни ведут себя как апстрим; неустранимые отличия —
 [DEVIATIONS.md](DEVIATIONS.md), верность — тесты-мостик `tests/bridge/` (эталоны сняты с апстримов, `bridge/`)
 и воспроизведение записей апстримов на живой модели `tests/live/` (`bridge/live/<метод>/`).
 Прототип отложен: его код — в теге `pre-rewrite` (`git show pre-rewrite:ace/methods/proto.py`).
@@ -30,7 +30,7 @@ docker build -t cestand-sandbox ace/env   # образ docker для испол�
 uv run python run.py formula ace 40       # результаты в results/formula40/ace/
 EPOCHS=3 OFFLINE=1 uv run python run.py formula ace 40   # офлайн: обучение на train, тест с лучшей по val памятью
 BACKEND=wire uv run python run.py formula dc 40          # вызовы без инструментов — клиентом openai как есть
-uv run python ablate.py formula 40        # цепочка абляций; ступени по именам: ablate.py formula 40 ace ace_opt
+uv run python ablate.py formula 40        # цепочка абляций; ступени по именам: ablate.py formula 40 ace_stand ace_stand_opt
 uv run python report.py                   # таблица по results/
 uv run pytest -q                          # тесты, в том числе мостик к апстримам (tests/bridge)
 uv run python tools/trace.py /tmp/a.json   # снимок запросов всех методов на фиктивной модели
@@ -48,13 +48,13 @@ uv run python tools/compare.py /tmp/a.json /tmp/b.json   # два снимка: 
 
 | блок | ступени |
 |---|---|
-| контроли | baseline; placebo (показ: текст той же длины без знаний); sc3 (3 попытки, T = 0 и 0.7, голосование — столько же вызовов, сколько у ace, без памяти) |
-| методы | ace_exact, dc, scope, tfgrpo, evolib, mce — как в апстримах, строки для сравнения |
-| база | ace — рефлектор с метками, куратор операциями, отсев вредных, показ всего |
-| извлечение | ace_text (свободный текст; память без отсева — иначе стык не сойдётся), ace_bo2 (Best-of-2), ace_group (контраст TF-GRPO по группе из 3, куратор ACE) |
-| память | ace_opt (предел 10 с оптимизатором SCOPE вместо отсева), ace_rewrite (перезапись куратором) |
-| показ | ace_catalog (каталог + read); ace_code (среда с python) -> ace_hooks (урок после ошибки в конец истории) и ace_hooks_system (хуки в системном промпте с начала) |
-| мета | ace_e3 (3 прохода) -> mce_ace (MCE над ACE) |
+| контроли | baseline; placebo (показ: текст той же длины без знаний); sc3 (3 попытки, T = 0 и 0.7, голосование — столько же вызовов, сколько у ace_stand, без памяти) |
+| методы | ace, dc, scope, tfgrpo, evolib, mce — как в апстримах, строки для сравнения |
+| база | ace_stand — рефлектор с метками, куратор операциями, отсев вредных, показ всего |
+| извлечение | ace_stand_text (свободный текст; память без отсева — иначе стык не сойдётся), ace_stand_bo2 (Best-of-2), ace_stand_group (контраст TF-GRPO по группе из 3, куратор ACE) |
+| память | ace_stand_opt (предел 10 с оптимизатором SCOPE вместо отсева), ace_stand_rewrite (перезапись куратором) |
+| показ | ace_stand_catalog (каталог + read); ace_stand_code (среда с python) -> ace_stand_hooks (урок после ошибки в конец истории) и ace_stand_hooks_system (хуки в системном промпте с начала) |
+| мета | ace_stand_e3 (3 прохода) -> mce_ace_stand (MCE над ACE) |
 | вердикт | evolib (голосование) -> evolib_judge (судья) -> evolib_golden (верный ответ) |
 | попытки | evolib_n5 (5 попыток вместо 3), evolib_t07 (попытки различаются и температурой) |
 | показ посреди попытки | scope_code (правило на шаге переписывает системный промпт, как в апстриме) -> scope_append (дописывается в конец истории) |
@@ -68,7 +68,7 @@ uv run python tools/compare.py /tmp/a.json /tmp/b.json   # два снимка: 
 ```
 uv run python scripts/evolib_ig.py formula 40     # IG по вопросам при голосовании, судье и верном ответе
 uv run python scripts/scope_patch.py formula 40   # перезапись системного промпта против дописывания
-uv run python scripts/ace_labels.py formula 40    # ace_exact_used: сколько названных пунктов и меток доходит до счётчиков
+uv run python scripts/ace_labels.py formula 40    # ace_used: сколько названных пунктов и меток доходит до счётчиков
 ```
 
 - `evolib_ig.py` — по каждому вопросу ответы попыток, голос, баллы и IG (`ig.json`); таблица IG по числу

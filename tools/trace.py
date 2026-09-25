@@ -105,7 +105,7 @@ task = TASKS["formula"]
 targets = {r["context"]: r["target"] for s in ("", "train", "val") for r in task.load(s)}
 # батч 2 и офлайн, чтобы на 4 задачах сработали события батча и прохода
 special = {"tfgrpo": (dict(every=2), {}), "mce_fs": (dict(every=2), dict(epochs=2, offline=True)),
-           "mce_ace": (dict(every=2), dict(epochs=2, offline=True))}
+           "mce_ace_stand": (dict(every=2), dict(epochs=2, offline=True))}
 traces = {}
 tmp = Path(tempfile.mkdtemp(prefix="trace-"))
 # mce — агенты Claude SDK через LiteLLM (model/claude.py): на фиктивной модели не идёт, его сверка — tests/live/test_mce.py

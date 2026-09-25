@@ -1,7 +1,7 @@
 """Хуки по ошибкам (Hooks) и гибриды: уроки модели (уверенные, trigger из текста ошибки, показ не помогших),
 уроки из траектории, память хуков (тот же trigger — новая запись, исходы показа, отсев), показ после ошибки
-Patch в конец с исходом по следующему шагу, показ в системном промпте с исходом по попытке; ace_bo2 (Best-of-2 с
-селектором), ace_opt (предел с оптимизатором вместо отсева), ace_group (контраст TF-GRPO и куратор ACE)."""
+Patch в конец с исходом по следующему шагу, показ в системном промпте с исходом по попытке; ace_stand_bo2 (Best-of-2 с
+селектором), ace_stand_opt (предел с оптимизатором вместо отсева), ace_stand_group (контраст TF-GRPO и куратор ACE)."""
 import json
 
 from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, ToolCallPart, UserPromptPart
@@ -18,7 +18,7 @@ from ace.learner import Learner
 from ace.loop import Attempt, Group, Prompt, run
 from ace.memory.ace import Ops
 from ace.memory.ace import CappedPlaybook
-from ace.methods.hybrids import ace_bo2, ace_group, ace_hooks, ace_opt
+from ace.methods.hybrids import ace_stand_bo2, ace_stand_group, ace_stand_hooks, ace_stand_opt
 from ace.model import Model, Patch, Step
 
 ERROR = "Traceback (most recent call last):\nZeroDivisionError: division by zero"
@@ -135,14 +135,14 @@ def test_hooks_run(tmp_path):
 
 
 def test_ace_hooks_levels():
-    assert ace_hooks.env.tools and ace_hooks.watches_steps() and ace_hooks.name == "ace_hooks"
+    assert ace_stand_hooks.env.tools and ace_stand_hooks.watches_steps() and ace_stand_hooks.name == "ace_stand_hooks"
 
 
 def test_ace_bo2_selects():
     lessons = iter([["first"], ["second"]])
     model = Stub(lambda call: "2", schemas={"Reflection": lambda call: Reflection(lessons=next(lessons))})
     ep = episode("1", ok=True, target="1")
-    x = ace_bo2.extract(Ex(model), Group("q", [ep], target="1"), ace_bo2.memory)
+    x = ace_stand_bo2.extract(Ex(model), Group("q", [ep], target="1"), ace_stand_bo2.memory)
     assert x.lessons == ["second"] and "## 1\n- first\n\n## 2\n- second" in model.calls[2]["user"]
     assert [c["temperature"] for c in model.calls] == [0.7, 0.7, 0]
 
@@ -158,13 +158,13 @@ def test_ace_opt_caps_playbook():
     texts = [r.text for r in m.records()]
     assert len(texts) == 10 and texts[-1] == "merged"
     assert texts[0] == "kept" and m.get("r1").helpful == 1         # нетронутый пункт — со своими счётчиками
-    assert ace_opt.memory.requires == frozenset()
+    assert ace_stand_opt.memory.requires == frozenset()
 
 
 def test_ace_group_levels():
-    """ace_group: в зачёт попытка при T = 0, группа из 3 при T = 0.7; извлечение без операций, память без отсева."""
-    assert [ace_group.attempts.temperature(k) for k in range(ace_group.attempts.n)] == [0, 0.7, 0.7, 0.7]
-    assert ace_group.extract.gives == frozenset() and ace_group.memory.requires == frozenset()
+    """ace_stand_group: в зачёт попытка при T = 0, группа из 3 при T = 0.7; извлечение без операций, память без отсева."""
+    assert [ace_stand_group.attempts.temperature(k) for k in range(ace_stand_group.attempts.n)] == [0, 0.7, 0.7, 0.7]
+    assert ace_stand_group.extract.gives == frozenset() and ace_stand_group.memory.requires == frozenset()
 
 
 def test_ace_group_contrast_to_curator(tmp_path):
@@ -178,12 +178,12 @@ def test_ace_group_contrast_to_curator(tmp_path):
             return "<Experiences>\n1. Tip: check units.\n</Experiences>"
         return right(call) if call["temperature"] == 0 or call["n"] % 2 else "FINAL ANSWER: 0"
     model = Stub(answer, schemas={"Ops": Ops(ops=[dict(op="ADD", text="Check units.")])})
-    run(TASK, ace_group, model, 1, str(tmp_path))
+    run(TASK, ace_stand_group, model, 1, str(tmp_path))
     users = [c["user"] for c in model.calls]
     assert sum(u.startswith("<Working Agent Input>") for u in users) == 3
     assert not any("<Existing Experiences>" in u for u in users)
     assert "- 1. Tip: check units." in users[-1]
     assert [r["text"] for r in json.load(open(tmp_path / "memory.json"))] == ["Check units."]
     model = Stub(right, schemas={"Ops": Ops(ops=[])})
-    run(TASK, ace_group, model, 1, str(tmp_path))
+    run(TASK, ace_stand_group, model, 1, str(tmp_path))
     assert len(model.calls) == 4

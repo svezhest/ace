@@ -1,4 +1,4 @@
-"""ACE (ace_exact) против апстрима ace 82709de: шаблоны и запросы генератора, рефлектора и куратора, разборщики
+"""ACE (ace) против апстрима ace 82709de: шаблоны и запросы генератора, рефлектора и куратора, разборщики
 ответов, операции над playbook (id, разделы, метки, статистика) и цикл online на 4 задачах эталона с той же фейковой
 моделью (все запросы по порядку)."""
 import json
@@ -13,7 +13,7 @@ from ace.learner import swap
 from ace.loop import run
 from ace.memory import HARMFUL, HELPFUL, Lesson
 from ace.memory.ace import SectionedPlaybook, SECTIONS, ace_input, ace_params, layout, question_context, section_slug
-from ace.methods.ace import ace_exact
+from ace.methods.ace import ace
 from ace.model import text_reply
 from ace.tasks import TASKS
 from ace.verdict import yes_no
@@ -312,7 +312,7 @@ def test_online_loop(tmp_path, key):
     up = LOOP[key]
     assert up["config"]["json_mode"] is False and up["config"]["max_num_rounds"] == 3
     model = Replay(up["calls"])
-    learner = swap(ace_exact, window=up["config"]["online_eval_frequency"])
+    learner = swap(ace, window=up["config"]["online_eval_frequency"])
     if key == "online_nogt":
         learner = swap(learner, verdict=yes_no)
     run(Task(up["samples"]), learner, model, len(up["samples"]), str(tmp_path))

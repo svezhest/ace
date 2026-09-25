@@ -1,5 +1,5 @@
 """Best-of-N над любым извлечением: n извлечений одной группы и выбор одного (SCOPE: synthesizer.py, Best-of-N).
-Добавки — те же, что у внутреннего извлечения. one_of_two — селектор наборов уроков (ace_bo2)."""
+Добавки — те же, что у внутреннего извлечения. one_of_two — селектор наборов уроков (ace_stand_bo2)."""
 from .. import prompts, render
 from ..model import Call, messages, params
 from . import Extractor

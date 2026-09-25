@@ -11,7 +11,7 @@ from ace.extract.ace import Diagnose, Reflection, Reflector, named, used_line
 from ace.learner import swap
 from ace.loop import Group
 from ace.memory.ace import Op, Ops, Playbook, SectionedPlaybook, curate_rewrite
-from ace.methods.ace import ace
+from ace.methods.ace import ace_stand
 
 
 class Ex:
@@ -57,8 +57,8 @@ def test_reflector_free():
 def test_ablation_needs_both_levels():
     """Рефлексия без меток при памяти со счётчиками и отсевом не собирается."""
     with pytest.raises(ValueError, match="labels"):
-        swap(ace, extract=Reflector(free=True))
-    swap(ace, extract=Reflector(free=True), memory=Playbook(prune=None))
+        swap(ace_stand, extract=Reflector(free=True))
+    swap(ace_stand, extract=Reflector(free=True), memory=Playbook(prune=None))
 
 
 def test_playbook_learn():
@@ -119,7 +119,7 @@ def test_diagnose_tags_as_upstream():
 
 
 def test_diagnose_bullets_used():
-    """ace_exact_used: нет строки USED или none — «No bullets used»; названы, но нет в памяти — строка апстрима."""
+    """ace_used: нет строки USED или none — «No bullets used»; названы, но нет в памяти — строка апстрима."""
     for final, text in (("FINAL ANSWER: 4", "ace_no_bullets"), ("USED: none", "ace_no_bullets"),
                         ("USED: r9", "ace_bullets_not_found")):
         model = Stub(lambda call: "")

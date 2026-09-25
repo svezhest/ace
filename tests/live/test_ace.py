@@ -1,4 +1,4 @@
-"""ACE (ace_exact) против записи апстрима ace 82709de на живой модели (bridge/live/ace, run.json): formula, online,
+"""ACE (ace) против записи апстрима ace 82709de на живой модели (bridge/live/ace, run.json): formula, online,
 5 задач, окно 3. Запись воспроизводится без модели (tools/record/replay): каждый запрос нашего метода побайтно
 совпадает с записанным, все записанные ответы востребованы, playbook после каждого шага и итоговый — как у апстрима,
 ответы до и после обучения и число верных в тесте окон — тоже."""
@@ -11,7 +11,7 @@ import pytest
 from ace.learner import swap
 from ace.loop import run
 from ace.memory.ace import SectionedPlaybook, layout
-from ace.methods.ace import ace_exact
+from ace.methods.ace import ace
 from ace.model import Model
 from ace.tasks import TASKS
 from tools.record.replay import Replayer
@@ -35,7 +35,7 @@ def replayed(tmp_path_factory):
     STEPS.clear()
     try:
         model = Model("ornith15-9b", f"http://127.0.0.1:{srv.server_address[1]}/v1", backend="wire")
-        run(TASKS["formula"], swap(ace_exact, window=WINDOW, memory=Watched()), model, N, str(out))
+        run(TASKS["formula"], swap(ace, window=WINDOW, memory=Watched()), model, N, str(out))
     finally:
         srv.shutdown()
     return srv.status(), json.load(open(out / "log.json"))

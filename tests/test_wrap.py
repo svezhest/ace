@@ -15,7 +15,7 @@ from ace.loop import Group, run
 from ace.memory import Lessons
 from ace.memory.ace import Ops
 from ace.memory.mce import Context
-from ace.methods.mce import mce_ace, mce_fs as mce
+from ace.methods.mce import mce_ace_stand, mce_fs as mce
 from ace.wrap.mce import META, MISSING, meta_agent
 from ace.wrap import Gate, Wrapper, skilled
 from ace.wrap.mce import Meta
@@ -199,7 +199,7 @@ def test_skill_in_ace_prompts():
     model = Stub(schemas={"Reflection": Reflection(lessons=["l"]), "Ops": Ops(ops=[])})
     ex = Ex()
     ex.model = model
-    inner = copy.deepcopy(mce_ace.inner)
+    inner = copy.deepcopy(mce_ace_stand.inner)
     x = inner.extract(ex, Group("q", [episode("1", ok=True, target="1")], target="1"), inner.memory)
     inner.memory.learn(ex, [x])
     assert all(c["system"].endswith("Follow this skill as your learning methodology:\n\nSKILL TEXT") for c in model.calls)
@@ -210,7 +210,7 @@ def test_skill_in_ace_prompts():
 def test_mce_ace_run():
     model = FileAgent(meta_writes("SKILL"), lambda call: right(call) if call["system"].startswith(TASK.system) else "done",
                       schemas={"Reflection": Reflection(lessons=["l"]), "Ops": Ops(ops=[])})
-    run(TASK, mce_ace, model, 2, epochs=2, offline=True)
+    run(TASK, mce_ace_stand, model, 2, epochs=2, offline=True)
     metas = [c for c in model.calls if "Meta-Level Agent" in c["user"]]
     assert len(metas) == 2 and "Base-Level (Reflector and Curator)" in metas[0]["user"]
     learning = [c for c in model.calls if c["output"] in (Reflection, Ops)]
