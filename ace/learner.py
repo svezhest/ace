@@ -100,5 +100,8 @@ class Learner:
 
 
 def swap(learner, name=None, **levels):
-    """Ученик с заменёнными уровнями; проверка стыка идёт заново."""
+    """Ученик с заменёнными уровнями; проверка стыка идёт заново. Обёртка (ace/wrap.py) меняет уровни своего
+    ученика."""
+    if not isinstance(learner, Learner):
+        return learner.swap(name, **levels)
     return replace(learner, name=name or learner.name, **levels)
