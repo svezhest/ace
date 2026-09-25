@@ -25,10 +25,14 @@ extract=Reflector(free=True), memory=Playbook(prune=None))`. Вмешатель�
 ace_rewrite; ace_exact и ace_exact_dedup (как в апстриме). В docstring метода — что взято из апстрима и где
 расходимся; все отклонения — в [DEVIATIONS.md](DEVIATIONS.md).
 DC (`ace/methods/dc.py`): dc (DC-Cu: cheatsheet целиком, куратор переписывает), dc_code (с песочницей,
-контейнер на вызов), dc_rs (пары и синтез cheatsheet под вопрос), контроли dc_retrieval и dc_history. TF-GRPO (`ace/methods/tfgrpo.py`, извлечение `ace/extract/tfgrpo.py`):
+контейнер на вызов), dc_rs (пары и синтез cheatsheet под вопрос), контроли dc_retrieval и dc_history.
+TF-GRPO (`ace/methods/tfgrpo.py`, извлечение `ace/extract/tfgrpo.py`):
 в зачёт итоговый агент (T = 0.3, top_p 0.95), группа из 5 при T = 0.7, контраст попыток, план батча раз в 20.
+EvoLib (`ace/methods/evolib.py`, извлечение `ace/extract/evolib.py`): evolib (3 попытки, различие — выборка
+памяти по весу, в зачёт и вердикт группы — голосование; библиотека skills / insights с IG и Future IG,
+слиянием похожих и скрытым лучшим решением вопроса) и evolib_judge (баллы от судьи).
 
-**Идёт переписывание.** SCOPE, EvoLib, MCE, прототип, хуки по ошибкам и гибриды ещё не
+**Идёт переписывание.** SCOPE, MCE, прототип, хуки по ошибкам и гибриды ещё не
 перенесены на уровни: их старый код — в коммите 2c5433e (`git show 2c5433e:ace/methods/scope.py`) и в теге
 `pre-rewrite`. `ablate.py` пока не работает (импортирует старые методы).
 
