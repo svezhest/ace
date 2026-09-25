@@ -24,8 +24,10 @@ extract=Reflector(free=True), memory=Playbook(prune=None))`. Вмешатель�
 Методы (`ace/methods/`): baseline; ace (стенд: рефлектор с метками, куратор операциями, отсев), ace_text,
 ace_rewrite; ace_exact и ace_exact_dedup (как в апстриме). В docstring метода — что взято из апстрима и где
 расходимся; все отклонения — в [DEVIATIONS.md](DEVIATIONS.md).
+DC (`ace/methods/dc.py`): dc (DC-Cu: cheatsheet целиком, куратор переписывает), dc_code (с песочницей,
+контейнер на вызов), dc_rs (пары и синтез cheatsheet под вопрос), контроли dc_retrieval и dc_history.
 
-**Идёт переписывание.** DC, SCOPE, TF-GRPO, EvoLib, MCE, прототип, хуки по ошибкам и гибриды ещё не
+**Идёт переписывание.** SCOPE, TF-GRPO, EvoLib, MCE, прототип, хуки по ошибкам и гибриды ещё не
 перенесены на уровни: их старый код — в коммите 2c5433e (`git show 2c5433e:ace/methods/scope.py`) и в теге
 `pre-rewrite`. `ablate.py` пока не работает (импортирует старые методы).
 
