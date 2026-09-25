@@ -1,6 +1,6 @@
 """Dynamic Cheatsheet (dynamic-cheatsheet: dynamic_cheatsheet/language_model.py, run_benchmark.py; сверка —
 tests/bridge/test_bridge_dc.py и записи живой модели tests/live/test_dc.py). Вердикта и извлечения нет: память
-читает сырое (вход задачи и весь ответ генератора). Решатель у всех — генератор апстрима (show/dc.py: Generator).
+читает сырое (вход задачи и весь ответ генератора). Решатель у всех — генератор апстрима (solver/dc.py: Generator).
 
 dc (DC-Cu, DynamicCheatsheet_Cumulative) — мир документов:
     память      один текст целиком; куратор после каждого вопроса пишет новый (memory/dc.py: Cheatsheet)
@@ -16,11 +16,11 @@ from .. import verdict
 from ..extract import Raw
 from ..learner import Learner, swap
 from ..memory.dc import Cheatsheet, Pairs
-from ..show.dc import Generator, cumulative, history, retrieval, synthesis
+from ..solver.dc import Generator, cumulative, history, retrieval, synthesis
 
-dc = Learner("dc", memory=Cheatsheet(), show=Generator(cumulative), extract=Raw(), verdict=verdict.none)
-dc_code = swap(dc, "dc_code", show=Generator(cumulative, code=True))
+dc = Learner("dc", memory=Cheatsheet(), solver=Generator(cumulative), extract=Raw(), verdict=verdict.none)
+dc_code = swap(dc, "dc_code", solver=Generator(cumulative, code=True))
 
-dc_rs = Learner("dc_rs", memory=Pairs(sheet=True), show=Generator(synthesis), extract=Raw(), verdict=verdict.none)
-dc_retrieval = Learner("dc_retrieval", memory=Pairs(), show=Generator(retrieval), extract=Raw(), verdict=verdict.none)
-dc_history = swap(dc_retrieval, "dc_history", show=Generator(history))
+dc_rs = Learner("dc_rs", memory=Pairs(sheet=True), solver=Generator(synthesis), extract=Raw(), verdict=verdict.none)
+dc_retrieval = Learner("dc_retrieval", memory=Pairs(), solver=Generator(retrieval), extract=Raw(), verdict=verdict.none)
+dc_history = swap(dc_retrieval, "dc_history", solver=Generator(history))

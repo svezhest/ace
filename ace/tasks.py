@@ -8,7 +8,7 @@ hmmt — бенчмарк EvoLib (eval_main.py _build_hmmt_task): MathArena/hmmt
 (93 задачи, в hmmt40 — первые 40), ответ — answer без пробелов по краям; только онлайн, без train и val.
 symptom — бенчмарк MCE (env/symptom_diagnosis апстрима, данные gretelai/symptom_to_diagnosis) целиком, строки как у
 апстрима: train 200, val 50, тест 212; выборки — первые SIZE / VAL_SIZE. Проверка — _normalize апстрима; решатель
-среды апстрима (get_context и промпт диагноза) — у mce (show/mce.py), общий решатель — ответ FINAL ANSWER."""
+среды апстрима (get_context и промпт диагноза) — у mce (solver/mce.py), общий решатель — ответ FINAL ANSWER."""
 import json
 import re
 from dataclasses import dataclass, field

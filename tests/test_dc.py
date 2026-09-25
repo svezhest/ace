@@ -11,7 +11,7 @@ from ace.memory.dc import Cheatsheet, Pairs
 from ace.methods.dc import dc, dc_code, dc_history, dc_retrieval, dc_rs
 from ace.parse import dc_answer
 from ace.render import EMPTY
-from ace.show import dc as show
+from ace.solver import dc as show
 from ace.tasks import TASKS
 
 ITEM = {"context": "What is 2 / 4?", "target": "0.5"}
@@ -48,7 +48,7 @@ def test_answer():
 
 
 def test_generator_prompt():
-    p = dc.show.prompt(Ex(None), Cheatsheet(), ITEM, 0)
+    p = dc.solver.prompt(Ex(None), Cheatsheet(), ITEM, 0)
     call = p.solver.call("")
     assert call.params == {"temperature": 0.0, "max_completion_tokens": 2048}
     assert [m["role"] for m in call.messages] == ["user"]
@@ -59,15 +59,15 @@ def test_generator_prompt():
 def test_cheatsheet_rewrite():
     m = Cheatsheet()
     model = Stub(lambda call: "notes <cheatsheet>\nv1\n</cheatsheet>")
-    p = dc.show.prompt(Ex(None), m, ITEM, 0)
+    p = dc.solver.prompt(Ex(None), m, ITEM, 0)
     m.learn(Ex(model), [extraction(generated(p))])
-    assert m.text == "v1" and dc.show.prompt(Ex(None), m, ITEM, 0).sheet == "v1"
+    assert m.text == "v1" and dc.solver.prompt(Ex(None), m, ITEM, 0).sheet == "v1"
     call = model.calls[0]
     assert call["system"] == "" and p.input in call["user"] and "FINAL ANSWER: 1" in call["user"] and EMPTY in call["user"]
     m.learn(Ex(Stub(lambda call: "no block")), [extraction(generated(p))])
     assert m.text == "v1"
     m.learn(Ex(Stub(lambda call: "<cheatsheet></cheatsheet>")), [extraction(generated(p))])
-    assert m.text == "" and dc.show.prompt(Ex(None), m, ITEM, 0).sheet == ""
+    assert m.text == "" and dc.solver.prompt(Ex(None), m, ITEM, 0).sheet == ""
 
 
 def test_curator_params():
@@ -77,7 +77,7 @@ def test_curator_params():
         def ask(self, call):
             seen.append(call.params)
             return super().ask(call)
-    p = dc.show.prompt(Ex(None), Cheatsheet(), ITEM, 0)
+    p = dc.solver.prompt(Ex(None), Cheatsheet(), ITEM, 0)
     Cheatsheet().learn(Ex(Params(lambda call: "<cheatsheet>v</cheatsheet>")), [extraction(generated(p))])
     assert seen == [{"temperature": 0.0, "max_completion_tokens": 4096}]
 
@@ -96,20 +96,20 @@ def pairs(*questions, sheet=False):
 
 def test_retrieval_and_history(monkeypatch):
     fake_embed(monkeypatch)
-    assert dc_retrieval.show.prompt(Ex(None), pairs(), ITEM, 0).sheet == EMPTY
-    p = dc_retrieval.show.prompt(Ex(None), pairs("q1", "q2", "q3"), ITEM, 0)
+    assert dc_retrieval.solver.prompt(Ex(None), pairs(), ITEM, 0).sheet == EMPTY
+    p = dc_retrieval.solver.prompt(Ex(None), pairs("q1", "q2", "q3"), ITEM, 0)
     assert p.shown == ["r2", "r3", "r1"]
     text = p.sheet
     assert prompts.text("dc_note") in text and "(Similarity: 1.00)" in text
     assert text.index("solution of q2") > text.index("solution of q3") > text.index("solution of q1")     # самая похожая последней
-    h = dc_history.show.prompt(Ex(None), pairs("q1", "q2"), ITEM, 0).sheet
+    h = dc_history.solver.prompt(Ex(None), pairs("q1", "q2"), ITEM, 0).sheet
     assert h.index("q1") < h.index("q2") and "Similarity" not in h
 
 
 def test_upstream_embeddings():
     """Вопросы meb с готовыми эмбеддингами апстрима: близость по ним, BGE-M3 не нужна."""
     qs = [r["context"] for r in TASKS["meb"].load()[:4]]
-    p = dc_retrieval.show.prompt(Ex(None), pairs(*qs[:3]), {"context": qs[3]}, 0)
+    p = dc_retrieval.solver.prompt(Ex(None), pairs(*qs[:3]), {"context": qs[3]}, 0)
     assert len(p.shown) == 3 and "(Similarity: 0." in p.sheet
 
 
@@ -119,7 +119,7 @@ def test_synthesis_kept(monkeypatch):
     fake_embed(monkeypatch)
     m = pairs("q1", sheet=True)
     model = Stub(lambda call: "<cheatsheet>for this question</cheatsheet>")
-    p = dc_rs.show.prompt(Ex(model), m, ITEM, 0)
+    p = dc_rs.solver.prompt(Ex(model), m, ITEM, 0)
     assert p.sheet == "for this question" and "for this question" in p.solver.call("").messages[0]["content"]
     user = model.calls[0]["user"]
     assert "solution of q1" in user and p.input in user and EMPTY in user
@@ -130,7 +130,7 @@ def test_synthesis_kept(monkeypatch):
 
 def test_synthesis_fallback():
     """Без блока <cheatsheet> генератор видит сами пары, и они же сохраняются как cheatsheet (как в апстриме)."""
-    p = dc_rs.show.prompt(Ex(Stub(lambda call: "nothing")), Pairs(sheet=True), ITEM, 0)
+    p = dc_rs.solver.prompt(Ex(Stub(lambda call: "nothing")), Pairs(sheet=True), ITEM, 0)
     assert p.sheet == EMPTY
 
 
@@ -152,14 +152,14 @@ def test_code_rounds(monkeypatch):
     monkeypatch.setattr("ace.env.sandbox.run", fake_run)
     block = "```python\nx = 2\nx * 2\n```\nEXECUTE CODE! trailing"
     model = Stub(lambda call: block)
-    p = dc_code.show.prompt(Ex(None), Cheatsheet(), ITEM, 0)
+    p = dc_code.solver.prompt(Ex(None), Cheatsheet(), ITEM, 0)
     reply = p.solver.talk(model, p.solver.call(""))
     assert ran[0] == ("x = 2\nprint(x * 2)", 3, "/tmp/code.py") and len(model.calls) == 4
     current = "```python\nx = 2\nx * 2\n```\nEXECUTE CODE!\n\nOutput of the Python code above:\n```\n4\n```"
     assert reply.text == "\n\n".join([current] * 5)
     assert model.calls[1]["user"] == prompts.text("dc_proceed")
     assert model.calls[3]["user"] == prompts.text("dc_proceed") + prompts.text("dc_last_round")
-    plain = dc.show.prompt(Ex(None), Cheatsheet(), ITEM, 0)
+    plain = dc.solver.prompt(Ex(None), Cheatsheet(), ITEM, 0)
     assert plain.solver.talk(Stub(lambda call: block), plain.solver.call("")).text == block
 
 

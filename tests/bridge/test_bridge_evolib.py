@@ -22,7 +22,7 @@ from ace.tasks import TASKS
 extract_evolib = importlib.import_module("ace.extract.evolib")
 E = importlib.import_module("ace.methods.evolib")      # модуль: имя в пакете занято самим методом
 MEM = importlib.import_module("ace.memory.evolib")
-SHOW = importlib.import_module("ace.show.evolib")
+SHOW = importlib.import_module("ace.solver.evolib")
 
 PROMPTS, PARSERS, MEMORY, LOOP = (fixture("evolib", n) for n in ("prompts", "parsers", "memory", "loop"))
 REASONING = {"max_completion_tokens": 50000, "reasoning_effort": "high"}
@@ -158,7 +158,7 @@ def test_solver_section(monkeypatch, name, skills, insights):
     if insights:
         m.insights.add("If adding integers, then do check the carry.")
     monkeypatch.setattr(random, "random", lambda: 0.1 if skills else 0.5)
-    call = solver_call(SHOW.SHOW.prompt(Ex(None), m, {"context": "Compute 2+3."}, 0))
+    call = solver_call(SHOW.SAMPLER.prompt(Ex(None), m, {"context": "Compute 2+3."}, 0))
     assert call.messages == [{"role": "user", "content": PROMPTS["filled"][name]}] and call.params == REASONING
 
 # разборщики

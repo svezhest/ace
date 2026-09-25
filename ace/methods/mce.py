@@ -7,8 +7,8 @@ mce = Iterations(базовый агент апстрима) — метод ап
                 следующая — от лучшей по val (wrap/mce.py: Iterations)
     память      папка под-итерации на диске: context/, interfaces/ (у symptom — get_context), навык; на батче —
                 data/train.json и базовый агент Claude SDK с проверкой интерфейсов (memory/mce.py: Folder)
-    показ       среда задачи: у symptom — get_context и промпт диагноза апстрима, у задач стенда — все файлы
-                (show/mce.py)
+    решатель    среда задачи: у symptom — get_context и промпт диагноза апстрима, у задач стенда — общий
+                решатель со всеми файлами (solver/mce.py)
     извлечение  нет: память читает сырое
     когда учится  батч 20; неполный батч применяется в конце прохода
     протокол    офлайн: 3 итерации по train, val после каждой, тест памятью лучшей по val итерации
@@ -26,7 +26,7 @@ from ..learner import Learner, swap
 from ..loop import Protocol
 from ..memory.mce import Context, Folder
 from ..show import Whole
-from ..show.mce import Environment
+from ..solver.mce import Environment
 from ..wrap.mce import META, META_ACE, Iterations, Meta, meta_agent
 from .ace import ace_stand
 
@@ -34,7 +34,7 @@ BATCH, ITERATIONS = 20, 3
 
 PROTOCOL = Protocol(offline=True, epochs=ITERATIONS)     # итерация = проход по train, val после неё
 
-mce = Iterations(Learner("mce", memory=Folder(), show=Environment(), extract=Raw(), every=BATCH, flush=True,
+mce = Iterations(Learner("mce", memory=Folder(), solver=Environment(), extract=Raw(), every=BATCH, flush=True,
                          protocol=PROTOCOL))
 base = Learner("mce_base", memory=Context(), show=Whole(line=render.plain, sep="\n\n"), extract=Raw(), every=BATCH,
                flush=True, protocol=PROTOCOL)

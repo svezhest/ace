@@ -15,7 +15,7 @@ from ace.model import text_reply
 
 DC = importlib.import_module("ace.methods.dc")       # модуль: имя в пакете занято самим методом
 MEM = importlib.import_module("ace.memory.dc")
-SHOW = importlib.import_module("ace.show.dc")
+SHOW = importlib.import_module("ace.solver.dc")
 EXTRACT = importlib.import_module("ace.extract")
 PROMPTS, PARSERS, MEMORY, LOOP = (fixture("dc", level) for level in ("prompts", "parsers", "memory", "loop"))
 CU, RS = LOOP["DynamicCheatsheet_Cumulative"], LOOP["DynamicCheatsheet_RetrievalSynthesis"]

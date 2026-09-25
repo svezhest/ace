@@ -1,4 +1,4 @@
-"""Показ Dynamic Cheatsheet: генератор апстрима целиком (dynamic-cheatsheet: language_model.py advanced_generate и
+"""Решатель Dynamic Cheatsheet: генератор апстрима целиком (dynamic-cheatsheet: language_model.py advanced_generate и
 generate, run_benchmark.py; промпты dc_generator.j2, dc_synth.j2, dc_note.j2 дословно).
 
 Generator — решатель попытки: одно сообщение user из generator_prompt.txt с cheatsheet и входом задачи, как его
@@ -21,7 +21,8 @@ from ..env import sandbox
 from ..loop import Prompt, Solver
 from ..memory.dc import CHEATSHEET, MAX_TOKENS, TOKENS, dc_params
 from ..model import Call, Reply, messages
-from . import Show, TopK, Whole
+from ..show import TopK, Whole
+from . import OwnSolver
 
 GENERATOR = prompts.load("dc_generator")
 SYNTH = prompts.load("dc_synth")
@@ -47,7 +48,7 @@ class DCPrompt(Prompt):
     sheet: str = ""             # что стояло в [[CHEATSHEET]]: DC-RS хранит его как прошлый cheatsheet
 
 
-class Generator(Show):
+class Generator(OwnSolver):
     """Решатель DC апстрима; sheet(ex, память, item, вход) -> (текст для [[CHEATSHEET]], показанные записи)."""
     def __init__(self, sheet, code=False):
         self.sheet, self.code = sheet, code

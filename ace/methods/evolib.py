@@ -7,8 +7,8 @@
     память      библиотека skills и insights с Future IG и IG при рождении, слиянием похожих и скрытым лучшим
                 решением вопроса; улучшает ли новое решение, решает память, при споре — сравнение решений моделью
                 (memory/evolib.py)
-    показ       решатель апстрима: выборка по весу из ветки skills или insights в промпте HMMT_SOLVER_PROMPT,
-                решение подзадачами (show/evolib.py)
+    решатель    апстрима: выборка по весу из ветки skills или insights в промпте HMMT_SOLVER_PROMPT,
+                решение подзадачами (solver/evolib.py)
 Параметры вызовов у hmmt — как у апстрима на его модели (reasoning API), у задач стенда — стенда.
 evolib_judge — вариант стенда: баллы от судьи (вердикт попытки judge), insight только при неудаче лучшей и с её
     вердиктом в промпте («Evaluation: wrong», как Test Result кодовых задач апстрима), без деления баллов и без
@@ -19,10 +19,10 @@ from ..extract.evolib import Gains
 from ..learner import Learner, swap
 from ..loop import Attempts, vote
 from ..memory.evolib import Library
-from ..show.evolib import SHOW
+from ..solver.evolib import SAMPLER
 
 ATTEMPTS = 3                # k_q_per_problem
 
-evolib = Learner("evolib", memory=Library(), show=SHOW, extract=Gains(), attempts=Attempts(ATTEMPTS, pick=vote),
+evolib = Learner("evolib", memory=Library(), solver=SAMPLER, extract=Gains(), attempts=Attempts(ATTEMPTS, pick=vote),
                  verdict=verdict.none, group_verdict=verdict.vote)
 evolib_judge = swap(evolib, "evolib_judge", extract=Gains(evaluated=True), verdict=verdict.judge, group_verdict=verdict.none)

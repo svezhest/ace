@@ -1,4 +1,4 @@
-"""Показ TF-GRPO — агент апстрима целиком (youtu-agent: configs/agents/practice/math_agent.yaml, SimpleAgent на
+"""Решатель TF-GRPO — агент апстрима целиком (youtu-agent: configs/agents/practice/math_agent.yaml, SimpleAgent на
 openai-agents; промпты tfgrpo_agent.j2, tfgrpo_answer_dapo.j2, tfgrpo_problem.j2 дословно).
 
     обучение    агент rollout: инструкции без опытов, в user — задача с опытами (PROBLEM_WITH_EXPERIENCE_TEMPLATE,
@@ -19,7 +19,7 @@ from ..env.tfgrpo import Kernel
 from ..loop import Prompt, Solver
 from ..model import Call, Reply, messages
 from ..tasks import final_answer
-from . import Show
+from . import OwnSolver
 
 TEMPLATE, PROBLEM = prompts.load("tfgrpo_agent"), prompts.load("tfgrpo_problem")
 INTRO = "\n\n" + prompts.text("tfgrpo_experiences_intro")
@@ -85,7 +85,7 @@ def talk(model, call):
     return Reply("", "")
 
 
-class Agent(Show):
+class Agent(OwnSolver):
     def prompt(self, ex, memory, item, k):
         recs = memory.records()
         if ex.training:

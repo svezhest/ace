@@ -20,7 +20,7 @@ from ace.loop import run
 from ace.memory.dc import Cheatsheet, Pairs
 from ace.methods.dc import dc, dc_code, dc_history, dc_retrieval, dc_rs
 from ace.model import Model
-from ace.show import dc as show
+from ace.solver import dc as show
 from ace.tasks import TASKS
 from tools.record.replay import Replayer
 

@@ -19,7 +19,7 @@ from ace.tasks import TASKS
 
 M = importlib.import_module("ace.methods.tfgrpo")      # имя tfgrpo в пакете занято самим методом
 MEM = importlib.import_module("ace.memory.tfgrpo")
-SHOW = importlib.import_module("ace.show.tfgrpo")
+SHOW = importlib.import_module("ace.solver.tfgrpo")
 
 PROMPTS, PARSERS, MEMORY = fixture("tfgrpo", "prompts"), fixture("tfgrpo", "parsers"), fixture("tfgrpo", "memory")
 LOOP, CONFIG = fixture("tfgrpo", "loop"), fixture("tfgrpo", "config")
@@ -288,10 +288,14 @@ def test_settings():
     final = yaml.safe_load(cfg["final_agent_yaml"])["model"]["model_settings"]
     at = M.tfgrpo.attempts
     assert at.n == M.GROUP == practice["grpo_n"] == built["practice_pass_k"]
-    assert [at.temperature(k) for k in range(at.n)] == [practice["rollout_temperature"]] * M.GROUP
+    # температуру и top_p попыток ставит агент (решатель метода), попытки их не меняют
+    rollout = Ex(None)
+    rollout.task, rollout.training = TASKS["dapo"], True
+    sent = [SHOW.AGENT.prompt(rollout, library([]), {"context": "q"}, k).solver.call("").params for k in range(at.n)]
+    assert [p["temperature"] for p in sent] == [practice["rollout_temperature"]] * M.GROUP
     assert built["practice_rollout_temperature"] == SHOW.ROLLOUT_TEMPERATURE
     # rollout меняет у агента только температуру: top_p итогового агента у всех попыток
-    assert [at.top_p(k) for k in range(at.n)] == [cfg["loaded"]["agent_top_p"]] * at.n == [SHOW.TOP_P] * at.n
+    assert [p["top_p"] for p in sent] == [cfg["loaded"]["agent_top_p"]] * at.n == [SHOW.TOP_P] * at.n
     assert built["original_temperature"] == final["temperature"] == SHOW.TEMPERATURE and final["top_p"] == SHOW.TOP_P
     assert T.NUM == practice["num_experiences_per_query"]
     assert practice["given_ground_truth"] and M.tfgrpo.verdict is verdict.golden

@@ -14,12 +14,12 @@ c4b7a7c (MCE). Тесты — `uv run pytest tests/bridge`.
 S1. **Решатель общий для всех методов, кроме ace, DC, TF-GRPO, EvoLib и mce на symptom.** Методы сравниваются по памяти при одном решателе:
     системный промпт задачи, память — в нём же (после «What you learned so far:» или раздел метода), вопрос — весь
     вход задачи, ответ — строка FINAL ANSWER (`tasks.final_answer`), код — инструмент `run_python`, траектория для
-    обучения — наш транскрипт (`render.transcript`). ace идёт генератором апстрима целиком (`show/ace.py`:
+    обучения — наш транскрипт (`render.transcript`). ace идёт генератором апстрима целиком (`solver/ace.py`:
     GENERATOR, свой решатель попытки `loop.Solver`); общий решатель с playbook — вариант ace_used. Все
-    варианты DC — генератором апстрима (`show/dc.py`: Generator — `generator_prompt.txt`, вход задачи как в
+    варианты DC — генератором апстрима (`solver/dc.py`: Generator — `generator_prompt.txt`, вход задачи как в
     `run_benchmark.py`, ответ `extract_answer`, у dc_code код по «EXECUTE CODE!»); TF-GRPO — агентом апстрима
-    (`show/tfgrpo.py`: инструкции `math_agent.yaml`, инструмент execute_python_code, траектория — repr списка
-    сообщений); EvoLib — решателем апстрима (`show/evolib.py`: `HMMT_SOLVER_PROMPT` с выборкой из библиотеки, ответ
+    (`solver/tfgrpo.py`: инструкции `math_agent.yaml`, инструмент execute_python_code, траектория — repr списка
+    сообщений); EvoLib — решателем апстрима (`solver/evolib.py`: `HMMT_SOLVER_PROMPT` с выборкой из библиотеки, ответ
     у hmmt — первый `<answer>` без `$`, у задач стенда — роль и инструкция задачи и строка FINAL ANSWER (S2)).
 S2. **Задачи стенда, а не бенчмарки апстримов.** Тексты апстримов, привязанные к домену их бенчмарка, заменены
     текстами наших задач, форма та же: цели агента и обучения TF-GRPO (`tfgrpo_objective_*.j2`,
@@ -97,7 +97,7 @@ DC4. **dc_code: код модели исполняется в песочнице
     (`utils/execute_code.py`) пишет код во временный файл и запускает его `python3` хоста с пределом 3 с; у нас —
     тот же файл в одноразовом контейнере без сети (`env/sandbox.py`: python 3.12 с numpy и sympy, `/tmp/code.py`,
     предел 3 с, stdout и stderr режутся до 20 + 20 строк и 64 КБ). Разбор блока, обёртка print и сообщения — как
-    у апстрима (`show/dc.py`: run_block). Расходится: в traceback наш файл вместо случайного `/tmp/tmpXXXXXXXX.py`
+    у апстрима (`solver/dc.py`: run_block). Расходится: в traceback наш файл вместо случайного `/tmp/tmpXXXXXXXX.py`
     (у апстрима он невоспроизводим и сам), набор библиотек и версия python, очень длинный вывод. Причина: код
     модели — недоверенный. Запись живой модели снята с апстрима целиком в контейнере (`bridge/live/dc_code`);
     при её воспроизведении вывод исполнения берётся из записи, вывод песочницы на тех же блоках сверяется отдельно.

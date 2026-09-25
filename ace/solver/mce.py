@@ -1,4 +1,4 @@
-"""Показ MCE апстрима (mce/eval.py batch_evaluate, env/*: aevaluate): решатель — среда задачи.
+"""Решатель MCE апстрима — среда задачи (mce/eval.py batch_evaluate, env/*: aevaluate).
 
 У задачи с интерфейсами (symptom: get_context) — среда апстрима целиком: контекст — get_context(вопрос) из
 interfaces/ папки под-итерации (нет интерфейса или он упал — пустой), промпт диагноза одним сообщением user при
@@ -8,13 +8,14 @@ from .. import prompts, render
 from ..loop import Prompt, Solver
 from ..model import Call, messages
 from ..tasks import symptom_diagnosis
-from . import Show, Whole
+from ..show import Whole
+from . import OwnSolver
 
 DIAGNOSIS = prompts.load("symptom_diagnosis")
 PARAMS = {"temperature": 0.0}       # LLMClient апстрима: temperature=0.0, без max_tokens
 
 
-class Environment(Show):
+class Environment(OwnSolver):
     def __init__(self):
         self.files = Whole(line=render.plain, sep="\n\n")
 

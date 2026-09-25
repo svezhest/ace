@@ -13,7 +13,7 @@ ace_stand_rewrite — куратор переписывает всю памят�
 ace — как в апстриме (ace/ace/ace.py, core/, playbook_utils.py; сверка — tests/bridge/test_bridge_ace.py и
     запись живой модели tests/live/test_ace.py):
     решатель    генератор апстрима: playbook, рефлексия, вопрос и context одним сообщением, ответ — final_answer
-                из JSON (show/ace.py: GENERATOR)
+                из JSON (solver/ace.py: GENERATOR)
     извлечение  диагноз с метками, при неверном ответе до 3 раундов с новой попыткой; использованные пункты —
                 регулярка апстрима по ответу генератора (extract/ace.py: Diagnose)
     память      playbook из 7 разделов, пункты только добавляются; куратор (последняя рефлексия, контекст вопроса,
@@ -28,7 +28,8 @@ from ..extract.ace import Diagnose, Reflector, named
 from ..learner import Learner, swap
 from ..loop import Protocol
 from ..memory.ace import DEDUP, Playbook, SectionedPlaybook, curate_rewrite
-from ..show.ace import GENERATOR, PLAYBOOK
+from ..show.ace import PLAYBOOK
+from ..solver.ace import GENERATOR
 
 ace_stand = Learner("ace_stand", memory=Playbook(), extract=Reflector())
 ace_stand_text = swap(ace_stand, "ace_stand_text", extract=Reflector(free=True), memory=Playbook(prune=None))
@@ -36,7 +37,7 @@ ace_stand_rewrite = swap(ace_stand, "ace_stand_rewrite", memory=Playbook(curate_
 
 WINDOW = 15                 # --online_eval_frequency апстрима
 
-ace = Learner("ace", memory=SectionedPlaybook(), show=GENERATOR, extract=Diagnose(),
+ace = Learner("ace", memory=SectionedPlaybook(), solver=GENERATOR, extract=Diagnose(),
               protocol=Protocol(window=WINDOW, recheck=True))
-ace_used = swap(ace, "ace_used", show=PLAYBOOK, extract=Diagnose(ids=named), protocol=Protocol())
+ace_used = swap(ace, "ace_used", solver=None, show=PLAYBOOK, extract=Diagnose(ids=named), protocol=Protocol())
 ace_dedup = swap(ace, "ace_dedup", memory=SectionedPlaybook(dedup=DEDUP))

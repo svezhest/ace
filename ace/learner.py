@@ -5,7 +5,8 @@
     вердикт группы      group_verdict: vote | none                              verdict.py
     извлечение          extract(ex, group, memory) -> Extraction; gives         extract/
     память              контейнер + learn(ex, extractions); requires            memory/
-    показ               show.prompt -> Prompt, show.on_step -> Patch            show/
+    решатель            solver: None — общий (показ, среда, шаги); свой решатель метода   solver/
+    показ               show.prompt -> Prompt, show.on_step -> Patch; только у общего решателя   show/
     когда учится        every (раз в сколько вопросов), flush (неполный батч в конце прохода)
     протокол            protocol: Protocol(offline, epochs, window, recheck, final) — по апстриму метода  loop.py
     среда попытки       env: Env | Sandbox(per="call" | "attempt")              env/
@@ -23,16 +24,19 @@ from dataclasses import dataclass, field, replace
 from . import verdict as verdicts
 from .env import Env
 from .extract import Contract, missing
-from .loop import Attempts, Protocol
+from .loop import Attempts, Protocol, at_zero, default
 from .memory import Lessons
 from .show import Show, Whole
+
+WHOLE = Whole()
 
 
 @dataclass
 class Learner:
     name: str
     memory: object = field(default_factory=Lessons)
-    show: Show = field(default_factory=Whole)
+    solver: object = None       # свой решатель метода (solver/); None — общий
+    show: Show = None           # показ общего решателя; None — Whole()
     extract: object = None
     attempts: Attempts = field(default_factory=Attempts)
     verdict: callable = verdicts.golden
@@ -48,9 +52,27 @@ class Learner:
 
     def __post_init__(self):
         self.protocol.check(self.name)
+        self.check_solver()
         lack = missing(self.memory, self.extract)
         if lack:
             raise Contract(f"{self.name}: память требует от извлечения {', '.join(sorted(lack))}, а оно этого не даёт")
+
+    def check_solver(self):
+        """Свой решатель сам показывает память и ставит параметры вызова: уровни, которые при нём не действуют, —
+        ошибка сборки, а не молча выключенная ступень абляции."""
+        if self.solver is None:
+            return
+        dead = [name for name, on in (
+            ("показ", self.show is not None),
+            ("температура и top_p попыток", self.attempts.temperature is not at_zero or self.attempts.top_p is not default),
+            ("среда", bool(self.env.tools or self.env.hint)),
+            ("извлечение на шаге", self.extract is not None and self.extract.steps)) if on]
+        if dead:
+            raise ValueError(f"{self.name}: при своём решателе метода не действуют: {', '.join(dead)} "
+                             "(меняются параметры решателя)")
+
+    def viewer(self):
+        return self.show or WHOLE
 
     # хуки масштабов
 
@@ -58,9 +80,10 @@ class Learner:
         """Промпт попытки k; memory — показать другую версию памяти (новая попытка из извлечения)."""
         memory = self.memory if memory is None else memory
         memory.begin(k)
-        p = self.show.prompt(ex, memory, item, k)
-        if p.solver is None:            # свой решатель метода ставит параметры сам
-            p.temperature, p.top_p = self.attempts.temperature(k), self.attempts.top_p(k)
+        if self.solver is not None:
+            return self.solver.prompt(ex, memory, item, k)
+        p = self.viewer().prompt(ex, memory, item, k)
+        p.temperature, p.top_p = self.attempts.temperature(k), self.attempts.top_p(k)
         return p
 
     def sample(self, ex, split, n):
@@ -72,7 +95,7 @@ class Learner:
             x = self.extract.step(ex, attempt, step, self.memory)
             if x:
                 self.memory.learn(ex, [x])
-        return self.show.on_step(ex, self.memory, attempt, step)
+        return self.viewer().on_step(ex, self.memory, attempt, step)
 
     def on_attempt(self, ex, episode):
         pass
@@ -104,7 +127,7 @@ class Learner:
     # протокол и обёртки
 
     def watches_steps(self):
-        return self.show.watches_steps
+        return self.solver is None and self.viewer().watches_steps
 
     def snapshot(self):
         """Версия памяти для отката (лучшая по val, Gate, Meta)."""
@@ -115,7 +138,7 @@ class Learner:
 
     def key(self):
         """Ключ кэша val; при случайном показе его нет."""
-        return None if self.show.random else self.memory.key()
+        return None if (self.solver or self.viewer()).random else self.memory.key()
 
     def dump(self):
         return self.memory.dump()

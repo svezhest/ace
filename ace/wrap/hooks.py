@@ -26,6 +26,10 @@ class Hooks(Wrapper):
         if lack:
             raise ValueError(f"{self.name}: память хуков требует {', '.join(sorted(lack))}")
 
+    def check(self):
+        if self.inner.solver is not None:
+            raise ValueError(f"{self.name}: хуки по ошибкам инструментов при своём решателе метода не действуют")
+
     def prompt(self, ex, item, k, memory=None):
         p = self.inner.prompt(ex, item, k, memory)
         if self.show_at == "system":

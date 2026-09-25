@@ -1,4 +1,4 @@
-"""Показ EvoLib — решатель апстрима целиком (EvoLib/EvoLib: evolib_agent.py _sample_from_library и run_iteration,
+"""Решатель EvoLib апстрима целиком (EvoLib/EvoLib: evolib_agent.py _sample_from_library и run_iteration,
 eval_main.py HMMT_SOLVER_PROMPT; промпты evolib_solver.j2, evolib_instruction_hmmt.j2, evolib_format_hmmt.j2 дословно).
 
 Выборка из библиотеки на каждую попытку: одно случайное число p; p < 0.4 и skills есть — до 10 skills, иначе p < 0.7
@@ -20,7 +20,7 @@ from ..extract.evolib import EPS, generate, llm_params
 from ..loop import Prompt, Solver
 from ..model import Call, messages
 from ..tasks import final_answer
-from . import Show
+from . import OwnSolver
 
 K, W_IG = 10, 1.0
 LEGACY_W_IG = 100           # при w_IG от 100 апстрим не прибавляет Future IG к весу skill («legacy defaults»)
@@ -56,7 +56,7 @@ def solver_texts(task):
             final_answer)
 
 
-class Sampler(Show):
+class Sampler(OwnSolver):
     """k записей ветки, вес skill с w_ig; temperature(k) — температура попытки k (ступень абляции), None — нет."""
     random = True
 
@@ -90,4 +90,4 @@ class Sampler(Show):
         return Prompt(shown=[r.id for r in shown], temperature=p.get("temperature", 0), solver=Solver(call, answer, generate))
 
 
-SHOW = Sampler()
+SAMPLER = Sampler()

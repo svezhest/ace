@@ -10,7 +10,7 @@ from ace.extract.tfgrpo import Contrast
 from ace.loop import Group, run
 from ace.memory.tfgrpo import Library
 from ace.methods.tfgrpo import GROUP, tfgrpo
-from ace.show.tfgrpo import AGENT
+from ace.solver.tfgrpo import AGENT
 
 
 class Ex:

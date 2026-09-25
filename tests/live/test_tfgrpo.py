@@ -22,7 +22,7 @@ from ace.loop import run
 from ace.memory.tfgrpo import Library
 from ace.methods.tfgrpo import tfgrpo
 from ace.model import Model
-from ace.show import tfgrpo as show
+from ace.solver import tfgrpo as show
 from ace.tasks import TASKS
 from tools.record.replay import Replayer
 

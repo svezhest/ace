@@ -341,3 +341,27 @@ def test_results_folder():
     from ace.loop import folder
     path = folder(TASK, 40, Learner("x", protocol=Protocol(offline=True, epochs=3)), Model("m", backend="wire"))
     assert path.parts[-3:] == ("formula40", "x", "offline-e3_m_wire")
+
+
+def test_own_solver_dead_levels():
+    """При своём решателе метода показ, температура попыток, среда, извлечение на шаге и хуки не действуют —
+    ошибка сборки; параметры решателя действуют (температура EvoLib — у Sampler)."""
+    from ace.env import Sandbox
+    from ace.extract.scope import Rules
+    from ace.methods import METHODS
+    from ace.show import Catalog
+    from ace.solver.evolib import Sampler
+    from ace.wrap.hooks import Hooks
+    dc, ace, tfgrpo, evolib = (METHODS[n] for n in ("dc", "ace", "tfgrpo", "evolib"))
+    for levels, dead in ((dict(env=Sandbox()), "среда"), (dict(show=Catalog()), "показ"),
+                         (dict(attempts=Attempts(3, lambda k: 0.7)), "температура"), (dict(extract=Rules()), "на шаге")):
+        with pytest.raises(ValueError, match=dead):
+            swap(dc, **levels)
+    with pytest.raises(ValueError, match="температура"):
+        swap(tfgrpo, attempts=Attempts(5, lambda k: 0.7))
+    with pytest.raises(ValueError, match="хуки"):
+        Hooks(ace)
+    t07 = swap(evolib, solver=Sampler(temperature=lambda k: 0 if k == 0 else 0.7))
+    model = Stub()
+    run(TASK, t07, model, 1)
+    assert [c["temperature"] for c in model.calls[:3]] == [0, 0.7, 0.7]

@@ -13,7 +13,7 @@ from ace.learner import Learner
 from ace.loop import Group, run
 from ace.memory.evolib import Library, Skill
 from ace.methods.evolib import evolib_judge
-from ace.show.evolib import SHOW, insight_weight, skill_weight
+from ace.solver.evolib import SAMPLER, insight_weight, skill_weight
 
 SKILL = "<subtask>\n<description>{}</description>\n<solution>s</solution>\n<result>r</result>\n</subtask>"
 
@@ -146,12 +146,12 @@ def test_weights_and_show():
     m = Library()
     m.insights.add("If a, then b.")
     random.seed(1)                  # первое число 0.13: ветка skills пуста, ход переходит к insights
-    p = SHOW.prompt(Ex(Stub()), m, {"context": "q"}, 0)
+    p = SAMPLER.prompt(Ex(Stub()), m, {"context": "q"}, 0)
     user = p.solver.call("").messages[0]["content"]
     assert "Problem: q\n\nHere are some insights that may help you solve the problem:\nIf a, then b.\n" in user
-    assert p.shown == ["r1"] and SHOW.random and Learner("x", show=SHOW).key() is None
+    assert p.shown == ["r1"] and SAMPLER.random and Learner("x", solver=SAMPLER).key() is None
     random.seed(0)                  # первое число 0.84: выше обоих порогов — ничего
-    assert SHOW.prompt(Ex(Stub()), m, {"context": "q"}, 0).shown == []
+    assert SAMPLER.prompt(Ex(Stub()), m, {"context": "q"}, 0).shown == []
 
 
 def test_judge_after_each_attempt():

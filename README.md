@@ -11,7 +11,8 @@
 | вердикт попытки и группы | `ace/verdict.py` |
 | извлечение | `ace/extract/<метод>.py` |
 | память | `ace/memory/<метод>.py` (контейнеры — `lessons.py`, `documents.py`) |
-| показ | `ace/show/<метод>.py` (общие варианты — `ace/show/__init__.py`) |
+| решатель: общий или решатель апстрима метода (`learner.solver`) | `ace/solver/<метод>.py` |
+| показ (у общего решателя) | `ace/show/` |
 | когда учится, сборка (`Learner`, `swap`) | `ace/learner.py` |
 | среда попытки (песочница) | `ace/env/` |
 | мета: Gate, Meta (MCE), Hooks | `ace/wrap/` |

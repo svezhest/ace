@@ -69,6 +69,7 @@ def meaningful(c):
 
 class Rules(Extractor):
     gives = frozenset({CONFIDENCE, DOMAIN, RATIONALE, ATTEMPT})
+    steps = True
 
     def __init__(self, n=1):
         self.n = n

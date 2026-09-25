@@ -48,6 +48,7 @@ class Extraction:
 class Extractor:
     gives = frozenset()
     scale = "question"
+    steps = False               # извлекает и на шаге попытки (step)
 
     def __call__(self, ex, group, memory):
         raise NotImplementedError
