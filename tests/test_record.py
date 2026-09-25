@@ -1,4 +1,4 @@
-"""Запись и воспроизведение на фейковом апстриме: uv run pytest -q tools/record"""
+"""Запись и воспроизведение (tools/record) на фейковом апстриме."""
 import json
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
