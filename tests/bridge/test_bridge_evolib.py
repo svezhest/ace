@@ -98,7 +98,7 @@ class Task:
     name, system, instr = "hmmt", "You solve problems.", "Solve the problem."
 
     def __init__(self, problems):
-        self.items = [dict(context=p, target=a) for p, a in problems]
+        self.items = [dict(question=p, target=a) for p, a in problems]
 
     def load(self, split="", size=None):
         return self.items
@@ -160,7 +160,7 @@ def test_solver_section(monkeypatch, name, skills, insights):
     if insights:
         m.insights.add("If adding integers, then do check the carry.")
     monkeypatch.setattr(random, "random", lambda: 0.1 if skills else 0.5)
-    call = solver_call(SHOW.SAMPLER.prompt(Ex(None), m, {"context": "Compute 2+3."}, 0))
+    call = solver_call(SHOW.SAMPLER.prompt(Ex(None), m, {"question": "Compute 2+3."}, 0))
     assert call.messages == [{"role": "user", "content": PROMPTS["filled"][name]}] and call.params == REASONING
 
 # разборщики
@@ -273,7 +273,7 @@ def test_sample_from_library(monkeypatch, case):
     for run_ in MEMORY["sample_from_library"][case]:
         random.seed(run_["seed"])
         log.clear()
-        p = show.prompt(Ex(None), m, {"context": "q"}, 0)
+        p = show.prompt(Ex(None), m, {"question": "q"}, 0)
         texts = [m.get(i).text for i in p.shown]
         assert (texts if m.skills.get(p.shown[0] if p.shown else "") else []) == run_["skills"]
         assert (texts if m.insights.get(p.shown[0] if p.shown else "") else []) == run_["insights"]

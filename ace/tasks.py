@@ -49,7 +49,7 @@ class Task:
         if path is None:
             raise FileNotFoundError(f"{self.name}: нет выборки {split or 'test'} на {size} вопросов в {config.DATA}")
         rows = [json.loads(l) for l in path.open() if l.strip()]
-        items = [{"context": r.get("context") or r.get("input") or r["question"], "target": r.get("target", r.get("answer"))}
+        items = [{"question": r.get("context") or r.get("input") or r["question"], "target": r.get("target", r.get("answer"))}
                  for r in rows]
         if len(items) < size and not whole:
             raise ValueError(f"{self.name}: в {path.name} {len(items)} вопросов, а нужно {size}")

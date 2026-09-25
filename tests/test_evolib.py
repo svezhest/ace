@@ -147,12 +147,12 @@ def test_weights_and_show():
     m = Library()
     m.insights.add("If a, then b.")
     random.seed(1)                  # первое число 0.13: ветка skills пуста, ход переходит к insights
-    p = SAMPLER.prompt(Ex(Stub()), m, {"context": "q"}, 0)
+    p = SAMPLER.prompt(Ex(Stub()), m, {"question": "q"}, 0)
     user = p.solver.call("").messages[0]["content"]
     assert "Problem: q\n\nHere are some insights that may help you solve the problem:\nIf a, then b.\n" in user
     assert p.shown == ["r1"] and SAMPLER.random and swap(evolib, solver=SAMPLER).key() is None
     random.seed(0)                  # первое число 0.84: выше обоих порогов — ничего
-    assert SAMPLER.prompt(Ex(Stub()), m, {"context": "q"}, 0).shown == []
+    assert SAMPLER.prompt(Ex(Stub()), m, {"question": "q"}, 0).shown == []
 
 
 def test_judge_after_each_attempt():

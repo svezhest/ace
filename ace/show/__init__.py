@@ -72,7 +72,7 @@ class Scored:
 
 
 def question(item):
-    return item["context"]
+    return item["question"]
 
 
 class TopK(Whole):

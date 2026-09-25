@@ -113,7 +113,7 @@ def test_outcome_by_next_response():
 def test_system_variant():
     h = Hooks(Learner("x"), learn="raw", show="system")
     h.hooks.add("Check the denominator.", trigger="ZeroDivisionError")
-    p = h.prompt(Ex(), {"context": "q"}, 0)
+    p = h.prompt(Ex(), {"question": "q"}, 0)
     assert "Known fixes for tool errors" in p.system and "- trigger: ZeroDivisionError" in p.system and p.shown == ["h1"]
     a = Attempt("q", 0, True, p, "SYS")
     a.steps.append(FAIL)

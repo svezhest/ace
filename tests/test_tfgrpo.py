@@ -100,7 +100,7 @@ def test_plan_and_labels():
     table = model.calls[0]["user"]
     assert "Experience G1:\nContent: B: b.\nRelated Operations:" in table and "Experience G0:\nContent: A: a.\nNo related" in table
     assert [(r.id, r.text) for r in m.records()] == [("r4", "A: a2."), ("r2", "B: b."), ("r5", "D: d.")]
-    system = AGENT.prompt(Ex(model, training=False), m, {"context": "q"}, 0).solver.call("").messages[0]["content"]
+    system = AGENT.prompt(Ex(model, training=False), m, {"question": "q"}, 0).solver.call("").messages[0]["content"]
     assert system.endswith("experiences:\n[G0]. A: a2.\n[G1]. B: b.\n[G2]. D: d.")
 
 
@@ -122,7 +122,7 @@ def test_attempts_and_batch():
     assert [(c["temperature"], c["top_p"]) for c in agent] == [(0.7, 0.95)] * (2 * GROUP + 2)
     assert all(c["user"].startswith("Please solve the problem:\n") and c["user"].endswith("experiences:\nNone")
                for c in agent[:2 * GROUP])
-    assert [c["user"] for c in agent[2 * GROUP:]] == [r["context"] for r in TASK.load()[:2]]
+    assert [c["user"] for c in agent[2 * GROUP:]] == [r["question"] for r in TASK.load()[:2]]
     assert agent[0]["system"].startswith(TASK.system + "\n\nSolve the following problem step by step.")
     assert summary["correct"] == 2 and summary["n"] == 2
     assert not any(c["user"].startswith("<Experiences and Proposed Operations>") for c in model.calls)

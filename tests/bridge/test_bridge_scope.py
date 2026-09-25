@@ -389,7 +389,7 @@ def test_limit_per_agent_across_tasks():
     learner = Learner("scope", memory=memory, show=scope.show, extract=Rules())
     got = []
     for i, k in [(i, 0) for i in range(22)] + [(99, 1)]:
-        learner.prompt(ex(model), {"context": TASK}, k)
+        learner.prompt(ex(model), {"question": TASK}, k)
         ep = Episode(TASK, k, Prompt(), "x", "x", f"n{i}", [], False, [], [], [], ok=False, target="t", system=BASE)
         learner.on_question(ex(model), Group(TASK, [ep], target="t"))
         learner.on_batch(ex(model), [])
@@ -430,7 +430,7 @@ def run_steps(learner, model, steps):
     out = []
     for step in steps:
         n = len(model.calls)
-        p = learner.prompt(ex(model), {"context": TASK}, 0)
+        p = learner.prompt(ex(model), {"question": TASK}, 0)
         err = step["error"]
         answer, target = (re.findall(r"'([^']*)'", err) if err else ["", ""])
         out_text = LOOP_OUTPUT[step["task_id"]]
@@ -478,7 +478,7 @@ def test_loop():
     book = memory.book(0)
     assert book.accepted == LOOP["run1"]["applied_rules_count"][AGENT]
     # второй прогон апстрима: strategic подгружены с диска, счётчик принятых новый
-    assert BASE + learner.prompt(ex(model), {"context": TASK}, 0).system == LOOP["run2"]["initial_prompt"]
+    assert BASE + learner.prompt(ex(model), {"question": TASK}, 0).system == LOOP["run2"]["initial_prompt"]
     fresh = Perspectives()
     fresh.book(0).domains = book.domains
     learner2 = Learner("scope", memory=fresh, show=scope.show, extract=Rules())

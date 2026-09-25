@@ -111,7 +111,7 @@ class Fake:
 
 
 task = TASKS["formula"]
-targets = {r["context"]: r["target"] for s in ("", "train", "val") for r in task.load(s)}
+targets = {r["question"]: r["target"] for s in ("", "train", "val") for r in task.load(s)}
 # батч 2 и офлайн, чтобы на 4 задачах сработали события батча и прохода
 special = {"tfgrpo": dict(every=2), "mce_fs": dict(every=2, protocol=Protocol(offline=True, epochs=2)),
            "mce_ace_stand": dict(every=2, protocol=Protocol(offline=True, epochs=2))}

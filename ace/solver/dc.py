@@ -51,7 +51,7 @@ class Generator(OwnSolver):
         self.reads = READS.get(sheet, ())
 
     def prompt(self, ex, memory, item, k):
-        question = dc_input(ex.task.name, ex.i, item["context"])
+        question = dc_input(ex.task.name, ex.i, item["question"])
         text, recs = self.sheet(ex, memory, item, question)
 
         def call(note):

@@ -246,7 +246,7 @@ def test_loop(tmp_path):
     под-итераций, что видит каждый агент (без interfaces/ и utils/), сводки train.json (только текущий батч),
     evaluations.json и база навыков (кроме долей верных: данные другие), с какой папки начинается итерация."""
     task = Small("formula")
-    targets = {r["context"]: r["target"] for s in ("", "train", "val") for r in task.load(s)}
+    targets = {r["question"]: r["target"] for s in ("", "train", "val") for r in task.load(s)}
     model, history = Agents(targets), []
 
     class Spy(Meta):

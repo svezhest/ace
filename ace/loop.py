@@ -199,10 +199,10 @@ class Experiment:
         if prompt.solver is not None:
             return self.solved(item, k, prompt)
         env = self.learner.env.open()
-        a = Attempt(item["context"], k, self.training, prompt, self.task.system + env.hint + prompt.system)
+        a = Attempt(item["question"], k, self.training, prompt, self.task.system + env.hint + prompt.system)
         try:
             tools = env.tools + prompt.tools
-            reply = self.model.ask(Call(messages(render.user_message(self.task.instr, item["context"], prompt.note), a.system),
+            reply = self.model.ask(Call(messages(render.user_message(self.task.instr, item["question"], prompt.note), a.system),
                                         params(prompt.temperature, prompt.top_p), tools=tools, deps=prompt.deps,
                                         rounds=env.rounds + prompt.rounds,
                                         on_step=self.stepper(a) if tools and self.learner.watches_steps() else None))
@@ -221,7 +221,7 @@ class Experiment:
         call = solver.call(prompt.note)
         reply = solver.talk(self.model, call) if solver.talk else self.model.ask(call)
         final = reply.output or ""
-        ep = Episode(item["context"], k, prompt, reply.text, final, solver.answer(final), [], reply.truncated,
+        ep = Episode(item["question"], k, prompt, reply.text, final, solver.answer(final), [], reply.truncated,
                      [], [], [], outcome=reply.outcome)
         self.learner.verdict(self, ep, item["target"])
         return ep
@@ -248,7 +248,7 @@ class Experiment:
             eps.append(ep)
             if self.training:
                 learner.on_attempt(self, ep)
-        g = Group(item["context"], eps, target=eps[0].target, item=item)
+        g = Group(item["question"], eps, target=eps[0].target, item=item)
         learner.group_verdict(self, g)
         g.pick = learner.attempts.pick.__name__
         g.pass_at_k = learner.attempts.pick is best
@@ -322,7 +322,7 @@ def entry(phase, epoch, i, g, item, correct, gated, memory_chars, sec, retried=(
 
 def failed(phase, epoch, i, item, error):
     """Запись лога о вопросе (или событии прохода), на котором прогон упал: неверно, с текстом ошибки."""
-    return dict(phase=phase, epoch=epoch, i=i, question=item["context"] if item else "", target=item["target"] if item else "",
+    return dict(phase=phase, epoch=epoch, i=i, question=item["question"] if item else "", target=item["target"] if item else "",
                 answer="", correct=False, finish="error", error="".join(traceback.format_exception(error)), group=[])
 
 

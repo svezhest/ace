@@ -8,7 +8,7 @@ from ace.memory import Lessons
 from ace.model import Patch, Step
 from ace.show import HEAD, AfterError, Catalog, TopK, Whole
 
-ITEM = {"context": "What is 2 / 4?", "target": "0.5"}
+ITEM = {"question": "What is 2 / 4?", "target": "0.5"}
 
 
 class Ex:
@@ -31,7 +31,7 @@ def test_whole():
 
 
 def test_topk(monkeypatch):
-    vecs = {"far": [0, 1], "near": [1, 0], "mid": [0.8, 0.6], ITEM["context"]: [1, 0]}
+    vecs = {"far": [0, 1], "near": [1, 0], "mid": [0.8, 0.6], ITEM["question"]: [1, 0]}
     monkeypatch.setattr("ace.embed.embed", lambda texts: np.array([vecs[t] for t in texts], dtype=float))
     p = TopK(2).prompt(Ex, memory("far", "near", "mid"), ITEM, 0)
     assert p.shown == ["r2", "r3"]

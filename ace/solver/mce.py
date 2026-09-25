@@ -28,9 +28,9 @@ class Environment(OwnSolver):
         context = ""
         if get_context:
             try:
-                context = get_context(item["context"])
+                context = get_context(item["question"])
                 len(context)            # апстрим печатает длину: не строка без len — как упавший интерфейс
             except Exception:
                 context = ""
-        text = DIAGNOSIS.fill(symptoms=item["context"], context=context)
+        text = DIAGNOSIS.fill(symptoms=item["question"], context=context)
         return Prompt(solver=Solver(lambda note: Call(messages(text), dict(PARAMS)), symptom_diagnosis))

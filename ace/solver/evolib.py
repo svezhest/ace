@@ -81,7 +81,7 @@ class Sampler(OwnSolver):
         shown = skills or insights
         section = INTRO["skills" if skills else "insights"] + "\n".join(r.text for r in shown) if shown else ""
         instruction, form, answer = solver_texts(ex.task)
-        user = SOLVER.fill(instruction=instruction, problem=item["context"], section=section, format=form)
+        user = SOLVER.fill(instruction=instruction, problem=item["question"], section=section, format=form)
         p = llm_params(ex.task)
         if self.temperature is not None:
             p["temperature"] = self.temperature(k)

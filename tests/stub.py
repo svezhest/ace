@@ -8,7 +8,7 @@ from ace.model import Reply, roles, text_reply
 from ace.tasks import TASKS
 
 TASK = TASKS["formula"]
-TARGETS = {r["context"]: r["target"] for s in ("", "train", "val") for r in TASK.load(s)}
+TARGETS = {r["question"]: r["target"] for s in ("", "train", "val") for r in TASK.load(s)}
 
 
 def target_of(user):

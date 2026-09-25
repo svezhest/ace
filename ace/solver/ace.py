@@ -16,7 +16,7 @@ class Generator(OwnSolver):
     reads = ("sections",)
 
     def prompt(self, ex, memory, item, k):
-        context, question = ace_input(ex.task.name, item["context"])
+        context, question = ace_input(ex.task.name, item["question"])
         playbook = layout(memory)
 
         def call(note):

@@ -73,7 +73,7 @@ def test_library(replayed):
     for ours, up in zip(STEPS, theirs):
         assert ours["skills"] == up["skills"], up["iteration"]
         assert ours["insights"] == up["insights"], up["iteration"]
-        assert ours["best"] == {items[int(i)]["context"]: b for i, b in up["best"].items()}, up["iteration"]
+        assert ours["best"] == {items[int(i)]["question"]: b for i, b in up["best"].items()}, up["iteration"]
 
 
 def test_iterations(replayed):

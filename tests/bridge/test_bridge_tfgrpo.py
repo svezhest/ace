@@ -273,12 +273,12 @@ def test_show():
     final = yaml.safe_load(cfg["final_agent_yaml"])
     test = Ex(None)
     test.task, test.training = TASKS["dapo"], False
-    p = SHOW.AGENT.prompt(test, library(["Units: check units.", "Verify: recompute."]), {"context": "q"}, 0)
+    p = SHOW.AGENT.prompt(test, library(["Units: check units.", "Verify: recompute."]), {"question": "q"}, 0)
     call = p.solver.call("")
     assert call.messages == [{"role": "system", "content": final["agent"]["instructions"]}, {"role": "user", "content": "q"}]
     settings = final["model"]["model_settings"]
     assert (call.params["temperature"], call.params["top_p"]) == (settings["temperature"], settings["top_p"])
-    empty = SHOW.AGENT.prompt(test, library([]), {"context": "q"}, 0).solver.call("")
+    empty = SHOW.AGENT.prompt(test, library([]), {"question": "q"}, 0).solver.call("")
     assert empty.params["temperature"] == cfg["after_build"]["practice_rollout_temperature"] == SHOW.ROLLOUT_TEMPERATURE
 
 
@@ -292,7 +292,7 @@ def test_settings():
     # температуру и top_p попыток ставит агент (решатель метода), попытки их не меняют
     rollout = Ex(None)
     rollout.task, rollout.training = TASKS["dapo"], True
-    sent = [SHOW.AGENT.prompt(rollout, library([]), {"context": "q"}, k).solver.call("").params for k in range(at.n)]
+    sent = [SHOW.AGENT.prompt(rollout, library([]), {"question": "q"}, k).solver.call("").params for k in range(at.n)]
     assert [p["temperature"] for p in sent] == [practice["rollout_temperature"]] * M.GROUP
     assert built["practice_rollout_temperature"] == SHOW.ROLLOUT_TEMPERATURE
     # rollout меняет у агента только температуру: top_p итогового агента у всех попыток

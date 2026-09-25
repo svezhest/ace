@@ -14,7 +14,7 @@ from ace.render import EMPTY
 from ace.solver import dc as show
 from ace.tasks import TASKS
 
-ITEM = {"context": "What is 2 / 4?", "target": "0.5"}
+ITEM = {"question": "What is 2 / 4?", "target": "0.5"}
 
 
 class Ex:
@@ -53,7 +53,7 @@ def test_generator_prompt():
     assert call.params == {"temperature": 0.0, "max_completion_tokens": 2048}
     assert [m["role"] for m in call.messages] == ["user"]
     assert call.messages[0]["content"] == prompts.load("dc_generator").fill(QUESTION=p.seen[INPUT], CHEATSHEET=EMPTY)
-    assert p.seen[INPUT] == "Question #1:\n" + ITEM["context"] and p.seen[SHEET] == EMPTY
+    assert p.seen[INPUT] == "Question #1:\n" + ITEM["question"] and p.seen[SHEET] == EMPTY
 
 
 def test_cheatsheet_rewrite():
@@ -83,7 +83,7 @@ def test_curator_params():
 
 
 def fake_embed(monkeypatch):
-    vecs = {"q1": [0, 1], "q2": [1, 0], "q3": [0.8, 0.6], ITEM["context"]: [1, 0]}
+    vecs = {"q1": [0, 1], "q2": [1, 0], "q3": [0.8, 0.6], ITEM["question"]: [1, 0]}
     monkeypatch.setattr("ace.embed.embed", lambda texts: np.array([vecs[t] for t in texts], dtype=float))
 
 
@@ -108,8 +108,8 @@ def test_retrieval_and_history(monkeypatch):
 
 def test_upstream_embeddings():
     """Вопросы meb с готовыми эмбеддингами апстрима: близость по ним, BGE-M3 не нужна."""
-    qs = [r["context"] for r in TASKS["meb"].load()[:4]]
-    p = dc_retrieval.solver.prompt(Ex(None), pairs(*qs[:3]), {"context": qs[3]}, 0)
+    qs = [r["question"] for r in TASKS["meb"].load()[:4]]
+    p = dc_retrieval.solver.prompt(Ex(None), pairs(*qs[:3]), {"question": qs[3]}, 0)
     assert len(p.shown) == 3 and "(Similarity: 0." in p.seen[SHEET]
 
 
@@ -123,8 +123,8 @@ def test_synthesis_kept(monkeypatch):
     assert p.seen[SHEET] == "for this question" and "for this question" in p.solver.call("").messages[0]["content"]
     user = model.calls[0]["user"]
     assert "solution of q1" in user and p.seen[INPUT] in user and EMPTY in user
-    m.learn(Ex(model), [extraction(generated(p, ITEM["context"]))])
-    assert [r.question for r in m.records()] == ["q1", ITEM["context"]] and m.sheet.text == "for this question"
+    m.learn(Ex(model), [extraction(generated(p, ITEM["question"]))])
+    assert [r.question for r in m.records()] == ["q1", ITEM["question"]] and m.sheet.text == "for this question"
     assert [d["kind"] for d in m.dump()] == ["pair", "pair", "sheet"]
 
 

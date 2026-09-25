@@ -283,7 +283,7 @@ class Task:
         self.samples = samples
 
     def load(self, split="", size=None):
-        return [dict(context=s["others"]["original_context"], target=s["target"]) for s in self.samples]
+        return [dict(question=s["others"]["original_context"], target=s["target"]) for s in self.samples]
 
     def check(self, answer, target):
         return TASKS["formula"].check(answer, target)

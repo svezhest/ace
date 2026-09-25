@@ -95,11 +95,11 @@ class Agent(OwnSolver):
         recs = memory.records()
         if ex.training:
             system = instructions(ex.task)
-            user = PROBLEM.fill(problem=item["context"], experiences=render.experiences(recs))
+            user = PROBLEM.fill(problem=item["question"], experiences=render.experiences(recs))
             temperature = ROLLOUT_TEMPERATURE
         else:
             system = instructions(ex.task) + (INTRO + render.experiences(recs) if recs else "")
-            user, temperature = item["context"], TEMPERATURE if recs else ROLLOUT_TEMPERATURE
+            user, temperature = item["question"], TEMPERATURE if recs else ROLLOUT_TEMPERATURE
         params = {"temperature": temperature, "top_p": TOP_P, "tools": [TOOL]}
 
         def call(note):

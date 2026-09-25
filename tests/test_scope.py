@@ -160,7 +160,7 @@ def test_step_patch_rewrites_system():
     a.training = False
     assert s.on_step(Ex(model), a, ERROR) is None
     # новая попытка: tactical прошлой ушли, strategic показаны при запуске
-    p = s.prompt(Ex(model), {"context": "q"}, 0)
+    p = s.prompt(Ex(model), {"question": "q"}, 0)
     assert memory.book(0).tactical == []
     assert p.system.startswith("\n## Strategic Guidelines") and "### General:\n- Guard division." in p.system
 
