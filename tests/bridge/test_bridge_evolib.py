@@ -9,6 +9,7 @@ import random
 
 import numpy as np
 import pytest
+from stub import experiment
 from upstream import deviation, fixture
 
 from ace import parse, prompts, verdict
@@ -110,13 +111,6 @@ class Task:
         return bool(answer) and answer == str(target)
 
 
-class Ex:
-    training = True
-
-    def __init__(self, model, task=Task([])):
-        self.model, self.task = model, task
-
-
 def state(m):
     """Библиотека, как её пишет эталон: skill -> [IG, Future IG, description], insight -> Future IG; порядок — как в dict."""
     return ([(r.text, [r.ig, list(r.outcomes), r.doc]) for r in m.skills.records()],
@@ -161,7 +155,7 @@ def test_solver_section(monkeypatch, name, skills, insights):
     if insights:
         m.insights.add("If adding integers, then do check the carry.")
     monkeypatch.setattr(random, "random", lambda: 0.1 if skills else 0.5)
-    call = solver_call(SHOW.SAMPLER.prompt(Ex(None), m, {"question": "Compute 2+3."}, 0))
+    call = solver_call(SHOW.SAMPLER.prompt(experiment(task=Task([])), m, {"question": "Compute 2+3."}, 0))
     assert call.messages == [{"role": "user", "content": PROMPTS["filled"][name]}] and call.params == REASONING
 
 # разборщики
@@ -274,7 +268,7 @@ def test_sample_from_library(monkeypatch, case):
     for run_ in MEMORY["sample_from_library"][case]:
         random.seed(run_["seed"])
         log.clear()
-        p = show.prompt(Ex(None), m, {"question": "q"}, 0)
+        p = show.prompt(experiment(task=Task([])), m, {"question": "q"}, 0)
         texts = [m.get(i).text for i in p.shown]
         assert (texts if m.skills.get(p.shown[0] if p.shown else "") else []) == run_["skills"]
         assert (texts if m.insights.get(p.shown[0] if p.shown else "") else []) == run_["insights"]
@@ -301,10 +295,10 @@ def test_add_new_insight(monkeypatch, case):
     table_embed(monkeypatch, INSIGHT_TABLE)
     model = Fake([("merge", "consolidate these insights", INSIGHT_REPLY.get(case, ""))], default="")
     m = MEM.SkillLibrary()
-    m.add_insight(Ex(model), "If base cond, then do x.")
+    m.add_insight(experiment(model, task=Task([])), "If base cond, then do x.")
     m.insights.records()[0].outcomes.extend([0.4, 0.2])
     if want["new"]:                 # пустой insight извлечение в память не отдаёт (add_new_insight апстрима: return)
-        m.add_insight(Ex(model), want["new"])
+        m.add_insight(experiment(model, task=Task([])), want["new"])
     assert state(m)[1] == upstream_state({}, figs(want["after"]))[1]
     assert [c["user"] for c in model.calls] == want["llm_prompts"]
 
@@ -327,9 +321,9 @@ def test_add_new_skills(monkeypatch, case):
     table_embed(monkeypatch, SKILL_TABLE)
     model = Fake([("merge", "consolidate these example problems", SKILL_REPLY.get(case, ""))], default="")
     m = MEM.SkillLibrary()
-    m.add_skills(Ex(model), parse.subtasks(solution("Base desc.", "1", "1")), 0.9)
+    m.add_skills(experiment(model, task=Task([])), parse.subtasks(solution("Base desc.", "1", "1")), 0.9)
     m.skills.records()[0].outcomes.append(0.5)
-    m.add_skills(Ex(model), [tuple(x) for x in want["new"]], want["IG_score"])
+    m.add_skills(experiment(model, task=Task([])), [tuple(x) for x in want["new"]], want["IG_score"])
     got = [(t, [pytest.approx(ig), fig, doc]) for t, (ig, fig, doc) in state(m)[0]]
     assert got == upstream_state(want["after"], {})[0] and len(model.calls) == want["llm_calls"]
 
@@ -370,8 +364,9 @@ def test_run_iteration(monkeypatch, case):
             f"<subtask><description>Add numbers variant {i}.</description></subtask> no tags" for i, a in enumerate(answers)]
     eps = [Episode("Compute 2+3.", k, Prompt(), output=s, final=s, answer=upstream_answer(s)) for k, s in enumerate(sols)]
     g = Group("Compute 2+3.", eps)
-    ex = Ex(Fake([("insight", "grain of salt, they might be wrong or incomplete. Try to spot", insight),
-                  ("compare", "and two solutions", judge or ""), ("merge", "consolidate these", "no block")]))
+    ex = experiment(Fake([("insight", "grain of salt, they might be wrong or incomplete. Try to spot", insight),
+                          ("compare", "and two solutions", judge or ""), ("merge", "consolidate these", "no block")]),
+                    task=Task([]))
     if gold:
         for e in eps:
             verdict.golden(ex, e, "5")

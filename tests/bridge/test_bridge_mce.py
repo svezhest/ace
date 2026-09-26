@@ -6,6 +6,7 @@ import json
 import re
 from types import SimpleNamespace
 
+from stub import experiment
 from upstream import deviation, fixture
 
 from ace import fs, render
@@ -139,7 +140,7 @@ def test_extract_skill_overview():
 
 def test_folder_names():
     """get_sub_iteration_folder_name для под-итераций: итерация = проход + 1, под-итерация = номер батча."""
-    ours = [sub_folder(SimpleNamespace(epoch=it - 1, batch=sub)) for it, sub in ((1, 0), (2, 3))]
+    ours = [sub_folder(experiment(epoch=it - 1, batch=sub)) for it, sub in ((1, 0), (2, 3))]
     assert ours == PARSERS["folder_names"][2:]
 
 # выбор итерации и evaluations.json

@@ -8,6 +8,7 @@ import re
 from types import SimpleNamespace
 
 import pytest
+from stub import experiment
 from upstream import deviation, fixture, messages
 
 from ace import parse, render
@@ -51,7 +52,7 @@ class Model:
 
 def ex(model, name="finer"):
     """Эксперимент для извлечения и памяти: агент finer_agent с ролью эталона."""
-    return SimpleNamespace(model=model, task=SimpleNamespace(name=name, system=ROLE), training=True)
+    return experiment(model, task=SimpleNamespace(name=name, system=ROLE))
 
 
 def user(call):

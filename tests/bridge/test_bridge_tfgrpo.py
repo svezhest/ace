@@ -7,6 +7,7 @@ import json
 import jinja2
 import pytest
 import yaml
+from stub import experiment
 from upstream import deviation, fixture, messages
 
 from ace import render, verdict
@@ -50,11 +51,7 @@ class Task:
     name = "bridge"
 
 
-class Ex:
-    task, training = Task(), True
-
-    def __init__(self, model):
-        self.model = model
+BRIDGE = Task()
 
 
 @pytest.fixture(autouse=True)
@@ -119,7 +116,7 @@ def test_summary_requests():
         g = group("A", [1, 0][:len(calls)], target="42" if labeled else "")
         # критика эталона: у первой попытки "Correct.", у второй нет; у math апстрима её нет никогда (test_loop)
         for e, critique, call in zip(T.rollouts(g, False), ["Correct.", render.TFGRPO.no_critique()], calls):
-            U.ask_stage(Ex(model), STAGES[0], question=e.question, trajectory=e.output, answer=g.target or render.TFGRPO.redacted(),
+            U.ask_stage(experiment(model, task=BRIDGE), STAGES[0], question=e.question, trajectory=e.output, answer=g.target or render.TFGRPO.redacted(),
                   critique=critique)
             assert model.calls[-1]["user"] == messages(call)[1]
         assert model.calls[0]["system"] == messages(calls[0])[0]
@@ -139,7 +136,7 @@ def test_group_update_requests():
                         ("group_update_library", ["Units: check units.", "Verify: recompute."])):
         call = PROMPTS["requests"][case][0]
         model = Fake([call])
-        ops = T.operations(U.ask_stage(Ex(model), STAGES[2], existing_experiences=render.experiences(library(texts).records()),
+        ops = T.operations(U.ask_stage(experiment(model, task=BRIDGE), STAGES[2], existing_experiences=render.experiences(library(texts).records()),
                                  new_experiences="1. Rule A: check the arithmetic of A."))
         assert model.calls[0]["user"] == messages(call)[1]
         assert ops == [{"operation": "ADD", "id": None, "content": "Rule A: check the arithmetic of A."}]
@@ -152,12 +149,12 @@ def test_batch_requests():
     ops = [{"operation": "UPDATE", "id": "G0", "content": "Units: check units twice."},
            {"operation": "ADD", "id": None, "content": "Rule A: check the arithmetic of A."}]
     model = Fake([call])
-    m.learn(Ex(model), [Extraction(None, [], [], {OPERATIONS: ops})])
+    m.learn(experiment(model, task=BRIDGE), [Extraction(None, [], [], {OPERATIONS: ops})])
     assert (model.calls[0]["system"], model.calls[0]["user"]) == messages(call)
     assert [r.text for r in m.records()] == ["Units: check units twice.", "Verify: recompute.", "Rule A: check the arithmetic of A."]
     call = PROMPTS["requests"]["batch_update_no_ops"][0]
     model = Fake([call])
-    library([]).learn(Ex(model), [Extraction(None, [], [], {OPERATIONS: []})])
+    library([]).learn(experiment(model, task=BRIDGE), [Extraction(None, [], [], {OPERATIONS: []})])
     assert model.calls[0]["user"] == messages(call)[1]
 
 # разбор ответов
@@ -190,7 +187,7 @@ def test_parse_batch_update(name):
     case = PARSERS["batch_update"][name]
     m = library(["old"])
     model = Fake(answer=lambda user: case["response"])
-    m.learn(Ex(model), [Extraction(None, [], [], {OPERATIONS: [{"operation": "ADD", "content": "X"}]})])
+    m.learn(experiment(model, task=BRIDGE), [Extraction(None, [], [], {OPERATIONS: [{"operation": "ADD", "content": "X"}]})])
     assert len(model.calls) == case["llm_calls"]
     if "error" in case["experiences"]:
         deviation("TF4")        # план-объект: у апстрима падение, у нас план пуст
@@ -208,7 +205,7 @@ def test_batch_update(name):
     case = MEMORY["batch_update"][name]
     m = library(case["before"].values())
     model = Fake(answer=lambda user: "```json\n" + json.dumps(case["plan"]) + "\n```")
-    m.learn(Ex(model), [Extraction(None, [], [], {OPERATIONS: [{"operation": "ADD", "content": "X"}]})])
+    m.learn(experiment(model, task=BRIDGE), [Extraction(None, [], [], {OPERATIONS: [{"operation": "ADD", "content": "X"}]})])
     assert [r.text for r in m.records()] == list(case["after"].values())
 
 
@@ -232,7 +229,7 @@ def test_partial_filter(gt):
     summarized = {}
     for c, g in groups.items():
         model = Fake(answer=lambda user: "summary" if user.startswith(MARKERS[0]) else "<Experiences>\n1. X\n</Experiences>")
-        T.Contrast()(Ex(model), g, library([]))
+        T.Contrast()(experiment(model, task=BRIDGE), g, library([]))
         rewards = [float(e.ok) for e in T.rollouts(g, False)]
         n = sum(stage(call["user"]) == 0 for call in model.calls)
         if n:
@@ -244,7 +241,7 @@ def test_empty_summary_kept():
     """Пустая сводка остаётся в группе (у апстрима выпадает только исключение); нет ответа — выпадает."""
     for empty, attempts in (("", 2), (None, 0)):
         model = Fake(answer=lambda user: empty if user.startswith(MARKERS[0]) else "<Experiences>\n1. X\n</Experiences>")
-        T.Contrast()(Ex(model), group("A", [1, 0]), library([]))
+        T.Contrast()(experiment(model, task=BRIDGE), group("A", [1, 0]), library([]))
         advantage = [c["user"] for c in model.calls if stage(c["user"]) == 1]
         assert len(advantage) == bool(attempts) and all(f"Attempt {i}" in advantage[0] for i in range(1, attempts + 1))
 
@@ -258,7 +255,7 @@ def test_loop():
     for run in LOOP:
         assert [r.text for r in m.records()] == list(run["before"].values())
         model = Fake(run["requests"])
-        m.learn(Ex(model), T.Contrast().batch(Ex(model), [group(c, r) for c, r in run["rewards"].items()], m))
+        m.learn(experiment(model, task=BRIDGE), T.Contrast().batch(experiment(model, task=BRIDGE), [group(c, r) for c, r in run["rewards"].items()], m))
         assert [(c["system"], c["user"]) for c in model.calls] == [messages(c) for c in run["requests"]]
         assert all(c["params"] == {} for c in run["requests"]) and all(c["params"] == {} for c in model.calls)
         assert render.experiences(m.records()) == "\n".join(f"[{k}]. {v}" for k, v in run["experiences"].items())
@@ -271,8 +268,7 @@ def test_show():
     оттуда же; без опытов агент остаётся при температуре rollout (model_copy поверхностный)."""
     cfg = CONFIG["math_reasoning"]
     final = yaml.safe_load(cfg["final_agent_yaml"])
-    test = Ex(None)
-    test.task, test.training = TASKS["dapo"], False
+    test = experiment(task=TASKS["dapo"], training=False)
     p = SHOW.AGENT.prompt(test, library(["Units: check units.", "Verify: recompute."]), {"question": "q"}, 0)
     call = p.solver.call("")
     assert call.messages == [{"role": "system", "content": final["agent"]["instructions"]}, {"role": "user", "content": "q"}]
@@ -290,8 +286,7 @@ def test_settings():
     at = M.tfgrpo.attempts
     assert at.n == M.GROUP == practice["grpo_n"] == built["practice_pass_k"]
     # температуру и top_p попыток ставит агент (решатель метода), попытки их не меняют
-    rollout = Ex(None)
-    rollout.task, rollout.training = TASKS["dapo"], True
+    rollout = experiment(task=TASKS["dapo"])
     sent = [SHOW.AGENT.prompt(rollout, library([]), {"question": "q"}, k).solver.call("").params for k in range(at.n)]
     assert [p["temperature"] for p in sent] == [practice["rollout_temperature"]] * M.GROUP
     assert built["practice_rollout_temperature"] == SHOW.ROLLOUT_TEMPERATURE

@@ -7,6 +7,7 @@ import json
 
 import pytest
 from sklearn.metrics.pairwise import cosine_similarity
+from stub import experiment
 from upstream import fixture
 
 from ace import prompts
@@ -77,13 +78,6 @@ class Model:
         return dict(calls=len(self.calls), prompt_tokens=0, completion_tokens=0)
 
 
-class Ex:
-    task, i = None, 0
-
-    def __init__(self, model):
-        self.model = model
-
-
 def request(up):
     """Запрос апстрима так, как его шлёт наш вызов: сообщения и параметры."""
     return dict(messages=up["messages"], params=dict(temperature=up["temperature"], max_completion_tokens=up["max_completion_tokens"]))
@@ -95,7 +89,7 @@ def test_cumulative_curator_request():
     model = Model([rec["curator"]])
     output = rec["generator"]["response"].strip()
     ep = Episode(rec["input"], 0, Prompt(seen={INPUT: rec["input"], SHEET: ""}), output=output, final=output, answer="")
-    MEM.Cheatsheet().learn(Ex(model), [EXTRACT.Seen()(None, Group(rec["input"], [ep]), None)])
+    MEM.Cheatsheet().learn(experiment(model, task=None), [EXTRACT.Seen()(None, Group(rec["input"], [ep]), None)])
     assert model.calls == [request(rec["curator"])]
 
 
@@ -108,7 +102,7 @@ def test_synthesis_request(monkeypatch):
     memory.add(OUTPUTS[0], question=QUESTIONS[0])
     memory.sheet.rewrite(MEM.CHEATSHEET.read(PROMPTS["synthesis_first"]["calls"][0]["response"]))
     model = Model(rec["calls"])
-    SHOW.synthesis(Ex(model), memory, {"question": QUESTIONS[1]}, rec["input"])
+    SHOW.synthesis(experiment(model, task=None), memory, {"question": QUESTIONS[1]}, rec["input"])
     assert model.calls == [request(rec["calls"][0])]
 
 # разборщик
@@ -148,7 +142,7 @@ def test_shown_pairs(monkeypatch, name, k):
     sheet = SHOW.retrieval if k else SHOW.history
     for i, want in enumerate(MEMORY[name]):
         m = pairs_memory(i)
-        text, recs = sheet(Ex(None), m, {"question": QUESTIONS[i]}, "")
+        text, recs = sheet(experiment(task=None), m, {"question": QUESTIONS[i]}, "")
         assert text == want["shown_cheatsheet"], (name, i)
         assert [r.question for r in recs] == want["top_k_original_inputs"], (name, i)
 

@@ -19,7 +19,7 @@ dev = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["."]
+pythonpath = [".", "tests"]         # tests — для stub и в tests/bridge
 filterwarnings = ["ignore::DeprecationWarning:pydantic_graph"]
 
 [tool.ruff]
