@@ -3,11 +3,12 @@
 попытка по метке), а не точность; ~ — прогон не закончен (итог пишется по ходу). Для каталога — доля вопросов с
 чтением записей и точность с чтением и без; для хуков — сколько раз хук показан (fired) и сколько раз помог.
 Считаются вопросы в зачёт (тест или последний проход); без log.json — только итог; err — вопросы, упавшие с ошибкой.
-python report.py [results]"""
+python report.py [папка; по умолчанию RESULTS]"""
 import json
 import sys
 from pathlib import Path
 
+from ace import config
 from ace.loop import in_score
 
 HEADER = (f"{'run':64} {'ok':>6} {'acc':>5} {'trunc':>5} {'err':>4} {'calls':>6} {'tok':>9} {'read%':>6} "
@@ -54,7 +55,7 @@ def row(root, path):
 
 
 def main():
-    root = Path(sys.argv[1] if len(sys.argv) > 1 else "results")
+    root = Path(sys.argv[1]) if len(sys.argv) > 1 else config.RESULTS
     print(HEADER)
     for path in sorted(root.rglob("summary.json")):
         print(row(root, path))
