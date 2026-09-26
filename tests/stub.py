@@ -17,6 +17,7 @@ def target_of(user):
 
 class Stub:
     name = "stub"
+    on_wire = True          # агентный цикл TF-GRPO — через message, как на проводе
 
     def __init__(self, answer=lambda call: "FINAL ANSWER: 0", schemas=None):
         self.answer, self.schemas, self.calls = answer, schemas or {}, []

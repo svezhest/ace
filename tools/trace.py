@@ -85,6 +85,7 @@ def fill(tp, seed):
 class Fake:
     """Модель без сети: инструменты не вызывает, ответ — функция от промпта."""
     name = "fake"
+    on_wire = True          # агентный цикл TF-GRPO — через message, как на проводе
 
     def __init__(self, targets):
         self.targets = targets

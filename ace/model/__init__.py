@@ -13,8 +13,8 @@
                     вызова, без своей логики; ответ текстом -> reader (wire.py)
 Входы Model — все вызовы идут через них и все в расходе (usage):
     ask(Call) -> Reply          вызов; с инструментами — только через pydantic-ai
-    message(messages, params)   агентный цикл апстрима (TF-GRPO: openai-agents) — проводом при любом бэкенде,
-                                ответ как есть (сообщение с tool_calls)
+    message(messages, params)   ход агентного цикла апстрима на проводе (TF-GRPO: openai-agents), ответ как есть
+                                (сообщение с tool_calls); только на wire — на pydantic-ai цикл идёт через ask
     session(...)                агент Claude Agent SDK на этой модели (MCE апстрима, claude.py): ходы и токены — из
                                 итогового сообщения SDK
     embed(texts, name)          эмбеддинги: провод — /v1/embeddings сервера с моделью name, как у апстрима (EvoLib),
@@ -168,7 +168,7 @@ class Model:
         if self.backend not in ("pydantic-ai", "wire"):
             raise ValueError(f"неизвестный бэкенд модели: {self.backend}")
         self.agent = PydanticAI(self.name, self.base_url)
-        self.wire = Wire(self.name, self.base_url)      # провод: бэкенд wire и model.message при любом бэкенде
+        self.wire = Wire(self.name, self.base_url)
         self.agents = dict(calls=0, prompt_tokens=0, completion_tokens=0)     # агенты Claude SDK
         self.embedded = 0
 
@@ -182,7 +182,10 @@ class Model:
         return self.agent.ask(call)
 
     def message(self, messages, params):
-        """(сообщение assistant dict, finish_reason): запрос ровно с messages и params (с tools), ответ с tool_calls."""
+        """(сообщение assistant dict, finish_reason): запрос ровно с messages и params (с tools), ответ с tool_calls.
+        Только на проводе: на другом бэкенде решатель ведёт цикл через ask, а не мимо бэкенда."""
+        if not self.on_wire:
+            raise RuntimeError(f"model.message — провод, а бэкенд модели {self.backend}")
         return self.wire.message(messages, params)
 
     def session(self, prompt, options, feedback, replies, root):

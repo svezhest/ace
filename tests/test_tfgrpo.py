@@ -1,7 +1,10 @@
 """TF-GRPO: контраст попыток группы (сводки -> преимущество -> сверка с библиотекой), план батча и операции
 по меткам G0, G1, ..., показ, попытки и неполный батч."""
+import ast
 import json
 
+from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, ToolCallPart, UserPromptPart
+from pydantic_ai.models.function import AgentInfo, FunctionModel
 from stub import TASK, Stub, episode, experiment, right
 
 from ace import render
@@ -10,7 +13,9 @@ from ace.extract.tfgrpo import Contrast
 from ace.loop import Group, run
 from ace.memory.tfgrpo import Experiences
 from ace.methods.tfgrpo import GROUP, tfgrpo
-from ace.solver.tfgrpo import AGENT
+from ace.model import Model
+from ace.solver import tfgrpo as solver
+from ace.solver.tfgrpo import AGENT, LAST_TURN, MAX_TURNS, RETRIES, TOOL
 
 
 def by_prompt(ops='[{"operation": "ADD", "content": "New: tip."}]', plan=None):
@@ -120,3 +125,104 @@ def test_attempts_and_batch():
     assert summary["correct"] == 2 and summary["n"] == 2
     assert not any(c["user"].startswith("<Experiences and Proposed Operations>") for c in model.calls)
     assert render.experiences([]) == "None"
+
+
+class Unreachable:
+    """Клиент провода, который падает при любом обращении."""
+    def __getattr__(self, name):
+        raise AssertionError(f"вызов провода: {name}")
+
+
+class FakeKernel:
+    """Ядро попытки без песочницы: запоминает аргументы вызовов."""
+    made = []
+
+    def __init__(self):
+        self.calls = []
+        FakeKernel.made.append(self)
+
+    def call(self, arguments):
+        self.calls.append(arguments)
+        return "2\n"
+
+    def close(self):
+        pass
+
+
+def on_pydantic_ai(monkeypatch, fn):
+    m = Model(backend="pydantic-ai")
+    m.wire.client = Unreachable()
+    m.agent.llm = FunctionModel(fn)
+    FakeKernel.made = []
+    monkeypatch.setattr(solver, "Kernel", FakeKernel)
+    return m
+
+
+def users(messages):
+    return [p.content for m in messages if isinstance(m, ModelRequest) for p in m.parts if isinstance(p, UserPromptPart)]
+
+
+def attempt(m):
+    s = AGENT.prompt(experiment(m), library(), {"question": "q"}, 0).solver
+    return s.talk(m, s.call(""))
+
+
+def test_agent_on_pydantic_ai(monkeypatch):
+    """На pydantic-ai попытка идёт его циклом, провод не тронут: модель видит ту же схему инструмента и параметры,
+    инструмент исполняет ядро попытки, траектория — той же формы, что на проводе, итог — текст ответа."""
+    seen = []
+
+    def fn(messages, info: AgentInfo):
+        seen.append(info)
+        if not any(isinstance(m, ModelResponse) for m in messages):
+            return ModelResponse(parts=[ToolCallPart("execute_python_code", '{"code": "print(1+1)"}', tool_call_id="c1")])
+        return ModelResponse(parts=[TextPart("FINAL ANSWER: 2")])
+    m = on_pydantic_ai(monkeypatch, fn)
+    reply = attempt(m)
+    tool = seen[0].function_tools[0]
+    assert (tool.name, tool.description, tool.parameters_json_schema) == (
+        "execute_python_code", TOOL["function"]["description"], TOOL["function"]["parameters"])
+    assert (seen[0].model_settings["temperature"], seen[0].model_settings["top_p"]) == (0.7, 0.95)
+    assert [k.calls for k in FakeKernel.made] == [['{"code": "print(1+1)"}']]
+    assert reply.output == "FINAL ANSWER: 2" and not reply.truncated
+    call = {"id": "c1", "type": "function", "function": {"name": "execute_python_code", "arguments": '{"code": "print(1+1)"}'}}
+    assert ast.literal_eval(reply.text)[1:] == [
+        {"role": "assistant", "content": None, "tool_calls": [call]},
+        {"role": "tool", "tool_call_id": "c1", "content": "2\n"},
+        {"role": "assistant", "content": "FINAL ANSWER: 2"}]
+    assert m.wire.calls == 0
+
+
+def test_agent_last_turn_and_retries(monkeypatch):
+    """Предел ходов тот же: перед последним ходом — просьба ответить, вызов на последнем ходу — попытка упала;
+    упавшая попытка повторяется до RETRIES раз, каждый раз с новым ядром, потом — попытка без траектории."""
+    requests = []
+
+    def fn(messages, info):
+        requests.append(users(messages))
+        return ModelResponse(parts=[ToolCallPart("execute_python_code", '{"code": "1"}')])
+    m = on_pydantic_ai(monkeypatch, fn)
+    reply = attempt(m)
+    assert (reply.output, reply.text) == ("", "")
+    assert len(FakeKernel.made) == RETRIES and len(requests) == RETRIES * MAX_TURNS
+    assert [LAST_TURN["content"] in r for r in requests[:MAX_TURNS]] == [False] * (MAX_TURNS - 1) + [True]
+
+
+def test_agent_foreign_tool_fails(monkeypatch):
+    """Вызов чужого инструмента роняет попытку, как на проводе."""
+    m = on_pydantic_ai(monkeypatch, lambda messages, info: ModelResponse(parts=[ToolCallPart("shell", "{}")]))
+    assert attempt(m).text == "" and len(FakeKernel.made) == RETRIES
+    assert all(k.calls == [] for k in FakeKernel.made)
+
+
+def test_run_on_pydantic_ai(monkeypatch):
+    """Обучение и тест TF-GRPO на pydantic-ai: ни одного вызова провода."""
+    answer = by_prompt()
+
+    def fn(messages, info):
+        user = users(messages)[-1]
+        text = right(dict(user=user)) if info.function_tools else answer(dict(user=user))
+        return ModelResponse(parts=[TextPart(text)])
+    m = on_pydantic_ai(monkeypatch, fn)
+    summary = run(TASK, tfgrpo, m, 2)
+    assert summary["correct"] == 2 and m.wire.calls == 0 and m.agent.calls > 2 * GROUP
