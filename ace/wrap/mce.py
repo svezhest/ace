@@ -63,6 +63,12 @@ class Iteration:
                     folder=self.folder)
 
 
+def utils_env(model):
+    """utils/llm.py апстрима, если его позовёт интерфейс в процессе стенда: адрес — модель стенда, а не OPENROUTER_*
+    снаружи, и .env не читается (load_dotenv(override=True) апстрима; PYTHON_DOTENV_DISABLED — с его python-dotenv 1.2.1)."""
+    os.environ.update(OPENROUTER_API_BASE=model.base_url, OPENROUTER_API_KEY="x", PYTHON_DOTENV_DISABLED="1")
+
+
 def offline_only(wrapper):
     """MCE учится только на train: итерация — проход по train, выбор — по val; мета одна."""
     single_meta(wrapper)
@@ -283,6 +289,7 @@ class Iterations(Wrapper):
             # свой workspace на процесс: параллельные прогоны с общим корнем не стирают друг друга
             self.ws = Workspace(root, self.workspace or f"{ex.task.name}-{os.getpid()}")
             claude.prepare(root, VENV)
+            utils_env(ex.model)
             self.ws.start(ex.task)
         samples = [dict(item, id=i) for i, item in enumerate(ex.task.load(split, whole=True))]
         if n and len(samples) > n:

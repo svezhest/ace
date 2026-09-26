@@ -3,6 +3,9 @@ train за проход, откат к лучшей по val, при равен�
 базовый агент MCE (context/ на запись, итоги только текущего батча в data/ на чтение), навык в промптах ACE."""
 import copy
 import json
+import os
+import shutil
+import subprocess
 from dataclasses import replace
 from types import SimpleNamespace
 
@@ -19,9 +22,11 @@ from ace.memory.ace import Ops
 from ace.memory.mce import Context
 from ace.methods import METHODS
 from ace.methods.mce import mce_ace_stand, mce_fs as mce
+from ace.model import Model
 from ace.render import skilled
 from ace.wrap import Gate, Wrapper
-from ace.wrap.mce import META, MISSING, Iterations, Meta, MetaAgent
+from ace.upstream.mce import UTILS
+from ace.wrap.mce import META, MISSING, VENV, Iterations, Meta, MetaAgent, utils_env
 
 OFFLINE2 = Protocol(offline=True, epochs=2)
 
@@ -248,3 +253,18 @@ def test_mce_folder_needs_iterations():
         with pytest.raises(Contract, match="Iterations"):
             run(TASK, learner, model, 2)
     assert model.calls == []
+
+
+@pytest.mark.skipif(not VENV.exists(), reason="нет venv апстрима MCE")
+def test_mce_utils_llm_on_stand_model(tmp_path, monkeypatch):
+    """utils/llm.py апстрима в окружении прогона mce: адрес — модель стенда, хотя снаружи OPENROUTER_* и .env рядом
+    указывают на другой (запросов нет — только куда смотрит клиент)."""
+    for k in ("OPENROUTER_API_BASE", "OPENROUTER_API_KEY", "PYTHON_DOTENV_DISABLED"):
+        monkeypatch.setenv(k, "http://outside/v1")
+    shutil.copytree(UTILS, tmp_path / "utils")
+    (tmp_path / ".env").write_text("OPENROUTER_API_BASE=http://outside/v1\n")
+    model = Model()
+    utils_env(model)
+    out = subprocess.run([str(VENV / "bin" / "python"), "-c", "from utils import llm; print(llm.llm.openai_api_base)"],
+                         cwd=tmp_path, env=dict(os.environ), capture_output=True, text=True, check=True)
+    assert out.stdout.strip() == model.base_url
