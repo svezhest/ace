@@ -1,6 +1,6 @@
 """Проверки ответов задач."""
 import pytest
-from stub import Stub, embed_by_length, experiment
+from stub import Stub, embed_by_length, episode, experiment
 
 import ablate
 from ace import config
@@ -9,7 +9,7 @@ from ace.loop import run
 from ace.memory.mce import Folder
 from ace.methods import METHODS
 from ace.solver.mce import Environment
-from ace.tasks import TASKS
+from ace.tasks import TASKS, grade, graded
 from ace.upstream.mce import signatures, task_instruction
 
 MEB = TASKS["meb"]
@@ -75,6 +75,13 @@ def test_dapo_whole_reply():
     assert t.check("x = 3 or x = 4", "4") and not t.check("x = 4 or x = 3", "4")
     assert t.check("\\boxed{r^3 - \\frac{1}{r^3} = 2786}", "2786")
     assert not t.check("\\boxed{3}, \\boxed{4}", "4")
+
+
+def test_graded_by_task():
+    """В зачёт у dapo и hmmt весь итоговый ответ (строка FINAL ANSWER тут не ответ), у formula — ответ решателя."""
+    ep = episode(answer="7", final="so \\boxed{103}\nFINAL ANSWER: 7")
+    assert grade(TASKS["dapo"], ep, "103") and grade(TASKS["hmmt"], ep, "103")
+    assert graded(TASKS["formula"], ep) == "7"
 
 
 def test_every_method_on_every_task(monkeypatch):
