@@ -104,8 +104,7 @@ class PydanticAI:
         (None: история уже кончается запросом). Сообщения сохраняются и при сбое: траектория и токены не теряются.
         Пустой системный промпт не отправляется: апстримы шлют промпт одним сообщением user."""
         # отбивка инструмента (ModelRetry) — обычный шаг: разговор кончается по раундам, а не на 4-й отбивке подряд
-        tools = [Tool(t, max_retries=max(RETRIES, call.rounds), description=getattr(t, "description", None))
-                 for t in call.tools]
+        tools = [tool(t, max(RETRIES, call.rounds)) for t in call.tools]
         agent = Agent(self.llm, system_prompt=system or (), output_type=output, tools=tools, retries=RETRIES)
         result, outcome = None, Outcome.answer
         with capture_run_messages() as messages:
@@ -123,6 +122,17 @@ class PydanticAI:
         self.prompt_tokens += sum(m.usage.input_tokens for m in responses)
         self.completion_tokens += sum(m.usage.output_tokens for m in responses)
         return result, messages, outcome
+
+
+def tool(function, retries):
+    """Инструмент pydantic-ai. Со схемой аргументов (function.schema, prompts.tool) модель видит её как есть, а
+    функция получает разобранный JSON аргументов без проверки по схеме; без неё схема — из сигнатуры."""
+    schema = getattr(function, "schema", None)
+    if schema is None:
+        return Tool(function, max_retries=retries, description=getattr(function, "description", None))
+    out = Tool.from_schema(function, function.__name__, function.description, schema)
+    out.max_retries = retries
+    return out
 
 
 # параметр вызова -> настройка pydantic-ai, где имена расходятся
@@ -154,4 +164,29 @@ def steps(messages):
                 out.append(Step(*calls[p.tool_call_id], str(p.content)))
             elif isinstance(p, RetryPromptPart) and p.tool_call_id in calls:
                 out.append(Step(*calls[p.tool_call_id], render.retry_error(p.content)))
+    return out
+
+
+def chat(messages):
+    """История pydantic-ai -> сообщения Chat Completions без системного, какими их видела модель: ответ — assistant
+    (текст или None и tool_calls), результат инструмента и отбивка — tool, прочее от стенда — user."""
+    out = []
+    for m in messages:
+        if isinstance(m, ModelResponse):
+            text = "".join(p.content for p in m.parts if isinstance(p, TextPart))
+            message = {"role": "assistant", "content": text or None}
+            calls = [p for p in m.parts if isinstance(p, ToolCallPart)]
+            if calls:
+                message["tool_calls"] = [{"id": p.tool_call_id, "type": "function", "function": {
+                    "name": p.tool_name, "arguments": p.args_as_json_str()}} for p in calls]
+            out.append(message)
+            continue
+        for p in m.parts:
+            if isinstance(p, ToolReturnPart):
+                out.append({"role": "tool", "tool_call_id": p.tool_call_id, "content": p.model_response_str()})
+            elif isinstance(p, RetryPromptPart) and p.tool_name is not None:
+                out.append({"role": "tool", "tool_call_id": p.tool_call_id, "content": p.model_response()})
+            elif isinstance(p, (UserPromptPart, RetryPromptPart)):
+                text = p.content if isinstance(p, UserPromptPart) else p.model_response()
+                out.append({"role": "user", "content": text})
     return out

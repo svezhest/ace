@@ -7,7 +7,8 @@
     macros(name)    короткие строки одного места — макросы одного шаблона (описания инструментов, отбивки,
                     разметка): macros("fs").no_file(path=...) -> текст; у строк апстрима источник — в комментарии
                     шаблона
-    tool(описание)  инструмент модели: описание, которое она видит, — из шаблона; докстрока функции — для читателя"""
+    tool(описание)  инструмент модели: описание, которое она видит, — из шаблона; докстрока функции — для читателя;
+                    schema — схема аргументов, если модель должна видеть её как есть (как шлёт апстрим)"""
 import jinja2
 
 from ..config import PROMPTS
@@ -41,9 +42,12 @@ def macros(name):
     return ENV.get_template(f"{name}.j2").module
 
 
-def tool(description):
-    """Декоратор инструмента: pydantic-ai отдаёт модели description (model/agent.py), а не докстроку."""
+def tool(description, schema=None):
+    """Декоратор инструмента: pydantic-ai отдаёт модели description (model/agent.py), а не докстроку; со schema —
+    и её вместо схемы из сигнатуры."""
     def described(function):
         function.description = description
+        if schema is not None:
+            function.schema = schema
         return function
     return described
