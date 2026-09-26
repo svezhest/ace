@@ -86,11 +86,29 @@ pydantic-ai: на проводе такой вызов — ошибка (`Runtim
 таких вызовов не делают; где у апстрима свой агентный цикл (TF-GRPO), он — в решателе, над `model.message`. Запись
 `bridge/live/scope_code` снята, когда провод ещё молча отдавал такие вызовы pydantic-ai (решатель — pydantic-ai,
 SCOPE — провод): воспроизводит её тестовая модель `tests/live.Mixed`; драйвер `bridge/live/scope/driver.py` на
-проводе scope_code больше не снимет — переснимать на одном бэкенде. Другие входы той же модели: `model.message(messages, params)` — ход агентного цикла
+проводе scope_code больше не снимет — переснимать на одном бэкенде.
+
+Другие входы той же модели: `model.message(messages, params)` — ход агентного цикла
 TF-GRPO апстрима, только на проводе, ответ как есть (с `tool_calls`); `model.session(...)` — агенты mce,
 Claude Agent SDK апстрима на модели стенда через LiteLLM proxy (`model/claude.py`); `model.embed(texts, name)`.
 `model.usage()` — вызовы и токены всех входов (у агентов Claude SDK — ходы и токены из итогового сообщения SDK,
 ещё и отдельно `agent_calls`) и число текстов эмбеддингов (`embedded`); это итог прогона в `summary.json`.
+
+Что идёт мимо бэкенда (`BACKEND` на это не влияет), и почему:
+- агенты Claude Agent SDK (`model.session`, mce и его мета): свой транспорт по природе — CLI шлёт Anthropic
+  `/v1/messages` в LiteLLM proxy, тот — на сервер модели; ни провода, ни pydantic-ai тут нет, расход — из итогового
+  сообщения SDK;
+- утилиты агентов MCE апстрима (`memory/mce_utils`: `llm.py`, `embedding.py` — langchain `ChatOpenAI` и
+  `OpenAIEmbeddings` на `OPENROUTER_API_BASE`): их зовёт код, который пишут агенты. Из Bash агента — на сервер
+  модели (`claude.env`), в расход не входят. Интерфейсы `interfaces/` исполняются в процессе стенда
+  (`load_interfaces`): если `get_context` зовёт `utils.llm`, запрос уйдёт по `OPENROUTER_*` процесса (и `.env`
+  выше по дереву от утилит — `load_dotenv(override=True)` апстрима), мимо модели и расхода;
+- эмбеддинги стенда без модели: BGE-M3 (`ace.embed`) и готовые эмбеддинги апстримов — слияние похожих пунктов ACE
+  (`memory/ace.py`), retrieval показа (`show/`) и DC (`embed.similarity`). Это локальная модель, не вызов модели
+  стенда, на обоих бэкендах одна и та же; в `embedded` не входит. Через `model.embed` идёт только EvoLib, у апстрима
+  которого эмбеддинги — запрос к серверу;
+- запись и воспроизведение (`tools/record`) и драйверы апстримов (`bridge/`) — обвязка сверки, не стенд.
+Прямых клиентов openai/httpx и обращений к `model.agent` / `model.wire` вне `model/` в коде стенда нет (только тесты).
 
 ## Решатель
 
