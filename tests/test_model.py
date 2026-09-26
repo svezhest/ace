@@ -208,11 +208,14 @@ def test_wire_readers():
     assert wire("no json").ask(Call(messages("q"), reader=Reader(schema=Answer))).output is None
 
 
-def test_wire_tools_go_to_pydantic_ai():
-    """Вызов с инструментами на проводе идёт через pydantic-ai."""
+def test_wire_rejects_tools_and_history():
+    """Вызов с инструментами или продолжение разговора на проводе — ошибка, в pydantic-ai он не уходит."""
     m = wire("never")
-    m.agent.llm = FunctionModel(lambda messages, info: ModelResponse(parts=[TextPart("FINAL ANSWER: 1")]))
-    assert ask(m, tools=(add,), rounds=1).output == "FINAL ANSWER: 1" and not m.wire.client.sent
+    m.agent.llm = FunctionModel(lambda messages, info: pytest.fail("вызов ушёл в pydantic-ai"))
+    for call in (dict(tools=(add,), rounds=1), dict(history=[])):
+        with pytest.raises(RuntimeError, match="на проводе"):
+            ask(m, **call)
+    assert not m.wire.client.sent
 
 
 def test_tool_retries_do_not_end_talk():

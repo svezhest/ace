@@ -27,6 +27,18 @@ def replaying(srv):
     return Model(MODEL, f"http://127.0.0.1:{srv.server_address[1]}/v1", backend="wire")
 
 
+class Mixed(Model):
+    """Модель, какой снята запись scope_code (bridge/live/scope/driver.py на проводе, пока вызовы с инструментами на
+    нём молча уходили в pydantic-ai): решатель с инструментами — pydantic-ai, остальное — провод. Только чтобы
+    воспроизвести ту запись; в стенде бэкенд один на все вызовы."""
+    def ask(self, call):
+        return self.agent.ask(call) if call.tools else self.wire.ask(call)
+
+
+def mixed(srv):
+    return Mixed(MODEL, f"http://127.0.0.1:{srv.server_address[1]}/v1", backend="wire")
+
+
 def requests(rec):
     """Тела записанных запросов по порядку записи."""
     return [json.loads(json.loads(line)["request"]) for line in open(rec)]

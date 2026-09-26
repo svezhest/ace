@@ -7,6 +7,7 @@
 
     scope       max_rules_per_task 3 и max_strategic_rules_per_domain 3, strategic память из seed_rules.json
     scope_code  run_python; вывод исполнения берётся из записи, test_sandbox сверяет вывод нашей песочницы
+                (модель — tests/live.Mixed: так снята запись, решатель с инструментами шёл через pydantic-ai)
     scope_bo2   Best-of-2: candidate_models — та же модель при T = 0.7
     scope_k2    два оптимизатора (efficiency, thoroughness), у каждой перспективы своя память"""
 import json
@@ -22,7 +23,7 @@ from ace.memory.scope import Book, Perspectives, Strategic
 from ace.methods.scope import scope, scope_bo2, scope_code, scope_k2
 from ace.tasks import TASKS
 
-from . import LIVE, replay, replaying, requests
+from . import LIVE, mixed, replay, replaying, requests
 
 AGENT = "formula_agent"
 STEPS, HISTORY = [], []         # память после каждого вопроса; события правил (перспектива, текст, исход, ...)
@@ -112,7 +113,8 @@ def replayed(request, tmp_path_factory):
         watch_history(patch)
         learner = METHODS[name]()
         n = json.load(open(LIVE / name / "run.json"))["n"]
-        run(TASKS["formula"], learner, replaying(srv), n, str(out))
+        model = mixed(srv) if name == "scope_code" else replaying(srv)
+        run(TASKS["formula"], learner, model, n, str(out))
     names = [b.name for b in learner.memory.books]
     return name, srv.status(), json.load(open(out / "log.json")), list(STEPS), list(HISTORY), names
 

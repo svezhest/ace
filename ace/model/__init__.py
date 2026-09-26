@@ -12,7 +12,7 @@
     wire            «провод апстрима»: официальный клиент openai, chat.completions.create ровно с messages и params
                     вызова, без своей логики; ответ текстом -> reader (wire.py)
 Входы Model — все вызовы идут через них и все в расходе (usage):
-    ask(Call) -> Reply          вызов; с инструментами — только через pydantic-ai
+    ask(Call) -> Reply          вызов; с инструментами или историей — только pydantic-ai, на проводе ошибка
     message(messages, params)   ход агентного цикла апстрима на проводе (TF-GRPO: openai-agents), ответ как есть
                                 (сообщение с tool_calls); только на wire — на pydantic-ai цикл идёт через ask
     session(...)                агент Claude Agent SDK на этой модели (MCE апстрима, claude.py): ходы и токены — из
@@ -51,7 +51,7 @@ class Call:
     messages: list
     params: dict = field(default_factory=dict)
     reader: Reader = TEXT
-    # только pydantic-ai: инструменты решателя и агентов, шаговый режим, продолжение разговора с инструментами
+    # только pydantic-ai (на проводе — ошибка): инструменты решателя и агентов, шаговый режим, продолжение разговора
     tools: tuple = ()
     deps: object = None
     rounds: int = 0             # раундов инструментов до ответа
@@ -157,8 +157,8 @@ def text_reply(call, text, truncated=False):
 
 
 class Model:
-    """Модель стенда: вызовы идут в выбранный бэкенд, вызовы с инструментами — в pydantic-ai; агенты Claude SDK и
-    эмбеддинги — тоже здесь, чтобы расход был полным."""
+    """Модель стенда: вызовы идут в выбранный бэкенд и только в него; агенты Claude SDK и эмбеддинги — тоже здесь,
+    чтобы расход был полным."""
     def __init__(self, name=None, base_url=None, backend=None):
         from .agent import PydanticAI
         from .wire import Wire
@@ -177,9 +177,13 @@ class Model:
         return self.backend == "wire"
 
     def ask(self, call):
-        if self.on_wire and not call.tools and call.history is None:
-            return self.wire.ask(call)
-        return self.agent.ask(call)
+        """Вызов в бэкенд модели. Провод — запрос апстрима без своей логики: цикла инструментов и продолжения
+        разговора на нём нет, такой вызов — ошибка, а не молчаливый переход в pydantic-ai."""
+        if not self.on_wire:
+            return self.agent.ask(call)
+        if call.tools or call.history is not None:
+            raise RuntimeError("на проводе нет инструментов и продолжения разговора: такой вызов — только BACKEND=pydantic-ai")
+        return self.wire.ask(call)
 
     def message(self, messages, params):
         """(сообщение assistant dict, finish_reason): запрос ровно с messages и params (с tools), ответ с tool_calls.
