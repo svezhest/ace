@@ -151,18 +151,19 @@ $U/mce/bin/python   bridge/capture_mce.py
 
 ## Тесты-мостик: итог
 
-`uv run pytest tests/bridge` — 389 тестов. Нормализация только по записям `DEVIATIONS.md` (тест вызывает
+`uv run pytest tests/bridge`. Нормализация только по записям `DEVIATIONS.md` (тест вызывает
 `deviation("ID")`). Наш код, где расходился без причины, приведён к апстриму.
 
-| файл | апстрим | тестов | что сверяется |
-|---|---|---|---|
-| `test_bridge_ace.py` | ACE | 113 | шаблоны и запросы генератора, рефлектора и куратора, параметры, разборщики (и bullet_ids, extract_answer), вход задачи, операции над playbook, цикл online на 4 задачах с окном 2 (все запросы по порядку, итоговый playbook) |
-| `test_bridge_dc.py` | DC | 32 | шаблоны генератора, куратора и синтеза, их запросы, `extract_cheatsheet`, вход задачи, показ пар, цикл DC-Cu и DC-RS на 5 задачах (все запросы по порядку) |
-| `test_bridge_scope.py` | SCOPE | 63 | шаблоны и запросы, все разборщики (текстом, как у апстрима), память (0.85, лимит 20), цикл на 7 задачах |
-| `test_bridge_evolib.py` | EvoLib | 45 | промпты (hmmt дословно, задачи стенда без math), решатель HMMT целиком, параметры, разборщики, IG и Future IG, выборка из библиотеки, слияния, цикл nogold и gold (все запросы по порядку) |
-| `test_bridge_tfgrpo.py` | TF-GRPO | 60 | шаблоны и запросы стадий, разборщики, план батча, фильтр групп, два батча `ExperienceUpdater.run`, настройки |
-| `test_bridge_mce.py` | MCE | 10 | промпты мета-агента и базового агента, разбор Skill Overview, выбор итерации, evaluations, цикл |
-| `test_bridge_tasks.py` | ACE, DC | 66 | чекеры finer и formula (ACE), meb (DC), отчётная точность; gpqa — наша (CHK2) |
+| файл | апстрим | что сверяется |
+|---|---|---|
+| `test_bridge_ace.py` | ACE | шаблоны и запросы генератора, рефлектора и куратора, параметры, разборщики (и bullet_ids, extract_answer), вход задачи, операции над playbook, цикл online на 4 задачах с окном 2 (все запросы по порядку, итоговый playbook) |
+| `test_bridge_dc.py` | DC | шаблоны генератора, куратора и синтеза, их запросы, `extract_cheatsheet`, вход задачи, показ пар, цикл DC-Cu и DC-RS на 5 задачах (все запросы по порядку) |
+| `test_bridge_scope.py` | SCOPE | шаблоны и запросы, все разборщики (текстом, как у апстрима), память (0.85, лимит 20), цикл на 7 задачах |
+| `test_bridge_evolib.py` | EvoLib | промпты (hmmt дословно, задачи стенда без math), решатель HMMT целиком, параметры, разборщики, IG и Future IG, выборка из библиотеки, слияния, цикл nogold и gold (все запросы по порядку) |
+| `test_bridge_tfgrpo.py` | TF-GRPO | шаблоны и запросы стадий, разборщики, план батча, фильтр групп, два батча `ExperienceUpdater.run`, настройки |
+| `test_bridge_mce.py` | MCE | промпты мета-агента и базового агента, разбор Skill Overview, выбор итерации, evaluations, цикл |
+| `test_bridge_tasks.py` | ACE, DC | чекеры finer и formula (ACE), meb (DC), отчётная точность; gpqa — наша (CHK2) |
+| `test_bridge_deviations.py` | — | номера записей `DEVIATIONS.md` уникальны (на них ссылаются тесты) |
 
 Подозрения: formula `$15.00`/строки, finer eval и `$1,200` — чекеры как у ACE (тест); meb — как у DC, без × ÷;
 bullet_ids ACE — регулярка апстрима как есть (тест); slug `ph` и id — как у ACE (тест); UPDATE / DELETE куратора ACE
