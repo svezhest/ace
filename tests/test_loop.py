@@ -308,7 +308,8 @@ def test_step_training_flag():
 def test_report_without_log(tmp_path):
     run_dir = tmp_path / "formula4" / "x"
     run_dir.mkdir(parents=True)
-    json.dump(dict(correct=1, n=2, truncated=0, calls=2, prompt_tokens=1, completion_tokens=1),
+    json.dump(dict(correct=1, n=2, accuracy=0.5, done=True, errors=0, truncated=0, calls=2, prompt_tokens=1,
+                   completion_tokens=1),
               open(run_dir / "summary.json", "w"))
     report = Path(__file__).parent.parent / "report.py"
     r = subprocess.run([sys.executable, str(report), str(tmp_path)], capture_output=True, text=True)

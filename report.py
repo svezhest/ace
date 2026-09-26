@@ -31,10 +31,8 @@ def fired(log):
 
 
 def row(root, path):
-    """Строка таблицы по summary.json прогона; пропущенный прогон (итога нет) — None."""
+    """Строка таблицы по summary.json прогона."""
     summary = json.load(path.open())
-    if "correct" not in summary:
-        return None
     log_path = path.parent / "log.json"
     log = final(json.load(log_path.open())) if log_path.exists() else []
     read = [r for r in log if r.get("read")]
@@ -43,17 +41,13 @@ def row(root, path):
     shows, helped = fired(log)
     if any(r.get("pass_at_k") for r in log):
         mark = "*"
-    elif not summary.get("done", True):
+    elif not summary["done"]:
         mark = "~"
     else:
         mark = " "
-    if "accuracy" in summary:
-        accuracy = summary["accuracy"]
-    else:
-        accuracy = summary["correct"] / max(summary["n"], 1)
     tokens = summary["prompt_tokens"] + summary["completion_tokens"]
     columns = [f"{str(path.parent.relative_to(root)):64}", f"{summary['correct']:>3}/{summary['n']:<2}{mark}",
-               f"{accuracy:>5.2f}{summary['truncated']:>5}", f"{summary.get('errors', 0):>4}", f"{summary['calls']:>6}",
+               f"{summary['accuracy']:>5.2f}{summary['truncated']:>5}", f"{summary['errors']:>4}", f"{summary['calls']:>6}",
                f"{tokens:>9}", f"{share:>6}", f"{acc(read):>8}", f"{acc(none) if read else '-':>8}",
                f"{shows if shows else '-':>6}", f"{helped if shows else '-':>6}"]
     return " ".join(columns)
@@ -63,9 +57,7 @@ def main():
     root = Path(sys.argv[1] if len(sys.argv) > 1 else "results")
     print(HEADER)
     for path in sorted(root.rglob("summary.json")):
-        line = row(root, path)
-        if line is not None:
-            print(line)
+        print(row(root, path))
     print("* — pass@k: в зачёт лучшая попытка по метке")
 
 
