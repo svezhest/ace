@@ -405,19 +405,23 @@ def skilled(system, ex):
 # GEPA (strategies/instruction_proposal.py: InstructionProposalSignature.prompt_renderer)
 
 
+MAX_HEADING = 6             # глубже ###### заголовков в markdown нет
+
+
 def gepa_samples(samples):
     """format_samples апстрима без картинок: пример — «# Example n», поле — «## ключ», строка — без пробелов по
-    краям и пустая строка после; словарь и список — заголовками на уровень глубже (не глубже ######)."""
+    краям и пустая строка после; словарь и список — заголовками на уровень глубже (не глубже ######), пустые —
+    пустой строкой."""
     def value(v, level):
-        deeper = min(level + 1, 6)
+        deeper = min(level + 1, MAX_HEADING)
+        if isinstance(v, (dict, list, tuple)) and not v:
+            return "\n"
         if isinstance(v, dict):
-            s = "".join(f"{'#' * level} {k}\n" + value(x, deeper) for k, x in v.items())
-            return s if v else s + "\n"
+            return "".join(f"{'#' * level} {k}\n" + value(x, deeper) for k, x in v.items())
         if isinstance(v, (list, tuple)):
-            s = "".join(f"{'#' * level} {GEPA.item(n=i + 1)}\n" + value(x, deeper) for i, x in enumerate(v))
-            return s if v else s + "\n"
+            return "".join(f"{'#' * level} {GEPA.item(n=i + 1)}\n" + value(x, deeper) for i, x in enumerate(v))
         return f"{str(v).strip()}\n\n"
     blocks = []
     for n, sample in enumerate(samples, 1):
-        blocks.append(GEPA.example(n=n) + "".join(f"## {k}\n" + value(v, 3) for k, v in sample.items()))
+        blocks.append(GEPA.example(n=n) + "".join(f"## {k}\n" + value(v, level=3) for k, v in sample.items()))
     return "\n\n".join(blocks)
