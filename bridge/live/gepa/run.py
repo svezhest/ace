@@ -64,8 +64,6 @@ def main():
     os.makedirs(OUT, exist_ok=True)
     trainset, valset, _ = gepa.examples.aime.init_dataset()
     trainset, valset = trainset[:TRAIN], valset[:VAL]
-    with open(os.path.join(OUT, "slice.json"), "w") as f:
-        json.dump(dict(train=trainset, val=valset), f, ensure_ascii=False, indent=1)
 
     seed_prompt = {
         "system_prompt": "You are a helpful assistant. Answer the question. "
