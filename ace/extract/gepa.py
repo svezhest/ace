@@ -44,6 +44,3 @@ class Reflection(Extractor):
         if reply.output is None or (reply.truncated and not parse.gepa_fenced((reply.raw or "").strip())):
             return []
         return [Extraction(groups, [reply.output], [s for g in groups for s in scores(g)])]
-
-    def __call__(self, ex, group, memory):
-        return (self.batch(ex, [group], memory) or [None])[0]
