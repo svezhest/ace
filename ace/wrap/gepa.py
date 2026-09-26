@@ -219,13 +219,14 @@ class EpochShuffled:
 def pareto_parent(at_front, averages, rng):
     """select_program_candidate_from_pareto_front: без доминируемых кандидатов фронта, кандидат — случайно с весом
     «на скольких вопросах val он на фронте»."""
-    front = without_dominated(at_front, averages)
-    frequency = {}
-    for programs in front.values():
-        for p in programs:
-            frequency[p] = frequency.get(p, 0) + 1
+    frequency = on_front(without_dominated(at_front, averages))
     sampling = [p for p, f in frequency.items() for _ in range(f)]
     return rng.choice(sampling)
+
+
+def on_front(at_front):
+    """Кандидат -> на скольких вопросах val он на фронте; порядок — первого появления, как у словаря апстрима."""
+    return Counter(p for programs in at_front.values() for p in programs)
 
 
 def dominated(y, others, at_front):
@@ -235,20 +236,12 @@ def dominated(y, others, at_front):
 
 def without_dominated(at_front, averages):
     """remove_dominated_programs: от худших по среднему к лучшим убирается по одному доминируемому, пока есть."""
-    frequency = {}
-    for programs in at_front.values():
-        for p in programs:
-            frequency[p] = frequency.get(p, 0) + 1
-    programs = sorted(frequency, key=lambda p: averages[p])
+    programs = sorted(on_front(at_front), key=lambda p: averages[p])
     gone = set()
-    found = True
-    while found:
-        found = False
-        for y in programs:
-            if y in gone:
-                continue
-            if dominated(y, set(programs).difference({y}).difference(gone), at_front):
-                gone.add(y)
-                found = True
-                break
-    return {j: {p for p in programs_ if p not in gone} for j, programs_ in at_front.items()}
+    while True:
+        y = next((y for y in programs if y not in gone
+                  and dominated(y, set(programs) - {y} - gone, at_front)), None)
+        if y is None:
+            break
+        gone.add(y)
+    return {j: {p for p in ps if p not in gone} for j, ps in at_front.items()}
