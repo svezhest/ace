@@ -147,6 +147,21 @@ def test_offline_best_by_val_and_training(tmp_path):
     assert json.load(open(tmp_path / "memory.json"))[0]["text"] == "version 0"
 
 
+class Budget(Spy):
+    """Ученик с бюджетом: после двух проходов выборка пуста."""
+    def sample(self, ex, split, n):
+        self.passes = getattr(self, "passes", 0) + 1
+        return [] if self.passes > 2 else super().sample(ex, split, n)
+
+
+def test_empty_sample_ends_training(tmp_path):
+    """Пустая выборка прохода кончает обучение раньше epochs: пустых проходов нет, дальше — тест."""
+    learner = Budget("budget", extract=Raw(), protocol=Protocol(offline=True, epochs=5))
+    run(TASK, learner, Stub(), 1, split="val", out=str(tmp_path))
+    log = json.load(open(tmp_path / "log.json"))
+    assert [(r["phase"], r["epoch"]) for r in log] == [("train", 0), ("train", 1), ("test", 0)]
+
+
 class Random(Whole):
     random = True
 

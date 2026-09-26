@@ -153,7 +153,8 @@ class Attempts:
 class Protocol:
     """Протокол метода — как у его апстрима: на чём память учится и что идёт в зачёт.
     offline   обучение на train, после каждого прохода val; тест на потоке с лучшей по val версией памяти
-    epochs    проходов обучения; онлайн — по тестовому потоку, в зачёт последний
+    epochs    проходов обучения (не больше: пустая выборка ученика кончает обучение раньше — бюджет вызовов
+              GEPA); онлайн — по тестовому потоку, в зачёт последний
     window    онлайн: тест окна — перед обучением на каждых window вопросах они решаются текущей памятью без
               обучения, это и в зачёт (ACE online); 0 — в зачёт первая попытка обучения
     recheck   после обучения на вопросе — попытка новой памятью, только в лог (ACE post_train)
@@ -436,7 +437,8 @@ class Run:
             if self.proto.window:
                 self.initial_test()
             for epoch in range(self.proto.epochs):
-                self.train_pass(epoch)
+                if not self.train_pass(epoch):
+                    break
             if self.proto.offline:
                 self.final_test()
             done = True
@@ -449,10 +451,13 @@ class Run:
             self.test("initial", i, item)
 
     def train_pass(self, epoch):
+        """Проход обучения; вопросов нет (ученик исчерпал бюджет, GEPA) — прохода нет и обучение кончено: False."""
         ex = self.ex
         learner = self.learner
         proto = self.proto
         items = learner.sample(ex, "train" if proto.offline else self.split, self.n)
+        if not items:
+            return False
         ex.epoch = epoch
         ex.total = len(items)
         ex.batch = 0
@@ -467,6 +472,7 @@ class Run:
             if proto.recheck:
                 self.test("post", i, item)
         self.guarded("pass", len(items), None, partial(self.end_pass, epoch, batch))
+        return True
 
     def final_test(self):
         """Тест с лучшей по val версией памяти (без val — с последней)."""
