@@ -30,7 +30,7 @@ uv sync                                   # окружение с зависим
 docker build -t cestand-sandbox ace/env   # образ docker для исполнения кода
 uv run python run.py formula ace 40       # в results/formula40/ace/online-w15-e1_<модель>_<бэкенд>/
 EPOCHS=3 OFFLINE=1 uv run python run.py formula ace_stand 40   # другой протокол в этом прогоне: офлайн, 3 прохода
-BACKEND=wire uv run python run.py formula dc 40          # вызовы без инструментов — клиентом openai как есть
+BACKEND=wire uv run python run.py formula dc 40          # провод апстрима: клиентом openai как есть (без инструментов)
 uv run python ablate.py formula 40        # цепочка абляций; ступени по именам: ablate.py formula 40 ace_stand ace_stand_opt
 uv run python report.py                   # таблица по results/
 uv run pytest -q                          # тесты, в том числе мостик к апстримам (tests/bridge)
