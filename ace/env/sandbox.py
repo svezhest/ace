@@ -50,11 +50,16 @@ def trim(text, head=HEAD_LINES, tail=TAIL_LINES):
     return "\n".join(lines[:head] + [TEXT.omitted(n=len(lines) - head - tail)] + lines[-tail:])
 
 
+def container_name(prefix):
+    """Имя контейнера: префикс и случайный хвост — по имени хост убивает контейнер после предела."""
+    return f"{prefix}-{uuid.uuid4().hex[:12]}"
+
+
 def run(code, container=None, limit=TIMEOUT, path=None):
     """-> dict(stdout, stderr, rc, timeout). Код уходит через stdin, обратно только текст.
     container — id контейнера попытки (start); без него — одноразовый контейнер на этот вызов. limit — секунд на код;
     path — исполнить как файл с этим путём внутри контейнера."""
-    name = f"sandbox-{uuid.uuid4().hex[:12]}"
+    name = container_name("sandbox")
     if container:
         args = ["docker", "exec", "-i", container, *python(limit, path)]
     else:

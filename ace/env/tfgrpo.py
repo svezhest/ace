@@ -8,11 +8,10 @@
 import json
 import select
 import subprocess
-import uuid
 from pathlib import Path
 
 from .. import render
-from .sandbox import DOCKER_GRACE, IMAGE, ISOLATION
+from .sandbox import DOCKER_GRACE, IMAGE, ISOLATION, container_name
 
 DEFAULT_TIMEOUT = 30        # timeout execute_python_code_args по умолчанию
 CODE = Path(__file__).parent / "tfgrpo_kernel.py"
@@ -35,7 +34,7 @@ class Kernel:
         self.name = None        # имя контейнера
 
     def start(self):
-        self.name = f"tfgrpo-kernel-{uuid.uuid4().hex[:12]}"
+        self.name = container_name("tfgrpo-kernel")
         command = ["docker", "run", "--rm", "-i", "--name", self.name, *ISOLATION, *ENV, IMAGE,
                    "python", "-c", self.code]
         self.proc = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
