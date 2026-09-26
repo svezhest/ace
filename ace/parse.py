@@ -111,12 +111,8 @@ def ace_json(text):
     """extract_json_from_text (ACE playbook_utils.py:256): весь текст; иначе первый разобранный блок ```json (регистр
     не важен); иначе первый разобранный объект {...} по балансу скобок, скобки в строках не считаются; иначе None."""
     try:
-        try:
-            return json.loads(text.strip())
-        except json.JSONDecodeError:
-            pass
         blocks = [b.strip() for b in re.findall(r"```json\s*(.*?)\s*```", text, re.DOTALL | re.IGNORECASE)]
-        return first_json(blocks + braced(text))
+        return first_json([text.strip()] + blocks + braced(text))
     except Exception:
         return None
 
@@ -398,12 +394,8 @@ def json_object(text):
     (рассуждающая модель упоминает JSON раньше итогового); иначе None."""
     if not text:
         return None
-    try:
-        return json.loads(text.strip())
-    except json.JSONDecodeError:
-        pass
     candidates = re.findall(r"```json\s*(.*?)\s*```", text, re.DOTALL) + braced(text)
-    return first_json(reversed(candidates))
+    return first_json([text.strip(), *reversed(candidates)])
 
 
 def structured(text, schema):
