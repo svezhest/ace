@@ -163,12 +163,17 @@ class Protocol:
     window    онлайн: тест окна — перед обучением на каждых window вопросах они решаются текущей памятью без
               обучения, это и в зачёт (ACE online); 0 — в зачёт первая попытка обучения
     recheck   после обучения на вопросе — попытка новой памятью, только в лог (ACE post_train)
-    final     офлайн без val: проход по train только учит, в зачёт — тест памятью после обучения (TF-GRPO)"""
+    final     офлайн без val: проход по train только учит, в зачёт — тест памятью после обучения (TF-GRPO)
+    epochs = 0 — без обучения при любых флагах: сразу тест пустой памятью (тот же метод без обучения)"""
     offline: bool = False
     epochs: int = 1
     window: int = 0
     recheck: bool = False
     final: bool = False
+
+    @property
+    def trains(self):
+        return self.epochs > 0
 
     @property
     def val(self):
@@ -455,9 +460,9 @@ def run(task, learner, model, n=None, out=None, split=""):
     proto.check(learner.name, learner.verdict, split)
     n = n or task.size(split)
     parts = {split: n}
-    if proto.offline:
+    if proto.offline and proto.trains:
         parts["train"] = task.size("train", n)
-    if proto.val or learner.needs_val:
+    if (proto.val or learner.needs_val) and proto.trains:
         parts["val"] = task.size("val", n)
     for part, size in parts.items():
         try:
@@ -486,12 +491,12 @@ class Run:
     def everything(self):
         done = False
         try:
-            if self.proto.window:
+            if self.proto.window and self.proto.trains:
                 self.initial_test()
             for epoch in range(self.proto.epochs):
                 if not self.train_pass(epoch):
                     break
-            if self.proto.offline:
+            if self.proto.offline or not self.proto.trains:
                 self.final_test()
             done = True
         finally:
