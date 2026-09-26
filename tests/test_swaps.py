@@ -2,9 +2,8 @@
 либо прогон на заглушке без ошибок. Молча не действующих и падающих в работе клеток нет."""
 import json
 
-import numpy as np
 import pytest
-from stub import TASK, Stub
+from stub import TASK, Stub, embed_by_length
 
 from ace import config, verdict
 from ace.env import Sandbox
@@ -45,7 +44,7 @@ def learner_of(method):
 
 @pytest.fixture(autouse=True)
 def stub_embeddings(monkeypatch):
-    monkeypatch.setattr("ace.embed.embed", lambda texts: np.array([[len(t) % 7 + 1.0, 1.0] for t in texts]))
+    monkeypatch.setattr("ace.embed.embed", embed_by_length)
     monkeypatch.setattr(config, "VAL_SIZE", 2)
 
 

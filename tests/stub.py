@@ -62,6 +62,16 @@ def experiment(model=None, task=TASK, **fields):
     return ex
 
 
+def fake_embed(monkeypatch, vecs):
+    """ace.embed.embed по таблице: текст -> вектор."""
+    monkeypatch.setattr("ace.embed.embed", lambda texts: np.array([vecs[t] for t in texts], dtype=float))
+
+
+def embed_by_length(texts):
+    """Эмбеддинги для прогонов на заглушке: вектор — от длины текста, у разных текстов разный."""
+    return np.array([[len(t) % 7 + 1.0, 1.0] for t in texts])
+
+
 def right(call):
     return f"FINAL ANSWER: {target_of(call['user'])}"
 

@@ -3,8 +3,7 @@
 import math
 import random
 
-import numpy as np
-from stub import TASK, Stub, episode, experiment
+from stub import TASK, Stub, episode, experiment, fake_embed
 
 from ace import verdict
 from ace.extract import ATTRIBUTION, BEST_ANSWER, IG, Extraction
@@ -81,8 +80,6 @@ def test_evaluated():
     assert "Evaluation: wrong" in model.calls[0]["user"] and x.lessons == ["If a, then b."] and x.scores == [0, 0, 0]
 
 
-def fake_embed(monkeypatch, vecs):
-    monkeypatch.setattr("ace.embed.embed", lambda texts: np.array([vecs[t] for t in texts], dtype=float))
 
 
 def extraction(insight=None, best=None, ig=0.5, shown=([], [], []), scores=(1, 0, 0), b=0):

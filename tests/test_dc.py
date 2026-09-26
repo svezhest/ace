@@ -1,8 +1,7 @@
 """DC: генератор апстрима (вход задачи, cheatsheet в промпте, ответ <answer>, разговор с исполнением кода),
 cheatsheet целиком (куратор переписывает, без блока остаётся старый), пары DC-RS и синтез под вопрос,
 синтезированный cheatsheet сохраняется; контроли retrieval и history."""
-import numpy as np
-from stub import TASK, Stub, episode, experiment
+from stub import TASK, Stub, episode, experiment, fake_embed
 
 from ace import prompts
 from ace.extract import INPUT, SHEET, Seen
@@ -75,9 +74,7 @@ def test_curator_params():
     assert seen == [{"temperature": 0.0, "max_completion_tokens": 4096}]
 
 
-def fake_embed(monkeypatch):
-    vecs = {"q1": [0, 1], "q2": [1, 0], "q3": [0.8, 0.6], ITEM["question"]: [1, 0]}
-    monkeypatch.setattr("ace.embed.embed", lambda texts: np.array([vecs[t] for t in texts], dtype=float))
+VECS = {"q1": [0, 1], "q2": [1, 0], "q3": [0.8, 0.6], ITEM["question"]: [1, 0]}
 
 
 def pairs(*questions, sheet=False):
@@ -88,7 +85,7 @@ def pairs(*questions, sheet=False):
 
 
 def test_retrieval_and_history(monkeypatch):
-    fake_embed(monkeypatch)
+    fake_embed(monkeypatch, VECS)
     assert dc_retrieval.solver.prompt(experiment(), pairs(), ITEM, 0).seen[SHEET] == EMPTY
     p = dc_retrieval.solver.prompt(experiment(), pairs("q1", "q2", "q3"), ITEM, 0)
     assert p.shown == ["r2", "r3", "r1"]
@@ -109,7 +106,7 @@ def test_upstream_embeddings():
 def test_synthesis_kept(monkeypatch):
     """Синтез видит пары, вход задачи и прошлый cheatsheet; синтезированный текст — в промпте генератора, память
     его хранит."""
-    fake_embed(monkeypatch)
+    fake_embed(monkeypatch, VECS)
     m = pairs("q1", sheet=True)
     model = Stub(lambda call: "<cheatsheet>for this question</cheatsheet>")
     p = dc_rs.solver.prompt(experiment(model), m, ITEM, 0)

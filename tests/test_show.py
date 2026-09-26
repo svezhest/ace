@@ -1,6 +1,5 @@
 """Показ: весь текст, top-k, синтез, каталог с чтением, урок после ошибки."""
-import numpy as np
-from stub import Stub, experiment
+from stub import Stub, experiment, fake_embed
 
 from ace import fs
 from ace.loop import Attempt, Prompt
@@ -29,7 +28,7 @@ def test_whole():
 
 def test_topk(monkeypatch):
     vecs = {"far": [0, 1], "near": [1, 0], "mid": [0.8, 0.6], ITEM["question"]: [1, 0]}
-    monkeypatch.setattr("ace.embed.embed", lambda texts: np.array([vecs[t] for t in texts], dtype=float))
+    fake_embed(monkeypatch, vecs)
     p = TopK(2).prompt(EX, memory("far", "near", "mid"), ITEM, 0)
     assert p.shown == ["r2", "r3"]
 
