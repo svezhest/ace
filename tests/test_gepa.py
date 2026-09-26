@@ -1,13 +1,18 @@
 """GEPA на модели-заглушке: пул и принятие по минибатчу, откат отвергнутого, тест лучшим по val; разбор ответа
 рефлексии (ProposalAdapter.parse) и разметка примеров (format_samples)."""
+import json
+
 from stub import TASK, Stub, right
 
-from ace import parse, render
+from ace import parse, render, verdict
 from ace.env import Sandbox
-from ace.learner import swap
-from ace.loop import Protocol, Version, run
+from ace.extract import Raw
+from ace.learner import Learner, swap
+from ace.loop import Attempts, Protocol, Version, run
+from ace.memory import Lessons
 from ace.methods import METHODS
 from ace.methods.gepa import gepa
+from ace.show import Whole
 from ace.solver.gepa import Adapter
 from ace.wrap.gepa import Candidate, EpochShuffled, Evolution, pareto_parent
 from ace.wrap.hooks import Hooks
@@ -88,3 +93,67 @@ def test_state_of_wrapped_learner():
     ev.take(0)
     assert ev.current == 0 and ev.dump()[-2:] == [dict(kind="candidate", id=0, memory=[], parents=[None],
                                                        scores={0: 1.0}), dict(kind="best", id=0)]
+
+
+def better_model():
+    """Рефлексия даёт «Better»; «Better» решает всё, seed — ничего."""
+    def answer(call):
+        if REFLECTION in call["user"]:
+            return "```\nBetter\n```"
+        return right(call) if call["system"] == "Better" else "FINAL ANSWER: 0"
+    return Stub(answer)
+
+
+def test_child_with_random_show_and_no_verdict():
+    """Потомок — память ученика после обучения на минибатче: и при случайном показе (ключа нет), и при вердикте
+    none — принятие и val по проверке задачи, а не по вердикту попытки."""
+    for levels in (dict(solver=RandomAdapter()), dict(verdict=verdict.none)):
+        model = better_model()
+        learner = Evolution(swap(gepa.inner, protocol=Protocol(offline=True, epochs=40), **levels), 40)
+        summary = run(TASK, learner, model, 3, split="val")
+        assert summary["correct"] == 3 and any(c["system"] == "Better" for c in model.calls), levels
+
+
+class Seen(Whole):
+    """Показ, который запоминает, какой вопрос стоит в ex, когда решается item."""
+    def __init__(self):
+        super().__init__()
+        self.mismatch = []
+
+    def __deepcopy__(self, memo):
+        return self
+
+    def prompt(self, ex, memory, item, k):
+        if ex.item is not item:
+            self.mismatch.append(item["question"])
+        return super().prompt(ex, memory, item, k)
+
+
+class Texts(Lessons):
+    """Каждое обучение добавляет «good N»."""
+    def learn(self, ex, extractions):
+        self.add(f"good {len(self.records())}")
+
+
+class Watched(Evolution):
+    def on_pass(self, ex):
+        super().on_pass(ex)
+        STATE.append((self.calls, len(self.pool)))
+
+
+STATE = []
+
+
+def test_child_question_budget_and_trace(tmp_path):
+    """Потомок решает минибатч с ex.i и ex.item своего вопроса; бюджет — попытки (у группы из 3 — все три), след
+    итераций — в memory.json."""
+    show = Seen()
+    good = Stub(lambda call: right(call) if "good" in call["system"] else "FINAL ANSWER: 0")
+    inner = Learner("notes", memory=Texts(), show=show, extract=Raw(), every=3, attempts=Attempts(3),
+                    protocol=Protocol(offline=True, epochs=1))
+    STATE.clear()
+    run(TASK, Watched(inner, 100), good, 3, str(tmp_path), split="val")
+    val = len(TASK.load("val"))
+    assert show.mismatch == [] and STATE == [(val + 9 + 3 + val, 2)]
+    kinds = [m["kind"] for m in json.load(open(tmp_path / "memory.json"))]
+    assert kinds.count("candidate") == 2 and kinds.count("iteration") == 1 and kinds[-1] == "best"

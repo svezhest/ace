@@ -16,7 +16,7 @@ select_program_candidate_from_pareto_front).
 лучшая по val версия прогона — тот же кандидат, что result.best_candidate апстрима."""
 import random
 from collections import Counter
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 
 from ..loop import Version, best_index, evaluated
 from . import Wrapper
@@ -106,7 +106,7 @@ class Evolution(Wrapper):
         idx = len(self.pool)
         self.current = idx
         version = evaluated(ex, self.inner, dump=True)
-        self.calls += len(version.val)
+        self.calls += len(version.val) * self.inner.attempts.count(False)
         self.pool.append(Candidate(version, parents))
         for j, score in version.scores.items():
             best = self.front.get(j, float("-inf"))
@@ -118,21 +118,25 @@ class Evolution(Wrapper):
         return idx
 
     def on_batch(self, ex, groups):
-        """Минибатч родителя решён: рефлексия, потомок на том же минибатче, принятие строго лучшего."""
+        """Минибатч родителя решён: обучение ученика на нём (рефлексия), потомок — память после него; потомок решает
+        тот же минибатч без обучения и, если верных строго больше, входит в пул. Оценка — ex.solved (проверка
+        задачи, метрика апстрима), а не вердикт попытки. Ученик ничего не выучил (рефлексия не дала текста) —
+        потомка нет. Минибатч родителя весь верен — обучения нет; извлечённое на вопросах до батча ученик
+        отбросит в конце прохода (итерации)."""
         it = self.trace[-1]
         parent = self.current
-        it.before = [score(g) for g in groups]
-        self.calls += len(groups)
+        it.before = [float(ex.solved(g)) for g in groups]
+        self.calls += attempts(groups)
         if all(s >= PERFECT for s in it.before):
             return
-        key = self.inner.key()
+        version = self.inner.version()
         self.inner.on_batch(ex, groups)
-        if self.inner.key() == key:     # рефлексия не дала текста — потомка нет
+        if self.inner.version() == version:
             return
         self.current = None
-        with ex.frozen():
-            it.after = [score(ex.question(g.item)) for g in groups]
-        self.calls += len(groups)
+        again = [ex.answer(g.i, g.item) for g in groups]
+        it.after = [float(ex.solved(g)) for g in again]
+        self.calls += attempts(again)
         if sum(it.after) > sum(it.before):
             it.child = self.add(ex, [parent])
         else:
@@ -147,14 +151,18 @@ class Evolution(Wrapper):
         return best_index([c.average for c in self.pool])
 
     def dump(self):
+        """Память ученика, пул кандидатов, след итераций (full_program_trace) и лучший."""
+        if not self.pool:
+            return self.inner.dump()
         pool = [dict(kind="candidate", id=i, memory=c.version.dump, parents=c.parents, scores=c.scores)
                 for i, c in enumerate(self.pool)]
-        return self.inner.dump() + pool + [dict(kind="best", id=self.best())] if self.pool else self.inner.dump()
+        trace = [dict(kind="iteration", id=i, **asdict(it)) for i, it in enumerate(self.trace)]
+        return self.inner.dump() + pool + trace + [dict(kind="best", id=self.best())]
 
 
-def score(group):
-    """Оценка вопроса: 1.0 — ответ в зачёт верен."""
-    return float(bool(group.episodes[group.chosen].ok))
+def attempts(groups):
+    """Вызовов метрики: попыток на вопросах (у ученика с группой попыток — все)."""
+    return sum(len(g.episodes) for g in groups)
 
 
 class EpochShuffled:
