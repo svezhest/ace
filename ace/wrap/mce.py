@@ -19,7 +19,7 @@ from .. import config, fs, prompts, render
 from ..memory import Files
 from ..model import Call, claude, messages, params
 from ..upstream.mce import (CLAUDE_SKILL, ROUNDS, SKILL, WORKSPACE, Workspace, cleanup, folder_name, signatures,
-                            sub_folder, task_instruction, utilities)
+                            sub_folder, task_instruction)
 from ..loop import Version, best_index, evaluated
 from ..render import MCE
 from . import Wrapper, single_meta
@@ -283,7 +283,6 @@ class Iterations(Wrapper):
             # свой workspace на процесс: параллельные прогоны с общим корнем не стирают друг друга
             self.ws = Workspace(root, self.workspace or f"{ex.task.name}-{os.getpid()}")
             claude.prepare(root, VENV)
-            utilities(ex.model)     # utils.llm интерфейсов в процессе стенда — на модели стенда, а не по OPENROUTER_*
             self.ws.start(ex.task)
         samples = [dict(item, id=i) for i, item in enumerate(ex.task.load(split, whole=True))]
         if n and len(samples) > n:

@@ -1,10 +1,4 @@
-"""Проверки ответов задач; утилиты интерфейсов MCE в процессе стенда — на модели стенда."""
-import shutil
-import sys
-import threading
-from http.server import BaseHTTPRequestHandler, HTTPServer
-from types import SimpleNamespace
-
+"""Проверки ответов задач."""
 import pytest
 from stub import Stub, embed_by_length, episode, experiment
 
@@ -12,12 +6,11 @@ import ablate
 from ace import config
 from ace.env import sandbox
 from ace.loop import run
-from ace.memory.mce import Folder, validate
+from ace.memory.mce import Folder
 from ace.methods import METHODS
-from ace.model import Model
 from ace.solver.mce import Environment
 from ace.tasks import TASKS, grade, graded
-from ace.upstream.mce import UTILS, signatures, task_instruction, utilities
+from ace.upstream.mce import signatures, task_instruction
 
 MEB = TASKS["meb"]
 
@@ -124,74 +117,3 @@ def test_ablation_chain_runs(monkeypatch):
             continue
         summary = run(TASKS["formula"], learner, Stub(), 2)
         assert summary["errors"] == 0 and summary["protocol"] == learner.protocol.name, name
-
-
-class Outside(BaseHTTPRequestHandler):
-    """Внешний адрес: любой запрос сюда — утечка мимо модели стенда."""
-    hits = []
-
-    def do_POST(self):
-        self.hits.append(self.path)
-        self.send_response(500)
-        self.end_headers()
-
-    def log_message(self, *args):
-        pass
-
-
-class Client:
-    """Заглушка клиента openai провода: пишет аргументы create, отвечает текстом."""
-    def __init__(self, text):
-        self.text, self.sent = text, []
-        self.chat = SimpleNamespace(completions=SimpleNamespace(create=self.create))
-
-    def create(self, **kw):
-        self.sent.append(kw)
-        message = SimpleNamespace(content=self.text)
-        return SimpleNamespace(choices=[SimpleNamespace(message=message, finish_reason="stop")],
-                               usage=SimpleNamespace(prompt_tokens=3, completion_tokens=2))
-
-
-# response_format, который шлёт utils/llm.py апстрима (langchain ChatOpenAI.with_structured_output(TextResponse)):
-# снят с его запроса
-UPSTREAM_FORMAT = {"type": "json_schema", "json_schema": {
-    "schema": {"description": "Simple text response from LLM.",
-               "properties": {"response": {"description": "The LLM's response text", "title": "Response",
-                                           "type": "string"}},
-               "required": ["response"], "title": "TextResponse", "type": "object", "additionalProperties": False},
-    "name": "TextResponse", "strict": True}}
-
-
-def test_mce_interface_llm_on_stand_model(tmp_path, monkeypatch):
-    """get_context, зовущий utils.llm апстрима, идёт в модель стенда с параметрами запроса апстрима и в её расход;
-    OPENROUTER_* / OPENAI_* окружения и .env над папкой никуда не уводят."""
-    srv = HTTPServer(("127.0.0.1", 0), Outside)
-    threading.Thread(target=srv.serve_forever, daemon=True).start()
-    outside = f"http://127.0.0.1:{srv.server_address[1]}/v1"
-    for k in ("OPENROUTER_API_BASE", "OPENAI_API_BASE"):
-        monkeypatch.setenv(k, outside)
-    for k in ("OPENROUTER_API_KEY", "OPENAI_API_KEY"):
-        monkeypatch.setenv(k, "outside")
-    for k in ("utils", "utils.llm", "utils.embedding"):
-        monkeypatch.setitem(sys.modules, k, None)       # после теста — как было
-    (tmp_path / ".env").write_text(f"OPENROUTER_API_BASE={outside}\nOPENROUTER_API_KEY=outside\n")
-    folder = tmp_path / "iter1_sub0"
-    shutil.copytree(UTILS, folder / "utils")           # копия утилит апстрима в папке, как у setup
-    (folder / "interfaces").mkdir()
-    (folder / "interfaces" / "__init__.py").write_text("from .get_context import get_context\n")
-    (folder / "interfaces" / "get_context.py").write_text(
-        "from utils.llm import call_llm\n\n\ndef get_context(symptoms):\n    return call_llm(f'Hints: {symptoms}')\n")
-    model = Model(backend="wire")
-    model.wire.client = Client('{"response": "check the rash"}')
-    utilities(model)
-    task = TASKS["symptom"]
-    assert validate(folder, signatures(task)) == []
-    memory = Folder()
-    memory.at(None, folder)
-    prompt = Environment().prompt(experiment(model, task=task), memory, dict(question="fever"), 0)
-    assert "check the rash" in prompt.solver.call(None).messages[0]["content"]
-    assert model.wire.client.sent == [dict(model=model.name, messages=[{"role": "user", "content": "Hints: fever"}],
-                                           temperature=0.0, response_format=UPSTREAM_FORMAT)]
-    assert model.usage()["calls"] == 1
-    srv.shutdown()
-    assert Outside.hits == []

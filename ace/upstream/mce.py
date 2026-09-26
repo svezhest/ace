@@ -1,20 +1,12 @@
 """MCE апстрима (meta-context-engineering: mce/utils.py, main.py, env/base.py, prompts/): общее для памяти (базовый
 агент) и меты (мета-агент) — пути и имена папок под-итераций, навык в папке, интерфейсы задачи, инструкция задачи
-агентам, workspace на диске и уборка папки после агента, утилиты агентов в процессе стенда."""
+агентам, workspace на диске и уборка папки после агента."""
 import json
 import shutil
-import sys
 from dataclasses import dataclass
-from functools import partial
 from pathlib import Path
-from types import ModuleType
-
-import numpy as np
-from openai.lib._parsing._completions import type_to_response_format_param
-from pydantic import BaseModel, Field
 
 from .. import prompts, render
-from ..model import Call, Reader, messages
 from ..render import MCE
 from ..tasks import variant
 
@@ -166,86 +158,3 @@ def cleanup(folder):
                 shutil.rmtree(item)
         except Exception:
             pass
-
-
-# Утилиты агентов (mce/workspace_utils: llm.py, embedding.py) в процессе стенда. Код интерфейсов исполняется здесь
-# (load_interfaces, проверка базового агента), и у апстрима `from utils.llm import call_llm` в нём — законная часть
-# метода: промпты агентов предлагают звать LLM из кода. Утилиты апстрима шли бы через langchain по OPENROUTER_*
-# процесса и .env выше по дереву (load_dotenv(override=True)) — мимо модели стенда и расхода. Поэтому в процессе
-# стенда пакет utils — этот: те же функции с теми же параметрами запроса, но на модели стенда (адрес и имя — её),
-# в её расходе. Копии utils/ в папках под-итераций в процессе не исполняются (их зовёт только Bash агентов, там
-# адрес — claude.env); в venv стенда нет ни langchain_openai, ни dotenv.
-
-MAX_LLM_CALLS = 100
-LLM_TRIES = 3               # with_retry(stop_after_attempt=3)
-EMBEDDING_MODEL = "text-embedding-3-small"
-
-
-class TextResponse(BaseModel):
-    """Simple text response from LLM."""
-    response: str = Field(description="The LLM's response text")
-
-
-def ask_llm(model, prompt, schema):
-    """Запрос llm.with_structured_output(schema) апстрима (ChatOpenAI, temperature=0): одно сообщение user, без
-    предела генерации; на проводе схема — response_format json_schema strict, как её шлёт клиент openai у
-    langchain, на pydantic-ai — его структурированный вывод. Не ответил или ответ не по схеме — ещё раз, до
-    LLM_TRIES; последняя ошибка — наружу."""
-    params = {"temperature": 0.0}
-    if model.on_wire:
-        params["response_format"] = type_to_response_format_param(schema)
-    call = Call(messages(prompt), params, Reader(schema=schema))
-    for attempt in range(LLM_TRIES):
-        try:
-            out = model.ask(call).output
-        except Exception:
-            if attempt == LLM_TRIES - 1:
-                raise
-            continue
-        if out is not None:
-            return out
-    raise ValueError(f"LLM output does not match {schema.__name__}")
-
-
-def batch(model, prompts, schema):
-    """call_llm_async апстрима; промпты по очереди, а не 50 разом."""
-    if len(prompts) > MAX_LLM_CALLS:
-        raise ValueError(f"Number of prompts ({len(prompts)}) exceeds maximum allowed per batch ({MAX_LLM_CALLS})")
-    return [ask_llm(model, p, schema) for p in prompts]
-
-
-async def call_llm_async(model, prompts, schema):
-    return batch(model, prompts, schema)
-
-
-def call_llm(model, prompts, schema=None):
-    """call_llm апстрима: строка — один ответ, список — список; без схемы — текст (TextResponse.response)."""
-    is_single = isinstance(prompts, str)
-    results = batch(model, [prompts] if is_single else prompts, schema if schema is not None else TextResponse)
-    if schema is None:
-        results = [r.response for r in results]
-    return results[0] if is_single else results
-
-
-def compute_embedding_similarity(model, strings_a, strings_b):
-    """Косинусная близость эмбеддингов (embedding.py апстрима): модель эмбеддингов апстрима по имени, через
-    model.embed."""
-    a = np.array(model.embed(strings_a, EMBEDDING_MODEL))
-    b = np.array(model.embed(strings_b, EMBEDDING_MODEL))
-    a = a / np.linalg.norm(a, axis=1, keepdims=True)
-    b = b / np.linalg.norm(b, axis=1, keepdims=True)
-    return a @ b.T
-
-
-def utilities(model):
-    """Пакет utils на модели model — в sys.modules: интерфейсы, загруженные после этого, берут его."""
-    llm = ModuleType("utils.llm")
-    llm.TextResponse, llm.MAX_LLM_CALLS = TextResponse, MAX_LLM_CALLS
-    llm.call_llm, llm.call_llm_async = partial(call_llm, model), partial(call_llm_async, model)
-    embedding = ModuleType("utils.embedding")
-    embedding.EMBEDDING_MODEL = EMBEDDING_MODEL
-    embedding.compute_embedding_similarity = partial(compute_embedding_similarity, model)
-    utils = ModuleType("utils")
-    utils.__path__ = []         # пакет: других модулей в нём нет
-    utils.llm, utils.embedding = llm, embedding
-    sys.modules.update({"utils": utils, "utils.llm": llm, "utils.embedding": embedding})
