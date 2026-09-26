@@ -67,6 +67,12 @@ class Learner:
             raise ValueError(f"{self.name}: при своём решателе метода не действуют: {', '.join(dead)} "
                              "(меняются параметры решателя)")
 
+    def check_placed(self, placing=False):
+        """Память, которую ставит на место обёртка (placed: папка под-итерации MCE), без такой обёртки не учится:
+        ошибка до первого вызова модели (run)."""
+        if self.memory.placed and not placing:
+            raise Contract(f"{self.name}: память живёт в папке, которую ставит обёртка (Iterations), а обёртки нет")
+
     def viewer(self):
         return self.show or WHOLE
 

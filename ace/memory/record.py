@@ -12,6 +12,7 @@ class Memory:
     (здесь уходят записи со сроком жизни «попытка», tactical SCOPE)."""
     requires = frozenset()
     skilled = False             # подставляет навык меты (ex.skill) в свои промпты обучения
+    placed = False              # живёт там, куда её ставит обёртка (at: папка под-итерации MCE)
 
     def begin(self, k):
         pass

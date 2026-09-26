@@ -208,7 +208,7 @@ def test_failed_seed_evaluation_is_logged(tmp_path):
     (lambda: Evolution(swap(METHODS["ace_stand"], protocol=replace(OFFLINE, recheck=True)), 10), "recheck"),
     (lambda: Evolution(METHODS["mce_fs"], 10), "мета над метой"),
     (lambda: Meta(Gate(gepa), lambda ex, h: ""), "мета над метой"),
-    (lambda: Iterations(gepa), "мета над метой"),
+    (lambda: Iterations(METHODS["mce"]), "мета над метой"),
 ])
 def test_evolution_build_errors(make, error):
     """Над учеником, где потомок не память после обучения на минибатче или бюджет не тот, и мета над метой —

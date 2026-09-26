@@ -248,3 +248,18 @@ def test_meta_needs_skill_reader():
         def learn(self, ex, extractions):
             pass
     assert Meta(swap(mce_ace_stand.inner, memory=Plain()), lambda ex, h: "", "meta").skilled     # читает рефлектор
+
+
+def test_mce_folder_needs_iterations():
+    """Iterations читает папку памяти (path, at): над другой памятью — ошибка сборки; память-папка без Iterations —
+    ошибка до первого вызова модели."""
+    from ace.extract import Contract
+    from ace.methods import METHODS
+    from ace.wrap.mce import Iterations
+    with pytest.raises(Contract, match="path, at"):
+        Iterations(swap(METHODS["ace_stand"], protocol=OFFLINE2))
+    model = Stub()
+    for learner in (METHODS["mce"].inner, Gate(METHODS["mce"].inner)):
+        with pytest.raises(Contract, match="Iterations"):
+            run(TASK, learner, model, 2)
+    assert model.calls == []

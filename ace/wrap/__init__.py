@@ -17,21 +17,34 @@
 куратора."""
 import copy
 
+from ..extract import Contract
 from ..learner import swap
 from ..loop import Version, evaluated
 
 
 class Wrapper:
     """Всё, чего нет у обёртки, берётся у inner (уровни, хуки); inner и служебные dunder — нет, иначе рекурсия при
-    deepcopy."""
+    deepcopy. reads — что обёртка читает у памяти ученика: сборка проверяет, что у памяти это есть; places —
+    обёртка ставит память ученика на место (Iterations: папка под-итерации), memory.placed — памяти это нужно."""
+    reads = ()
+    places = False
 
     def __init__(self, inner, name=None):
         self.inner = inner
         self.name = name or inner.name
+        self.check_reads()
         self.check()
+
+    def check_reads(self):
+        lack = [a for a in self.reads if not hasattr(self.inner.memory, a)]
+        if lack:
+            raise Contract(f"{self.name}: обёртка читает у памяти ученика {', '.join(lack)}, а у неё этого нет")
 
     def check(self):
         """Ошибка сборки, если ученик обёртке не подходит."""
+
+    def check_placed(self, placing=False):
+        self.inner.check_placed(placing or self.places)
 
     def __getattr__(self, attr):
         if attr.startswith("__") or attr == "inner":
@@ -43,6 +56,7 @@ class Wrapper:
         out = copy.deepcopy(self)
         out.inner = swap(self.inner, **levels)
         out.name = name or self.name
+        out.check_reads()
         out.check()
         return out
 

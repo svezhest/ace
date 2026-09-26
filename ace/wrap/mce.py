@@ -102,7 +102,8 @@ class Meta(Wrapper):
         self.seen += len(groups)
         self.inner.on_batch(ex, groups)
         memory = self.inner.memory
-        folder = memory.folder() if hasattr(memory, "folder") else {}      # память, отдающая себя папкой (Context)
+        # необязательное чтение: память, которая отдаёт себя папкой (Context), видна мета-агенту
+        folder = memory.folder() if hasattr(memory, "folder") else {}
         if ex.skill:
             folder = {SKILL: ex.skill, **folder}
         self.folders[sub_folder(ex)] = folder
@@ -254,6 +255,8 @@ class Iterations(Wrapper):
     (строго больше, при равенстве первая; iter0 не участвует). Workspace — root/workspace/<name>, по умолчанию
     <задача>-<pid>; без корня — временная папка, удаляется при выходе."""
     iterates = True
+    reads = ("path", "at")      # папка памяти ученика: at ставит её, path — текущая
+    places = True
 
     def __init__(self, inner, root=None, workspace=None, name=None):
         super().__init__(inner, name)

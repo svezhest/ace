@@ -445,6 +445,7 @@ def run(task, learner, model, n=None, out=None, split=""):
     val — task.size: выборки, заданные апстримом, от n не зависят; их нехватка — ошибка до первого вызова модели."""
     random.seed(config.SEED)
     learner = copy.deepcopy(learner)        # в реестре память ученика пуста: каждый прогон с чистой
+    learner.check_placed()
     proto = learner.protocol
     proto.check(learner.name, learner.verdict, split)
     n = n or task.size(split)
