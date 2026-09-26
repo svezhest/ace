@@ -1,7 +1,7 @@
 """Решатель GEPA апстрима — DefaultAdapter.evaluate (adapters/default_adapter/default_adapter.py): системный промпт —
 текст кандидата, user — вход задачи как есть, параметров запроса нет (LM(model) без kwargs: у сервера по умолчанию);
-ответ — текст без пробелов по краям (LM.batch_complete). В зачёт у aime — весь ответ (ContainsAnswerEvaluator ищет
-в нём «### N»), у задач стенда — строка FINAL ANSWER (S2)."""
+ответ — текст без пробелов по краям (LM.batch_complete). Ответ решателя у aime — весь текст (в зачёт у aime и так
+весь ответ: ContainsAnswerEvaluator ищет в нём «### N», tasks.WHOLE_REPLY), у задач стенда — строка FINAL ANSWER (S2)."""
 from ..loop import Prompt, Solver
 from ..model import Call, Reader
 from ..tasks import final_answer, variant

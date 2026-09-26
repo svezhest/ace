@@ -15,17 +15,18 @@ from collections import Counter
 
 from . import prompts
 from .model import Call, messages, params
+from .tasks import grade
 
 JUDGE = prompts.load("judge")
 
 
 def golden(ex, episode, target):
-    episode.ok = ex.task.check(episode.answer, target)
+    episode.ok = grade(ex.task, episode, target)
     episode.target = target
 
 
 def yes_no(ex, episode, target):
-    episode.ok = ex.task.check(episode.answer, target)
+    episode.ok = grade(ex.task, episode, target)
 
 
 def judge(ex, episode, target):

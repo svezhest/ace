@@ -13,7 +13,10 @@ aime — бенчмарк GEPA (gepa/examples/aime.py: init_dataset) целик�
 AI-MO/aimo-validation-aime после shuffle Random(0) (по 45, с решением в additional_context), тест — MathArena/aime_2025
 (30 вопросов в aime.jsonl) пять раз подряд при загрузке (150); выборки по умолчанию — целиком, как у апстрима; ответ —
 «### N», проверка — ContainsAnswerEvaluator апстрима (ответ входит в текст). У общего решателя ответ — строка FINAL
-ANSWER в том же виде «### N»."""
+ANSWER в том же виде «### N».
+
+Что в зачёт — свойство задачи, одно для всех методов на ней (graded): у dapo и aime — весь итоговый ответ модели,
+как судят апстримы этих бенчмарков, у остальных — ответ, который решатель выделил в своём формате."""
 import json
 import re
 from dataclasses import dataclass, field
@@ -219,6 +222,9 @@ TASKS = {name: Task(name) for name in CHECK}
 
 WHOLE = {"aime"}            # выборки задал апстрим: по умолчанию — целиком (train и val не зависят от размера теста)
 REPEAT = {"aime": 5}        # тест апстрима — выборка несколько раз подряд (init_dataset GEPA: aime_2025 * 5)
+# В зачёт весь итоговый ответ модели: проверка апстрима бенчмарка сама ищет в нём ответ (dapo — verify_func TF-GRPO,
+# math_verify; aime — ContainsAnswerEvaluator GEPA). Так судятся все методы на задаче, каким бы ни был решатель.
+WHOLE_REPLY = {"dapo", "aime"}
 
 # Метод × задача — единственное место, где метод узнаёт задачу по имени. На бенчмарке своего апстрима метод берёт
 # его тексты, разбор входа и параметры (вариант); на остальных задачах — запасной вариант стенда "" (DEVIATIONS S2).
@@ -226,10 +232,10 @@ VARIANTS = {
     ("ace", "formula"): "formula",      # DataProcessor: вопрос между «Question: » и «. Answer:», приписка про число
     ("ace", "finer"): "instruction",    # DataProcessor: Instruction / Input
     ("dc", "meb"): "meb",               # вход с вступлением MathEquationBalancer
-    ("tfgrpo", "dapo"): "math",         # math_agent.yaml и math_reasoning.yaml, в зачёт весь ответ (math_verify)
+    ("tfgrpo", "dapo"): "math",         # math_agent.yaml и math_reasoning.yaml, ответ — весь итоговый текст
     ("evolib", "hmmt"): "math",         # HMMT_SOLVER_PROMPT, reasoning API, проверка по тексту решения
     ("mce", "symptom"): "symptom",      # интерфейс get_context, промпт диагноза, инструкция и поле symptoms
-    ("gepa", "aime"): "aime",           # seed_prompt квикстарта, в зачёт весь ответ (ContainsAnswerEvaluator)
+    ("gepa", "aime"): "aime",           # seed_prompt квикстарта, ответ — весь текст
 }
 
 
@@ -246,6 +252,17 @@ def accuracy(task, answers, targets):
         total = sum(n for _, n in counts)
         return sum(c for c, _ in counts) / total if total else 0.0
     return sum(task.check(a, t) for a, t in zip(answers, targets)) / len(answers) if answers else 0.0
+
+
+def graded(task, episode):
+    """Что судит проверка задачи в попытке: у задач WHOLE_REPLY — весь итоговый ответ модели (episode.final), у
+    остальных — ответ, выделенный решателем в своём формате (episode.answer). Одно для всех методов на задаче."""
+    return episode.final if task.name in WHOLE_REPLY else episode.answer
+
+
+def grade(task, episode, target):
+    """Верна ли попытка по проверке задачи."""
+    return task.check(graded(task, episode), target)
 
 
 def final_answer(text):

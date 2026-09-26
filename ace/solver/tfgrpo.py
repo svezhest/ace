@@ -51,7 +51,8 @@ def whole(text):
 
 
 def answer(task):
-    """Ответ в зачёт: у dapo весь итоговый ответ (его судит math_verify), у задач стенда — строка FINAL ANSWER."""
+    """Ответ решателя: у dapo весь итоговый ответ (формат апстрима <answer>\\boxed{}; в зачёт у dapo и так весь
+    ответ — tasks.WHOLE_REPLY), у задач стенда — строка FINAL ANSWER."""
     return whole if variant("tfgrpo", task) == "math" else final_answer
 
 

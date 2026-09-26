@@ -476,3 +476,24 @@ def test_show_reads_memory():
     with pytest.raises(ValueError, match="sections"):
         swap(METHODS["ace_stand"], solver=GENERATOR)
     swap(METHODS["ace"], solver=None)           # общий решатель с playbook апстрима — можно
+
+
+def test_task_grades_whole_reply_for_every_solver(tmp_path):
+    """Что в зачёт — свойство задачи, одно для всех методов: на dapo весь итоговый ответ идёт в math_verify
+    (verify_func TF-GRPO) и у общего решателя, у которого строка FINAL ANSWER тут не ответ, и у агента TF-GRPO."""
+    dapo = TASKS["dapo"]
+    targets = {r["question"]: r["target"] for s in ("", "train") for r in dapo.load(s)}
+
+    def reply(call):
+        target = next(t for q, t in targets.items() if q in call["user"])
+        return f"So the result is \\boxed{{{target}}}.\n\nFINAL ANSWER: see above"
+    answers = {}
+    for name in ("baseline", "tfgrpo"):
+        out = tmp_path / name
+        summary = run(dapo, METHODS[name], Stub(reply), 2, out=str(out))
+        rows = [r for r in json.load(open(out / "log.json")) if r["phase"] in ("online", "test")]
+        assert [r["correct"] for r in rows] == [True, True] and summary["accuracy"] == 1.0, name
+        assert all(r["graded"].startswith("So the result is") for r in rows), name
+        answers[name] = rows[0]["answer"]
+    # ответ решателя свой: у общего — строка FINAL ANSWER, у агента TF-GRPO — весь текст
+    assert answers["baseline"] == "see above" and answers["tfgrpo"].startswith("So the result is")

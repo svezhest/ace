@@ -18,7 +18,7 @@ from typing import Callable
 from . import config, render
 from .extract import Contract
 from .model import Call, Outcome, messages, params
-from .tasks import accuracy, final_answer
+from .tasks import accuracy, final_answer, grade, graded
 from .verdict import LABELED, majority
 
 
@@ -99,10 +99,14 @@ class Group:
     i: int = None               # номер вопроса в проходе
 
     @property
-    def answer(self):
-        return self.episodes[self.chosen].answer
+    def episode(self):
+        return self.episodes[self.chosen]
 
-# что в зачёт: pick(group, check) -> номер попытки; check(ответ) — проверка задачи
+    @property
+    def answer(self):
+        return self.episode.answer
+
+# что в зачёт: pick(group, check) -> номер попытки; check(попытка) — проверка задачи (tasks.grade)
 
 
 def first(group, check):
@@ -119,7 +123,7 @@ def vote(group, check):
 
 def best(group, check):
     """Первая верная по метке, иначе первая (SCOPE K=2). Это pass@k — помечается в логе."""
-    return next((i for i, e in enumerate(group.episodes) if check(e.answer)), 0)
+    return next((i for i, e in enumerate(group.episodes) if check(e)), 0)
 
 # температура попытки k
 
@@ -287,7 +291,7 @@ class Experiment:
         pick = learner.attempts.pick
         group.pick = pick.__name__
         group.pass_at_k = pick is best
-        group.chosen = pick(group, lambda answer: self.task.check(answer, item["target"]))
+        group.chosen = pick(group, lambda ep: grade(self.task, ep, item["target"]))
         return group
 
     def retry(self, memory, note):
@@ -327,7 +331,7 @@ class Experiment:
     def solved(self, group):
         """Верен ли ответ в зачёт — проверка задачи по метке (метрика апстримов), а не вердикт попытки ученика:
         это оценка val и сигнал меты на train."""
-        return self.task.check(group.answer, group.item["target"])
+        return grade(self.task, group.episode, group.item["target"])
 
 
 def combine(patch, mine):
@@ -405,11 +409,12 @@ def retry_entry(ep):
     return dict(answer=ep.answer, ok=ep.ok, finish=finish(ep), note=ep.prompt.note, output=ep.output)
 
 
-def entry(phase, epoch, i, group, item, correct, gated, memory_chars, sec, retried=()):
-    """Запись лога по вопросу: ответ в зачёт, как выбран, вся группа и попытки из извлечения (раунды ACE)."""
-    chosen = group.episodes[group.chosen]
+def entry(phase, epoch, i, group, item, correct, graded, gated, memory_chars, sec, retried=()):
+    """Запись лога по вопросу: ответ в зачёт и что из него судила проверка задачи (graded), как выбран, вся группа и
+    попытки из извлечения (раунды ACE)."""
+    chosen = group.episode
     return dict(phase=phase, epoch=epoch, i=i, question=group.question, target=item["target"], answer=group.answer,
-                correct=correct, pick=group.pick, pass_at_k=group.pass_at_k, vote=group.vote, finish=finish(chosen),
+                graded=graded, correct=correct, pick=group.pick, pass_at_k=group.pass_at_k, vote=group.vote, finish=finish(chosen),
                 output=chosen.output, shown=chosen.shown, read=chosen.used, gated=gated, memory_chars=memory_chars,
                 sec=sec, group=[attempt_entry(e) for e in group.episodes], retries=[retry_entry(e) for e in retried])
 
@@ -417,7 +422,7 @@ def entry(phase, epoch, i, group, item, correct, gated, memory_chars, sec, retri
 def failed(phase, epoch, i, item, error):
     """Запись лога о вопросе (или событии прохода), на котором прогон упал: неверно, с текстом ошибки."""
     return dict(phase=phase, epoch=epoch, i=i, question=item["question"] if item else "",
-                target=item["target"] if item else "", answer="", correct=False, finish="error",
+                target=item["target"] if item else "", answer="", graded="", correct=False, finish="error",
                 error="".join(traceback.format_exception(error)), group=[])
 
 
@@ -601,9 +606,10 @@ class Run:
 
     def record(self, phase, i, group, item, t0, gated=(), retried=()):
         epoch = self.ex.epoch
-        correct = self.task.check(group.answer, item["target"])
+        correct = grade(self.task, group.episode, item["target"])
         chars = self.learner.memory.chars()
-        self.log.append(entry(phase, epoch, i, group, item, correct, gated=list(gated), memory_chars=chars,
+        self.log.append(entry(phase, epoch, i, group, item, correct, graded(self.task, group.episode),
+                              gated=list(gated), memory_chars=chars,
                               sec=round(time.time() - t0, 1), retried=retried))
         done = [r for r in self.log if r["phase"] == phase and r["epoch"] == epoch]
         right = sum(r["correct"] for r in done)
@@ -614,7 +620,7 @@ class Run:
     def summary(self, done):
         proto, model = self.proto, self.model
         final = [r for r in self.log if in_score(r, self.last)]
-        answers = [r["answer"] for r in final]
+        answers = [r["graded"] for r in final]
         targets = [r["target"] for r in final]
         return dict(task=self.task.name, method=self.learner.name, model=model.name,
                     backend=getattr(model, "backend", ""), n=len(final), protocol=proto.name, epochs=proto.epochs,
