@@ -414,9 +414,12 @@ def structured(text, schema):
         return None
 
 
+FENCE = "```"
+
+
 def gepa_fenced(text):
     """_has_fence_pair апстрима GEPA: в тексте две ограды ```."""
-    return (text.find("```") + 3) < text.rfind("```")
+    return text.find(FENCE) + len(FENCE) < text.rfind(FENCE)
 
 
 def gepa_instruction(text):
@@ -425,18 +428,19 @@ def gepa_instruction(text):
     конце. None — ответ оборван (_is_known_truncated): начался с <think> и не закрыл его. Обрыв по длине (без двух
     оград) проверяет вызывающий: finish_reason у ответа, а не в тексте."""
     text = (text or "").strip()
-    if not gepa_fenced(text) and text.lstrip().startswith("<think>") and text.count("<think>") > text.count("</think>"):
+    fenced = gepa_fenced(text)
+    if not fenced and text.startswith("<think>") and text.count("<think>") > text.count("</think>"):
         return None
-    if gepa_fenced(text):
-        content = text[text.find("```") + 3:text.rfind("```")]
+    if fenced:
+        content = text[text.find(FENCE) + len(FENCE):text.rfind(FENCE)]
         match = re.match(r"^\S*\n", content)
         if match:
             content = content[match.end():]
         return content.strip()
-    if text.startswith("```"):
+    if text.startswith(FENCE):
         match = re.match(r"^```\S*\n?", text)
         if match:
             text = text[match.end():].strip()
-    elif text.endswith("```"):
-        text = text[:-3].strip()
+    elif text.endswith(FENCE):
+        text = text[:-len(FENCE)].strip()
     return text
