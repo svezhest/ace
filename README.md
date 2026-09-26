@@ -1,6 +1,6 @@
 # ace
 
-Стенд для сравнения методов агентного контекст-инжиниринга (ACE, Dynamic Cheatsheet, SCOPE, TF-GRPO, EvoLib, MCE) на
+Стенд для сравнения методов агентного контекст-инжиниринга (ACE, Dynamic Cheatsheet, SCOPE, TF-GRPO, EvoLib, MCE, GEPA) на
 одном цикле. Метод — ученик, собранный из уровней; цикл один на все методы и зовёт хуки ученика на своих масштабах
 (шаг / попытка / вопрос / батч / проход). Устройство — [docs/architecture.md](docs/architecture.md).
 
@@ -15,11 +15,11 @@
 | показ (у общего решателя) | `ace/show/` |
 | когда учится, сборка (`Learner`, `swap`) | `ace/learner.py` |
 | среда попытки (песочница) | `ace/env/` |
-| мета: Gate, Meta (MCE), Hooks | `ace/wrap/` |
+| мета: Gate, Meta (MCE), Evolution (GEPA: пул и Парето-выбор), Hooks | `ace/wrap/` |
 
 Методы (`ace/methods/<метод>.py` — только сборка, в docstring — что метод берёт на каждом уровне): baseline;
 ace и ace_dedup (как в апстриме), ace_used; ace_stand, ace_stand_text, ace_stand_rewrite (стенд); dc, dc_code, dc_rs, dc_retrieval,
-dc_history; scope, scope_bo2, scope_code, scope_k2; tfgrpo; evolib, evolib_judge; mce, mce_fs, mce_ace_stand; гибриды ace_stand_bo2,
+dc_history; scope, scope_bo2, scope_code, scope_k2; tfgrpo; evolib, evolib_judge; mce, mce_fs, mce_ace_stand; gepa; гибриды ace_stand_bo2,
 ace_stand_opt, ace_stand_hooks, ace_stand_group. По умолчанию уровни ведут себя как апстрим; неустранимые отличия —
 [DEVIATIONS.md](DEVIATIONS.md), верность — тесты-мостик `tests/bridge/` (эталоны сняты с апстримов, `bridge/`)
 и воспроизведение записей апстримов на живой модели `tests/live/` (`bridge/live/<метод>/`).
@@ -52,7 +52,7 @@ uv run python tools/compare.py /tmp/a.json /tmp/b.json   # два снимка: 
 | блок | ступени |
 |---|---|
 | контроли | baseline; placebo (показ: текст той же длины без знаний); sc3 (3 попытки, T = 0 и 0.7, голосование — столько же вызовов, сколько у ace_stand, без памяти) |
-| методы | ace, dc, scope, tfgrpo, evolib, mce — как в апстримах, строки для сравнения |
+| методы | ace, dc, scope, tfgrpo, evolib, mce, gepa — как в апстримах, строки для сравнения |
 | база | ace_stand — рефлектор с метками, куратор операциями, отсев вредных, показ всего |
 | извлечение | ace_stand_text (свободный текст; память без отсева — иначе стык не сойдётся), ace_stand_bo2 (Best-of-2), ace_stand_group (контраст TF-GRPO по группе из 3, куратор ACE) |
 | память | ace_stand_opt (предел 10 с оптимизатором SCOPE вместо отсева), ace_stand_rewrite (перезапись куратором) |

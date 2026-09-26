@@ -1,0 +1,13 @@
+{#- GEPA апстрима дословно (gepa-ai/gepa d771eb21b5): отзыв ContainsAnswerEvaluator
+    (adapters/default_adapter/default_adapter.py), поля записи рефлексии (DefaultReflectiveRecord) и разметка примеров
+    (strategies/instruction_proposal.py: format_samples) -#}
+{% macro correct(answer) %}The generated response is correct. The response include the correct answer '{{ answer }}'{% endmacro %}
+{% macro incorrect(answer) %}The generated response is incorrect. The correct answer is '{{ answer }}'. Ensure that the correct answer is included in the response exactly as it is.{% endmacro %}
+{% macro context(text) %} Here is some additional context that might be helpful:
+{{ text }}{% endmacro %}
+{% macro inputs() %}Inputs{% endmacro %}
+{% macro outputs() %}Generated Outputs{% endmacro %}
+{% macro feedback() %}Feedback{% endmacro %}
+{% macro example(n) %}# Example {{ n }}
+{% endmacro %}
+{% macro item(n) %}Item {{ n }}{% endmacro %}

@@ -208,6 +208,7 @@ VARIANTS = {
     ("tfgrpo", "dapo"): "math",         # math_agent.yaml и math_reasoning.yaml, в зачёт весь ответ (math_verify)
     ("evolib", "hmmt"): "math",         # HMMT_SOLVER_PROMPT, reasoning API, проверка по тексту решения
     ("mce", "symptom"): "symptom",      # интерфейс get_context, промпт диагноза, инструкция и поле symptoms
+    ("gepa", "aime"): "aime",           # seed_prompt квикстарта, в зачёт весь ответ (ContainsAnswerEvaluator)
 }
 
 

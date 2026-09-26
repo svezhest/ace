@@ -412,3 +412,31 @@ def structured(text, schema):
         return schema.model_validate(json_object(text))
     except ValueError:
         return None
+
+
+def gepa_fenced(text):
+    """_has_fence_pair апстрима GEPA: в тексте две ограды ```."""
+    return (text.find("```") + 3) < text.rfind("```")
+
+
+def gepa_instruction(text):
+    """ProposalAdapter.parse апстрима GEPA (strategies/instruction_proposal.py) по ответу без пробелов по краям:
+    есть две ограды — текст между первой и последней без строки языка; нет — весь ответ без ограды в начале или в
+    конце. None — ответ оборван (_is_known_truncated): начался с <think> и не закрыл его. Обрыв по длине (без двух
+    оград) проверяет вызывающий: finish_reason у ответа, а не в тексте."""
+    text = (text or "").strip()
+    if not gepa_fenced(text) and text.lstrip().startswith("<think>") and text.count("<think>") > text.count("</think>"):
+        return None
+    if gepa_fenced(text):
+        content = text[text.find("```") + 3:text.rfind("```")]
+        match = re.match(r"^\S*\n", content)
+        if match:
+            content = content[match.end():]
+        return content.strip()
+    if text.startswith("```"):
+        match = re.match(r"^```\S*\n?", text)
+        if match:
+            text = text[match.end():].strip()
+    elif text.endswith("```"):
+        text = text[:-3].strip()
+    return text

@@ -1,7 +1,7 @@
 """Сериализации: всё, что из данных стенда сшивается в текст для модели. Формулировки — шаблоны в ace/prompts/
 (строки стенда — stand.j2, строки апстримов — <метод>_strings.j2), здесь только сборка: строки записей и раскладки
-памяти, файловые инструменты, сообщение решателю, траектория, вердикт, поля промптов SCOPE, TF-GRPO, MCE, хуков,
-вывод песочницы. Каждую сериализацию, взятую у апстрима, сверяют с ним по этому модулю."""
+памяти, файловые инструменты, сообщение решателю, траектория, вердикт, поля промптов SCOPE, TF-GRPO, MCE, GEPA,
+хуков, вывод песочницы. Каждую сериализацию, взятую у апстрима, сверяют с ним по этому модулю."""
 import json
 import re
 
@@ -15,6 +15,7 @@ SCOPE = prompts.macros("scope_strings")
 TFGRPO = prompts.macros("tfgrpo_strings")
 MCE = prompts.macros("mce_strings")
 DC = prompts.macros("dc_strings")
+GEPA = prompts.macros("gepa_strings")
 
 EMPTY = STAND.empty()
 
@@ -408,3 +409,24 @@ def task_instruction(task):
     if variant("mce", task) == "symptom":
         return prompts.text("mce_task_symptom")
     return f"{task.system} {task.instr}"
+
+
+# GEPA (strategies/instruction_proposal.py: InstructionProposalSignature.prompt_renderer)
+
+
+def gepa_samples(samples):
+    """format_samples апстрима без картинок: пример — «# Example n», поле — «## ключ», строка — без пробелов по
+    краям и пустая строка после; словарь и список — заголовками на уровень глубже (не глубже ######)."""
+    def value(v, level):
+        deeper = min(level + 1, 6)
+        if isinstance(v, dict):
+            s = "".join(f"{'#' * level} {k}\n" + value(x, deeper) for k, x in v.items())
+            return s if v else s + "\n"
+        if isinstance(v, (list, tuple)):
+            s = "".join(f"{'#' * level} {GEPA.item(n=i + 1)}\n" + value(x, deeper) for i, x in enumerate(v))
+            return s if v else s + "\n"
+        return f"{str(v).strip()}\n\n"
+    blocks = []
+    for n, sample in enumerate(samples, 1):
+        blocks.append(GEPA.example(n=n) + "".join(f"## {k}\n" + value(v, 3) for k, v in sample.items()))
+    return "\n\n".join(blocks)
