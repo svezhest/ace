@@ -385,8 +385,21 @@ def test_missing_split_is_error():
     with pytest.raises(ValueError, match="нужна выборка train задачи gpqa"):
         run(TASKS["gpqa"], Learner("x", protocol=Protocol(offline=True)), model, 2)
     assert model.calls == []
-    with pytest.raises(FileNotFoundError, match="на 50 вопросов"):
+    with pytest.raises(ValueError, match="выборка test задачи formula на 50 вопросов"):
         run(TASK, Learner("x"), model, 50)
+    assert model.calls == []
+
+
+def test_upstream_splits(tmp_path):
+    """Выборки aime задал апстрим: train и val — целиком (по 45), тест — n из 150 (aime_2025 пять раз), и train не
+    грузится размером теста."""
+    task = TASKS["aime"]
+    assert (task.size("train", 150), task.size("val"), task.size(), task.size("", 40)) == (45, 45, 150, 40)
+    test = task.load()
+    assert len(test) == 150 and test[30:60] == test[:30] and len(task.rows("", 1)) == 150
+    run(task, Learner("x", protocol=Protocol(offline=True)), Stub(), 150, str(tmp_path))
+    log = json.load(open(tmp_path / "log.json"))
+    assert [sum(r["phase"] == p for r in log) for p in ("train", "test")] == [45, 150]
 
 
 def test_results_folder():

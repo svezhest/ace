@@ -11,8 +11,9 @@ symptom — бенчмарк MCE (env/symptom_diagnosis апстрима, дан
 среды апстрима (get_context и промпт диагноза) — у mce (solver/mce.py), общий решатель — ответ FINAL ANSWER.
 aime — бенчмарк GEPA (gepa/examples/aime.py: init_dataset) целиком, строки как у апстрима: train и val — половины
 AI-MO/aimo-validation-aime после shuffle Random(0) (по 45, с решением в additional_context), тест — MathArena/aime_2025
-пять раз подряд (150); ответ — «### N», проверка — ContainsAnswerEvaluator апстрима (ответ входит в текст).
-У общего решателя ответ — строка FINAL ANSWER в том же виде «### N»."""
+(30 вопросов в aime.jsonl) пять раз подряд при загрузке (150); выборки по умолчанию — целиком, как у апстрима; ответ —
+«### N», проверка — ContainsAnswerEvaluator апстрима (ответ входит в текст). У общего решателя ответ — строка FINAL
+ANSWER в том же виде «### N»."""
 import json
 import re
 from dataclasses import dataclass, field
@@ -51,23 +52,40 @@ class Task:
         whole = config.DATA / f"{name}.jsonl"
         return whole if whole.exists() else None
 
-    def load(self, split="", size=None, whole=False):
-        """Первые size вопросов файла (whole — все); поля апстримов: input | context | question, target | answer.
-        Нет файла или в нём меньше size вопросов — ошибка, а не молча меньше."""
-        size = size or default_size(split)
+    def size(self, split="", n=None):
+        """Вопросов в выборке split прогона на n вопросов теста. Выборки, заданные апстримом (WHOLE: aime), — целиком
+        (тест — если n не задан); у остальных train и тест — n (по умолчанию SIZE), val — VAL_SIZE."""
+        if self.name in WHOLE and (split or n is None):
+            return len(self.rows(split))
+        if split == "val":
+            return config.VAL_SIZE
+        return n or config.SIZE
+
+    def rows(self, split="", size=None):
+        """Все вопросы файла выборки (file); тест, который апстрим повторяет (REPEAT), — с повтором."""
         path = self.file(split, size)
         if path is None:
-            raise FileNotFoundError(f"{self.name}: нет выборки {split or 'test'} на {size} вопросов в {config.DATA}")
-        rows = [json.loads(line) for line in path.open() if line.strip()]
+            raise FileNotFoundError(f"{self.name}: нет выборки {split or 'test'} на {size or default_size(split)} "
+                                    f"вопросов в {config.DATA}")
         items = []
-        for r in rows:
+        for line in path.open():
+            if not line.strip():
+                continue
+            r = json.loads(line)
             question = r.get("context") or r.get("input") or r["question"]
             item = {"question": question, "target": r.get("target", r.get("answer"))}
             if "additional_context" in r:       # GEPA: подсказка в обратную связь рефлексии (решение задачи)
                 item["additional_context"] = r["additional_context"]
             items.append(item)
+        return items if split else items * REPEAT.get(self.name, 1)
+
+    def load(self, split="", size=None, whole=False):
+        """Первые size вопросов выборки (по умолчанию — size(split); whole — все); поля апстримов: input | context |
+        question, target | answer. Нет файла или в нём меньше size вопросов — ошибка, а не молча меньше."""
+        size = size or self.size(split)
+        items = self.rows(split, size)
         if len(items) < size and not whole:
-            raise ValueError(f"{self.name}: в {path.name} {len(items)} вопросов, а нужно {size}")
+            raise ValueError(f"{self.name}: в выборке {split or 'test'} {len(items)} вопросов, а нужно {size}")
         return items if whole else items[:size]
 
     def check(self, answer, target):
@@ -198,6 +216,9 @@ CHECK = {"finer": finer_ok, "formula": formula_ok, "meb": meb_ok, "gpqa": gpqa_o
          "symptom": symptom_ok, "aime": aime_ok}
 
 TASKS = {name: Task(name) for name in CHECK}
+
+WHOLE = {"aime"}            # выборки задал апстрим: по умолчанию — целиком (train и val не зависят от размера теста)
+REPEAT = {"aime": 5}        # тест апстрима — выборка несколько раз подряд (init_dataset GEPA: aime_2025 * 5)
 
 # Метод × задача — единственное место, где метод узнаёт задачу по имени. На бенчмарке своего апстрима метод берёт
 # его тексты, разбор входа и параметры (вариант); на остальных задачах — запасной вариант стенда "" (DEVIATIONS S2).

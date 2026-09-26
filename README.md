@@ -40,7 +40,8 @@ uv run python tools/compare.py /tmp/a.json /tmp/b.json   # два снимка: 
 
 Настройки (`ace/config.py`, из окружения): `OPENAI_BASE_URL` (по умолчанию `http://localhost:8080/v1`),
 `OPENAI_API_KEY` (`local`), `MODEL`, `BACKEND` (`pydantic-ai` или `wire`), `MAX_TOKENS` (MEB: 8192), `SEED`, размеры
-выборок `SIZE` и `VAL_SIZE` (40 и 10, входят в имя файла данных), `RESULTS`. Протокол (онлайн / офлайн, проходы,
+выборок `SIZE` и `VAL_SIZE` (40 и 10, входят в имя файла данных; у aime выборки апстрима целиком: train и val по 45,
+тест 150), `RESULTS`. Протокол (онлайн / офлайн, проходы,
 окно ACE) задаёт метод по своему апстриму (`learner.protocol`); `EPOCHS` и `OFFLINE` меняют его только в одном
 прогоне `run.py`, `ablate.py` гоняет каждую ступень по её протоколу.
 

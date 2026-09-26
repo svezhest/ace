@@ -17,7 +17,7 @@ if config.EPOCHS or config.OFFLINE:
     epochs = config.EPOCHS or method.protocol.epochs
     window = 0 if offline else method.protocol.window
     method = swap(method, protocol=replace(method.protocol, epochs=epochs, offline=offline, window=window))
-n = int(sys.argv[3]) if len(sys.argv) > 3 else config.SIZE
+n = int(sys.argv[3]) if len(sys.argv) > 3 else task.size()
 model = Model()
 out = sys.argv[4] if len(sys.argv) > 4 else folder(task, n, method, model)
 print(run(task, method, model, n, out))

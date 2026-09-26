@@ -3,7 +3,7 @@
 python ablate.py TASK [N] [STEP ...]; каждая ступень идёт по своему протоколу (learner.protocol)."""
 import sys
 
-from ace import config, prompts, verdict
+from ace import prompts, verdict
 from ace.env import Sandbox
 from ace.learner import swap
 from ace.loop import Attempts, Protocol, folder, run, spread, vote
@@ -95,7 +95,7 @@ CHAIN = {
 
 if __name__ == "__main__":
     task = TASKS[sys.argv[1]]
-    n = int(sys.argv[2]) if len(sys.argv) > 2 else config.SIZE
+    n = int(sys.argv[2]) if len(sys.argv) > 2 else task.size()
     for name in sys.argv[3:] or CHAIN:
         model = Model()
         try:

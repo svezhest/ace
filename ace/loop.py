@@ -388,7 +388,7 @@ def folder(task, n, learner, model):
     return Path(config.RESULTS) / f"{task.name}{n}" / learner.name / tag
 
 
-def run(task, learner, model, n=config.SIZE, out=None, split=""):
+def run(task, learner, model, n=None, out=None, split=""):
     """Прогон метода на задаче по протоколу ученика (learner.protocol).
         онлайн    поток split, память учится по ходу, epochs проходов, в зачёт последний: первая попытка обучения,
                   а с window — тест окна; до первого прохода — начальный тест всего потока (в лог)
@@ -399,22 +399,24 @@ def run(task, learner, model, n=config.SIZE, out=None, split=""):
     Лог и итог пишутся после каждого вопроса, память — в конце. Исключение на вопросе (или в событии прохода)
     уходит в лог записью finish="error", вопрос засчитывается неверным, прогон идёт дальше; в итоге — errors.
     Исключение обучения — своя запись (phase learn), ответ вопроса в зачёте остаётся. Нарушение стыка сборки
-    (Contract) прогон останавливает."""
+    (Contract) прогон останавливает. n — вопросов теста (потока); по умолчанию — task.size(split). Размеры train и
+    val — task.size: выборки, заданные апстримом, от n не зависят; их нехватка — ошибка до первого вызова модели."""
     random.seed(config.SEED)
     learner = copy.deepcopy(learner)        # в реестре память ученика пуста: каждый прогон с чистой
     proto = learner.protocol
     proto.check(learner.name, learner.verdict, split)
-    parts = []
+    n = n or task.size(split)
+    parts = {split: n}
     if proto.offline:
-        parts.append("train")
+        parts["train"] = task.size("train", n)
     if proto.val or learner.needs_val:
-        parts.append("val")
-    for part in parts:
+        parts["val"] = task.size("val", n)
+    for part, size in parts.items():
         try:
-            task.load(part)
+            task.load(part, size)
         except (FileNotFoundError, ValueError) as error:
-            raise ValueError(f"{learner.name}: протоколу {proto.name} нужна выборка {part} задачи {task.name} — "
-                             f"{error}")
+            raise ValueError(f"{learner.name}: протоколу {proto.name} нужна выборка {part or 'test'} задачи "
+                             f"{task.name} на {size} вопросов — {error}")
     return Run(task, learner, model, n, out, split).everything()
 
 
@@ -456,7 +458,10 @@ class Run:
         ex = self.ex
         learner = self.learner
         proto = self.proto
-        items = learner.sample(ex, "train" if proto.offline else self.split, self.n)
+        if proto.offline:
+            items = learner.sample(ex, "train", self.task.size("train", self.n))
+        else:
+            items = learner.sample(ex, self.split, self.n)
         if not items:
             return False
         ex.epoch = epoch
