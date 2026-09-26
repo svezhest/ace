@@ -6,7 +6,7 @@
 ## Окружения
 
 ```sh
-bridge/setup_envs.sh            # все; или: bridge/setup_envs.sh ace mce youtu light
+bridge/setup_envs.sh            # все; или: bridge/setup_envs.sh ace mce youtu gepa light
 ```
 
 Скрипт делает `git worktree add --detach` апстримов из `$REPRO` (папка с git-клонами апстримов; дальше в тексте —
@@ -22,6 +22,7 @@ bridge/setup_envs.sh            # все; или: bridge/setup_envs.sh ace mce y
 | evolib | EvoLib                   | 98266b2 | light |
 | tfgrpo | youtu-agent              | c2caa53 | youtu (lock) |
 | mce    | meta-context-engineering | c4b7a7c | mce (lock) |
+| gepa   | gepa                     | d771eb2 | gepa (lock, extra full) |
 
 ## Снятие эталонов
 
@@ -178,8 +179,9 @@ bullet_ids ACE — регулярка апстрима как есть (тест
 Пути хоста в записях — через `$UPSTREAMS`, `$HOME`, `@ROOT@`, `@UV@` (подставляет раннер записи). В запросах
 MCE путей хоста нет вне вывода Bash агентов, а его воспроизведение не сравнивает (`tools/record/mce.py`).
 
-Запись GEPA (`gepa/`) снята раннером `gepa/run.py` — квикстарт README апстрима (gepa d771eb21b5, клон в
-`$UPSTREAMS/gepa`, venv `.venvs/gepa` из его `uv.lock` с extra full); эталонов на фейковой модели у GEPA нет.
+Запись GEPA (`gepa/`) снята раннером `gepa/run.py` — квикстарт README апстрима (gepa d771eb21b5 в
+`$UPSTREAMS/gepa`, venv `.venvs/gepa` из его `uv.lock` с extra full: `bridge/setup_envs.sh gepa`); эталонов на
+фейковой модели у GEPA нет.
 
 Запись MCE (`mce/rec.jsonl.gz`) содержит системный промпт Claude Code CLI 2.1.20: агенты MCE апстрима — Claude
 Agent SDK, и CLI сам отправляет модели свой промпт (с описаниями инструментов, шаблоном сообщения коммита и
