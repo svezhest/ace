@@ -43,6 +43,8 @@ def sub_folder(ex):
 
 class Context(Files):
     """Файлы context/ базового агента; train — data/train.json последнего батча."""
+    skilled = True              # навык — в папке под-итерации агента
+
     def __init__(self, rounds=ROUNDS):
         super().__init__("context")
         self.rounds = rounds

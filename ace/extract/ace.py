@@ -31,6 +31,8 @@ class Reflection(BaseModel):
 
 
 class Reflector(Extractor):
+    skilled = True              # системный промпт — с навыком меты
+
     def __init__(self, free=False, temperature=0):
         self.free = free
         self.temperature = temperature

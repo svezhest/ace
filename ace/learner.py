@@ -134,6 +134,11 @@ class Learner:
         return self.extract is not None
 
     @property
+    def skilled(self):
+        """Навык меты доходит до промптов обучения: извлечение или память его подставляют (skilled)."""
+        return self.learns and (self.extract.skilled or self.memory.skilled)
+
+    @property
     def watches_steps(self):
         """Показу нужны шаги попытки (цикл идёт шагами); у своего решателя шагов нет."""
         return self.solver is None and self.viewer().watches_steps

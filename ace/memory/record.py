@@ -11,6 +11,7 @@ class Memory:
     requires — добавки, которые память требует от извлечения (extract/__init__.py); begin(k) — начало попытки k
     (здесь уходят записи со сроком жизни «попытка», tactical SCOPE)."""
     requires = frozenset()
+    skilled = False             # подставляет навык меты (ex.skill) в свои промпты обучения
 
     def begin(self, k):
         pass

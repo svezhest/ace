@@ -86,7 +86,11 @@ class Meta(Wrapper):
         self.folders = {}
 
     def check(self):
+        """Навык автора должен кто-то читать: ученик без уровня, подставляющего ex.skill, — ошибка сборки."""
         offline_only(self)
+        if not self.inner.skilled:
+            raise ValueError(f"{self.name}: навык меты некому читать — ни извлечение, ни память ученика не "
+                             "подставляют его в промпты обучения (skilled)")
 
     def on_pass_start(self, ex):
         """Начало прохода открывает итерацию: навык до всего обучения прохода."""

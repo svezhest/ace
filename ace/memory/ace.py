@@ -60,6 +60,8 @@ def curate_rewrite(ex, memory, x):
 class Playbook(Lessons):
     """Пункты стенда: метки рефлектора -> журнал исходов, уроки -> куратор, затем отсев вредных.
     prune=None — без отсева; тогда и метки не нужны."""
+    skilled = True              # куратор — с навыком меты
+
     def __init__(self, curator=curate_ops, prune=PRUNE_HARMFUL):
         super().__init__("bullet", Counted)
         self.curator, self.prune_at = curator, prune

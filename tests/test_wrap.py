@@ -34,8 +34,9 @@ class Source(list):
 
 
 class Notes(Lessons):
-    """На каждом батче добавляет следующий текст из списка."""
+    """На каждом батче добавляет следующий текст из списка; навык меты «читает» (Meta над ней собирается)."""
     requires = frozenset()
+    skilled = True
 
     def __init__(self, texts):
         super().__init__()
@@ -234,3 +235,16 @@ def test_meta_offline_only():
         Meta(notes(), lambda ex, h: "", "meta")
     with pytest.raises(ValueError, match="офлайн"):
         swap(mce, protocol=Protocol())
+
+
+def test_meta_needs_skill_reader():
+    """Навык меты некому читать (dc, gepa, ученик без обучения) — ошибка сборки, а не мета-агент вхолостую."""
+    from ace.methods import METHODS
+    for base in (METHODS["dc"], METHODS["gepa"].inner, swap(mce.inner, extract=None)):
+        with pytest.raises(ValueError, match="некому читать"):
+            Meta(swap(base, protocol=OFFLINE2), lambda ex, h: "", "meta")
+
+    class Plain(Lessons):
+        def learn(self, ex, extractions):
+            pass
+    assert Meta(swap(mce_ace_stand.inner, memory=Plain()), lambda ex, h: "", "meta").skilled     # читает рефлектор

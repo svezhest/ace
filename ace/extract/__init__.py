@@ -60,6 +60,7 @@ class Extractor:
     gives = frozenset()
     scale = "question"
     steps = False               # извлекает и на шаге попытки (step)
+    skilled = False             # подставляет навык меты (ex.skill) в свои промпты
 
     def __call__(self, ex, group, memory):
         raise NotImplementedError
