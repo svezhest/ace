@@ -119,14 +119,14 @@ class Meta(Wrapper):
         train = self.right / self.seen if self.seen else 0.0
         self.history.append(Iteration(ex.skill, train=train, version=version, rollouts=self.seen,
                                       folders=self.folders))
-        self.inner.restore(self.history[best(self.history)].memory)
+        self.inner.restore(self.history[best_iteration(self.history)].memory)
         self.new_pass()
 
     def dump(self):
         return self.inner.dump() + [h.dump(i) for i, h in enumerate(self.history, 1)]
 
 
-def best(history):
+def best_iteration(history):
     """Номер лучшей по val итерации (строго больше, при равенстве первая)."""
     return best_index([h.val for h in history])
 
@@ -297,7 +297,7 @@ class Iterations(Wrapper):
         folder = self.ws.create(iteration, sub)
         if sub == 0:
             ex.skill = claude_meta(ex, self.ws, folder, iteration)
-            last = self.history[best(self.history)].folder if self.history else folder_name(0)
+            last = self.history[best_iteration(self.history)].folder if self.history else folder_name(0)
             source = self.ws.base / last
         else:
             source = self.inner.memory.path
@@ -319,7 +319,7 @@ class Iterations(Wrapper):
         train = self.ws.aggregate(ex.epoch + 1, self.subs, metrics, len(version.val), last)
         rollouts = sum(s["batch_size"] for s in self.subs)
         self.history.append(Iteration(ex.skill, train=train, version=version, rollouts=rollouts, folder=last.name))
-        self.inner.restore(self.history[best(self.history)].memory)
+        self.inner.restore(self.history[best_iteration(self.history)].memory)
         self.subs = []
 
     def dump(self):

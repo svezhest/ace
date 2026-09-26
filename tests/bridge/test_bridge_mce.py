@@ -10,14 +10,12 @@ from upstream import deviation, fixture
 
 from ace import fs, render
 from ace.learner import swap
-from ace.loop import Protocol, Version, run
+from ace.loop import Protocol, Version, best_index, run
 from ace.memory.mce import BASE, WORKSPACE
 from ace.methods.mce import mce_fs as mce
-from ace.wrap.mce import META, MISSING, evaluations
 from ace.model import Reply, roles
 from ace.tasks import Task
-from ace.loop import best_index as best_iteration
-from ace.wrap.mce import Iteration, Meta, SKILL, sub_folder
+from ace.wrap.mce import META, MISSING, SKILL, Iteration, Meta, best_iteration, evaluations, sub_folder
 
 PROMPTS, PARSERS, MEMORY, LOOP = (fixture("mce", level) for level in ("prompts", "parsers", "memory", "loop"))
 
@@ -150,7 +148,7 @@ def test_folder_names():
 def best_of(evals, current):
     """Наш выбор по тем же evaluations.json: итерации до текущей, у которых есть val_accuracy."""
     its = [i for i in range(current) if "val_accuracy" in evals.get(f"iter{i}", {})]
-    best = best_iteration([evals[f"iter{i}"]["val_accuracy"] for i in its])
+    best = best_index([evals[f"iter{i}"]["val_accuracy"] for i in its])
     return None if best is None else its[best]
 
 
@@ -284,7 +282,7 @@ def test_loop(tmp_path):
     # iter2 начинается с последней папки iter1; iter3 — с лучшей по val (в эталоне тоже iter1: 0.25 против 0.0)
     base = {c["folder"]: c for c in got if c["agent"] == "base"}
     assert base["iter2_sub0"]["context"] == base_after(base, "iter1_sub1")
-    best = best_iteration([h.val for h in history[:2]])
+    best = best_iteration(history[:2])
     assert base["iter3_sub0"]["context"] == base_after(base, f"iter{best + 1}_sub1")
     sees = {c["iter_dir"]: c for c in want if c["agent"] == "base"}
     assert sees["iter3_sub0"]["sees"]["context/knowledge.md"] == \
