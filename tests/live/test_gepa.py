@@ -39,13 +39,13 @@ class Watched(Evolution):
         super().on_pass(ex)
         it = self.trace[-1]
         STEPS.append(dict(
-            i=self.i, total_num_evals=self.calls,
+            i=self.iteration, total_num_evals=self.calls,
             candidates=[{"system_prompt": current(c.memory, ex.task)} for c in self.pool],
             parents=[c.parents for c in self.pool],
             val_subscores=[{str(j): s for j, s in c.scores.items()} for c in self.pool],
             pareto_front_valset={str(j): s for j, s in self.front.items()},
             program_at_pareto_front_valset={str(j): sorted(p) for j, p in self.at_front.items()},
-            best=self.best(),
+            best=self.best_candidate(),
             trace=dict(selected_program_candidate=it.parent, subsample_ids=it.ids,
                        subsample_scores=it.before if it.after is not None else None,
                        new_subsample_scores=it.after, new_program_idx=it.child),

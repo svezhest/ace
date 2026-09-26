@@ -47,8 +47,9 @@ class Candidate:
 
 
 @dataclass
-class Iteration:
-    """След итерации (full_program_trace): родитель, минибатч, оценки на нём до и после, принятый потомок."""
+class Proposal:
+    """Предложение итерации (след full_program_trace): родитель, минибатч, оценки на нём до и после, принятый
+    потомок."""
     parent: int
     ids: list
     before: list = field(default_factory=list)
@@ -69,8 +70,8 @@ class Evolution(Wrapper):
         self.front = {}                 # номер вопроса val -> лучшая оценка (pareto_front_valset)
         self.at_front = {}              # номер вопроса val -> номера кандидатов с ней (program_at_pareto_front_valset)
         self.calls = 0                  # total_num_evals
-        self.i = -1                     # номер итерации (state.i)
-        self.trace = []                 # Iteration по порядку
+        self.iteration = -1             # номер итерации (state.i)
+        self.trace = []                 # Proposal по порядку
         self.current = 0                # номер кандидата в памяти ученика; None — потомок, ещё не в пуле
 
     def check(self):
@@ -110,12 +111,12 @@ class Evolution(Wrapper):
             self.add(ex, [None])
         if self.calls >= self.budget:
             return []
-        self.i += 1
+        self.iteration += 1
         parent = pareto_parent(self.at_front, [c.average for c in self.pool], self.rng)
         self.take(parent)
         train = self.inner.sample(ex, split, n)
-        ids = self.sampler.next(len(train), self.i, self.inner.every)
-        self.trace.append(Iteration(parent, ids))
+        ids = self.sampler.next(len(train), self.iteration, self.inner.every)
+        self.trace.append(Proposal(parent, ids))
         return [train[j] for j in ids]
 
     def add(self, ex, parents):
@@ -162,9 +163,9 @@ class Evolution(Wrapper):
     def on_pass(self, ex):
         """Конец итерации: у ученика — лучший по val кандидат пула (FullEvaluationPolicy.get_best_program)."""
         self.inner.on_pass(ex)
-        self.take(self.best())
+        self.take(self.best_candidate())
 
-    def best(self):
+    def best_candidate(self):
         return best_index([c.average for c in self.pool])
 
     def dump(self):
@@ -174,7 +175,7 @@ class Evolution(Wrapper):
         pool = [dict(kind="candidate", id=i, memory=c.version.dump, parents=c.parents, scores=c.scores)
                 for i, c in enumerate(self.pool)]
         trace = [dict(kind="iteration", id=i, **asdict(it)) for i, it in enumerate(self.trace)]
-        return self.inner.dump() + pool + trace + [dict(kind="best", id=self.best())]
+        return self.inner.dump() + pool + trace + [dict(kind="best", id=self.best_candidate())]
 
 
 def attempts(groups):
