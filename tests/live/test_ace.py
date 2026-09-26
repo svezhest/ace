@@ -11,7 +11,8 @@ import pytest
 
 from ace.learner import swap
 from ace.loop import run
-from ace.memory.ace import SectionedPlaybook, layout
+from ace.memory.ace import SectionedPlaybook
+from ace.upstream.ace import layout
 from ace.methods.ace import ace
 from ace.tasks import TASKS
 from tools.record.replay import Replayer

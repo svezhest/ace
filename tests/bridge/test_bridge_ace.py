@@ -14,7 +14,8 @@ from ace.learner import swap
 from ace.loop import run
 from ace.memory import HARMFUL, HELPFUL, Counted
 from ace.memory.counters import count
-from ace.memory.ace import SECTIONS, SectionedPlaybook, layout, question_context, section_slug
+from ace.memory.ace import SectionedPlaybook, question_context, section_slug
+from ace.upstream.ace import SECTIONS, layout
 from ace.upstream.ace import ace_input, ace_params
 from ace.methods.ace import ace
 from ace.model import text_reply

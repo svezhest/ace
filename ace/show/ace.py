@@ -2,7 +2,7 @@
 использованные пункты строкой USED. Решатель ACE апстрима — solver/ace.py; у ace_stand показ по умолчанию
 (все пункты «[id] текст»)."""
 from .. import prompts
-from ..memory.ace import layout
+from ..upstream.ace import layout
 from . import Whole
 
 def playbook_layout(records, memory):

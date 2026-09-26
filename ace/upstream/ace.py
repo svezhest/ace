@@ -1,6 +1,6 @@
-"""ACE апстрима (ace/ace/ace.py, eval/finance/data_processor.py): вход задачи и параметры вызовов генератора,
-рефлектора и куратора."""
-from .. import prompts
+"""ACE апстрима (ace/ace/ace.py, eval/finance/data_processor.py, playbook_utils.py): вход задачи и параметры вызовов
+генератора, рефлектора и куратора; разделы playbook и его текст (его видят решатель, показ и куратор)."""
+from .. import prompts, render
 from ..tasks import variant
 
 MAX_TOKENS = 4096           # --max_tokens апстрима
@@ -31,3 +31,20 @@ def ace_input(task, text):
         return "", text
     instruction = text.split("Input: ")[0].strip().split("Instruction: ")[1].strip()
     return text.split("Input: ")[1].split("Answer: ")[0].strip(), instruction
+
+
+SECTIONS = prompts.text("ace_sections").splitlines()
+
+
+def section_key(name):
+    """Имя раздела из заголовка или из операции куратора, как в apply_curator_operations (без strip: у операции
+    лишний пробел даёт другое имя)."""
+    return name.lower().replace(" ", "_").replace("&", "and")
+
+
+TITLES = {section_key(s): s for s in SECTIONS}
+
+
+def layout(playbook):
+    """Весь playbook текстом, как его ведёт апстрим."""
+    return render.ace_playbook([(TITLES[n], s.records()) for n, s in playbook.sections.items()])

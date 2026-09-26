@@ -13,7 +13,7 @@ from pydantic import BaseModel
 from .. import embed, parse, prompts, render
 from ..extract import LABELS, LESSONS
 from ..model import TEXT, Call, Reader, messages, params
-from ..upstream.ace import ace_input, ace_params
+from ..upstream.ace import TITLES, ace_input, ace_params, layout, section_key
 from . import Ids, Lessons, Sections
 from .counters import HARMFUL, HELPFUL, Counted, count, prune_harmful
 from .scope import CAP, compress, optimize, target_count
@@ -100,7 +100,6 @@ class CappedPlaybook(Playbook):
 CURATOR_GT = prompts.load("ace_curator")
 CURATOR_NOGT = prompts.load("ace_curator_nogt")
 MERGE = prompts.load("ace_merge")
-SECTIONS = prompts.text("ace_sections").splitlines()
 OTHERS = "others"
 GENERAL = "general"         # раздел, которого нет: пункт встаёт в начало OTHERS
 SLUGS = {"financial_strategies_and_insights": "fin", "formulas_and_calculations": "calc",
@@ -119,12 +118,6 @@ def question_context(task, text):
     return ace_input(task, text)[0]
 
 
-def section_key(name):
-    """Имя раздела из заголовка или из операции куратора, как в apply_curator_operations (без strip: у операции
-    лишний пробел даёт другое имя)."""
-    return name.lower().replace(" ", "_").replace("&", "and")
-
-
 def section_slug(name):
     """get_section_slug апстрима (utils.py:52): слаг из словаря или первые буквы слов (одно слово — 4 буквы)."""
     clean = section_key(name.strip())
@@ -132,9 +125,6 @@ def section_slug(name):
         return SLUGS[clean]
     words = clean.split("_")
     return words[0][:4] if len(words) == 1 else "".join(w[0] for w in words[:5])
-
-
-TITLES = {section_key(s): s for s in SECTIONS}
 
 
 class SlugIds(Ids):
@@ -147,11 +137,6 @@ class SlugIds(Ids):
 
     def order(self, id):
         return int(id.rsplit("-", 1)[1])
-
-
-def layout(playbook):
-    """Весь playbook текстом, как его ведёт апстрим."""
-    return render.ace_playbook([(TITLES[n], s.records()) for n, s in playbook.sections.items()])
 
 
 class SectionedPlaybook(Sections):
