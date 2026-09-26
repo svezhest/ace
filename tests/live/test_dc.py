@@ -9,8 +9,6 @@ dc_code: при воспроизведении вывод исполнения �
 DC4), а test_sandbox сверяет вывод нашей песочницы на тех же блоках кода с записанным."""
 import json
 import re
-import threading
-from pathlib import Path
 
 import pytest
 
@@ -22,11 +20,9 @@ from ace.memory.dc import Cheatsheet, Pairs
 from ace.methods.dc import dc, dc_code, dc_history, dc_retrieval, dc_rs
 from ace.solver import dc as show
 from ace.tasks import TASKS
-from tools.record.replay import Replayer
 
-from . import replaying
+from . import LIVE, replay, replaying, requests
 
-LIVE = Path(__file__).resolve().parents[2] / "bridge" / "live"
 N = 5
 STEPS = []                  # после каждого обучения: (что стояло в [[CHEATSHEET]], память)
 
@@ -52,8 +48,8 @@ RECORDED = [name for name in METHODS if (LIVE / name / "rec.jsonl").exists()]
 def executed(name):
     """Блок кода -> вывод его исполнения у апстрима, из сообщений assistant записанных запросов."""
     out = {}
-    for line in open(LIVE / name / "rec.jsonl"):
-        for m in json.loads(json.loads(line)["request"])["messages"]:
+    for request in requests(LIVE / name / "rec.jsonl"):
+        for m in request["messages"]:
             if m["role"] == "assistant":
                 head, ran = m["content"].split(f"\n{show.FLAG}\n\n", 1)
                 out[head] = ran
@@ -64,17 +60,10 @@ def executed(name):
 def replayed(request, tmp_path_factory):
     name = request.param
     out = tmp_path_factory.mktemp(name)
-    srv = Replayer(("127.0.0.1", 0), LIVE / name / "rec.jsonl")
-    threading.Thread(target=srv.serve_forever, daemon=True).start()
     STEPS.clear()
-    patch = pytest.MonkeyPatch()
-    try:
+    with pytest.MonkeyPatch.context() as patch, replay(LIVE / name / "rec.jsonl") as srv:
         patch.setattr(show, "run_block", executed(name).__getitem__)
-        model = replaying(srv)
-        run(TASKS["meb"], METHODS[name], model, N, str(out))
-    finally:
-        patch.undo()
-        srv.shutdown()
+        run(TASKS["meb"], METHODS[name], replaying(srv), N, str(out))
     theirs = [json.loads(line) for line in open(LIVE / name / "outputs.jsonl")]
     return name, srv.status(), json.load(open(out / "log.json")), list(STEPS), theirs
 

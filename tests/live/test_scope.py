@@ -10,8 +10,6 @@
     scope_bo2   Best-of-2: candidate_models — та же модель при T = 0.7
     scope_k2    два оптимизатора (efficiency, thoroughness), у каждой перспективы своя память"""
 import json
-import threading
-from pathlib import Path
 
 import pytest
 
@@ -23,11 +21,9 @@ from ace.loop import run
 from ace.memory.scope import Book, Perspectives, Strategic
 from ace.methods.scope import scope, scope_bo2, scope_code, scope_k2
 from ace.tasks import TASKS
-from tools.record.replay import Replayer
 
-from . import replaying
+from . import LIVE, replay, replaying, requests
 
-LIVE = Path(__file__).resolve().parents[2] / "bridge" / "live"
 AGENT = "formula_agent"
 STEPS, HISTORY = [], []         # память после каждой задачи; события правил (перспектива, текст, исход, ...)
 
@@ -71,8 +67,8 @@ RECORDED = [name for name in METHODS if (LIVE / name / "rec.jsonl").exists()]
 def executed(name):
     """Код run_python -> его вывод у апстрима, из сообщений tool записанных запросов."""
     out = {}
-    for line in open(LIVE / name / "rec.jsonl"):
-        msgs = json.loads(json.loads(line)["request"])["messages"]
+    for request in requests(LIVE / name / "rec.jsonl"):
+        msgs = request["messages"]
         calls = {c["id"]: json.loads(c["function"]["arguments"])["code"] for m in msgs for c in m.get("tool_calls") or []}
         out.update({calls[m["tool_call_id"]]: m["content"] for m in msgs if m["role"] == "tool"})
     return out
@@ -109,20 +105,14 @@ def watch_history(patch):
 def replayed(request, tmp_path_factory):
     name = request.param
     out = tmp_path_factory.mktemp(name)
-    srv = Replayer(("127.0.0.1", 0), LIVE / name / "rec.jsonl")
-    threading.Thread(target=srv.serve_forever, daemon=True).start()
     STEPS.clear()
     HISTORY.clear()
-    patch = pytest.MonkeyPatch()
-    try:
+    with pytest.MonkeyPatch.context() as patch, replay(LIVE / name / "rec.jsonl") as srv:
         patch.setattr(sandbox, "run", recorded_run(executed(name)))
         watch_history(patch)
-        model = replaying(srv)
         learner = METHODS[name]()
-        run(TASKS["formula"], learner, model, json.load(open(LIVE / name / "run.json"))["n"], str(out))
-    finally:
-        patch.undo()
-        srv.shutdown()
+        n = json.load(open(LIVE / name / "run.json"))["n"]
+        run(TASKS["formula"], learner, replaying(srv), n, str(out))
     names = [b.name for b in learner.memory.books]
     return name, srv.status(), json.load(open(out / "log.json")), list(STEPS), list(HISTORY), names
 

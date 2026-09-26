@@ -9,9 +9,7 @@ DAPO-Math-17k (первые 4 задачи dapo_train: DAPO-Math-17k-live апс
 test_kernel сверяет вывод нашего ядра на тех же вызовах."""
 import json
 import re
-import threading
 from dataclasses import replace
-from pathlib import Path
 
 import pytest
 
@@ -23,12 +21,11 @@ from ace.memory.tfgrpo import Experiences
 from ace.methods.tfgrpo import tfgrpo
 from ace.solver import tfgrpo as show
 from ace.tasks import TASKS
-from tools.record.replay import Replayer
 
-from . import replaying
+from . import LIVE, replay, replaying, requests
 
-LIVE = Path(__file__).resolve().parents[2] / "bridge" / "live" / "tfgrpo"
-RUN = json.load(open(LIVE / "run.json"))
+RECORD = LIVE / "tfgrpo"
+RUN = json.load(open(RECORD / "run.json"))
 N, GROUP, BATCH = RUN["tasks"], RUN["grpo_n"], RUN["batch_size"]
 STEPS = []                  # библиотека после каждого батча
 
@@ -39,17 +36,10 @@ class Watched(Experiences):
         STEPS.append([r.text for r in self.records()])
 
 
-def agent_requests():
-    for line in open(LIVE / "rec.jsonl"):
-        request = json.loads(json.loads(line)["request"])
-        if "tools" in request:
-            yield request["messages"]
-
-
 def rollouts():
     """Вызовы инструмента по попыткам агента: [(аргументы, вывод апстрима), ...] у каждой попытки."""
-    requests = list(agent_requests())
-    last = [m for m in requests if not any(len(o) > len(m) and o[:len(m)] == m for o in requests)]
+    agent = [r["messages"] for r in requests(RECORD / "rec.jsonl") if "tools" in r]
+    last = [m for m in agent if not any(len(o) > len(m) and o[:len(m)] == m for o in agent)]
     out = []
     for msgs in last:
         args = {c["id"]: c["function"]["arguments"] for m in msgs if m["role"] == "assistant" for c in m.get("tool_calls") or []}
@@ -73,20 +63,13 @@ class Recorded:
 @pytest.fixture(scope="module")
 def replayed(tmp_path_factory):
     out = tmp_path_factory.mktemp("tfgrpo")
-    srv = Replayer(("127.0.0.1", 0), LIVE / "rec.jsonl")
-    threading.Thread(target=srv.serve_forever, daemon=True).start()
     STEPS.clear()
     Recorded.queue = [c for calls in rollouts() for c in calls]
-    patch = pytest.MonkeyPatch()
-    try:
+    learner = swap(tfgrpo, memory=Watched(), attempts=replace(tfgrpo.attempts, n=GROUP), every=BATCH)
+    with pytest.MonkeyPatch.context() as patch, replay(RECORD / "rec.jsonl") as srv:
         patch.setattr(show, "Kernel", Recorded)
-        model = replaying(srv)
-        learner = swap(tfgrpo, memory=Watched(), attempts=replace(tfgrpo.attempts, n=GROUP), every=BATCH)
-        run(TASKS["dapo"], learner, model, N, str(out), split="train")
-    finally:
-        patch.undo()
-        srv.shutdown()
-    return srv.status(), json.load(open(out / "log.json")), json.load(open(LIVE / "samples.json"))
+        run(TASKS["dapo"], learner, replaying(srv), N, str(out), split="train")
+    return srv.status(), json.load(open(out / "log.json")), json.load(open(RECORD / "samples.json"))
 
 
 def test_requests(replayed):
@@ -97,7 +80,7 @@ def test_requests(replayed):
 
 def test_library(replayed):
     """Библиотека после батча — опыты G0, G1, ... апстрима (recorder.experiences, ExperienceCache)."""
-    theirs = list(json.load(open(LIVE / "experiences.json")).values())
+    theirs = list(json.load(open(RECORD / "experiences.json")).values())
     assert theirs and STEPS == [theirs]
 
 

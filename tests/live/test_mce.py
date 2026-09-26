@@ -12,7 +12,6 @@ import os
 import shutil
 import socket
 import subprocess
-import threading
 import time
 from dataclasses import replace
 from pathlib import Path
@@ -28,14 +27,15 @@ from ace.wrap.mce import VENV
 from ace.model import Model, claude
 from ace.tasks import TASKS
 from tools.record.mce import normalize
-from tools.record.replay import Replayer
 
-LIVE = Path(__file__).resolve().parents[2] / "bridge" / "live" / "mce"
-RUN = json.load(open(LIVE / "run.json"))
+from . import LIVE, replay
+
+RECORD = LIVE / "mce"
+RUN = json.load(open(RECORD / "run.json"))
 ROOT = Path(RUN["root"])
 LITELLM = config.UPSTREAMS / ".venvs" / "litellm" / "bin" / "litellm"
 
-pytestmark = pytest.mark.skipif(not (LIVE / "rec.jsonl.gz").exists() or not LITELLM.exists() or not VENV.exists(),
+pytestmark = pytest.mark.skipif(not (RECORD / "rec.jsonl.gz").exists() or not LITELLM.exists() or not VENV.exists(),
                                 reason="нет записи bridge/live/mce/rec.jsonl, venv LiteLLM или venv апстрима MCE")
 
 
@@ -43,7 +43,7 @@ def strays():
     """Файлы вне ROOT, которые агенты записи создают инструментом Write (скрипты анализа в /tmp): до
     воспроизведения их не должно быть, иначе Write CLI ответит иначе (файл не прочитан)."""
     out = set()
-    for line in gzip.decompress((LIVE / "rec.jsonl.gz").read_bytes()).decode().splitlines():
+    for line in gzip.decompress((RECORD / "rec.jsonl.gz").read_bytes()).decode().splitlines():
         for choice in json.loads(line)["response"].get("choices") or []:
             for call in choice["message"].get("tool_calls") or []:
                 if call["function"]["name"] == "Write":
@@ -63,7 +63,7 @@ def litellm(model_url, tmp):
     """LiteLLM proxy с конфигом записи (bridge/live/mce/litellm.yaml), направленный на воспроизведение."""
     port = free_port()
     cfg = tmp / "litellm.yaml"
-    cfg.write_text((LIVE / "litellm.yaml").read_text().replace("http://127.0.0.1:8090/v1", model_url))
+    cfg.write_text((RECORD / "litellm.yaml").read_text().replace("http://127.0.0.1:8090/v1", model_url))
     proc = subprocess.Popen([str(LITELLM), "--config", str(cfg), "--port", str(port), "--host", "127.0.0.1"],
                             env={"HOME": str(tmp), "PATH": "/usr/bin:/bin"}, stdout=open(tmp / "litellm.log", "w"),
                             stderr=subprocess.STDOUT)
@@ -85,27 +85,23 @@ def replayed(tmp_path_factory):
     for path in strays():
         path.unlink(missing_ok=True)
     rec = tmp / "rec.jsonl"
-    rec.write_bytes(gzip.decompress((LIVE / "rec.jsonl.gz").read_bytes()))
+    rec.write_bytes(gzip.decompress((RECORD / "rec.jsonl.gz").read_bytes()))
     # тот же адрес, что у записи: агенты видят его в окружении и зовут модель сами (utils/llm.py, urllib)
-    srv = Replayer(("127.0.0.1", RUN["model_port"]), rec, normalize)
-    threading.Thread(target=srv.serve_forever, daemon=True).start()
     url = f"http://127.0.0.1:{RUN['model_port']}/v1"
-    proc, proxy = litellm(url, tmp)
-    patch = pytest.MonkeyPatch()
-    try:
-        patch.setattr(config, "CLAUDE_BASE_URL", proxy)
-        patch.setattr(config, "VAL_SIZE", RUN["val_limit"])
-        patch.setattr(config, "SEED", RUN["seed"])
-        ROOT.mkdir(parents=True)
-        patch.chdir(ROOT)               # cwd процесса апстрима — корень (относительные пути в коде интерфейсов)
-        learner = swap(mce, every=RUN["train_batch_size"], protocol=replace(mce.protocol, epochs=RUN["iterations"]))
-        learner.root, learner.workspace = ROOT, RUN["workspace"]
-        model = Model(RUN["model"], url, backend="wire")
-        run(TASKS["symptom"], learner, model, RUN["train_limit"], str(tmp / "out"))
-    finally:
-        patch.undo()
-        proc.kill()
-        srv.shutdown()
+    with replay(rec, RUN["model_port"], normalize) as srv, pytest.MonkeyPatch.context() as patch:
+        proc, proxy = litellm(url, tmp)
+        try:
+            patch.setattr(config, "CLAUDE_BASE_URL", proxy)
+            patch.setattr(config, "VAL_SIZE", RUN["val_limit"])
+            patch.setattr(config, "SEED", RUN["seed"])
+            ROOT.mkdir(parents=True)
+            patch.chdir(ROOT)           # cwd процесса апстрима — корень (относительные пути в коде интерфейсов)
+            learner = swap(mce, every=RUN["train_batch_size"], protocol=replace(mce.protocol, epochs=RUN["iterations"]))
+            learner.root, learner.workspace = ROOT, RUN["workspace"]
+            model = Model(RUN["model"], url, backend="wire")
+            run(TASKS["symptom"], learner, model, RUN["train_limit"], str(tmp / "out"))
+        finally:
+            proc.kill()
     left = {k: (srv.used[k], len(v)) for k, v in srv.rec.items() if len(v) > srv.used[k]}
     return dict(srv.status(), left=left), json.load(open(tmp / "out" / "log.json"))
 
@@ -130,7 +126,7 @@ def test_requests(replayed):
 
 def test_workspace(replayed):
     """Навык, context/, interfaces/, data/train.json, evaluations.json и архив навыков."""
-    ours, theirs = files(ROOT / "workspace" / RUN["workspace"]), files(LIVE / "workspace")
+    ours, theirs = files(ROOT / "workspace" / RUN["workspace"]), files(RECORD / "workspace")
     assert sorted(ours) == sorted(theirs)
     assert [p for p in ours if ours[p] != theirs[p]] == []
 
@@ -138,9 +134,9 @@ def test_workspace(replayed):
 def test_best_and_test(replayed):
     """Лучшая по val итерация и ответы теста ею — как у mce.eval апстрима на её последней папке."""
     _, log = replayed
-    evals = json.loads((LIVE / "workspace" / "meta_agent" / "evaluations.json").read_text())
+    evals = json.loads((RECORD / "workspace" / "meta_agent" / "evaluations.json").read_text())
     assert max(evals, key=lambda k: evals[k]["val_accuracy"]) == RUN["best"]
-    theirs = json.load(open(LIVE / "test_evaluation.json"))["results"]
+    theirs = json.load(open(RECORD / "test_evaluation.json"))["results"]
     test = [r for r in log if r["phase"] == "test"]
     assert [r["correct"] for r in test] == [r["evaluation"]["metrics"]["accuracy"] == 1.0 for r in theirs]
     assert [r["answer"] for r in test] == [r["evaluation"]["trajectory"][-1]["prediction"] for r in theirs]
@@ -150,7 +146,7 @@ def test_env():
     """Окружение CLI стенда — то же, что у записи (bridge/live/mce/env.txt), с адресами прокси и модели."""
     ours = claude.env(ROOT, RUN["model"], "http://127.0.0.1:8090/v1")
     ours["ANTHROPIC_BASE_URL"] = "http://127.0.0.1:4000"
-    text = (LIVE / "env.txt").read_text().replace("@ROOT@", str(ROOT)).replace("@UV@", os.path.dirname(shutil.which("uv")))
+    text = (RECORD / "env.txt").read_text().replace("@ROOT@", str(ROOT)).replace("@UV@", os.path.dirname(shutil.which("uv")))
     theirs = dict(line.split("=", 1) for line in text.splitlines())
     assert ours == theirs
 

@@ -6,9 +6,6 @@
 (родитель, минибатч, оценки до и после, принятый потомок) — как снимок апстрима (steps.json), лучший в конце — как
 result.best_idx."""
 import json
-import os
-import threading
-from pathlib import Path
 
 import pytest
 
@@ -17,12 +14,11 @@ from ace.methods.gepa import gepa
 from ace.tasks import Task
 from ace.upstream.gepa import current
 from ace.wrap.gepa import Evolution
-from tools.record.replay import Replayer
 
-from . import replaying
+from . import LIVE, replay, replaying
 
-LIVE = Path(os.environ.get("GEPA_LIVE") or Path(__file__).resolve().parents[2] / "bridge" / "live" / "gepa")
-RUN = json.load(open(LIVE / "run.json"))
+RECORD = LIVE / "gepa"
+RUN = json.load(open(RECORD / "run.json"))
 STEPS = []                  # снимок после каждой итерации
 
 
@@ -54,14 +50,10 @@ class Watched(Evolution):
 @pytest.fixture(scope="module")
 def replayed(tmp_path_factory):
     out = tmp_path_factory.mktemp("gepa")
-    srv = Replayer(("127.0.0.1", 0), LIVE / "rec.jsonl")
-    threading.Thread(target=srv.serve_forever, daemon=True).start()
     STEPS.clear()
-    try:
-        run(Slice("aime"), Watched(gepa.inner, RUN["max_metric_calls"], RUN["seed"]), replaying(srv), RUN["train"],
-            str(out))
-    finally:
-        srv.shutdown()
+    learner = Watched(gepa.inner, RUN["max_metric_calls"], RUN["seed"])
+    with replay(RECORD / "rec.jsonl") as srv:
+        run(Slice("aime"), learner, replaying(srv), RUN["train"], str(out))
     return srv.status(), json.load(open(out / "memory.json"))
 
 
@@ -72,7 +64,7 @@ def test_requests(replayed):
 
 def test_iterations(replayed):
     """Состояние после каждой итерации — как снимок апстрима (on_iteration_end)."""
-    theirs = json.load(open(LIVE / "steps.json"))
+    theirs = json.load(open(RECORD / "steps.json"))
     assert len(STEPS) == len(theirs["steps"])
     for ours, up in zip(STEPS, theirs["steps"]):
         for k, v in ours.items():
@@ -82,7 +74,7 @@ def test_iterations(replayed):
 def test_best(replayed):
     """Лучший по val в конце и его текст — result апстрима; память прогона — его текст."""
     _, memory = replayed
-    result = json.load(open(LIVE / "steps.json"))["result"]
+    result = json.load(open(RECORD / "steps.json"))["result"]
     assert STEPS[-1]["best"] == result["best_idx"]
     assert STEPS[-1]["candidates"][result["best_idx"]] == result["best_candidate"]
     assert [m for m in memory if m["kind"] == "best"] == [dict(kind="best", id=result["best_idx"])]

@@ -5,9 +5,7 @@ hmmt_feb_2025, 5 итераций по кругу (задачи 0, 1, 2, 0, 1 �
 description) и insights (Future IG), лучшие решения задач, баллы, IG и улучшение — как в снимке апстрима
 (steps.json)."""
 import json
-import threading
 from dataclasses import dataclass
-from pathlib import Path
 
 import pytest
 
@@ -17,12 +15,11 @@ from ace.loop import run
 from ace.memory.evolib import SkillLibrary
 from ace.methods.evolib import evolib
 from ace.tasks import Task
-from tools.record.replay import Replayer
 
-from . import replaying
+from . import LIVE, replay, replaying
 
-LIVE = Path(__file__).resolve().parents[2] / "bridge" / "live" / "evolib"
-RUN = json.load(open(LIVE / "run.json"))
+RECORD = LIVE / "evolib"
+RUN = json.load(open(RECORD / "run.json"))
 STEPS = []                  # после каждой итерации: (библиотека, лучшие решения, извлечённое, улучшило ли)
 
 
@@ -48,15 +45,10 @@ class Watched(SkillLibrary):
 @pytest.fixture(scope="module")
 def replayed(tmp_path_factory):
     out = tmp_path_factory.mktemp("evolib")
-    srv = Replayer(("127.0.0.1", 0), LIVE / "rec.jsonl")
-    threading.Thread(target=srv.serve_forever, daemon=True).start()
     STEPS.clear()
-    try:
-        model = replaying(srv)
-        task = Stream("hmmt")
-        run(task, swap(evolib, memory=Watched()), model, RUN["iterations"], str(out))
-    finally:
-        srv.shutdown()
+    task = Stream("hmmt")
+    with replay(RECORD / "rec.jsonl") as srv:
+        run(task, swap(evolib, memory=Watched()), replaying(srv), RUN["iterations"], str(out))
     return srv.status(), json.load(open(out / "log.json")), task.load()
 
 
@@ -68,7 +60,7 @@ def test_requests(replayed):
 def test_library(replayed):
     """Библиотека и лучшие решения после каждой итерации — как снимок апстрима."""
     _, _, items = replayed
-    theirs = json.load(open(LIVE / "steps.json"))
+    theirs = json.load(open(RECORD / "steps.json"))
     assert len(STEPS) == len(theirs) == RUN["iterations"]
     for ours, up in zip(STEPS, theirs):
         assert ours["skills"] == up["skills"], up["iteration"]
@@ -79,7 +71,7 @@ def test_library(replayed):
 def test_iterations(replayed):
     """Лучшее решение итерации, его балл, IG и улучшение — как result run_iteration."""
     _, log, _ = replayed
-    theirs = json.load(open(LIVE / "steps.json"))
+    theirs = json.load(open(RECORD / "steps.json"))
     for ours, entry, up in zip(STEPS, log, theirs):
         r = up["result"]
         assert entry["output"] == r["best_solution"], up["iteration"]
