@@ -12,8 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from ace.learner import swap
-from ace.loop import Protocol, run
+from ace.loop import run
 from ace.methods.gepa import gepa
 from ace.tasks import Task
 from ace.upstream.gepa import current
@@ -58,10 +57,9 @@ def replayed(tmp_path_factory):
     srv = Replayer(("127.0.0.1", 0), LIVE / "rec.jsonl")
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     STEPS.clear()
-    budget = RUN["max_metric_calls"]
-    inner = swap(gepa.inner, protocol=Protocol(offline=True, epochs=budget))
     try:
-        run(Slice("aime"), Watched(inner, budget, RUN["seed"]), replaying(srv), RUN["train"], str(out))
+        run(Slice("aime"), Watched(gepa.inner, RUN["max_metric_calls"], RUN["seed"]), replaying(srv), RUN["train"],
+            str(out))
     finally:
         srv.shutdown()
     return srv.status(), json.load(open(out / "memory.json"))

@@ -17,9 +17,10 @@ None — SEED стенда на старте прогона. Минибатч �
 лучшая по val версия прогона — тот же кандидат, что result.best_candidate апстрима."""
 import random
 from collections import Counter
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 
 from .. import config
+from ..learner import swap
 from ..loop import Version, best_index, evaluated
 from . import Wrapper, single_meta
 
@@ -61,7 +62,8 @@ class Evolution(Wrapper):
     iterates = True
 
     def __init__(self, inner, budget, seed=None, name=None):
-        super().__init__(inner, name)
+        # проходов не больше бюджета: итерация тратит хотя бы один вызов метрики, обучение кончает бюджет
+        super().__init__(swap(inner, protocol=replace(inner.protocol, epochs=budget)), name)
         self.budget = budget            # max_metric_calls
         self.seed = seed                # None — config.SEED на старте прогона
         self.rng = random.Random(seed)

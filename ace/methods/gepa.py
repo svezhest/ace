@@ -26,8 +26,5 @@ from ..wrap.gepa import Evolution
 MINIBATCH = 3               # reflection_minibatch_size
 MAX_METRIC_CALLS = 150      # бюджет квикстарта
 
-# проходов не больше бюджета: итерация тратит минимум минибатч вызовов, обучение кончает Evolution
-PROTOCOL = Protocol(offline=True, epochs=MAX_METRIC_CALLS)
-
 gepa = Evolution(Learner("gepa", memory=Instruction(), solver=ADAPTER, extract=Reflection(), every=MINIBATCH,
-                         protocol=PROTOCOL), MAX_METRIC_CALLS)
+                         protocol=Protocol(offline=True)), MAX_METRIC_CALLS)

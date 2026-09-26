@@ -27,7 +27,7 @@ REFLECTION = "Your task is to write a new instruction"
 
 
 def evolution(budget):
-    return Evolution(swap(gepa.inner, protocol=Protocol(offline=True, epochs=budget)), budget)
+    return Evolution(gepa.inner, budget)
 
 
 def test_accepts_better_and_tests_best(tmp_path):
@@ -115,7 +115,7 @@ def test_child_with_random_show_and_no_verdict():
     none — принятие и val по проверке задачи, а не по вердикту попытки."""
     for levels in (dict(solver=RandomAdapter()), dict(verdict=verdict.none)):
         model = better_model()
-        learner = Evolution(swap(gepa.inner, protocol=Protocol(offline=True, epochs=40), **levels), 40)
+        learner = Evolution(swap(gepa.inner, **levels), 40)
         summary = run(TASK, learner, model, 3, split="val")
         assert summary["correct"] == 3 and any(c["system"] == "Better" for c in model.calls), levels
 
@@ -156,11 +156,12 @@ def test_child_question_budget_and_trace(tmp_path):
     show = Seen()
     good = Stub(lambda call: right(call) if "good" in call["system"] else "FINAL ANSWER: 0")
     inner = Learner("notes", memory=Texts(), show=show, extract=Raw(), every=3, attempts=Attempts(3),
-                    protocol=Protocol(offline=True, epochs=1))
-    STATE.clear()
-    run(TASK, Watched(inner, 100), good, 3, str(tmp_path), split="val")
+                    protocol=Protocol(offline=True))
     val = len(TASK.load("val"))
-    assert show.mismatch == [] and STATE == [(val + 9 + 3 + val, 2)]
+    budget = val + 9 + 3 + val          # одна итерация: val seed, минибатч родителя, потомок на нём, val потомка
+    STATE.clear()
+    run(TASK, Watched(inner, budget), good, 3, str(tmp_path), split="val")
+    assert show.mismatch == [] and STATE == [(budget, 2)]
     kinds = [m["kind"] for m in json.load(open(tmp_path / "memory.json"))]
     assert kinds.count("candidate") == 2 and kinds.count("iteration") == 1 and kinds[-1] == "best"
 
@@ -187,8 +188,7 @@ def test_seed(tmp_path, monkeypatch):
     zero = first_minibatch(tmp_path / "a", evolution(budget))
     monkeypatch.setattr(config, "SEED", 1)
     assert first_minibatch(tmp_path / "b", evolution(budget)) != zero
-    inner = swap(gepa.inner, protocol=Protocol(offline=True, epochs=budget))
-    assert first_minibatch(tmp_path / "c", Evolution(inner, budget, 0)) == zero
+    assert first_minibatch(tmp_path / "c", Evolution(gepa.inner, budget, 0)) == zero
 
 
 def test_failed_seed_evaluation_is_logged(tmp_path):
