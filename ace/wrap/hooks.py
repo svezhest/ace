@@ -24,6 +24,8 @@ def helped(hook, step):
 
 
 class Hooks(Wrapper):
+    learns = True               # книга хуков учится всегда
+
     def __init__(self, inner, name=None, learn="model", prune=PRUNE, show="after"):
         super().__init__(inner, name)
         self.book = Learner(f"{self.name}: хуки", memory=HookBook(prune), extract=FromErrors(LEARN[learn]))

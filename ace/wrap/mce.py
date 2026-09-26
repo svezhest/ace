@@ -20,7 +20,7 @@ from ..memory import Files
 from ..model import Call, claude, messages, params
 from ..memory.mce import CLAUDE_SKILL, ROUNDS, SKILL, WORKSPACE, Workspace, cleanup, folder_name, signatures, sub_folder
 from ..loop import Version, best_index, evaluated
-from . import Wrapper
+from . import Wrapper, single_meta
 
 META = prompts.load("mce_meta")
 META_ACE = prompts.load("mce_meta_ace")
@@ -58,7 +58,8 @@ class Iteration:
 
 
 def offline_only(wrapper):
-    """MCE учится только на train: итерация — проход по train, выбор — по val."""
+    """MCE учится только на train: итерация — проход по train, выбор — по val; мета одна."""
+    single_meta(wrapper)
     if not wrapper.inner.protocol.val:
         raise ValueError(f"{wrapper.name}: MCE — только офлайн с val (итерация — проход по train)")
 
@@ -70,6 +71,8 @@ class Meta(Wrapper):
     ученика отдаёт как папку (folder()). В конце прохода val, итерация — в историю, следующая начинается с лучшей
     по val из уже пройденных (_find_best_iteration). Нулевой итерации (val пустой памяти) нет: апстрим по
     умолчанию начинает с iter1, а iter0 в выборе не участвует."""
+    iterates = True
+
     def __init__(self, inner, author, name=None):
         super().__init__(inner, name)
         self.author = author
@@ -246,6 +249,8 @@ class Iterations(Wrapper):
     прохода — val последней папкой, итерация — в meta_agent/evaluations.json и архив навыков, откат к лучшей по val
     (строго больше, при равенстве первая; iter0 не участвует). Workspace — root/workspace/<name>, по умолчанию
     <задача>-<pid>; без корня — временная папка, удаляется при выходе."""
+    iterates = True
+
     def __init__(self, inner, root=None, workspace=None, name=None):
         super().__init__(inner, name)
         self.root = root

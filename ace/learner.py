@@ -29,6 +29,7 @@ class Learner:
     protocol: Protocol = Protocol()
     env: Env = field(default_factory=Env)
     needs_val = False           # val нужен и без офлайна (Gate)
+    iterates = False            # итерации по проходам с выбором версии в конце прохода ведёт мета (MCE, GEPA)
     pending: list = field(default_factory=list, init=False, repr=False)    # извлечённое до батча
     gated: list = field(default_factory=list, init=False, repr=False)      # решения Gate (в лог по вопросу)
 
@@ -126,6 +127,11 @@ class Learner:
         self.pending = []           # неполный батч без flush отбрасывается
 
     # протокол и обёртки
+
+    @property
+    def learns(self):
+        """Учится ли ученик: память правится только из извлечения."""
+        return self.extract is not None
 
     @property
     def watches_steps(self):

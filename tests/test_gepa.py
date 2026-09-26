@@ -1,7 +1,9 @@
 """GEPA на модели-заглушке: пул и принятие по минибатчу, откат отвергнутого, тест лучшим по val; разбор ответа
 рефлексии (ProposalAdapter.parse) и разметка примеров (format_samples)."""
 import json
+from dataclasses import replace
 
+import pytest
 from stub import TASK, Stub, right
 
 from ace import config, parse, render, verdict
@@ -15,7 +17,11 @@ from ace.methods.gepa import gepa
 from ace.show import Whole
 from ace.solver.gepa import Adapter
 from ace.wrap.gepa import Candidate, EpochShuffled, Evolution, pareto_parent
+from ace.wrap import Gate
 from ace.wrap.hooks import Hooks
+from ace.wrap.mce import Iterations, Meta
+
+OFFLINE = Protocol(offline=True, epochs=2)
 
 REFLECTION = "Your task is to write a new instruction"
 
@@ -194,3 +200,18 @@ def test_failed_seed_evaluation_is_logged(tmp_path):
     summary = run(TASK, evolution(40), Stub(answer), 3, str(tmp_path), split="val")
     log = json.load(open(tmp_path / "log.json"))
     assert log[0]["phase"] == "pass" and "model 500" in log[0]["error"] and summary["n"] == 3
+
+
+@pytest.mark.parametrize("make, error", [
+    (lambda: Evolution(swap(METHODS["scope"], protocol=OFFLINE), 10), "на шаге"),
+    (lambda: Evolution(Learner("x", protocol=OFFLINE), 10), "не учится"),
+    (lambda: Evolution(swap(METHODS["ace_stand"], protocol=replace(OFFLINE, recheck=True)), 10), "recheck"),
+    (lambda: Evolution(METHODS["mce_fs"], 10), "мета над метой"),
+    (lambda: Meta(Gate(gepa), lambda ex, h: ""), "мета над метой"),
+    (lambda: Iterations(gepa), "мета над метой"),
+])
+def test_evolution_build_errors(make, error):
+    """Над учеником, где потомок не память после обучения на минибатче или бюджет не тот, и мета над метой —
+    ошибка сборки, а не молчаливый холостой прогон."""
+    with pytest.raises(ValueError, match=error):
+        make()

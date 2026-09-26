@@ -21,7 +21,7 @@ from dataclasses import asdict, dataclass, field
 
 from .. import config
 from ..loop import Version, best_index, evaluated
-from . import Wrapper
+from . import Wrapper, single_meta
 
 PERFECT = 1.0               # perfect_score; skip_perfect_score — минибатч родителя весь верен, рефлексии нет
 
@@ -57,6 +57,8 @@ class Iteration:
 
 
 class Evolution(Wrapper):
+    iterates = True
+
     def __init__(self, inner, budget, seed=None, name=None):
         super().__init__(inner, name)
         self.budget = budget            # max_metric_calls
@@ -72,8 +74,19 @@ class Evolution(Wrapper):
         self.current = 0                # номер кандидата в памяти ученика; None — потомок, ещё не в пуле
 
     def check(self):
-        if not self.inner.protocol.val:
+        """Ученик, над которым потомок GEPA — не память после обучения на минибатче или бюджет не тот, — ошибка
+        сборки."""
+        single_meta(self)
+        inner = self.inner
+        if not inner.protocol.val:
             raise ValueError(f"{self.name}: GEPA — только офлайн с val (пул оценивается на val)")
+        if not inner.learns:
+            raise ValueError(f"{self.name}: GEPA над учеником, который не учится (нет извлечения), — потомков не будет")
+        if inner.extract is not None and inner.extract.steps:
+            raise ValueError(f"{self.name}: GEPA — извлечение на шаге правит память посреди минибатча, и оценка на нём "
+                             "была бы не родителя")
+        if inner.protocol.recheck:
+            raise ValueError(f"{self.name}: GEPA — recheck тратит попытки вне бюджета вызовов метрики")
 
     def state(self):
         """Кандидат — по месту в пуле (и в ключе): у двух кандидатов с одним текстом оценки свои, как у апстрима без
