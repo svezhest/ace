@@ -24,8 +24,9 @@ lessons = False), и память, которая учится по урокам
 показ объявляет, что показывает (shows): сверка — при сборке.
 
 Масштаб извлечения (scale): "question" — extractor(ex, group, memory) после каждого вопроса; "batch" —
-batch(ex, groups, memory) -> [Extraction] на батче, стадиями по всему батчу (TF-GRPO). Извлечение на шаге (SCOPE:
-правило посреди попытки) — step(ex, attempt, шаг, memory) -> Extraction | None; у остальных его нет.
+batch(ex, groups, memory) -> [Extraction] на батче: стадиями по всему батчу (TF-GRPO), рефлексия по минибатчу
+(GEPA). Извлечение на шаге (SCOPE: правило посреди попытки) — step(ex, attempt, шаг, memory) -> Extraction | None;
+у остальных его нет.
 Реализации — extract/<метод>.py."""
 from dataclasses import dataclass, field
 
@@ -56,7 +57,7 @@ class Labels:
 
 @dataclass
 class Extraction:
-    group: object               # сырое: вопрос и попытки (DC и MCE память читает его)
+    group: object               # сырое: вопрос и попытки (DC и MCE память читает его); у GEPA — группы минибатча
     lessons: list               # ядро: текст уроков
     scores: list                # ядро: баллы попыток группы; пусто, если вердикта нет
     extras: dict = field(default_factory=dict)      # объявленные добавки: имя -> значение
