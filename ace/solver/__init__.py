@@ -14,6 +14,7 @@
 class OwnSolver:
     random = False              # показ внутри решателя случаен (выборка EvoLib): val такой памяти не кэшируется
     reads = ()                  # что решатель читает у памяти сверх records(): сборка проверяет, что это есть
+    shows = frozenset()         # что решатель кладёт в Prompt.seen для извлечения (DC: вход и cheatsheet)
 
     def prompt(self, ex, memory, item, k):
         raise NotImplementedError

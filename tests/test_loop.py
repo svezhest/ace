@@ -221,6 +221,20 @@ def test_seam():
         Learner("x", memory=Needs(), extract=Raw())
 
 
+@pytest.mark.parametrize("method, levels, error", [
+    ("dc", dict(solver=None), "показанного решателем input, sheet"),
+    ("gepa", dict(extract=Raw()), "требует от извлечения lessons"),
+    ("mce_fs", dict(memory=Lessons()), "память не учится"),
+])
+def test_seam_of_swaps(method, levels, error):
+    """Замены, которые собирались и падали в работе: извлечение DC берёт показанное своим решателем (seen / shows),
+    память GEPA учится по урокам, а Raw их не даёт, память без learn при извлечении."""
+    from ace.extract import Contract
+    from ace.methods import METHODS
+    with pytest.raises(Contract, match=error):
+        swap(METHODS[method], "x", **levels)
+
+
 def test_undeclared_extras():
     class Sneaky(Extractor):
         def __call__(self, ex, group, memory):
@@ -357,7 +371,7 @@ class Boom(Extractor):
 def test_learning_error_keeps_answer(tmp_path):
     """Ошибка обучения на вопросе — своя запись (phase learn) в логе и в errors; ответ уже получен и в зачёт идёт
     с вердиктом."""
-    summary = run(TASK, Learner("x", extract=Boom()), Stub(right), 3, str(tmp_path))
+    summary = run(TASK, Learner("x", memory=Memory(), extract=Boom()), Stub(right), 3, str(tmp_path))
     log = json.load(open(tmp_path / "log.json"))
     assert [(r["phase"], r["finish"]) for r in log] == [("learn", "error"), ("online", "stop")] * 3
     assert "reflector HTTP 400" in log[0]["error"] and all(r["answer"] for r in log if r["phase"] == "online")

@@ -11,7 +11,7 @@ from typing import Literal
 from pydantic import BaseModel
 
 from .. import embed, parse, prompts, render
-from ..extract import LABELS
+from ..extract import LABELS, LESSONS
 from ..model import TEXT, Call, Reader, messages, params
 from ..upstream.ace import ace_input, ace_params
 from . import Ids, Lessons, Sections
@@ -65,7 +65,7 @@ class Playbook(Lessons):
     def __init__(self, curator=curate_ops, prune=PRUNE_HARMFUL):
         super().__init__("bullet", Counted)
         self.curator, self.prune_at = curator, prune
-        self.requires = frozenset({LABELS}) if prune else frozenset()
+        self.requires = frozenset({LESSONS, LABELS}) if prune else frozenset({LESSONS})
 
     def learn(self, ex, extractions):
         for x in extractions:
@@ -157,7 +157,7 @@ def layout(playbook):
 class SectionedPlaybook(Sections):
     """Playbook апстрима: 7 разделов, общий счётчик id со слагом раздела. Порядок пунктов — как в тексте апстрима:
     по разделам, внутри раздела по добавлению; пункт раздела general — в начало OTHERS."""
-    requires = frozenset({LABELS})
+    requires = frozenset({LESSONS, LABELS})
 
     def __init__(self, dedup=None, read=OPERATIONS):
         super().__init__(list(TITLES), "bullet", Counted, SlugIds())

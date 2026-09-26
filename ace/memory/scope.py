@@ -12,7 +12,7 @@ from dataclasses import dataclass
 
 from .. import parse, prompts, render
 from ..model import Call, Reader, parts
-from ..extract import ATTEMPT, CONFIDENCE, DOMAIN, RATIONALE
+from ..extract import ATTEMPT, CONFIDENCE, DOMAIN, LESSONS, RATIONALE
 from . import Container, Ids, Record
 
 ANALYZE = prompts.load("scope_analyze")
@@ -212,7 +212,7 @@ class Book(Container):
 class Perspectives(Container):
     """Своя память у каждой перспективы; попытка k работает с памятью перспективы k. Урок идёт в память
     перспективы попытки, на которой он извлечён (attempt)."""
-    requires = frozenset({CONFIDENCE, DOMAIN, RATIONALE, ATTEMPT})
+    requires = frozenset({LESSONS, CONFIDENCE, DOMAIN, RATIONALE, ATTEMPT})
 
     def __init__(self, names=(THOROUGHNESS,), **book):
         self.books = [Book(name, **book) for name in names]

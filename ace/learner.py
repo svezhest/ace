@@ -40,6 +40,15 @@ class Learner:
         lack = missing(self.memory, self.extract)
         if lack:
             raise Contract(f"{self.name}: память требует от извлечения {', '.join(sorted(lack))}, а оно этого не даёт")
+        if self.extract is None:
+            return
+        if not hasattr(self.memory, "learn"):
+            raise Contract(f"{self.name}: извлечение есть, а память не учится (нет learn): контейнер без правила "
+                           "обучения")
+        unseen = set(self.extract.seen) - set((self.solver or self.viewer()).shows)
+        if unseen:
+            raise Contract(f"{self.name}: извлечение берёт из показанного решателем {', '.join(sorted(unseen))}, "
+                           "а решатель этого не показывает")
 
     def check_reads(self):
         """Показ (или свой решатель) читает у памяти то, что объявил (reads): иначе он упадёт на первой попытке."""

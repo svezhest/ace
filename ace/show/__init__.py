@@ -14,7 +14,8 @@
 Переписать системный промпт посреди попытки (SCOPE) — Patch(system) из on_step показа.
 
 random — показ случаен: val такой памяти не кэшируется. watches_steps — показу нужны шаги попытки. reads — что
-показ читает у памяти сверх records() (устройство памяти метода): сборка проверяет, что у памяти это есть."""
+показ читает у памяти сверх records() (устройство памяти метода): сборка проверяет, что у памяти это есть. shows —
+что показ кладёт в Prompt.seen (у общих показов — ничего)."""
 from .. import embed, fs, prompts, render
 from ..loop import Prompt, combine
 from ..model import Patch
@@ -29,6 +30,7 @@ class Show:
     random = False
     watches_steps = False
     reads = ()
+    shows = frozenset()         # что показ кладёт в Prompt.seen для извлечения
 
     def prompt(self, ex, memory, item, k):
         return Prompt()

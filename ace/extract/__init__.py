@@ -1,9 +1,10 @@
 """Извлечение: что вынести из группы попыток вопроса. extractor(ex, group, memory) -> Extraction | None;
 память читает только для полей промпта (что было показано, какие записи помечать).
 
-Ядро есть всегда: текст уроков (lessons) и баллы попыток (scores). Добавки объявляются: извлечение — что
-даёт (gives), память — что ей нужно (requires). Сборка ученика сравнивает два множества: это единственный
-стык с проверкой. Имена добавок:
+Ядро есть всегда: текст уроков (lessons) и баллы попыток (scores); уроков нет только у извлечения без них (Raw,
+lessons = False), и память, которая учится по урокам, требует их как добавку LESSONS. Добавки объявляются:
+извлечение — что даёт (gives), память — что ей нужно (requires). Сборка ученика сравнивает два множества. Имена
+добавок:
 
     labels        метки записей, бывших в попытке: Labels(helpful, harmful) (ACE)
     confidence    уверенность урока при рождении (SCOPE)
@@ -17,6 +18,10 @@
     attempt       номер попытки, на которой урок извлечён (SCOPE: урок — в память перспективы попытки)
     input         вход задачи, как его видел решатель (DC: вопрос куратора)
     sheet         что стояло в [[CHEATSHEET]] у решателя (DC-RS хранит его как прошлый cheatsheet)
+    lessons       текст уроков (ядро; даёт любое извлечение с lessons = True)
+
+Что решатель показал сверх записей (Prompt.seen: input, sheet) извлечение берёт объявленно (seen), а решатель или
+показ объявляет, что показывает (shows): сверка — при сборке.
 
 Масштаб извлечения (scale): "question" — extractor(ex, group, memory) после каждого вопроса; "batch" —
 batch(ex, groups, memory) -> [Extraction] на батче, стадиями по всему батчу (TF-GRPO). Извлечение на шаге (SCOPE:
@@ -36,6 +41,7 @@ TRIGGER = "trigger"
 ATTEMPT = "attempt"
 INPUT = "input"
 SHEET = "sheet"
+LESSONS = "lessons"
 
 
 class Contract(ValueError):
@@ -58,6 +64,8 @@ class Extraction:
 
 class Extractor:
     gives = frozenset()
+    lessons = True              # даёт текст уроков (ядро)
+    seen = frozenset()          # что берёт из показанного решателем (Prompt.seen)
     scale = "question"
     steps = False               # извлекает и на шаге попытки (step)
     skilled = False             # подставляет навык меты (ex.skill) в свои промпты
@@ -74,6 +82,8 @@ class Extractor:
 
 class Raw(Extractor):
     """Нет извлечения: память читает сырое (MCE)."""
+    lessons = False
+
     def __call__(self, ex, group, memory):
         return Extraction(group, [], scores(group))
 
@@ -81,6 +91,7 @@ class Raw(Extractor):
 class Seen(Raw):
     """Нет извлечения, но память видит, что показал решатель (DC: вход задачи и cheatsheet — Prompt.seen)."""
     gives = frozenset({INPUT, SHEET})
+    seen = gives
 
     def __call__(self, ex, group, memory):
         x = super().__call__(ex, group, memory)
@@ -97,5 +108,6 @@ def scores(group):
 
 
 def missing(memory, extractor):
-    """Добавки, которые память требует, а извлечение не даёт."""
-    return set(memory.requires) - set(extractor.gives if extractor else ())
+    """Добавки, которые память требует, а извлечение не даёт (уроки — если у извлечения они есть)."""
+    gives = set(extractor.gives) | ({LESSONS} if extractor.lessons else set()) if extractor else set()
+    return set(memory.requires) - gives

@@ -9,7 +9,7 @@ from pydantic_ai.models.function import AgentInfo, FunctionModel
 from stub import TASK, Stub, episode, right
 
 from ace.env import Env
-from ace.extract import LABELS, TRIGGER, Extraction, Labels
+from ace.extract import LABELS, LESSONS, TRIGGER, Extraction, Labels
 from ace.extract.ace import Reflection
 from ace.extract.hooks import HookLesson, HookLessons, by_model, by_trajectory, error_kind
 from ace.memory.counters import count
@@ -75,7 +75,7 @@ def test_hook_book():
     assert [(r.id, r.text, r.helpful) for r in m.records()] == [("h2", "b", 0), ("h3", "c", 0)]
     m.learn(Ex(), [x([], [], harmful=["h2", "h2", "h3"], helpful=["h3"])])
     assert [r.id for r in m.records()] == ["h3"]
-    assert HookBook(prune=None).requires == frozenset({TRIGGER})
+    assert HookBook(prune=None).requires == frozenset({LESSONS, TRIGGER})
 
 
 def step(h, a, s, turn):
@@ -178,13 +178,13 @@ def test_ace_opt_caps_playbook():
     texts = [r.text for r in m.records()]
     assert len(texts) == 10 and texts[-1] == "merged"
     assert texts[0] == "kept" and m.get("r1").helpful == 1         # нетронутый пункт — со своими счётчиками
-    assert ace_stand_opt.memory.requires == frozenset()
+    assert ace_stand_opt.memory.requires == frozenset({LESSONS})
 
 
 def test_ace_group_levels():
     """ace_stand_group: в зачёт попытка при T = 0, группа из 3 при T = 0.7; извлечение без операций, память без отсева."""
     assert [ace_stand_group.attempts.temperature(k) for k in range(ace_stand_group.attempts.n)] == [0, 0.7, 0.7, 0.7]
-    assert ace_stand_group.extract.gives == frozenset() and ace_stand_group.memory.requires == frozenset()
+    assert ace_stand_group.extract.gives == frozenset() and ace_stand_group.memory.requires == frozenset({LESSONS})
 
 
 def test_ace_group_contrast_to_curator(tmp_path):

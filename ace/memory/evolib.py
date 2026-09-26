@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from .. import parse, prompts, render
-from ..extract import ATTRIBUTION, BEST_ANSWER, IG
+from ..extract import ATTRIBUTION, BEST_ANSWER, IG, LESSONS
 from ..upstream.evolib import domain, generate, llm_params, log_gain
 from ..model import Call, Reader, messages
 from ..tasks import variant
@@ -86,7 +86,7 @@ def second_better(judgment):
 
 class SkillLibrary(Container):
     """skills и insights с общей нумерацией; solutions — лучшее решение каждого вопроса (решателю не видно)."""
-    requires = frozenset({IG, BEST_ANSWER, ATTRIBUTION})
+    requires = frozenset({LESSONS, IG, BEST_ANSWER, ATTRIBUTION})
 
     def __init__(self):
         self.ids = Ids()

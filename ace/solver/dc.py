@@ -48,6 +48,8 @@ def dc_input(task, i, question):
 
 class Generator(OwnSolver):
     """Решатель DC апстрима; sheet(ex, память, item, вход) -> (текст для [[CHEATSHEET]], показанные записи)."""
+    shows = frozenset({INPUT, SHEET})
+
     def __init__(self, sheet, code=False):
         self.sheet = sheet
         self.code = code
