@@ -10,7 +10,7 @@ from upstream import deviation, fixture
 
 from ace import fs, render
 from ace.learner import swap
-from ace.loop import Protocol, run
+from ace.loop import Protocol, Version, run
 from ace.memory.mce import BASE, WORKSPACE
 from ace.methods.mce import mce_fs as mce
 from ace.wrap.mce import META, MISSING, evaluations
@@ -180,7 +180,8 @@ def test_evaluations_json():
     want = json.loads(MEMORY["aggregate_iteration_results"]["after_iter1"]["evaluations.json"])
     deviation("S2")
     want["iter1"]["train_metrics"] = {"accuracy": want["iter1"]["train_metrics"]["accuracy"]}
-    h = Iteration("s", (1 + 1) / (3 + 1), 0.5, None, val_total=4, rollouts=4, folders={"iter1_sub0": {}, "iter1_sub1": {}})
+    val = Version(None, [(True, False), (True, False), (False, False), (False, False)])       # 0.5 из 4
+    h = Iteration("s", (1 + 1) / (3 + 1), val, rollouts=4, folders={"iter1_sub0": {}, "iter1_sub1": {}})
     assert evaluations([h]) == want
     assert render.pretty_json(evaluations([h])) == json.dumps(want, indent=2)
 

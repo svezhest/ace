@@ -306,21 +306,28 @@ class Experiment:
         key = self.learner.key()
         if key is not None and key in self.scores:
             return self.scores[key]
-        i, item = self.i, self.item
         out = []
-        try:
-            with self.frozen():
-                for n, row in enumerate(self.task.load("val")):
-                    self.i, self.item = n, row
-                    out.append(self.result(self.question(row), row))
-        finally:
-            self.i, self.item = i, item
+        for n, row in enumerate(self.task.load("val")):
+            group = self.answer(n, row)
+            out.append((self.solved(group), group.episodes[group.chosen].truncated))
         if key is not None:
             self.scores[key] = out
         return out
 
-    def result(self, group, item):
-        return self.task.check(group.answer, item["target"]), group.episodes[group.chosen].truncated
+    def answer(self, i, item):
+        """Вопрос i без обучения (val, повтор минибатча потомком GEPA): номер и вопрос — его на время ответа."""
+        saved = self.i, self.item
+        try:
+            with self.frozen():
+                self.i, self.item = i, item
+                return self.question(item)
+        finally:
+            self.i, self.item = saved
+
+    def solved(self, group):
+        """Верен ли ответ в зачёт — проверка задачи по метке (метрика апстримов), а не вердикт попытки ученика:
+        это оценка val и сигнал меты на train."""
+        return self.task.check(group.answer, group.item["target"])
 
 
 def combine(patch, mine):
@@ -330,6 +337,40 @@ def combine(patch, mine):
     if mine is None:
         return patch
     return patch.merge(mine)
+
+
+@dataclass
+class Version:
+    """Версия памяти ученика и её оценка на val: снимок для отката (learner.snapshot()), (верно, обрыв) по вопросам
+    val (ex.evaluate()) и дамп памяти на момент снимка, если он нужен (пул GEPA). Общее у меты: версии прогона
+    (офлайн), итерации MCE, кандидаты GEPA, правка Gate."""
+    memory: object
+    val: list
+    dump: list = None
+
+    @property
+    def correct(self):
+        return sum(c for c, _ in self.val)
+
+    @property
+    def truncated(self):
+        return sum(t for _, t in self.val)
+
+    @property
+    def share(self):
+        """Доля верных на val; без val — 0."""
+        return self.correct / len(self.val) if self.val else 0.0
+
+    @property
+    def scores(self):
+        """Оценки по вопросам val: номер -> 1.0 / 0.0."""
+        return {j: float(bool(c)) for j, (c, _) in enumerate(self.val)}
+
+
+def evaluated(ex, learner, dump=False):
+    """Версия памяти learner сейчас: val (ex.evaluate), затем снимок и, если нужен, дамп."""
+    val = ex.evaluate()
+    return Version(learner.snapshot(), val, learner.dump() if dump else None)
 
 
 def best_index(values):
@@ -432,7 +473,7 @@ class Run:
         self.proto = learner.protocol
         self.ex = Experiment(task, learner, model)
         self.log = []
-        self.versions = []      # (верных на val, версия памяти) после каждого прохода
+        self.versions = []      # Version после каждого прохода (офлайн)
         self.last = -1          # номер последнего пройденного прохода: онлайн в зачёт — он
 
     def everything(self):
@@ -492,8 +533,8 @@ class Run:
     def final_test(self):
         """Тест с лучшей по val версией памяти (без val — с последней)."""
         if self.versions:
-            best = best_index([score for score, _ in self.versions])
-            self.learner.restore(self.versions[best][1])
+            best = best_index([v.share for v in self.versions])
+            self.learner.restore(self.versions[best].memory)
         self.ex.training = False
         self.ex.epoch = 0
         for i, item in enumerate(self.task.load(self.split, self.n)):
@@ -524,9 +565,9 @@ class Run:
         learner = self.learner
         learner.on_pass(self.ex)
         if self.proto.val:
-            score = sum(correct for correct, _ in self.ex.evaluate())
-            print(f"val after epoch {epoch}: {score}", flush=True)
-            self.versions.append((score, learner.snapshot()))
+            version = evaluated(self.ex, learner)
+            print(f"val after epoch {epoch}: {version.correct}", flush=True)
+            self.versions.append(version)
 
     def test(self, phase, i, item):
         self.guarded(phase, i, item, partial(self.tested, phase, i, item))

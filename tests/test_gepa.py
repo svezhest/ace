@@ -3,10 +3,14 @@
 from stub import TASK, Stub, right
 
 from ace import parse, render
+from ace.env import Sandbox
 from ace.learner import swap
-from ace.loop import Protocol, run
+from ace.loop import Protocol, Version, run
+from ace.methods import METHODS
 from ace.methods.gepa import gepa
-from ace.wrap.gepa import EpochShuffled, Evolution, pareto_parent
+from ace.solver.gepa import Adapter
+from ace.wrap.gepa import Candidate, EpochShuffled, Evolution, pareto_parent
+from ace.wrap.hooks import Hooks
 
 REFLECTION = "Your task is to write a new instruction"
 
@@ -67,3 +71,20 @@ def test_pareto_parent_skips_dominated():
     at_front = {0: {0}, 1: {1, 2}, 2: {2}}
     picks = {pareto_parent(at_front, [0.3, 0.3, 0.6], random.Random(s)) for s in range(20)}
     assert picks == {0, 2}
+
+
+class RandomAdapter(Adapter):
+    random = True
+
+
+def test_state_of_wrapped_learner():
+    """Своё состояние обёртки — в снимке и ключе ученика; при случайном показе ключа нет и у Evolution; кандидат
+    хранит дамп на момент снимка — Evolution над Hooks пишет memory.json (снимок Hooks — пара)."""
+    assert Evolution(swap(gepa.inner, solver=RandomAdapter(), protocol=Protocol(offline=True)), 10).key() is None
+    assert evolution(10).key() == ((0, None), 0)
+    hooks = Hooks(swap(METHODS["ace_stand"], protocol=Protocol(offline=True), env=Sandbox()))
+    ev = Evolution(hooks, 10)
+    ev.pool.append(Candidate(Version(ev.inner.snapshot(), [(True, False)], ev.inner.dump()), [None]))
+    ev.take(0)
+    assert ev.current == 0 and ev.dump()[-2:] == [dict(kind="candidate", id=0, memory=[], parents=[None],
+                                                       scores={0: 1.0}), dict(kind="best", id=0)]

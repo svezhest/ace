@@ -91,16 +91,14 @@ class Hooks(Wrapper):
         self.inner.on_pass(ex)
         self.book.on_pass(ex)
 
-    def snapshot(self):
-        return self.inner.snapshot(), self.book.snapshot()
+    def state(self):
+        return self.book.snapshot()
 
-    def restore(self, snapshot):
-        self.inner.restore(snapshot[0])
-        self.book.restore(snapshot[1])
+    def restore_state(self, state):
+        self.book.restore(state)
 
-    def key(self):
-        key = self.inner.key()
-        return None if key is None else (key, self.hooks.key())
+    def state_key(self):
+        return self.hooks.key()
 
     def dump(self):
         return self.inner.dump() + self.hooks.dump()

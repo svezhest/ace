@@ -18,7 +18,7 @@ import random
 from collections import Counter
 from dataclasses import dataclass, field
 
-from ..loop import best_index
+from ..loop import Version, best_index, evaluated
 from . import Wrapper
 
 PERFECT = 1.0               # perfect_score; skip_perfect_score — минибатч родителя весь верен, рефлексии нет
@@ -26,14 +26,22 @@ PERFECT = 1.0               # perfect_score; skip_perfect_score — миниба
 
 @dataclass
 class Candidate:
-    """Кандидат пула: версия памяти ученика, родители, оценки по вопросам val (номер -> 0/1)."""
-    memory: object
+    """Кандидат пула: версия памяти ученика (снимок, оценки по вопросам val, дамп на момент снимка) и родители."""
+    version: Version
     parents: list
-    scores: dict
+
+    @property
+    def memory(self):
+        return self.version.memory
+
+    @property
+    def scores(self):
+        """Номер вопроса val -> 1.0 / 0.0."""
+        return self.version.scores
 
     @property
     def average(self):
-        return sum(self.scores.values()) / len(self.scores) if self.scores else float("-inf")
+        return self.version.share
 
 
 @dataclass
@@ -64,20 +72,20 @@ class Evolution(Wrapper):
         if not self.inner.protocol.val:
             raise ValueError(f"{self.name}: GEPA — только офлайн с val (пул оценивается на val)")
 
-    def key(self):
-        """Кандидат — по месту в пуле: у двух кандидатов с одним текстом оценки свои, как у апстрима без кэша."""
-        return self.current, self.inner.key()
+    def state(self):
+        """Кандидат — по месту в пуле (и в ключе): у двух кандидатов с одним текстом оценки свои, как у апстрима без
+        кэша."""
+        return self.current
 
-    def snapshot(self):
-        return self.current, self.inner.snapshot()
+    def restore_state(self, state):
+        self.current = state
 
-    def restore(self, snapshot):
-        self.current, memory = snapshot
-        self.inner.restore(memory)
+    def state_key(self):
+        return self.current
 
     def take(self, idx):
         """Кандидат пула — в память ученика."""
-        self.restore((idx, self.pool[idx].memory))
+        self.restore((self.pool[idx].memory, idx))
 
     def sample(self, ex, split, n):
         """Начало итерации: seed на val (до первой), проверка бюджета, родитель, минибатч."""
@@ -97,11 +105,10 @@ class Evolution(Wrapper):
         """Память ученика — новым кандидатом: весь val, пул, Парето-фронт (update_state_with_new_program)."""
         idx = len(self.pool)
         self.current = idx
-        val = ex.evaluate()
-        self.calls += len(val)
-        scores = {j: float(bool(ok)) for j, (ok, _) in enumerate(val)}
-        self.pool.append(Candidate(self.inner.snapshot(), parents, scores))
-        for j, score in scores.items():
+        version = evaluated(ex, self.inner, dump=True)
+        self.calls += len(version.val)
+        self.pool.append(Candidate(version, parents))
+        for j, score in version.scores.items():
             best = self.front.get(j, float("-inf"))
             if score > best:
                 self.front[j] = score
@@ -140,7 +147,7 @@ class Evolution(Wrapper):
         return best_index([c.average for c in self.pool])
 
     def dump(self):
-        pool = [dict(kind="candidate", id=i, memory=c.memory.dump(), parents=c.parents, scores=c.scores)
+        pool = [dict(kind="candidate", id=i, memory=c.version.dump, parents=c.parents, scores=c.scores)
                 for i, c in enumerate(self.pool)]
         return self.inner.dump() + pool + [dict(kind="best", id=self.best())] if self.pool else self.inner.dump()
 

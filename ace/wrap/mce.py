@@ -19,8 +19,8 @@ from .. import config, fs, prompts, render
 from ..memory import Files
 from ..model import Call, claude, messages, params
 from ..memory.mce import CLAUDE_SKILL, ROUNDS, SKILL, WORKSPACE, Workspace, cleanup, folder_name, signatures, sub_folder
-from ..loop import best_index
-from . import Wrapper, correct
+from ..loop import Version, best_index, evaluated
+from . import Wrapper
 
 META = prompts.load("mce_meta")
 META_ACE = prompts.load("mce_meta_ace")
@@ -30,16 +30,27 @@ SKILL_TRIES = 3             # max_validation_attempts мета-агента: о�
 
 @dataclass
 class Iteration:
-    """Итерация меты: навык (text), точность на train за проход и на val, версия памяти ученика после неё, сколько
-    вопросов val и train (rollouts), папки под-итераций: имя -> {путь: текст} (их видит мета-агент)."""
+    """Итерация меты: навык (text), точность на train за проход, версия памяти ученика после неё с оценкой на val,
+    сколько вопросов train (rollouts), папки под-итераций: имя -> {путь: текст} (их видит мета-агент)."""
     text: str
     train: float
-    val: float
-    memory: object
-    val_total: int = 0
+    version: Version
     rollouts: int = 0
     folders: dict = field(default_factory=dict)
     folder: str = ""            # MCE апстрима: последняя папка под-итерации на диске
+
+    @property
+    def val(self):
+        """Доля верных на val."""
+        return self.version.share
+
+    @property
+    def val_total(self):
+        return len(self.version.val)
+
+    @property
+    def memory(self):
+        return self.version.memory
 
     def dump(self, i):
         return dict(kind="iterations", id=f"iter{i}", text=self.text, train=self.train, val=self.val,
@@ -50,11 +61,6 @@ def offline_only(wrapper):
     """MCE учится только на train: итерация — проход по train, выбор — по val."""
     if not wrapper.inner.protocol.val:
         raise ValueError(f"{wrapper.name}: MCE — только офлайн с val (итерация — проход по train)")
-
-
-def share_correct(results):
-    """Доля верных по (верно, обрыв) вопросов val."""
-    return correct(results) / len(results) if results else 0.0
 
 
 class Meta(Wrapper):
@@ -96,10 +102,10 @@ class Meta(Wrapper):
 
     def on_pass(self, ex):
         self.inner.on_pass(ex)
-        val = ex.evaluate()
+        version = evaluated(ex, self.inner)
         train = self.right / self.seen if self.seen else 0.0
-        self.history.append(Iteration(ex.skill, train=train, val=share_correct(val), memory=self.inner.snapshot(),
-                                      val_total=len(val), rollouts=self.seen, folders=self.folders))
+        self.history.append(Iteration(ex.skill, train=train, version=version, rollouts=self.seen,
+                                      folders=self.folders))
         self.inner.restore(self.history[best(self.history)].memory)
         self.new_pass()
 
@@ -290,14 +296,12 @@ class Iterations(Wrapper):
 
     def on_pass(self, ex):
         self.inner.on_pass(ex)
-        val = ex.evaluate()
-        metrics = {"accuracy": share_correct(val)} if val else {}
+        version = evaluated(ex, self.inner)
+        metrics = {"accuracy": version.share} if version.val else {}
         last = self.inner.memory.path
-        train = self.ws.aggregate(ex.epoch + 1, self.subs, metrics, len(val), last)
+        train = self.ws.aggregate(ex.epoch + 1, self.subs, metrics, len(version.val), last)
         rollouts = sum(s["batch_size"] for s in self.subs)
-        self.history.append(Iteration(ex.skill, train=train, val=metrics.get("accuracy", 0.0),
-                                      memory=self.inner.snapshot(), val_total=len(val), rollouts=rollouts,
-                                      folder=last.name))
+        self.history.append(Iteration(ex.skill, train=train, version=version, rollouts=rollouts, folder=last.name))
         self.inner.restore(self.history[best(self.history)].memory)
         self.subs = []
 

@@ -139,9 +139,14 @@ class Learner:
     def restore(self, snapshot):
         self.memory = copy.deepcopy(snapshot)
 
+    def version(self):
+        """Версия памяти: меняется при правке (ключ памяти) и при случайном показе тоже — по ней мета видит, выучил
+        ли ученик что-то."""
+        return self.memory.key()
+
     def key(self):
         """Ключ кэша val; при случайном показе его нет."""
-        return None if (self.solver or self.viewer()).random else self.memory.key()
+        return None if (self.solver or self.viewer()).random else self.version()
 
     def dump(self):
         return self.memory.dump()
