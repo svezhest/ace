@@ -4,7 +4,7 @@ import json
 
 from stub import TASK, Stub, right
 
-from ace import parse, render, verdict
+from ace import config, parse, render, verdict
 from ace.env import Sandbox
 from ace.extract import Raw
 from ace.learner import Learner, swap
@@ -64,8 +64,8 @@ def test_samples():
 def test_minibatches_pad_and_reshuffle():
     """Train 4 при минибатче 3: добивка самым редким до 6, новая эпоха — новое перемешивание."""
     import random
-    sampler = EpochShuffled(3, random.Random(0))
-    batches = [sampler.next(4, i) for i in range(4)]
+    sampler = EpochShuffled(random.Random(0))
+    batches = [sampler.next(4, i, 3) for i in range(4)]
     assert all(len(b) == 3 for b in batches)
     assert sorted(batches[0] + batches[1]) != sorted(range(4)) and set(batches[0] + batches[1]) == set(range(4))
 
@@ -157,3 +157,40 @@ def test_child_question_budget_and_trace(tmp_path):
     assert show.mismatch == [] and STATE == [(val + 9 + 3 + val, 2)]
     kinds = [m["kind"] for m in json.load(open(tmp_path / "memory.json"))]
     assert kinds.count("candidate") == 2 and kinds.count("iteration") == 1 and kinds[-1] == "best"
+
+
+def first_minibatch(tmp_path, learner, n=10):
+    """Номера train первого минибатча прогона (след итераций в memory.json)."""
+    run(TASK, learner, Stub(), n, str(tmp_path), split="val")
+    return [m["ids"] for m in json.load(open(tmp_path / "memory.json")) if m["kind"] == "iteration"][0]
+
+
+def test_minibatch_of_swapped_learner(tmp_path):
+    """swap(every=5) над Evolution: минибатч — пять вопросов, рефлексия по ним."""
+    model = better_model()
+    learner = swap(evolution(40), "gepa_mb5", every=5)
+    run(TASK, learner, model, 10, str(tmp_path), split="val")
+    reflections = [c for c in model.calls if REFLECTION in c["user"]]
+    assert reflections and "# Example 5" in reflections[0]["user"] and "# Example 6" not in reflections[0]["user"]
+
+
+def test_seed(tmp_path, monkeypatch):
+    """Случайность Evolution — от SEED стенда, если сид не задан явно; явный сид (запись GEPA) SEED не меняет."""
+    val = len(TASK.load("val"))
+    budget = val + 3
+    zero = first_minibatch(tmp_path / "a", evolution(budget))
+    monkeypatch.setattr(config, "SEED", 1)
+    assert first_minibatch(tmp_path / "b", evolution(budget)) != zero
+    inner = swap(gepa.inner, protocol=Protocol(offline=True, epochs=budget))
+    assert first_minibatch(tmp_path / "c", Evolution(inner, budget, 0)) == zero
+
+
+def test_failed_seed_evaluation_is_logged(tmp_path):
+    """Исключение в начале итерации (val seed) — запись в логе, обучение кончено, тест идёт."""
+    def answer(call):
+        if call["n"] == 0:
+            raise RuntimeError("model 500")
+        return right(call)
+    summary = run(TASK, evolution(40), Stub(answer), 3, str(tmp_path), split="val")
+    log = json.load(open(tmp_path / "log.json"))
+    assert log[0]["phase"] == "pass" and "model 500" in log[0]["error"] and summary["n"] == 3

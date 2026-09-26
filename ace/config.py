@@ -10,7 +10,9 @@ BACKEND = os.getenv("BACKEND", "pydantic-ai")     # доступ к модели
 MAX_TOKENS = int(os.getenv("MAX_TOKENS", 4096))
 # устройство BGE-M3 (mps, cuda, cpu); не задано — выбирает sentence-transformers
 EMBED_DEVICE = os.getenv("EMBED_DEVICE")
-SEED = int(os.getenv("SEED", 0))    # сид random стенда (выборки, порядок); вызовы модели при T > 0 идут без seed
+# сид random стенда (выборки, порядок, родитель и минибатчи GEPA; не 0 — в имени папки результатов); вызовы модели
+# при T > 0 идут без seed
+SEED = int(os.getenv("SEED", 0))
 
 # размер выборки входит в имя файла данных: formula40.jsonl, formula_train40.jsonl, formula_val10.jsonl
 SIZE = int(os.getenv("SIZE", 40))

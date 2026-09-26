@@ -422,9 +422,10 @@ def failed(phase, epoch, i, item, error):
 
 
 def folder(task, n, learner, model):
-    """Папка результатов: задача и размер, метод, протокол, модель и бэкенд — прогоны разных настроек не затирают
-    друг друга."""
-    parts = (learner.protocol.name, model.name, getattr(model, "backend", ""))
+    """Папка результатов: задача и размер, метод, протокол, модель, бэкенд и SEED, если не 0, — прогоны разных
+    настроек не затирают друг друга."""
+    seed = f"seed{config.SEED}" if config.SEED else ""
+    parts = (learner.protocol.name, model.name, getattr(model, "backend", ""), seed)
     tag = "_".join(x for x in parts if x)
     return Path(config.RESULTS) / f"{task.name}{n}" / learner.name / tag
 
@@ -496,18 +497,21 @@ class Run:
             self.test("initial", i, item)
 
     def train_pass(self, epoch):
-        """Проход обучения; вопросов нет (ученик исчерпал бюджет, GEPA) — прохода нет и обучение кончено: False."""
+        """Проход обучения; вопросов нет (ученик исчерпал бюджет, GEPA; выборка упала) — прохода нет и обучение
+        кончено: False."""
         ex = self.ex
         learner = self.learner
         proto = self.proto
+        ex.epoch = epoch
         if proto.offline:
-            items = learner.sample(ex, "train", self.task.size("train", self.n))
+            split, size = "train", self.task.size("train", self.n)
         else:
-            items = learner.sample(ex, self.split, self.n)
+            split, size = self.split, self.n
+        # выборка — начало итерации меты (GEPA: val seed, бюджет): её исключение — в лог, обучение кончено
+        items = self.guarded("pass", 0, None, partial(learner.sample, ex, split, size))
         if not items:
             return False
         self.last = epoch
-        ex.epoch = epoch
         ex.total = len(items)
         ex.batch = 0
         batch = []

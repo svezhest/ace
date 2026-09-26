@@ -14,7 +14,8 @@ gepa = Evolution(ученик) — метод апстрима целиком:
     когда учится  на каждом минибатче (reflection_minibatch_size 3); минибатч родителя весь верен — рефлексии нет
     протокол    офлайн: val — весь, в пул; тест — лучшим по val кандидатом (result.best_candidate)
 Умолчания optimize: candidate_selection_strategy pareto, frontier_type instance, module_selector round_robin (компонент
-один), acceptance strict_improvement, use_merge False, seed 0; max_metric_calls 150 — как в квикстарте."""
+один), acceptance strict_improvement, use_merge False; seed — SEED стенда (по умолчанию 0, как у квикстарта);
+max_metric_calls 150 — как в квикстарте."""
 from ..extract.gepa import Reflection
 from ..learner import Learner
 from ..loop import Protocol
@@ -24,10 +25,9 @@ from ..wrap.gepa import Evolution
 
 MINIBATCH = 3               # reflection_minibatch_size
 MAX_METRIC_CALLS = 150      # бюджет квикстарта
-SEED = 0
 
 # проходов не больше бюджета: итерация тратит минимум минибатч вызовов, обучение кончает Evolution
 PROTOCOL = Protocol(offline=True, epochs=MAX_METRIC_CALLS)
 
 gepa = Evolution(Learner("gepa", memory=Instruction(), solver=ADAPTER, extract=Reflection(), every=MINIBATCH,
-                         protocol=PROTOCOL), MAX_METRIC_CALLS, SEED)
+                         protocol=PROTOCOL), MAX_METRIC_CALLS)

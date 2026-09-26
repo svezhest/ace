@@ -10,7 +10,7 @@ from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, ToolCall
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 from stub import TASK, Stub, episode, right
 
-from ace import verdict
+from ace import config, verdict
 from ace.env import Env
 from ace.extract import Extraction, Extractor, Raw
 from ace.learner import Learner, swap
@@ -418,11 +418,13 @@ def test_upstream_splits(tmp_path):
     assert [sum(r["phase"] == p for r in log) for p in ("train", "test")] == [45, 150]
 
 
-def test_results_folder():
+def test_results_folder(monkeypatch):
     """В папке результатов — протокол, модель и бэкенд: разные настройки не затирают друг друга."""
     from ace.loop import folder
     path = folder(TASK, 40, Learner("x", protocol=Protocol(offline=True, epochs=3)), Model("m", backend="wire"))
     assert path.parts[-3:] == ("formula40", "x", "offline-e3_m_wire")
+    monkeypatch.setattr(config, "SEED", 7)
+    assert folder(TASK, 40, Learner("x"), Model("m")).parts[-1] == "online-e1_m_pydantic-ai_seed7"
 
 
 def test_own_solver_dead_levels():

@@ -11,13 +11,15 @@ select_program_candidate_from_pareto_front).
                                       решает весь val и входит в пул; обучение кончается, когда вызовов метрики
                                       (попыток на вопросах) не меньше budget
 
-Случайность одна — random.Random(seed) апстрима: выбор родителя, затем перемешивание train на новой эпохе.
+Случайность одна — random.Random(seed) апстрима: выбор родителя, затем перемешивание train на новой эпохе; seed
+None — SEED стенда на старте прогона. Минибатч — every ученика (и после swap), вопросы — из выборки ученика.
 В конце прохода у ученика — лучший по val кандидат пула (при равенстве ранний), и цикл берёт его версией прохода:
 лучшая по val версия прогона — тот же кандидат, что result.best_candidate апстрима."""
 import random
 from collections import Counter
 from dataclasses import asdict, dataclass, field
 
+from .. import config
 from ..loop import Version, best_index, evaluated
 from . import Wrapper
 
@@ -55,11 +57,12 @@ class Iteration:
 
 
 class Evolution(Wrapper):
-    def __init__(self, inner, budget, seed=0, name=None):
+    def __init__(self, inner, budget, seed=None, name=None):
         super().__init__(inner, name)
         self.budget = budget            # max_metric_calls
+        self.seed = seed                # None — config.SEED на старте прогона
         self.rng = random.Random(seed)
-        self.sampler = EpochShuffled(inner.every, self.rng)
+        self.sampler = EpochShuffled(self.rng)
         self.pool = []                  # Candidate по номерам
         self.front = {}                 # номер вопроса val -> лучшая оценка (pareto_front_valset)
         self.at_front = {}              # номер вопроса val -> номера кандидатов с ней (program_at_pareto_front_valset)
@@ -88,16 +91,17 @@ class Evolution(Wrapper):
         self.restore((self.pool[idx].memory, idx))
 
     def sample(self, ex, split, n):
-        """Начало итерации: seed на val (до первой), проверка бюджета, родитель, минибатч."""
+        """Начало итерации: seed на val (до первой), проверка бюджета, родитель, минибатч из выборки ученика."""
         if not self.pool:
+            self.rng.seed(config.SEED if self.seed is None else self.seed)
             self.add(ex, [None])
         if self.calls >= self.budget:
             return []
         self.i += 1
         parent = pareto_parent(self.at_front, [c.average for c in self.pool], self.rng)
         self.take(parent)
-        train = ex.task.load(split, n)
-        ids = self.sampler.next(len(train), self.i)
+        train = self.inner.sample(ex, split, n)
+        ids = self.sampler.next(len(train), self.i, self.inner.every)
         self.trace.append(Iteration(parent, ids))
         return [train[j] for j in ids]
 
@@ -168,8 +172,8 @@ def attempts(groups):
 class EpochShuffled:
     """EpochShuffledBatchSampler: номера train перемешиваются в начале эпохи и добиваются до кратного размеру
     минибатча самыми редкими; минибатч итерации i — кусок с i * size по кругу."""
-    def __init__(self, size, rng):
-        self.size = size
+    def __init__(self, rng):
+        self.size = 0
         self.rng = rng
         self.shuffled = []
         self.epoch = -1
@@ -187,7 +191,9 @@ class EpochShuffled:
             self.shuffled.append(rare)
             self.freqs[rare] += 1
 
-    def next(self, n, i):
+    def next(self, n, i, size):
+        """Минибатч итерации i из train на n вопросов; size — размер минибатча (every ученика)."""
+        self.size = size
         base = i * self.size
         epoch = 0 if self.epoch == -1 else base // max(len(self.shuffled), 1)
         if not self.shuffled or n != self.last or epoch > self.epoch:
