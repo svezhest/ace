@@ -11,14 +11,20 @@ from pydantic_ai.models.function import AgentInfo, FunctionModel
 from stub import TASK, Stub, episode, right
 
 from ace import config, verdict
-from ace.env import Env
-from ace.extract import Extraction, Extractor, Raw
+from ace.env import Env, Sandbox
+from ace.extract import Contract, Extraction, Extractor, Raw
+from ace.extract.scope import Rules
 from ace.learner import Learner, swap
-from ace.loop import SPREAD, Attempts, Experiment, Protocol, best, first, run, spread, vote
+from ace.loop import SPREAD, Attempts, Experiment, Protocol, best, finish, first, folder, run, spread, vote
 from ace.memory import Lessons
+from ace.methods import METHODS
 from ace.tasks import TASKS
-from ace.model import Model, Patch
-from ace.show import Show, Whole
+from ace.model import Model, Outcome, Patch
+from ace.show import Catalog, Show, Whole
+from ace.solver.ace import GENERATOR
+from ace.solver.evolib import Sampler
+from ace.wrap.hooks import Hooks
+from report import final
 
 
 OFFLINE2 = Protocol(offline=True, epochs=2)
@@ -172,8 +178,6 @@ def test_online_early_end_scores_last_pass():
 
 def test_report_counts_only_scored_rows():
     """report: прогон без записей в зачёт (оборвался до теста) — пусто, а не train-лог."""
-    sys.path.insert(0, str(Path(__file__).parent.parent))
-    from report import final
     train = [dict(phase="train", epoch=0, correct=True), dict(phase="train", epoch=1, correct=True)]
     online = [dict(phase="online", epoch=e, correct=True) for e in (0, 1)] + [dict(phase="learn", epoch=2)]
     assert final(train) == [] and final(online) == online[1:2]
@@ -229,8 +233,6 @@ def test_seam():
 def test_seam_of_swaps(method, levels, error):
     """Замены, которые собирались и падали в работе: извлечение DC берёт показанное своим решателем (seen / shows),
     память GEPA учится по урокам, а Raw их не даёт, память без learn при извлечении."""
-    from ace.extract import Contract
-    from ace.methods import METHODS
     with pytest.raises(Contract, match=error):
         swap(METHODS[method], "x", **levels)
 
@@ -435,7 +437,6 @@ def test_upstream_splits(tmp_path):
 
 def test_results_folder(monkeypatch):
     """В папке результатов — протокол, модель и бэкенд: разные настройки не затирают друг друга."""
-    from ace.loop import folder
     path = folder(TASK, 40, Learner("x", protocol=Protocol(offline=True, epochs=3)), Model("m", backend="wire"))
     assert path.parts[-3:] == ("formula40", "x", "offline-e3_m_wire")
     monkeypatch.setattr(config, "SEED", 7)
@@ -445,12 +446,6 @@ def test_results_folder(monkeypatch):
 def test_own_solver_dead_levels():
     """При своём решателе метода показ, температура попыток, среда, извлечение на шаге и хуки не действуют —
     ошибка сборки; параметры решателя действуют (температура EvoLib — у Sampler)."""
-    from ace.env import Sandbox
-    from ace.extract.scope import Rules
-    from ace.methods import METHODS
-    from ace.show import Catalog
-    from ace.solver.evolib import Sampler
-    from ace.wrap.hooks import Hooks
     dc, ace, tfgrpo, evolib = (METHODS[n] for n in ("dc", "ace", "tfgrpo", "evolib"))
     for levels, dead in ((dict(env=Sandbox()), "среда"), (dict(show=Catalog()), "показ"),
                          (dict(attempts=Attempts(3, lambda k: 0.7)), "температура"), (dict(extract=Rules()), "на шаге")):
@@ -467,8 +462,6 @@ def test_own_solver_dead_levels():
 
 
 def test_finish_by_outcome():
-    from ace.loop import finish
-    from ace.model import Outcome
     ep = episode()
     assert finish(ep) == "stop"
     ep.outcome = Outcome.step
@@ -480,8 +473,6 @@ def test_finish_by_outcome():
 def test_show_reads_memory():
     """Показ или решатель читает у памяти то, что объявил: нет этого у памяти — ошибка сборки, а не падение на
     первой попытке."""
-    from ace.methods import METHODS
-    from ace.solver.ace import GENERATOR
     with pytest.raises(ValueError, match="sections"):
         swap(METHODS["ace_stand"], solver=GENERATOR)
     swap(METHODS["ace"], solver=None)           # общий решатель с playbook апстрима — можно

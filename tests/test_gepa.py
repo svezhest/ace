@@ -1,6 +1,7 @@
 """GEPA на модели-заглушке: пул и принятие по минибатчу, откат отвергнутого, тест лучшим по val; разбор ответа
 рефлексии (ProposalAdapter.parse) и разметка примеров (format_samples)."""
 import json
+import random
 from dataclasses import replace
 
 import pytest
@@ -69,7 +70,6 @@ def test_samples():
 
 def test_minibatches_pad_and_reshuffle():
     """Train 4 при минибатче 3: добивка самым редким до 6, новая эпоха — новое перемешивание."""
-    import random
     sampler = EpochShuffled(random.Random(0))
     batches = [sampler.next(4, i, 3) for i in range(4)]
     assert all(len(b) == 3 for b in batches)
@@ -78,7 +78,6 @@ def test_minibatches_pad_and_reshuffle():
 
 def test_pareto_parent_skips_dominated():
     """Кандидат 1 на фронте только там, где и 2, при худшем среднем — доминируем: выбора нет, кроме 0 и 2."""
-    import random
     at_front = {0: {0}, 1: {1, 2}, 2: {2}}
     picks = {pareto_parent(at_front, [0.3, 0.3, 0.6], random.Random(s)) for s in range(20)}
     assert picks == {0, 2}

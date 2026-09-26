@@ -3,12 +3,16 @@
 import copy
 from types import SimpleNamespace
 
+import numpy as np
+import pytest
+from claude_agent_sdk import ResultMessage
 from pydantic import BaseModel
+from pydantic_ai import ModelRetry
 from pydantic_ai.messages import ModelRequest, ModelResponse, SystemPromptPart, TextPart, ToolCallPart, ToolReturnPart, UserPromptPart
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 
-from ace.model import Call, Model, Outcome, Patch, Reader, Step, messages, params
-from ace.model.agent import EXTRA_REQUESTS
+from ace.model import Call, Model, Outcome, Patch, Reader, Step, claude, messages, params
+from ace.model.agent import EXTRA_REQUESTS, settings
 
 
 def model_of(fn):
@@ -213,8 +217,6 @@ def test_wire_tools_go_to_pydantic_ai():
 
 def test_tool_retries_do_not_end_talk():
     """Отбивки одного инструмента подряд (ModelRetry) не обрывают разговор раньше раундов."""
-    from pydantic_ai import ModelRetry
-
     def strict(x: int) -> str:
         """Always fails."""
         raise ModelRetry("bad x")
@@ -226,10 +228,6 @@ def test_tool_retries_do_not_end_talk():
 
 def test_usage_counts_agents_and_embeddings(monkeypatch):
     """Расход полный: сессии агентов Claude SDK (ходы и токены из ResultMessage) и тексты эмбеддингов."""
-    import numpy as np
-    from claude_agent_sdk import ResultMessage
-
-    from ace.model import claude
     m = Model()
     used = dict(calls=0, prompt_tokens=0, completion_tokens=0)
     claude.count(ResultMessage("success", 1, 1, False, 4, "s", usage={"input_tokens": 100, "output_tokens": 7}), used)
@@ -243,9 +241,6 @@ def test_usage_counts_agents_and_embeddings(monkeypatch):
 
 def test_settings_keep_every_param():
     """reasoning_effort уходит модели (openai_reasoning_effort), незнакомый pydantic-ai параметр — ошибка, а не потеря."""
-    import pytest
-
-    from ace.model.agent import settings
     assert settings({"max_completion_tokens": 5, "reasoning_effort": "high", "temperature": 0}) == \
         {"max_tokens": 5, "openai_reasoning_effort": "high", "temperature": 0}
     with pytest.raises(ValueError, match="best_of"):

@@ -1,7 +1,16 @@
 """Проверки ответов задач."""
 import pytest
+from stub import Stub, embed_by_length, experiment
 
+import ablate
+from ace import config
+from ace.env import sandbox
+from ace.loop import run
+from ace.memory.mce import Folder
+from ace.methods import METHODS
+from ace.solver.mce import Environment
 from ace.tasks import TASKS
+from ace.upstream.mce import signatures, task_instruction
 
 MEB = TASKS["meb"]
 
@@ -61,14 +70,6 @@ def test_every_method_on_every_task(monkeypatch):
     """Метод × задача: на задаче вне таблицы вариантов (tasks.VARIANTS) метод идёт запасным вариантом стенда, а не
     падает; протокол без нужной выборки (офлайн на задаче без train / val) — понятная ошибка до обучения.
     mce (агенты Claude SDK) — только его части, зависящие от задачи."""
-    from stub import Stub, embed_by_length, experiment
-
-    from ace import config
-    from ace.loop import run
-    from ace.memory.mce import Folder
-    from ace.upstream.mce import signatures, task_instruction
-    from ace.methods import METHODS
-    from ace.solver.mce import Environment
     monkeypatch.setattr("ace.embed.embed", embed_by_length)
     monkeypatch.setattr(config, "VAL_SIZE", 2)
     runs = 0
@@ -91,12 +92,6 @@ def test_every_method_on_every_task(monkeypatch):
 def test_ablation_chain_runs(monkeypatch):
     """Каждая ступень ablate.py собирается и идёт по своему протоколу на заглушке без ошибок (mce — агенты Claude SDK,
     ступени с контейнером на попытку — только при docker)."""
-    from stub import Stub, embed_by_length
-
-    import ablate
-    from ace import config
-    from ace.env import sandbox
-    from ace.loop import run
     monkeypatch.setattr("ace.embed.embed", embed_by_length)
     monkeypatch.setattr(config, "VAL_SIZE", 2)
     for name, learner in ablate.CHAIN.items():

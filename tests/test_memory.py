@@ -2,9 +2,13 @@
 разделы с общей нумерацией, документы."""
 import dataclasses
 
+import numpy as np
 import pytest
+from stub import Stub, experiment
 
 from ace.memory import Counted, Document, Files, Lesson, Lessons, Sections
+from ace.memory import ace as A
+from ace.memory.ace import SectionedPlaybook
 from ace.memory.counters import count, prune_harmful
 
 
@@ -108,10 +112,6 @@ def test_files():
 
 def test_dedup_unparsed_merge_keeps_group(monkeypatch):
     """Ответ слияния не разобрался — группа похожих пунктов остаётся целиком, как у апстрима."""
-    import numpy as np
-    from stub import Stub, experiment
-
-    from ace.memory import ace as A
     monkeypatch.setattr("ace.embed.embed", lambda texts: np.ones((len(texts), 4)) / 2.0)
     p = A.SectionedPlaybook(dedup=A.DEDUP)
     for t in ("rule a", "rule b", "rule c"):
@@ -122,7 +122,6 @@ def test_dedup_unparsed_merge_keeps_group(monkeypatch):
 
 def test_playbook_key_sees_counters():
     """Кэш val у playbook апстрима различает счётчики: решатель видит их в playbook."""
-    from ace.memory.ace import SectionedPlaybook
     p = SectionedPlaybook()
     p.add("rule", "formulas_and_calculations")
     before = p.key()

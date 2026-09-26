@@ -6,7 +6,7 @@ import json
 from stub import TASK, Stub, episode, experiment, right
 
 from ace.extract import ATTEMPT, CONFIDENCE, DOMAIN, RATIONALE, Extraction
-from ace.extract.scope import Proposal, Rules, answer_step, tool_step
+from ace.extract.scope import DEFAULT_CONFIDENCE, Proposal, Rules, answer_step, tool_step
 from ace.learner import swap
 from ace.loop import Attempt, Group, Prompt, run
 from ace.memory.scope import Book, CAP, PER_RUN, Perspectives, Strategic, compress, target_count, duplicate_words
@@ -198,5 +198,4 @@ def test_answer_order_chosen_first():
 
 def test_confidence_null():
     """Уверенность null от модели — умолчание, а не падение прогона."""
-    from ace.extract.scope import DEFAULT_CONFIDENCE, Proposal
     assert Proposal("x", "", None).initial() == DEFAULT_CONFIDENCE and Proposal("x", "", 0.8).initial() == 0.8

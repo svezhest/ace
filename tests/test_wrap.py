@@ -4,25 +4,24 @@ train за проход, откат к лучшей по val, при равен�
 import copy
 import json
 from dataclasses import replace
-
-import pytest
 from types import SimpleNamespace
 
+import pytest
 from stub import TASK, Stub, episode, experiment, right
 
 from ace import fs, verdict
-from ace.extract import Raw
+from ace.extract import Contract, Raw
 from ace.extract.ace import Reflection
 from ace.learner import Learner, swap
 from ace.loop import Group, Protocol, run
 from ace.memory import Lessons
 from ace.memory.ace import Ops
 from ace.memory.mce import Context
+from ace.methods import METHODS
 from ace.methods.mce import mce_ace_stand, mce_fs as mce
-from ace.wrap.mce import META, MISSING, MetaAgent
 from ace.render import skilled
 from ace.wrap import Gate, Wrapper
-from ace.wrap.mce import Meta
+from ace.wrap.mce import META, MISSING, Iterations, Meta, MetaAgent
 
 OFFLINE2 = Protocol(offline=True, epochs=2)
 
@@ -229,7 +228,6 @@ def test_meta_offline_only():
 
 def test_meta_needs_skill_reader():
     """Навык меты некому читать (dc, gepa, ученик без обучения) — ошибка сборки, а не мета-агент вхолостую."""
-    from ace.methods import METHODS
     for base in (METHODS["dc"], METHODS["gepa"].inner, swap(mce.inner, extract=None)):
         with pytest.raises(ValueError, match="некому читать"):
             Meta(swap(base, protocol=OFFLINE2), lambda ex, h: "", "meta")
@@ -243,9 +241,6 @@ def test_meta_needs_skill_reader():
 def test_mce_folder_needs_iterations():
     """Iterations читает папку памяти (path, at): над другой памятью — ошибка сборки; память-папка без Iterations —
     ошибка до первого вызова модели."""
-    from ace.extract import Contract
-    from ace.methods import METHODS
-    from ace.wrap.mce import Iterations
     with pytest.raises(Contract, match="path, at"):
         Iterations(swap(METHODS["ace_stand"], protocol=OFFLINE2))
     model = Stub()

@@ -1,5 +1,8 @@
 """fs: мир документов (Files) и каталог записей только на чтение. Читать обязательно только перед edit,
 read постранично, папки — части пути."""
+import threading
+import time
+
 import pytest
 from pydantic_ai import ModelRetry
 
@@ -95,8 +98,6 @@ def test_root_paths():
 
 def test_parallel_edits_keep_both():
     """Две правки одного файла из одного ответа (pydantic-ai исполняет их в потоках) — обе в файле."""
-    import threading
-    import time
     ctx, store = files()
     ctx.deps.seen.add("context/notes.md")
     read = store.read

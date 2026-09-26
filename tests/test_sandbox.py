@@ -1,8 +1,11 @@
 """Изоляция песочницы: код модели не вредит хосту и возвращает ошибку или таймаут. Нужен docker и образ
 cestand-sandbox (docker build -t cestand-sandbox ace/env)."""
+import time
+
 import pytest
 
-from ace.env import Sandbox, sandbox
+from ace import render
+from ace.env import Sandbox, sandbox, tfgrpo
 
 docker = pytest.mark.skipif(not sandbox.available(), reason="нет docker или образа песочницы")
 
@@ -93,8 +96,6 @@ def test_call_container_is_shared_env():
 def test_kernel_host_timeout():
     """Код, держащий GIL, ядро не прерывает — хост убивает контейнер после timeout и запаса; модели — текст о
     пределе времени; нехватка памяти — текст о смерти ядра; дальше — новое ядро с чистыми переменными."""
-    from ace import render
-    from ace.env import tfgrpo
     kernel = tfgrpo.Kernel()
     grace = tfgrpo.DOCKER_GRACE
     try:
@@ -111,7 +112,6 @@ def test_kernel_host_timeout():
 @docker
 def test_timeout_ignoring_sigterm():
     """Код, который глушит SIGTERM, добивается SIGKILL-ом сразу после предела: вызов не держит лишние 15 с."""
-    import time
     t0 = time.time()
     r = sandbox.run("import signal, time\nsignal.signal(signal.SIGTERM, signal.SIG_IGN)\nwhile True: time.sleep(0.1)", limit=2)
     assert r["timeout"] and time.time() - t0 < 2 + sandbox.DOCKER_GRACE
