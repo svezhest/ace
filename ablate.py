@@ -2,6 +2,7 @@
 своего блока (она указана в комментарии). Семь методов — отдельными строками для сравнения.
 python ablate.py TASK [N] [STEP ...]; каждая ступень идёт по своему протоколу (learner.protocol)."""
 import sys
+from dataclasses import replace
 
 from ace import prompts, verdict
 from ace.env import Sandbox
@@ -23,6 +24,13 @@ evolib = METHODS["evolib"]
 scope_code = METHODS["scope_code"]
 ace_stand_code = swap(ace_stand, "ace_stand_code", env=Sandbox())
 
+
+def untrained(method):
+    """Тот же метод без обучения: свой решатель, показ и попытки, пустая память; протокол без проходов (epochs = 0) —
+    сразу тест. Контроль для метода со своим решателем: разница с ним — от памяти, а не от решателя."""
+    return swap(method, f"{method.name}_e0", protocol=replace(method.protocol, epochs=0))
+
+
 CHAIN = {
     # контроли
     "baseline": baseline,
@@ -39,6 +47,13 @@ CHAIN = {
     "evolib": evolib,
     "mce": METHODS["mce"],
     "gepa": METHODS["gepa"],
+    # протокол: те же методы со своим решателем без обучения
+    "ace_e0": untrained(METHODS["ace"]),
+    "dc_e0": untrained(METHODS["dc"]),
+    "tfgrpo_e0": untrained(METHODS["tfgrpo"]),
+    "evolib_e0": untrained(evolib),
+    "mce_e0": untrained(METHODS["mce"]),
+    "gepa_e0": untrained(METHODS["gepa"]),
 
     # база цепочки — ace_stand: рефлектор с метками, куратор операциями, отсев вредных, показ всего
     "ace_stand": ace_stand,

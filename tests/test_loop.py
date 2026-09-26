@@ -8,8 +8,9 @@ from pathlib import Path
 import pytest
 from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, ToolCallPart, UserPromptPart
 from pydantic_ai.models.function import AgentInfo, FunctionModel
-from stub import TASK, Stub, episode, right
+from stub import TASK, Stub, embed_by_length, episode, right
 
+import ablate
 from ace import config, verdict
 from ace.env import Env, Sandbox
 from ace.extract import Contract, Extraction, Extractor, Raw
@@ -497,3 +498,17 @@ def test_task_grades_whole_reply_for_every_solver(tmp_path):
         answers[name] = rows[0]["answer"]
     # ответ решателя свой: у общего — строка FINAL ANSWER, у агента TF-GRPO — весь текст
     assert answers["baseline"] == "see above" and answers["tfgrpo"].startswith("So the result is")
+
+
+@pytest.mark.parametrize("name", ["ace", "dc", "tfgrpo", "evolib", "mce", "gepa"])
+def test_untrained_own_solver(name, tmp_path, monkeypatch):
+    """Метод со своим решателем без обучения — одна замена протокола (epochs = 0): тот же решатель, сразу тест,
+    ни train, ни val, память пустая."""
+    monkeypatch.setattr("ace.embed.embed", embed_by_length)
+    method = ablate.CHAIN[f"{name}_e0"]
+    assert type(method.solver) is type(METHODS[name].solver)
+    task = TASKS["symptom" if name == "mce" else "dapo"]
+    summary = run(task, method, Stub(), 2, out=str(tmp_path))
+    log = json.load(open(tmp_path / "log.json"))
+    assert summary["errors"] == 0 and [r["phase"] for r in log] == ["test", "test"]
+    assert json.load(open(tmp_path / "memory.json")) == METHODS[name].dump()
