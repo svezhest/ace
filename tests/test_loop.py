@@ -163,6 +163,22 @@ def test_empty_sample_ends_training(tmp_path):
     assert [(r["phase"], r["epoch"]) for r in log] == [("train", 0), ("train", 1), ("test", 0)]
 
 
+def test_online_early_end_scores_last_pass():
+    """Онлайн-ученик кончил раньше epochs: в зачёт — последний пройденный проход, а не пусто."""
+    learner = Budget("budget", memory=Memory(), extract=Raw(), protocol=Protocol(epochs=5))
+    summary = run(TASK, learner, Stub(right), 2, split="train")
+    assert summary["n"] == 2 and summary["correct"] == 2
+
+
+def test_report_counts_only_scored_rows():
+    """report: прогон без записей в зачёт (оборвался до теста) — пусто, а не train-лог."""
+    sys.path.insert(0, str(Path(__file__).parent.parent))
+    from report import final
+    train = [dict(phase="train", epoch=0, correct=True), dict(phase="train", epoch=1, correct=True)]
+    online = [dict(phase="online", epoch=e, correct=True) for e in (0, 1)] + [dict(phase="learn", epoch=2)]
+    assert final(train) == [] and final(online) == online[1:2]
+
+
 class Random(Whole):
     random = True
 

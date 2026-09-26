@@ -15,9 +15,9 @@ HEADER = (f"{'run':64} {'ok':>6} {'acc':>5} {'trunc':>5} {'err':>4} {'calls':>6}
 
 
 def final(log):
-    """Записи, которые идут в зачёт: тест или последний онлайн-проход."""
-    last = max((r.get("epoch", 0) for r in log), default=0)
-    return [r for r in log if in_score(r, last)] or log
+    """Записи, которые идут в зачёт: тест или последний онлайн-проход; прогон, не дошедший до зачёта, — пусто."""
+    last = max((r.get("epoch", 0) for r in log if r.get("phase", "online") == "online"), default=0)
+    return [r for r in log if in_score(r, last)]
 
 
 def acc(rows):

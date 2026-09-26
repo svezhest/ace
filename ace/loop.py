@@ -433,6 +433,7 @@ class Run:
         self.ex = Experiment(task, learner, model)
         self.log = []
         self.versions = []      # (верных на val, версия памяти) после каждого прохода
+        self.last = -1          # номер последнего пройденного прохода: онлайн в зачёт — он
 
     def everything(self):
         done = False
@@ -464,6 +465,7 @@ class Run:
             items = learner.sample(ex, self.split, self.n)
         if not items:
             return False
+        self.last = epoch
         ex.epoch = epoch
         ex.total = len(items)
         ex.batch = 0
@@ -565,7 +567,7 @@ class Run:
 
     def summary(self, done):
         proto, model = self.proto, self.model
-        final = [r for r in self.log if in_score(r, proto.epochs - 1)]
+        final = [r for r in self.log if in_score(r, self.last)]
         answers = [r["answer"] for r in final]
         targets = [r["target"] for r in final]
         return dict(task=self.task.name, method=self.learner.name, model=model.name,
