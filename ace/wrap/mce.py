@@ -18,10 +18,15 @@ from pathlib import Path
 from .. import config, fs, prompts, render
 from ..memory import Files
 from ..model import Call, claude, messages, params
-from ..memory.mce import CLAUDE_SKILL, ROUNDS, SKILL, WORKSPACE, Workspace, cleanup, folder_name, signatures, sub_folder
+from ..upstream.mce import (CLAUDE_SKILL, ROUNDS, SKILL, WORKSPACE, Workspace, cleanup, folder_name, signatures,
+                            sub_folder, task_instruction)
 from ..loop import Version, best_index, evaluated
 from . import Wrapper, single_meta
 
+# окружение python агентов — venv апстрима meta-context-engineering; корень workspace (над workspace/<задача>) — не
+# задан: временная папка на прогон, удаляется при выходе
+VENV = Path(os.getenv("MCE_VENV", config.UPSTREAMS / ".venvs" / "mce"))
+ROOT = os.getenv("MCE_ROOT")
 META = prompts.load("mce_meta")
 META_ACE = prompts.load("mce_meta_ace")
 MISSING = prompts.load("mce_skill_missing")
@@ -167,7 +172,7 @@ class MetaAgent:
         mounts[name] = fs.Mount(out)
         path = f"{WORKSPACE}/{name}/{SKILL}"
         database = render.skill_database(evaluations(history), skills(history), len(history) + 1)
-        user = self.template.fill(task_instruction=render.task_instruction(ex.task), workspace=WORKSPACE,
+        user = self.template.fill(task_instruction=task_instruction(ex.task), workspace=WORKSPACE,
                                   iter_name=name, skill_output_path=path, skill_database=database)
         conversation = None     # история разговора: просьба записать идёт в тот же разговор
         for _ in range(SKILL_TRIES):
@@ -230,7 +235,7 @@ def claude_meta(ex, ws, folder, iteration):
     from claude_agent_sdk import ClaudeAgentOptions
     sigs = signatures(ex.task)
     skill = folder / CLAUDE_SKILL
-    prompt = CLAUDE_META.fill(task_instruction=render.task_instruction(ex.task),
+    prompt = CLAUDE_META.fill(task_instruction=task_instruction(ex.task),
                               interfaces=CLAUDE_META_INTERFACES.fill(signatures=sigs), workspace=str(ws.base),
                               iter_name=folder.name, skill_output_path=f"{ws.base}/{folder.name}/{CLAUDE_SKILL}",
                               skill_database=render.skill_database(ws.evaluations(), ws.skills(), iteration))
@@ -271,13 +276,13 @@ class Iterations(Wrapper):
 
     def sample(self, ex, split, n):
         if self.ws is None:
-            root = self.root or config.MCE_ROOT
+            root = self.root or ROOT
             if root is None:
                 root = tempfile.mkdtemp(prefix="mce-")
                 atexit.register(shutil.rmtree, root, ignore_errors=True)
             # свой workspace на процесс: параллельные прогоны с общим корнем не стирают друг друга
             self.ws = Workspace(root, self.workspace or f"{ex.task.name}-{os.getpid()}")
-            claude.prepare(root)
+            claude.prepare(root, VENV)
             self.ws.start(ex.task)
         samples = [dict(item, id=i) for i, item in enumerate(ex.task.load(split, whole=True))]
         if n and len(samples) > n:

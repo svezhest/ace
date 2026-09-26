@@ -22,8 +22,9 @@ import pytest
 from ace import config
 from ace.learner import swap
 from ace.loop import run
-from ace.memory.mce import folder_name
+from ace.upstream.mce import folder_name
 from ace.methods.mce import mce
+from ace.wrap.mce import VENV
 from ace.model import Model, claude
 from ace.tasks import TASKS
 from tools.record.mce import normalize
@@ -34,7 +35,7 @@ RUN = json.load(open(LIVE / "run.json"))
 ROOT = Path(RUN["root"])
 LITELLM = config.UPSTREAMS / ".venvs" / "litellm" / "bin" / "litellm"
 
-pytestmark = pytest.mark.skipif(not (LIVE / "rec.jsonl.gz").exists() or not LITELLM.exists() or not config.MCE_VENV.exists(),
+pytestmark = pytest.mark.skipif(not (LIVE / "rec.jsonl.gz").exists() or not LITELLM.exists() or not VENV.exists(),
                                 reason="нет записи bridge/live/mce/rec.jsonl, venv LiteLLM или venv апстрима MCE")
 
 

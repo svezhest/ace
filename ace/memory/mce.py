@@ -4,22 +4,17 @@
 iter{k}_sub{j} — навык (.agent/, только чтение), context/ и data/train.json с итогами только текущего батча."""
 import ast
 import importlib.util
-import json
-import shutil
 import sys
-from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
 
 from .. import fs, prompts, render
 from ..model import Call, messages, params
 from ..tasks import variant
+from ..upstream.mce import ROUNDS, SKILL, WORKSPACE, cleanup, signatures, sub_folder, task_instruction
 from . import Files, Memory, Record
 
 BASE = prompts.load("mce_base")
-ROUNDS = 30
-WORKSPACE = "/workspace"    # корень, как его видят агенты (E2B-пути апстрима)
-SKILL = ".agent/skills/learning-context/SKILL.md"      # навык в папке под-итерации (MCE5)
 
 
 def train_json(ex, groups, ids, field="question"):
@@ -34,11 +29,6 @@ def train_json(ex, groups, ids, field="question"):
         results.append({"id": rid, field: g.question, "ground_truth": g.target, "llm_prediction": g.answer,
                         "is_correct": ok})
     return render.train_json(summary, results)
-
-
-def sub_folder(ex):
-    """Папка текущей под-итерации: итерация = проход, под-итерация = батч."""
-    return folder_name(ex.epoch + 1, ex.batch)
 
 
 class Context(Files):
@@ -59,7 +49,7 @@ class Context(Files):
         if ex.skill:
             top, rest = SKILL.split("/", 1)
             mounts = {top: fs.Mount(Files.of({rest: ex.skill}), "ro"), **mounts}
-        prompt = BASE.fill(task_instruction=render.task_instruction(ex.task), iter_dir=f"{WORKSPACE}/{name}",
+        prompt = BASE.fill(task_instruction=task_instruction(ex.task), iter_dir=f"{WORKSPACE}/{name}",
                            iter_name=name)
         ex.model.ask(Call(messages(prompt), params(), tools=fs.TOOLS, deps=fs.FS(mounts, root=f"{WORKSPACE}/{name}"),
                           rounds=self.rounds))
@@ -70,147 +60,16 @@ class Context(Files):
         return {**out, "data/train.json": self.train} if self.train else out
 
 
-# MCE апстрима на Claude Agent SDK (mce/utils.py, base_agent.py, validation.py, env/base.py): workspace на диске,
+# MCE апстрима на Claude Agent SDK (base_agent.py, validation.py, env/base.py; workspace — upstream/mce.py),
 # базовый агент — Claude SDK (model/claude.py) с интерфейсами задачи (get_context у symptom), навык в .claude/.
 
-CLAUDE_SKILL = ".claude/skills/learning-context/SKILL.md"
 BASE_TOOLS = ["Skill", "Read", "Write", "Edit", "Bash", "Glob", "Grep", "Task", "TaskOutput", "ExitPlanMode",
               "TodoWrite", "KillShell", "EnterPlanMode"]
 VALIDATION_TRIES = 3        # max_validation_attempts run_base_agent: ответов, пока проверка не прошла
-UTILS = Path(__file__).parent / "mce_utils"     # mce/workspace_utils апстрима дословно: копия в utils/ под-итерации
 CLAUDE_BASE = prompts.load("mce_claude_base")
 INTERFACES = prompts.load("mce_claude_interfaces")
 INVALID = prompts.load("mce_claude_invalid")
 MCE = prompts.macros("mce_strings")
-
-
-@dataclass(frozen=True)
-class Signature:
-    """InterfaceSignature: функция, которую пишет базовый агент, и её описание для промптов."""
-    name: str
-    inputs: tuple           # (имя, тип, описание)
-    output: tuple           # (тип, описание)
-    description: str
-
-    @property
-    def args(self):
-        return render.signature_args(self.inputs)
-
-
-SIGNATURES = {"symptom": (Signature("get_context", inputs=(("symptoms", "str", MCE.symptoms()),),
-                                    output=("str", MCE.context()), description=MCE.get_context()),)}
-
-
-def signatures(task):
-    """Интерфейсы задачи (get_interface_signatures); у задач стенда их нет (MCE1)."""
-    return SIGNATURES.get(variant("mce", task), ())
-
-
-def folder_name(iteration, sub=None):
-    """get_sub_iteration_folder_name."""
-    return f"iter{iteration}" if sub is None else f"iter{iteration}_sub{sub}"
-
-
-def ignore_pycache(directory, contents):
-    return ["__pycache__"] if "__pycache__" in contents else []
-
-
-class Workspace:
-    """workspace апстрима на диске: root/workspace/<name>; root — как корень репозитория апстрима (в нём окружение
-    агентов, model/claude.py). Функции mce/utils.py."""
-    def __init__(self, root, name):
-        self.root = Path(root)
-        self.base = self.root / "workspace" / name
-
-    def start(self, task):
-        """Новый workspace и setup_meta_agent_reference: meta_agent/train.jsonl — файл train целиком. Утилиты
-        лежат в корне, как в репозитории апстрима (mce/workspace_utils): оттуда их копирует setup, их же находит
-        агент, если ищет вне workspace."""
-        if self.base.exists():
-            shutil.rmtree(self.base)
-        utils = self.root / "mce" / "workspace_utils"
-        if not utils.exists():
-            shutil.copytree(UTILS, utils, ignore=ignore_pycache)
-        self.base.mkdir(parents=True)
-        ref = self.base / "meta_agent"
-        ref.mkdir()
-        (ref / "skills").mkdir()
-        (ref / "train.jsonl").write_text(task.file("train").read_text())
-
-    def create(self, iteration, sub):
-        """create_iteration_workspace: папка под-итерации и .claude/skills/learning-context."""
-        folder = self.base / folder_name(iteration, sub)
-        if folder.exists():
-            raise FileExistsError(f"Iteration folder already exists at {folder}")
-        folder.mkdir(parents=True)
-        (folder / CLAUDE_SKILL).parent.mkdir(parents=True)
-        return folder
-
-    def setup(self, folder, source):
-        """setup_base_agent_workspace: context/ и interfaces/ из source (нет — пустые), utils/, data/."""
-        for part in ("context", "interfaces"):
-            src, dst = source / part, folder / part
-            if src.exists() and not dst.exists():
-                shutil.copytree(src, dst, ignore=ignore_pycache)
-            elif not dst.exists():
-                dst.mkdir(parents=True)
-        if not (folder / "utils").exists():
-            shutil.copytree(self.root / "mce" / "workspace_utils", folder / "utils", ignore=ignore_pycache)
-        (folder / "data").mkdir(exist_ok=True)
-
-    def copy_skills(self, source, folder):
-        """copy_skills_to_sub_iteration."""
-        shutil.copytree(source / ".claude" / "skills", folder / ".claude" / "skills", ignore=ignore_pycache,
-                        dirs_exist_ok=True)
-
-    def aggregate(self, iteration, subs, val_metrics, val_total, last):
-        """aggregate_iteration_results: итерация в meta_agent/evaluations.json (train — метрики батчей, среднее с
-        весом размера), навык последней под-итерации — в meta_agent/skills/iter{k}/SKILL.md. subs — батчи:
-        {"batch_size", "metric" (accuracy), "metrics"}. -> train итерации."""
-        total = sum(s["batch_size"] for s in subs)
-        train = sum(s["metric"] * s["batch_size"] for s in subs) / total if total > 0 else 0.0
-        train_metrics = {}
-        if subs:
-            for name in subs[0]["metrics"]:
-                weighted = sum(s["metrics"].get(name, 0.0) * s["batch_size"] for s in subs)
-                train_metrics[name] = weighted / total if total > 0 else 0.0
-        evaluations = self.evaluations()
-        evaluations[f"iter{iteration}"] = {"train_accuracy": train, "train_metrics": train_metrics,
-                                           "val_accuracy": val_metrics.get("accuracy", 0.0), "val_metrics": val_metrics,
-                                           "val_total": val_total, "total_rollouts": total, "num_sub_iters": len(subs),
-                                           "last_sub_folder": last.name}
-        (self.base / "meta_agent" / "evaluations.json").write_text(render.pretty_json(evaluations))
-        skill = last / CLAUDE_SKILL
-        if iteration >= 1 and skill.exists():
-            target = self.base / "meta_agent" / "skills" / f"iter{iteration}"
-            target.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(skill, target / "SKILL.md")
-        return train
-
-    def evaluations(self):
-        """meta_agent/evaluations.json; нет файла — {}."""
-        file = self.base / "meta_agent" / "evaluations.json"
-        return json.loads(file.read_text()) if file.exists() else {}
-
-    def skills(self):
-        """Архив навыков meta_agent/skills/iter*/SKILL.md."""
-        return {p.parent.name: p.read_text() for p in (self.base / "meta_agent" / "skills").glob("iter*/SKILL.md")}
-
-
-def cleanup(folder):
-    """cleanup_irrelevant_files: в корне под-итерации остаётся только своё (скрытое не трогается); у апстрима вид
-    агента выбирает только строку лога."""
-    keep = {"data", "utils", "__pycache__", ".claude", "context", "interfaces"}
-    for item in folder.iterdir():
-        if item.name in keep or item.name.startswith("."):
-            continue
-        try:
-            if item.is_file():
-                item.unlink()
-            elif item.is_dir():
-                shutil.rmtree(item)
-        except Exception:
-            pass
 
 
 async def base_permission(tool_name, input_data, context, iter_dir):
@@ -398,7 +257,7 @@ def base_agent(ex, ws, folder):
     """run_base_agent: сессия Claude SDK в папке под-итерации; -> прошла ли проверка интерфейсов."""
     from claude_agent_sdk import ClaudeAgentOptions
     sigs = signatures(ex.task)
-    prompt = CLAUDE_BASE.fill(task_instruction=render.task_instruction(ex.task), iter_dir=str(folder),
+    prompt = CLAUDE_BASE.fill(task_instruction=task_instruction(ex.task), iter_dir=str(folder),
                               iter_name=folder.name, signatures=bool(sigs), interfaces=INTERFACES.fill(signatures=sigs))
     options = ClaudeAgentOptions(cwd=str(folder), setting_sources=["project"], allowed_tools=BASE_TOOLS,
                                  can_use_tool=partial(base_permission, iter_dir=folder))

@@ -7,7 +7,7 @@ use_chat_completions_url_for_anthropic_messages обязателен), тот �
 
 Окружение CLI задаётся целиком (env), а не наследуется от процесса стенда: от него зависят инструменты агента
 (Bash: python3 и uv из .venv корня, оболочка, HOME) и значит его запросы. Корень (root) — папка над workspace/,
-как корень репозитория апстрима: в ней home/, tmp/ и .venv (окружение python апстрима, config.MCE_VENV). У записи
+как корень репозитория апстрима: в ней home/, tmp/ и .venv (окружение python апстрима). У записи
 апстрима то же окружение (bridge/live/mce/env.txt)."""
 import asyncio
 import os
@@ -31,13 +31,13 @@ def env(root, model, model_url):
             "OPENROUTER_API_KEY": "x", "OPENROUTER_API_BASE": model_url}
 
 
-def prepare(root):
-    """Корень: home/ и tmp/ CLI, .venv — окружение апстрима."""
+def prepare(root, venv):
+    """Корень: home/ и tmp/ CLI, .venv — окружение апстрима venv."""
     root = Path(root)
     for d in ("home", "tmp"):
         (root / d).mkdir(parents=True, exist_ok=True)
     if not (root / ".venv").exists():
-        (root / ".venv").symlink_to(config.MCE_VENV)
+        (root / ".venv").symlink_to(venv)
 
 
 def session(prompt, options, feedback, replies, environ):

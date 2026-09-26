@@ -66,16 +66,17 @@ def test_every_method_on_every_task(monkeypatch):
     import numpy as np
     from stub import Stub
 
-    from ace import config, render
+    from ace import config
     from ace.loop import run
-    from ace.memory.mce import Folder, signatures
+    from ace.memory.mce import Folder
+    from ace.upstream.mce import signatures, task_instruction
     from ace.methods import METHODS
     from ace.solver.mce import Environment
     monkeypatch.setattr("ace.embed.embed", lambda texts: np.array([[len(t) % 7 + 1.0, 1.0] for t in texts]))
     monkeypatch.setattr(config, "VAL_SIZE", 2)
     runs = 0
     for task in TASKS.values():
-        render.task_instruction(task), signatures(task)
+        task_instruction(task), signatures(task)
         Environment().prompt(SimpleNamespace(task=task), Folder(), task.load()[0], 0)
         for name, method in METHODS.items():
             if name == "mce":

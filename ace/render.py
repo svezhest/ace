@@ -8,7 +8,6 @@ import re
 from pydantic_ai.messages import TextPart, ToolCallPart, ToolReturnPart
 
 from . import prompts
-from .tasks import variant
 
 STAND = prompts.macros("stand")
 SCOPE = prompts.macros("scope_strings")
@@ -401,14 +400,6 @@ def skilled(system, ex):
     if not skill:
         return system
     return system + "\n\n" + prompts.text("meta_skill", skill=skill)
-
-
-def task_instruction(task):
-    """Инструкция задачи агентам MCE: у бенчмарка апстрима — его get_task_instruction (mce_task_<задача>), у
-    задач стенда — системный промпт и инструкция решателю (S2)."""
-    if variant("mce", task) == "symptom":
-        return prompts.text("mce_task_symptom")
-    return f"{task.system} {task.instr}"
 
 
 # GEPA (strategies/instruction_proposal.py: InstructionProposalSignature.prompt_renderer)

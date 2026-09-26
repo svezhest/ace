@@ -28,9 +28,7 @@ DATA = ROOT / "data"
 PROMPTS = Path(__file__).parent / "prompts"
 RESULTS = Path(os.getenv("RESULTS", "results"))
 
-# MCE: агенты Claude Agent SDK (model/claude.py) — CLI шлёт /v1/messages в LiteLLM proxy перед сервером модели;
-# окружение python агентов — venv апстрима meta-context-engineering; корень workspace (над workspace/<задача>)
+# агенты Claude Agent SDK (model/claude.py) — CLI шлёт /v1/messages в LiteLLM proxy перед сервером модели;
+# UPSTREAMS — репозитории апстримов и их окружения (.venvs)
 CLAUDE_BASE_URL = os.getenv("CLAUDE_BASE_URL", "http://127.0.0.1:4000")
 UPSTREAMS = Path(os.getenv("UPSTREAMS", Path.home() / "Projects" / "upstreams"))
-MCE_VENV = Path(os.getenv("MCE_VENV", UPSTREAMS / ".venvs" / "mce"))
-MCE_ROOT = os.getenv("MCE_ROOT")        # не задан — временная папка на прогон, удаляется при выходе
