@@ -11,8 +11,8 @@ from ace.methods import METHODS
 from ace.methods.mce import ITERATIONS
 from ace.model import Model
 from ace.show import Catalog, Whole
-from ace.solver.evolib import Sampler
 from ace.show.scope import StrategicRules
+from ace.solver.evolib import Sampler
 from ace.tasks import TASKS
 from ace.wrap import Gate
 from ace.wrap.hooks import Hooks

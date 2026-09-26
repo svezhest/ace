@@ -16,9 +16,9 @@ from pathlib import Path
 from typing import Callable
 
 from . import config, render
+from .extract import Contract
 from .model import Call, Outcome, messages, params
 from .tasks import accuracy, final_answer
-from .extract import Contract
 from .verdict import LABELED, majority
 
 
