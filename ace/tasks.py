@@ -8,7 +8,11 @@ hmmt — бенчмарк EvoLib (eval_main.py _build_hmmt_task): MathArena/hmmt
 (93 вопроса, в hmmt40 — первые 40), ответ — answer без пробелов по краям; только онлайн, без train и val.
 symptom — бенчмарк MCE (env/symptom_diagnosis апстрима, данные gretelai/symptom_to_diagnosis) целиком, строки как у
 апстрима: train 200, val 50, тест 212; выборки — первые SIZE / VAL_SIZE. Проверка — _normalize апстрима; решатель
-среды апстрима (get_context и промпт диагноза) — у mce (solver/mce.py), общий решатель — ответ FINAL ANSWER."""
+среды апстрима (get_context и промпт диагноза) — у mce (solver/mce.py), общий решатель — ответ FINAL ANSWER.
+aime — бенчмарк GEPA (gepa/examples/aime.py: init_dataset) целиком, строки как у апстрима: train и val — половины
+AI-MO/aimo-validation-aime после shuffle Random(0) (по 45, с решением в additional_context), тест — MathArena/aime_2025
+пять раз подряд (150); ответ — «### N», проверка — ContainsAnswerEvaluator апстрима (ответ входит в текст).
+У общего решателя ответ — строка FINAL ANSWER в том же виде «### N»."""
 import json
 import re
 from dataclasses import dataclass, field
@@ -58,7 +62,10 @@ class Task:
         items = []
         for r in rows:
             question = r.get("context") or r.get("input") or r["question"]
-            items.append({"question": question, "target": r.get("target", r.get("answer"))})
+            item = {"question": question, "target": r.get("target", r.get("answer"))}
+            if "additional_context" in r:       # GEPA: подсказка в обратную связь рефлексии (решение задачи)
+                item["additional_context"] = r["additional_context"]
+            items.append(item)
         if len(items) < size and not whole:
             raise ValueError(f"{self.name}: в {path.name} {len(items)} вопросов, а нужно {size}")
         return items if whole else items[:size]
@@ -175,6 +182,12 @@ def symptom_diagnosis(response):
     return response.strip().split("\n")[-1]
 
 
+def aime_ok(pred, tgt):
+    """ContainsAnswerEvaluator апстрима GEPA (adapters/default_adapter/default_adapter.py): эталон «### N» входит в
+    ответ."""
+    return tgt in pred
+
+
 def gpqa_ok(pred, tgt):
     """Наша: буква варианта в начале ответа. Не eval_for_multiple_choice DC (тот принимает и текст варианта из
     вопроса): GPQA в стенде — наша задача, не из статей методов."""
@@ -182,7 +195,7 @@ def gpqa_ok(pred, tgt):
 
 
 CHECK = {"finer": finer_ok, "formula": formula_ok, "meb": meb_ok, "gpqa": gpqa_ok, "dapo": dapo_ok, "hmmt": hmmt_ok,
-         "symptom": symptom_ok}
+         "symptom": symptom_ok, "aime": aime_ok}
 
 TASKS = {name: Task(name) for name in CHECK}
 
