@@ -17,6 +17,7 @@ from functools import partial
 
 from .. import parse, prompts, render
 from ..model import Call, Reader, parts
+from ..render import STAND
 from ..upstream.scope import current_system, strategic_text
 from . import ATTEMPT, CONFIDENCE, DOMAIN, RATIONALE, Extraction, Extractor
 
@@ -25,7 +26,6 @@ QUALITY = {"thoroughness": prompts.load("scope_thoroughness"), "efficiency": pro
 SELECTOR = prompts.load("scope_selector")
 CLASSIFY = prompts.load("scope_classify")
 DOMAINS = prompts.text("scope_domains").split()
-STAND = prompts.macros("stand")
 LEVEL = {"low": 0.3, "medium": 0.6, "high": 0.9}    # метка кандидата -> начальная confidence
 DEFAULT_CONFIDENCE = 0.5    # метка не из списка
 BEST_OF_TEMPERATURE = 0.7

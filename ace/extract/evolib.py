@@ -15,12 +15,12 @@ from dataclasses import dataclass
 
 from .. import parse, prompts, render
 from ..model import Call, Reader, messages
+from ..render import STAND
 from ..upstream.evolib import domain, generate, llm_params, log_gain
 from . import ATTRIBUTION, BEST_ANSWER, IG, Extraction, Extractor
 
 UNEVALUATED = 0.5           # множитель баллов без внешней оценки, когда insight есть
 INSIGHT = prompts.load("evolib_insight")
-STAND = prompts.macros("stand")
 
 
 @dataclass

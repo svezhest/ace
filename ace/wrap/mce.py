@@ -21,6 +21,7 @@ from ..model import Call, claude, messages, params
 from ..upstream.mce import (CLAUDE_SKILL, ROUNDS, SKILL, WORKSPACE, Workspace, cleanup, folder_name, signatures,
                             sub_folder, task_instruction)
 from ..loop import Version, best_index, evaluated
+from ..render import MCE
 from . import Wrapper, single_meta
 
 # окружение python агентов — venv апстрима meta-context-engineering; корень workspace (над workspace/<задача>) — не
@@ -193,7 +194,6 @@ META_TOOLS = ["Read", "Write", "Edit", "Bash", "Glob", "Grep", "Task", "TaskOutp
               "KillShell", "EnterPlanMode"]
 CLAUDE_META, CLAUDE_META_INTERFACES = prompts.load("mce_claude_meta"), prompts.load("mce_claude_meta_interfaces")
 CLAUDE_MISSING = prompts.load("mce_claude_skill_missing")
-MCE = prompts.macros("mce_strings")
 
 
 async def meta_permission(tool_name, input_data, context, iter_dir):

@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .. import prompts, render
+from ..render import MCE
 from ..tasks import variant
 
 ROUNDS = 30                 # раундов файловых инструментов у агентов mce_fs
@@ -15,7 +16,6 @@ SKILL = ".agent/skills/learning-context/SKILL.md"      # навык в папк�
 CLAUDE_SKILL = ".claude/skills/learning-context/SKILL.md"
 # mce/workspace_utils апстрима дословно: копия в utils/ под-итерации
 UTILS = Path(__file__).parent.parent / "memory" / "mce_utils"
-MCE = prompts.macros("mce_strings")
 
 
 def task_instruction(task):

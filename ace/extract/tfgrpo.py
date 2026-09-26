@@ -12,12 +12,12 @@ tfgrpo_*.j2 дословно, пара системный / пользовате
 Библиотека до конца батча не меняется, поэтому сверка идёт здесь, а план батча — в памяти метода
 (memory/tfgrpo.py). Группа без опыта даёт пустые операции: план батча апстрим строит всегда. Вызовы — без
 параметров запроса, как у апстрима (model_params = {}: температура и предел генерации — сервера)."""
-from .. import parse, prompts, render
+from .. import parse, render
 from ..model import Reader
+from ..render import TFGRPO
 from ..upstream.tfgrpo import ADVANTAGE, GROUP_UPDATE, SUMMARY, ask_stage
 from . import OPERATIONS, Extraction, Extractor, scores
 
-TFGRPO = prompts.macros("tfgrpo_strings")
 EXPERIENCES = Reader(text=parse.enclosed("Experiences"))
 
 

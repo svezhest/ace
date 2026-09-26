@@ -22,6 +22,7 @@ from ..loop import Prompt, Solver
 from ..upstream.dc import CHEATSHEET, MAX_TOKENS, TOKENS, dc_params
 from ..extract import INPUT, SHEET
 from ..model import Call, Reply, messages
+from ..render import DC
 from ..tasks import variant
 from ..show import TopK, Whole
 from . import OwnSolver
@@ -32,7 +33,6 @@ NOTE = prompts.text("dc_note")
 MEB = prompts.text("dc_meb")
 PROCEED = prompts.text("dc_proceed")
 LAST_ROUND = prompts.text("dc_last_round")
-DC = prompts.macros("dc_strings")
 FLAG = DC.flag()            # после блока кода — просьба его исполнить
 TOP = 3                     # --retrieve_top_k
 ROUNDS = 3                  # max_depth_num_rounds generate

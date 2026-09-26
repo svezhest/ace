@@ -12,11 +12,11 @@ from dataclasses import dataclass
 from .. import prompts
 from ..extract import INPUT, SHEET
 from ..model import Call, messages
+from ..render import DC
 from ..upstream.dc import CHEATSHEET, MAX_TOKENS, TOKENS, dc_params
 from . import Document, Lessons, Record
 
 CURATOR = prompts.load("dc_curator")
-DC = prompts.macros("dc_strings")
 
 
 class Sheet(Document):

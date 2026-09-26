@@ -5,11 +5,11 @@ additional_context вопроса) по вопросам минибатча, о�
 ProposalAdapter.parse. Ответ оборван или не разобран — нового текста нет (кандидата нет, как у апстрима)."""
 from .. import parse, prompts, render
 from ..model import Call, Reader, messages
+from ..render import GEPA
 from ..upstream.gepa import current
 from . import Extraction, Extractor, scores
 
 REFLECT = prompts.load("gepa_reflect")
-GEPA = prompts.macros("gepa_strings")
 SIDE_INFO = "<side_info>"
 
 

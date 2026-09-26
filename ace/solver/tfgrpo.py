@@ -18,6 +18,7 @@ from .. import prompts, render
 from ..env.tfgrpo import DEFAULT_TIMEOUT, Kernel
 from ..loop import Prompt, Solver
 from ..model import Call, Reply, messages
+from ..render import TFGRPO
 from ..tasks import final_answer, variant
 from . import OwnSolver
 
@@ -25,7 +26,6 @@ TEMPLATE = prompts.load("tfgrpo_agent")
 PROBLEM = prompts.load("tfgrpo_problem")
 INTRO = "\n\n" + prompts.text("tfgrpo_experiences_intro")
 LAST_TURN = {"role": "user", "content": prompts.text("tfgrpo_last_turn")}
-TFGRPO = prompts.macros("tfgrpo_strings")
 # схема инструмента, как её шлёт openai-agents (FunctionTool python_executor апстрима)
 TOOL = {"type": "function", "function": {
     "name": "execute_python_code", "description": TFGRPO.tool_description(), "strict": False,

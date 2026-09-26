@@ -4,7 +4,6 @@ from .. import prompts, render
 from . import sandbox
 
 CALLS = 3                   # вызовов run_python до ответа
-TEXT = prompts.macros("sandbox")
 
 
 class Env:
@@ -38,7 +37,7 @@ class Sandbox(Env):
     def open(self):
         return Session() if self.per == "attempt" else self
 
-    @prompts.tool(TEXT.run_python())
+    @prompts.tool(sandbox.TEXT.run_python())
     def run_python(self, code: str) -> str:
         """Код в контейнере; модели — stdout и stderr."""
         r = sandbox.run(code, self.container)

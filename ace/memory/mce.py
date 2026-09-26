@@ -10,6 +10,7 @@ from pathlib import Path
 
 from .. import fs, prompts, render
 from ..model import Call, messages, params
+from ..render import MCE
 from ..tasks import variant
 from ..upstream.mce import ROUNDS, SKILL, WORKSPACE, cleanup, signatures, sub_folder, task_instruction
 from . import Files, Memory, Record
@@ -69,7 +70,6 @@ VALIDATION_TRIES = 3        # max_validation_attempts run_base_agent: ответ
 CLAUDE_BASE = prompts.load("mce_claude_base")
 INTERFACES = prompts.load("mce_claude_interfaces")
 INVALID = prompts.load("mce_claude_invalid")
-MCE = prompts.macros("mce_strings")
 
 
 async def base_permission(tool_name, input_data, context, iter_dir):
