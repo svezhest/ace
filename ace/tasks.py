@@ -169,7 +169,8 @@ def numbers(expression):
 
 def dapo_ok(pred, tgt):
     """verify_func апстрима TF-GRPO (utu/practice/verify/math.py): эталон в \\boxed{}, math_verify по всему ответу,
-    верно — награда 1.0."""
+    верно — награда 1.0. Нестрогая: \\boxed где угодно важнее остального текста, без него — последнее выражение
+    (перечисление с эталоном в конце верно), равенство — по правой части."""
     verify = math_metric(gold_extraction_target=(LatexExtractionConfig(),),
                          pred_extraction_target=(ExprExtractionConfig(), LatexExtractionConfig()))
     score, _ = verify(["\\boxed{" + str(tgt) + "}"], [pred])

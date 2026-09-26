@@ -66,6 +66,17 @@ def test_hmmt():
     assert len(t.load()) == 40 and t.load()[0]["target"] == "103"
 
 
+def test_dapo_whole_reply():
+    """verify_func TF-GRPO — math_verify по всему ответу, нестрогая: \\boxed где угодно важнее строки FINAL ANSWER,
+    без него в зачёт последнее выражение (перечисление с эталоном в конце верно), равенство — по правой части;
+    несколько \\boxed — множество, неверно."""
+    t = TASKS["dapo"]
+    assert t.check("\\boxed{4}\nFINAL ANSWER: 5", "4")
+    assert t.check("x = 3 or x = 4", "4") and not t.check("x = 4 or x = 3", "4")
+    assert t.check("\\boxed{r^3 - \\frac{1}{r^3} = 2786}", "2786")
+    assert not t.check("\\boxed{3}, \\boxed{4}", "4")
+
+
 def test_every_method_on_every_task(monkeypatch):
     """Метод × задача: на задаче вне таблицы вариантов (tasks.VARIANTS) метод идёт запасным вариантом стенда, а не
     падает; протокол без нужной выборки (офлайн на задаче без train / val) — понятная ошибка до обучения.
