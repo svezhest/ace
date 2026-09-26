@@ -15,11 +15,12 @@ def load(path):
 
 
 def texts(trace):
-    """Тексты записей по видам: порядок внутри вида сравнивается, чередование видов — нет."""
+    """Тексты записей по видам: порядок внутри вида сравнивается, чередование видов — нет. Запись без текста
+    (кандидат и итерация GEPA) — целиком."""
     out = {}
     for r in trace["memory"]:
         if r["kind"] not in HIDDEN:
-            out.setdefault(r["kind"], []).append(r["text"])
+            out.setdefault(r["kind"], []).append(r.get("text", json.dumps(r, sort_keys=True, ensure_ascii=False)))
     return out
 
 
