@@ -1,21 +1,17 @@
 """GEPA (gepa-ai/gepa d771eb21b5: api.py optimize с умолчаниями, README «Quick Start» на AIME).
 
 gepa = Evolution(ученик) — метод апстрима целиком:
-    мета        пул кандидатов с оценками по вопросам val и Парето-фронтом; итерация — родитель с фронта (без
-                доминируемых, с весом по числу вопросов), минибатч из перемешанного по эпохам train; потомок снова
-                решает минибатч и входит в пул, если верных строго больше, — тогда он решает весь val; обучение — до
-                бюджета вызовов метрики (wrap/gepa.py: Evolution)
+    мета        пул кандидатов с оценками по вопросам val, родитель с Парето-фронта, потомок входит в пул, если на
+                минибатче верных строго больше; обучение — до бюджета вызовов метрики (wrap/gepa.py: Evolution)
     решатель    DefaultAdapter: системный промпт — текст кандидата, user — вход задачи, без параметров; в зачёт у
                 aime — весь ответ (solver/gepa.py)
     вердикт     верный ответ (ContainsAnswerEvaluator — проверка задачи aime)
     извлечение  рефлексия на минибатче: вход, ответ и отзыв с верным ответом и решением по каждому вопросу, новый
                 текст из ```-блока (extract/gepa.py)
     память      текст системного промпта (memory/gepa.py: Instruction); до рефлексии — seed задачи
-    когда учится  на каждом минибатче (reflection_minibatch_size 3); минибатч родителя весь верен — рефлексии нет
+    учится      на каждом минибатче (reflection_minibatch_size 3); минибатч родителя весь верен — рефлексии нет
     протокол    офлайн: val — весь, в пул; тест — лучшим по val кандидатом (result.best_candidate)
-Умолчания optimize: candidate_selection_strategy pareto, frontier_type instance, module_selector round_robin (компонент
-один), acceptance strict_improvement, use_merge False; seed — SEED стенда (по умолчанию 0, как у квикстарта);
-max_metric_calls 150 — как в квикстарте."""
+Умолчания optimize — DEVIATIONS GEPA1; seed — SEED стенда (по умолчанию 0, как у квикстарта)."""
 from ..extract.gepa import Reflection
 from ..learner import Learner
 from ..loop import Protocol

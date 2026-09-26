@@ -1,20 +1,7 @@
-"""GEPA: мета-уровень — пул кандидатов с оценками по вопросам val, Парето-выбор родителя, принятие по минибатчу
-(gepa-ai/gepa d771eb21b5: core/engine.py GEPAEngine.run, core/state.py GEPAState, proposer/reflective_mutation/
-reflective_mutation.py propose, strategies/ candidate_selector ParetoCandidateSelector, batch_sampler
-EpochShuffledBatchSampler, acceptance StrictImprovementAcceptance, eval_policy FullEvaluationPolicy; gepa_utils.py
-select_program_candidate_from_pareto_front).
-
-    Evolution(ученик, budget, seed)   итерация = проход по минибатчу (батч ученика, every вопросов): родитель — с
-                                      Парето-фронта, минибатч — из перемешанного по эпохам train, вопросы — попытки
-                                      ученика памятью родителя, рефлексия — извлечение ученика на батче, потомок —
-                                      память после неё; потомок снова решает минибатч и, если верных строго больше,
-                                      решает весь val и входит в пул; обучение кончается, когда вызовов метрики
-                                      (попыток на вопросах) не меньше budget
-
-Случайность одна — random.Random(seed) апстрима: выбор родителя, затем перемешивание train на новой эпохе; seed
-None — SEED стенда на старте прогона. Минибатч — every ученика (и после swap), вопросы — из выборки ученика.
-В конце прохода у ученика — лучший по val кандидат пула (при равенстве ранний), и цикл берёт его версией прохода:
-лучшая по val версия прогона — тот же кандидат, что result.best_candidate апстрима."""
+"""GEPA: мета-обёртка Evolution — пул кандидатов с оценками по вопросам val, Парето-выбор родителя, принятие по
+минибатчу (gepa-ai/gepa d771eb21b5: core/engine.py, core/state.py, proposer/reflective_mutation/, strategies/,
+gepa_utils.py). Уровни апстрима на стенде — docs/architecture.md, отличия — DEVIATIONS GEPA1–2. Случайность одна —
+random.Random(seed) апстрима: выбор родителя, затем перемешивание train в начале эпохи сэмплера."""
 import random
 from collections import Counter
 from dataclasses import asdict, dataclass, field, replace
@@ -59,6 +46,10 @@ class Proposal:
 
 
 class Evolution(Wrapper):
+    """Итерация — проход по одному минибатчу (батч ученика, every): родитель с фронта решает его, обучение ученика
+    на нём — рефлексия, потомок — память после неё; строго лучший на минибатче решает весь val и входит в пул.
+    Обучение кончается, когда вызовов метрики не меньше budget; в конце прохода у ученика — лучший по val кандидат
+    (result.best_candidate)."""
     iterates = True
 
     def __init__(self, inner, budget, seed=None, name=None):
@@ -186,8 +177,9 @@ def attempts(groups):
 
 
 class EpochShuffled:
-    """EpochShuffledBatchSampler: номера train перемешиваются в начале эпохи и добиваются до кратного размеру
-    минибатча самыми редкими; минибатч итерации i — кусок с i * size по кругу."""
+    """EpochShuffledBatchSampler: номера train перемешиваются в начале эпохи сэмплера (не прохода цикла: проход —
+    один минибатч) и добиваются до кратного размеру минибатча самыми редкими; минибатч итерации i — кусок с
+    i * size по кругу."""
     def __init__(self, rng):
         self.size = 0
         self.rng = rng
