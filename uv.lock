@@ -21,8 +21,12 @@ dependencies = [
     { name = "jinja2", marker = "python_full_version < '3.15' or platform_system != 'Linux' or sys_platform == 'emscripten'" },
     { name = "loguru", marker = "python_full_version < '3.15' or platform_system != 'Linux' or sys_platform == 'emscripten'" },
     { name = "math-verify", extra = ["antlr4-11-0"], marker = "python_full_version < '3.15' or platform_system != 'Linux' or sys_platform == 'emscripten'" },
+    { name = "numpy", marker = "python_full_version < '3.15' or platform_system != 'Linux' or sys_platform == 'emscripten'" },
+    { name = "pydantic", marker = "python_full_version < '3.15' or platform_system != 'Linux' or sys_platform == 'emscripten'" },
     { name = "pydantic-ai-slim", extra = ["openai"], marker = "python_full_version < '3.15' or platform_system != 'Linux' or sys_platform == 'emscripten'" },
+    { name = "scikit-learn", marker = "python_full_version < '3.15' or platform_system != 'Linux' or sys_platform == 'emscripten'" },
     { name = "sentence-transformers", marker = "python_full_version < '3.15' or platform_system != 'Linux' or sys_platform == 'emscripten'" },
+    { name = "sympy", marker = "python_full_version < '3.15' or platform_system != 'Linux' or sys_platform == 'emscripten'" },
 ]
 
 [package.dev-dependencies]
@@ -37,8 +41,12 @@ requires-dist = [
     { name = "jinja2", specifier = ">=3.1.6" },
     { name = "loguru", specifier = ">=0.7.3" },
     { name = "math-verify", extras = ["antlr4-11-0"], specifier = "==0.9.0" },
+    { name = "numpy", specifier = ">=2.4.6" },
+    { name = "pydantic", specifier = ">=2.13.5" },
     { name = "pydantic-ai-slim", extras = ["openai"], specifier = ">=2.46" },
+    { name = "scikit-learn", specifier = ">=1.9.1" },
     { name = "sentence-transformers", specifier = ">=3.0" },
+    { name = "sympy", specifier = ">=1.14.0" },
 ]
 
 [package.metadata.requires-dev]
