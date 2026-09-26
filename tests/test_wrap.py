@@ -147,8 +147,8 @@ def test_mce_base_agent():
     ex.model = model
     context = Context()
     context.write("notes.md", "old")
-    groups = [Group("q1", [episode("1", ok=True, target="1", question="q1")], target="1"),
-              Group("q2", [episode("2", ok=False, target="3", question="q2")], target="3")]
+    groups = [Group("q1", [episode("1", ok=True, target="1", question="q1")], target="1", i=0),
+              Group("q2", [episode("2", ok=False, target="3", question="q2")], target="3", i=1)]
     context.learn(ex, [Raw()(ex, g, context) for g in groups])
     call = model.calls[0]
     assert call["tools"] == fs.TOOLS and call["system"] == ""

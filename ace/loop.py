@@ -96,6 +96,7 @@ class Group:
     pick: str = "first"         # как она выбрана
     pass_at_k: bool = False     # выбрана по метке: зачёт — pass@k, а не точность
     item: dict = None           # вопрос как в выборке (у MCE — с id выборки)
+    i: int = None               # номер вопроса в проходе
 
     @property
     def answer(self):
@@ -272,7 +273,8 @@ class Experiment:
         return on_step
 
     def question(self, item):
-        """Группа попыток одного вопроса; при обучении — события попытки и вопроса."""
+        """Группа попыток одного вопроса; при обучении — события попытки (on_attempt). Обучение на вопросе
+        (on_question) зовёт цикл после ответа: его ошибка не меняет ответ."""
         learner = self.learner
         eps = []
         for k in range(learner.attempts.count(self.training)):
@@ -280,14 +282,12 @@ class Experiment:
             eps.append(ep)
             if self.training:
                 learner.on_attempt(self, ep)
-        group = Group(item["question"], eps, target=eps[0].target, item=item)
+        group = Group(item["question"], eps, target=eps[0].target, item=item, i=self.i)
         learner.group_verdict(self, group)
         pick = learner.attempts.pick
         group.pick = pick.__name__
         group.pass_at_k = pick is best
         group.chosen = pick(group, lambda answer: self.task.check(answer, item["target"]))
-        if self.training:
-            learner.on_question(self, group)
         return group
 
     def retry(self, memory, note):
@@ -398,7 +398,8 @@ def run(task, learner, model, n=config.SIZE, out=None, split=""):
         recheck   после обучения на вопросе ещё попытка новой памятью, только в лог
     Лог и итог пишутся после каждого вопроса, память — в конце. Исключение на вопросе (или в событии прохода)
     уходит в лог записью finish="error", вопрос засчитывается неверным, прогон идёт дальше; в итоге — errors.
-    Нарушение стыка сборки (Contract) прогон останавливает."""
+    Исключение обучения — своя запись (phase learn), ответ вопроса в зачёте остаётся. Нарушение стыка сборки
+    (Contract) прогон останавливает."""
     random.seed(config.SEED)
     learner = copy.deepcopy(learner)        # в реестре память ученика пуста: каждый прогон с чистой
     proto = learner.protocol
@@ -464,14 +465,21 @@ class Run:
         batch = []
         self.guarded("pass", 0, None, partial(learner.on_pass_start, ex))
         phase = "train" if proto.offline or proto.window else "online"
+        every = learner.every
         for i, item in enumerate(items):
             if proto.window and i % proto.window == 0:
                 for j in range(i, min(i + proto.window, len(items))):
                     self.test("online", j, items[j])
-            self.guarded(phase, i, item, partial(self.train, phase, i, item, batch))
+            if i % every == 0:
+                ex.batch = i // every
+                ex.i, ex.item = i, item
+                self.guarded("learn", i, item, partial(learner.on_batch_start, ex))
+            self.train(phase, i, item, batch, closes=i % every == every - 1)
             if proto.recheck:
                 self.test("post", i, item)
-        self.guarded("pass", len(items), None, partial(self.end_pass, epoch, batch))
+        if batch and learner.flush:
+            self.guarded("learn", len(items) - 1, None, partial(learner.on_batch, ex, list(batch)))
+        self.guarded("pass", len(items), None, partial(self.end_pass, epoch))
         return True
 
     def final_test(self):
@@ -484,26 +492,29 @@ class Run:
         for i, item in enumerate(self.task.load(self.split, self.n)):
             self.test("test", i, item)
 
-    def train(self, phase, i, item, batch):
+    def train(self, phase, i, item, batch, closes):
+        """Вопрос обучения: ответ, обучение на вопросе, на последнем номере батча — обучение на батче (closes). Ответ
+        идёт в лог после обучения (с решениями Gate и попытками извлечения); исключение обучения — своя запись
+        (phase learn), ответ и его вердикт оно не меняет. Батч — вопросы с номерами батча: упавший до ответа в него
+        не входит, соседние батчи от этого не сдвигаются; батч, где не решился ни один, не учит."""
         ex, learner = self.ex, self.learner
         t0 = time.time()
         gates = len(learner.gated)
         ex.retried = []
         ex.i, ex.item = i, item
-        if i % learner.every == 0:
-            ex.batch = i // learner.every
-            learner.on_batch_start(ex)
-        group = ex.question(item)
-        batch.append(group)
-        if len(batch) == learner.every:
-            learner.on_batch(ex, batch)
+        group = self.guarded(phase, i, item, partial(ex.question, item))
+        if group is not None:
+            batch.append(group)
+            self.guarded("learn", i, item, partial(learner.on_question, ex, group))
+        if closes:
+            if batch:
+                self.guarded("learn", i, item, partial(learner.on_batch, ex, list(batch)))
             batch.clear()
-        self.record(phase, i, group, item, t0, gated=learner.gated[gates:], retried=ex.retried)
+        if group is not None:
+            self.record(phase, i, group, item, t0, gated=learner.gated[gates:], retried=ex.retried)
 
-    def end_pass(self, epoch, batch):
+    def end_pass(self, epoch):
         learner = self.learner
-        if batch and learner.flush:
-            learner.on_batch(self.ex, batch)
         learner.on_pass(self.ex)
         if self.proto.val:
             score = sum(correct for correct, _ in self.ex.evaluate())
@@ -522,15 +533,18 @@ class Run:
         self.record(phase, i, group, item, t0)
 
     def guarded(self, phase, i, item, step):
-        """step() — вопрос или событие прохода; исключение — в лог, прогон дальше."""
+        """step() — вопрос, обучение или событие прохода; исключение — в лог, прогон дальше. -> что вернул step
+        (None при исключении)."""
+        out = None
         try:
-            step()
+            out = step()
         except Contract:
             raise
         except Exception as error:
             self.log.append(failed(phase, self.ex.epoch, i, item, error))
             print(f"{self.task.name} {self.learner.name} {phase}{self.ex.epoch} {i:3} ОШИБКА {error!r}", flush=True)
         self.save()
+        return out
 
     def record(self, phase, i, group, item, t0, gated=(), retried=()):
         epoch = self.ex.epoch

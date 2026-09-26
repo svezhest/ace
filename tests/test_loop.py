@@ -47,6 +47,7 @@ class Spy(Learner):
 
     def on_batch(self, ex, groups):
         self.events.append(("batch", len(groups)))
+        self.events.append(("groups", len(groups), list(groups)))
         super().on_batch(ex, groups)
 
     def on_pass(self, ex):
@@ -156,7 +157,7 @@ class Budget(Spy):
 
 def test_empty_sample_ends_training(tmp_path):
     """Пустая выборка прохода кончает обучение раньше epochs: пустых проходов нет, дальше — тест."""
-    learner = Budget("budget", extract=Raw(), protocol=Protocol(offline=True, epochs=5))
+    learner = Budget("budget", memory=Memory(), extract=Raw(), protocol=Protocol(offline=True, epochs=5))
     run(TASK, learner, Stub(), 1, split="val", out=str(tmp_path))
     log = json.load(open(tmp_path / "log.json"))
     assert [(r["phase"], r["epoch"]) for r in log] == [("train", 0), ("train", 1), ("test", 0)]
@@ -329,6 +330,41 @@ def test_error_logged_and_run_goes_on(tmp_path):
     assert [r["finish"] for r in log] == ["stop", "error", "stop"] and "HTTP 400" in log[1]["error"]
     assert summary["errors"] == 1 and summary["correct"] == 2 and summary["n"] == 3 and summary["done"]
     assert json.load(open(tmp_path / "summary.json"))["errors"] == 1 and (tmp_path / "memory.json").exists()
+
+
+class Boom(Extractor):
+    """Извлечение, которое падает после ответа (рефлектор с HTTP 400)."""
+    def __call__(self, ex, group, memory):
+        raise RuntimeError("reflector HTTP 400")
+
+
+def test_learning_error_keeps_answer(tmp_path):
+    """Ошибка обучения на вопросе — своя запись (phase learn) в логе и в errors; ответ уже получен и в зачёт идёт
+    с вердиктом."""
+    summary = run(TASK, Learner("x", extract=Boom()), Stub(right), 3, str(tmp_path))
+    log = json.load(open(tmp_path / "log.json"))
+    assert [(r["phase"], r["finish"]) for r in log] == [("learn", "error"), ("online", "stop")] * 3
+    assert "reflector HTTP 400" in log[0]["error"] and all(r["answer"] for r in log if r["phase"] == "online")
+    assert summary["correct"] == 3 and summary["n"] == 3 and summary["errors"] == 3
+
+
+class Batches(Spy):
+    def on_batch_start(self, ex):
+        self.events.append(("start", ex.batch, ex.i))
+
+
+def test_failed_question_keeps_batches():
+    """Упавший вопрос в батч не входит, а соседние батчи не сдвигаются: начало и конец батча — по номерам вопросов."""
+    questions = [r["question"] for r in TASK.load("", 6)]
+
+    def answer(call):
+        if questions[1] in call["user"]:
+            raise RuntimeError("model 500")
+        return right(call)
+    summary, learner = run_spy(Batches("spy", memory=Memory(), extract=Raw(), every=3), Stub(answer), n=6)
+    assert learner.of("start") == [("start", 0, 0), ("start", 1, 3)]
+    assert [[g.i for g in e[2]] for e in learner.of("groups")] == [[0, 2], [3, 4, 5]]
+    assert summary["errors"] == 1 and summary["correct"] == 5
 
 
 def test_interrupted_run_keeps_log(tmp_path):

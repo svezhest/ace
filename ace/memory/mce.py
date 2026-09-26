@@ -50,7 +50,7 @@ class Context(Files):
     def learn(self, ex, extractions):
         groups = [x.group for x in extractions]
         # id — место вопроса в проходе (порядок train у нас один и тот же), вопрос — поле question
-        self.train = train_json(ex, groups, range(ex.i + 1 - len(groups), ex.i + 1))
+        self.train = train_json(ex, groups, [g.i for g in groups])
         name = sub_folder(ex)
         mounts = {"context": fs.Mount(self), "data": fs.Mount(Files.of({"train.json": self.train}), "ro")}
         if ex.skill:
