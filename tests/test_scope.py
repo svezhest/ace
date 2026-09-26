@@ -3,7 +3,7 @@
 оптимизатором), Patch системного промпта на шаге, перспективы K=2 с зачётом pass@k."""
 import json
 
-from stub import TASK, Stub, episode, right
+from stub import TASK, Stub, episode, experiment, right
 
 from ace.extract import ATTEMPT, CONFIDENCE, DOMAIN, RATIONALE, Extraction
 from ace.extract.scope import Proposal, Rules, answer_step, tool_step
@@ -33,13 +33,6 @@ def js(**fields):
     return json.dumps(fields)
 
 
-class Ex:
-    task, training = TASK, True
-
-    def __init__(self, model):
-        self.model = model
-
-
 def rule(text, confidence=0.9, domain="general", rationale="why"):
     return Extraction(None, [text], [], {CONFIDENCE: [confidence], DOMAIN: [domain], RATIONALE: [rationale], ATTEMPT: [0]})
 
@@ -64,20 +57,20 @@ def test_propose_error_and_quality():
     reply = {"text": js(update_text="Check the denominator.", confidence="high")}
     model = Stub(lambda call: reply["text"])
     book = Book()
-    assert Rules().propose(Ex(model), attempt(), book, *tool_step(ERROR)).update_text == "Check the denominator."
+    assert Rules().propose(experiment(model), attempt(), book, *tool_step(ERROR)).update_text == "Check the denominator."
     assert "analyzing agent execution errors" in model.calls[0]["user"] and "ZeroDivisionError" in model.calls[0]["user"]
     reply["text"] = js(update_text="No improvement needed")
-    assert Rules().propose(Ex(model), attempt(), book, *tool_step(FINE)) is None
+    assert Rules().propose(experiment(model), attempt(), book, *tool_step(FINE)) is None
     assert "**Correctness & Logic**" in model.calls[1]["user"]          # перспектива по умолчанию — thoroughness
     # с ошибкой «none» не отбрасывается, как в апстриме
     reply["text"] = js(update_text="none")
-    assert Rules().propose(Ex(model), attempt(), book, *tool_step(ERROR)).update_text == "none"
+    assert Rules().propose(experiment(model), attempt(), book, *tool_step(ERROR)).update_text == "none"
 
 
 def test_best_of_two():
     cands = iter(["first", "second"])
     model = Stub(texts(quality=lambda call: js(update_text=next(cands)), select=js(selected_index=1)))
-    p = Rules(n=2).propose(Ex(model), attempt(), Book(), *tool_step(FINE))
+    p = Rules(n=2).propose(experiment(model), attempt(), Book(), *tool_step(FINE))
     assert p.update_text == "second"
     assert [c["temperature"] for c in model.calls] == [None, 0.7, None]    # основная, кандидат, селектор
     assert "[Candidate 0]\nUpdate: first" in model.calls[2]["user"]
@@ -86,20 +79,20 @@ def test_best_of_two():
 def test_classify():
     reply = {"text": js(scope="strategic", confidence=0.95, domain="made_up")}
     model = Stub(lambda call: reply["text"])
-    x = Rules().classify(Ex(model), Proposal(update_text="Always check units.", rationale="r", confidence="low"), Book())
+    x = Rules().classify(experiment(model), Proposal(update_text="Always check units.", rationale="r", confidence="low"), Book())
     assert x.lessons == ["Always check units."] and x.extras == {CONFIDENCE: [0.95], DOMAIN: ["general"], RATIONALE: ["r"], ATTEMPT: [0]}
     assert "Initial Confidence: 0.30" in model.calls[0]["user"]
     reply["text"] = js(scope="tactical")
-    assert Rules().classify(Ex(model), Proposal(update_text="x", confidence="high"), Book()).extras[DOMAIN] == [None]
-    assert Rules().classify(Ex(model), Proposal(update_text="x", confidence="high"), Book()).extras[CONFIDENCE] == [0.9]
+    assert Rules().classify(experiment(model), Proposal(update_text="x", confidence="high"), Book()).extras[DOMAIN] == [None]
+    assert Rules().classify(experiment(model), Proposal(update_text="x", confidence="high"), Book()).extras[CONFIDENCE] == [0.9]
     reply["text"] = js(is_duplicate=True)
-    assert Rules().classify(Ex(model), Proposal(update_text="x"), Book()) is None
+    assert Rules().classify(experiment(model), Proposal(update_text="x"), Book()) is None
     reply["text"] = "no json"           # сбой классификатора: tactical с исходной confidence
-    assert Rules().classify(Ex(model), Proposal(update_text="x", confidence="medium"), Book()).extras[DOMAIN] == [None]
+    assert Rules().classify(experiment(model), Proposal(update_text="x", confidence="medium"), Book()).extras[DOMAIN] == [None]
 
 
 def test_admission_and_promotion():
-    memory, ex = Perspectives(), Ex(Stub())
+    memory, ex = Perspectives(), experiment(Stub())
     book = memory.book(0)
     memory.learn(ex, [rule("low", 0.4), rule("tactical only", 0.6, None), rule("mid", 0.8), rule("Always check units.", 0.9)])
     assert [r.text for r in book.tactical] == ["tactical only", "mid", "Always check units."]
@@ -112,7 +105,7 @@ def test_admission_and_promotion():
 
 
 def test_limit_per_run_is_not_reset():
-    memory, ex = Perspectives(), Ex(Stub())
+    memory, ex = Perspectives(), experiment(Stub())
     book = memory.book(0)
     for i in range(PER_RUN + 3):
         book.begin()
@@ -122,7 +115,7 @@ def test_limit_per_run_is_not_reset():
 
 def test_domain_cap_optimizer():
     model = Stub(texts(analyze=js(consolidation=[[0, 1, 2, 3]]), merge=js(rule="merged", rationale="m")))
-    memory, ex = Perspectives(), Ex(model)
+    memory, ex = Perspectives(), experiment(model)
     book = memory.book(0)
     for i in range(CAP + 1):
         memory.learn(ex, [rule(" ".join(f"w{i}{j}" for j in range(5)), 0.86 + i / 1000)])
@@ -154,16 +147,16 @@ def test_step_patch_rewrites_system():
     memory = Perspectives()
     s = swap(scope, memory=memory)
     a = attempt()
-    patch = s.on_step(Ex(model), a, ERROR)
+    patch = s.on_step(experiment(model), a, ERROR)
     assert patch == Patch(system="SYS\n\n## Learned Guideline:\nGuard division.")
     update["text"] = "Print intermediate values."
-    patch = s.on_step(Ex(model), a, FINE)
+    patch = s.on_step(experiment(model), a, FINE)
     assert patch.system == "SYS\n\n## Learned Guideline:\nGuard division.\n\n## Learned Guideline:\nPrint intermediate values."
     assert [r.text for r in memory.book(0).records()] == ["Guard division.", "Print intermediate values."]
     a.training = False
-    assert s.on_step(Ex(model), a, ERROR) is None
+    assert s.on_step(experiment(model), a, ERROR) is None
     # новая попытка: tactical прошлой ушли, strategic показаны при запуске
-    p = s.prompt(Ex(model), {"question": "q"}, 0)
+    p = s.prompt(experiment(model), {"question": "q"}, 0)
     assert memory.book(0).tactical == []
     assert p.system.startswith("\n## Strategic Guidelines") and "### General:\n- Guard division." in p.system
 
@@ -176,9 +169,9 @@ def test_step_patch_append():
                        classify=js(scope="tactical", confidence=0.6)))
     s = swap(scope, show=StrategicRules("append"), memory=Perspectives())
     a = attempt()
-    assert s.on_step(Ex(model), a, ERROR) == Patch(append="## Learned Guideline:\nGuard division.")
+    assert s.on_step(experiment(model), a, ERROR) == Patch(append="## Learned Guideline:\nGuard division.")
     update["text"] = "Print intermediate values."
-    assert s.on_step(Ex(model), a, FINE) == Patch(append="## Learned Guideline:\nPrint intermediate values.")
+    assert s.on_step(experiment(model), a, FINE) == Patch(append="## Learned Guideline:\nPrint intermediate values.")
 
 
 def test_k2_own_memory_per_perspective():
@@ -197,7 +190,7 @@ def test_answer_order_chosen_first():
                        quality=lambda call: js(update_text=f"u{len(model.calls)}"), classify=js(scope="tactical", confidence=0.9)))
     memory = Perspectives(("efficiency", "thoroughness"))
     g = Group("q", [episode("1", ok=False, k=0), episode("2", ok=True, k=1)], chosen=1)
-    x = Rules()(Ex(model), g, memory)
+    x = Rules()(experiment(model), g, memory)
     assert x.extras[ATTEMPT] == [1, 0]
     kinds = ["classify" if MARK["classify"] in c["user"] else "propose" for c in model.calls]
     assert kinds == ["propose", "propose", "classify", "classify"]

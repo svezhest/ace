@@ -61,10 +61,8 @@ def test_every_method_on_every_task(monkeypatch):
     """Метод × задача: на задаче вне таблицы вариантов (tasks.VARIANTS) метод идёт запасным вариантом стенда, а не
     падает; протокол без нужной выборки (офлайн на задаче без train / val) — понятная ошибка до обучения.
     mce (агенты Claude SDK) — только его части, зависящие от задачи."""
-    from types import SimpleNamespace
-
     import numpy as np
-    from stub import Stub
+    from stub import Stub, experiment
 
     from ace import config
     from ace.loop import run
@@ -77,7 +75,7 @@ def test_every_method_on_every_task(monkeypatch):
     runs = 0
     for task in TASKS.values():
         task_instruction(task), signatures(task)
-        Environment().prompt(SimpleNamespace(task=task), Folder(), task.load()[0], 0)
+        Environment().prompt(experiment(task=task), Folder(), task.load()[0], 0)
         for name, method in METHODS.items():
             if name == "mce":
                 continue

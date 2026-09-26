@@ -2,7 +2,7 @@
 по меткам G0, G1, ..., показ, попытки и неполный батч."""
 import json
 
-from stub import TASK, Stub, episode, right
+from stub import TASK, Stub, episode, experiment, right
 
 from ace import render
 from ace.extract import OPERATIONS, Extraction
@@ -11,13 +11,6 @@ from ace.loop import Group, run
 from ace.memory.tfgrpo import Experiences
 from ace.methods.tfgrpo import GROUP, tfgrpo
 from ace.solver.tfgrpo import AGENT
-
-
-class Ex:
-    task = TASK
-
-    def __init__(self, model, training=True):
-        self.model, self.training = model, training
 
 
 def by_prompt(ops='[{"operation": "ADD", "content": "New: tip."}]', plan=None):
@@ -51,7 +44,7 @@ def library(*texts):
 def test_contrast_partial():
     """Сводка на каждую попытку группы (все — rollout), награды 0/1; затем преимущество и сверка с библиотекой."""
     model = Stub(by_prompt())
-    x = Contrast().batch(Ex(model), [group([True, True, False, True, False, False])], library("Old: one."))[0]
+    x = Contrast().batch(experiment(model), [group([True, True, False, True, False, False])], library("Old: one."))[0]
     assert [c["user"].split("\n")[0] for c in model.calls[:6]] == ["<Working Agent Input>"] * 6
     advantage = model.calls[6]["user"]
     assert "Attempt 1 (Reward 1.0)" in advantage and "Attempt 3 (Reward 0.0)" in advantage and "Attempt 6" in advantage
@@ -66,7 +59,7 @@ def test_contrast_skips_uniform_group():
     попытка в зачёт в группу не входит."""
     for oks, scored in (([True] * 3, False), ([False] * 3, False), ([False, True, True], True)):
         model = Stub(by_prompt())
-        x = Contrast(scored=scored).batch(Ex(model), [group(oks)], library())[0]
+        x = Contrast(scored=scored).batch(experiment(model), [group(oks)], library())[0]
         assert model.calls == [] and x.extras[OPERATIONS] == [] and x.lessons == []
 
 
@@ -74,14 +67,14 @@ def test_contrast_without_label():
     """Без верного ответа в работу идёт любая группа, ответ и награды скрыты."""
     model = Stub(by_prompt())
     g = Group("q", [episode(k=k) for k in range(3)])
-    Contrast().batch(Ex(model), [g], library())[0]
+    Contrast().batch(experiment(model), [g], library())[0]
     assert "<Ground Truth>\n[REDACTED]" in model.calls[3]["user"] and "(Reward [REDACTED])" in model.calls[3]["user"]
 
 
 def test_contrast_bad_update():
     """Сверка без JSON-списка — пустые операции."""
     model = Stub(by_prompt(ops='{"operation": "ADD"}'))
-    x = Contrast().batch(Ex(model), [group([True, True, False])], library())[0]
+    x = Contrast().batch(experiment(model), [group([True, True, False])], library())[0]
     assert x.extras[OPERATIONS] == []
 
 
@@ -96,11 +89,11 @@ def test_plan_and_labels():
     plan = json.dumps([dict(operation="UPDATE", id="G0", content="A: a2."), dict(operation="UPDATE", id="r2", content="D: d."),
                        dict(operation="DELETE", id="G2", content="obsolete"), dict(operation="DELETE", id="G1")])
     model = Stub(by_prompt(plan=plan))
-    m.learn(Ex(model), [extraction([dict(operation="UPDATE", id="G1", content="B: b2.")]), extraction([])])
+    m.learn(experiment(model), [extraction([dict(operation="UPDATE", id="G1", content="B: b2.")]), extraction([])])
     table = model.calls[0]["user"]
     assert "Experience G1:\nContent: B: b.\nRelated Operations:" in table and "Experience G0:\nContent: A: a.\nNo related" in table
     assert [(r.id, r.text) for r in m.records()] == [("r4", "A: a2."), ("r2", "B: b."), ("r5", "D: d.")]
-    system = AGENT.prompt(Ex(model, training=False), m, {"question": "q"}, 0).solver.call("").messages[0]["content"]
+    system = AGENT.prompt(experiment(model, training=False), m, {"question": "q"}, 0).solver.call("").messages[0]["content"]
     assert system.endswith("experiences:\n[G0]. A: a2.\n[G1]. B: b.\n[G2]. D: d.")
 
 
@@ -108,7 +101,7 @@ def test_plan_retries_and_no_ops():
     """Без операций план всё равно строится (как в апстриме); JSON не разобрался — до трёх попыток."""
     model = Stub(lambda call: "no json")
     m = library("A: a.")
-    m.learn(Ex(model), [extraction([])])
+    m.learn(experiment(model), [extraction([])])
     assert len(model.calls) == 3 and "No batch operations." in model.calls[0]["user"] and len(m) == 1
 
 

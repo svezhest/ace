@@ -3,24 +3,23 @@
 import json
 
 import pytest
-from stub import TASK, Stub, episode
+from stub import TASK, Stub, episode, experiment
 
 from ace import prompts
 from ace.extract import LABELS, Extraction, Labels
 from ace.extract.ace import Diagnose, Reflection, Reflector, named, used_line
 from ace.learner import swap
-from ace.loop import Group
+from ace.loop import Experiment, Group
 from ace.memory.counters import count
 from ace.memory.ace import Op, Ops, Playbook, SectionedPlaybook, curate_rewrite
 from ace.methods.ace import ace_stand
 
 
-class Ex:
-    """Эксперимент-заглушка: модель, номер вопроса и новая попытка из заготовленных эпизодов."""
-    task, i, total, training = TASK, 0, 4, True
-
+class Retrying(Experiment):
+    """Эксперимент, у которого новая попытка — из заготовленных эпизодов; заметка и метки памяти раунда — в notes."""
     def __init__(self, model, retries=()):
-        self.model, self.retries, self.notes = model, list(retries), []
+        super().__init__(TASK, None, model)
+        self.retries, self.notes = list(retries), []
 
     def retry(self, memory, note):
         self.notes.append((note, [(r.helpful, r.harmful) for r in memory.records()]))
@@ -40,7 +39,7 @@ def playbook(*texts):
 
 def test_reflector_labels():
     model = Stub(schemas={"Reflection": Reflection(lessons=["Check units."], helpful=["r1"], harmful=["r2"])})
-    x = Reflector()(Ex(model), group(episode("3", ok=False, target="4")), playbook("a", "b"))
+    x = Reflector()(experiment(model), group(episode("3", ok=False, target="4")), playbook("a", "b"))
     assert x.lessons == ["Check units."] and x.scores == [0.0]
     assert x.extras == {LABELS: Labels(["r1"], ["r2"])}
     user = model.calls[0]["user"]
@@ -50,7 +49,7 @@ def test_reflector_labels():
 def test_reflector_free():
     model = Stub(lambda call: "free lesson")
     r = Reflector(free=True)
-    x = r(Ex(model), group(episode("3", ok=True)), playbook())
+    x = r(experiment(model), group(episode("3", ok=True)), playbook())
     assert r.gives == frozenset() and x.lessons == ["free lesson"] and x.extras == {}
     assert prompts.text("reflect_free_form") in model.calls[0]["user"]
 
@@ -68,7 +67,7 @@ def test_playbook_learn():
     count(m, [], ["r2", "r2"])
     model = Stub(schemas={"Ops": Ops(ops=[Op(op="UPDATE", id="r1", text="a2"), Op(op="ADD", text="c")])})
     x = Extraction(group(episode()), ["lesson"], [1.0], {LABELS: Labels(["r1"], ["r2"])})
-    m.learn(Ex(model), [x])
+    m.learn(experiment(model), [x])
     assert [(r.id, r.text, r.helpful) for r in m.records()] == [("r3", "a2", 0), ("r4", "c", 0)]
     assert "- lesson" in model.calls[0]["user"] and "[r1] a" in model.calls[0]["user"]
 
@@ -76,10 +75,10 @@ def test_playbook_learn():
 def test_playbook_rewrite():
     m = Playbook(curate_rewrite)
     m.add("a")
-    m.learn(Ex(Stub(lambda call: " first bullet \n\n second\n")), [Extraction(group(episode()), ["l"], [], {})])
+    m.learn(experiment(Stub(lambda call: " first bullet \n\n second\n")), [Extraction(group(episode()), ["l"], [], {})])
     assert [(r.id, r.text) for r in m.records()] == [("r2", "first bullet"), ("r3", "second")]
     m = Playbook(curate_rewrite)
-    m.learn(Ex(Stub(lambda call: "")), [Extraction(group(episode()), ["l"], [], {LABELS: Labels()})])
+    m.learn(experiment(Stub(lambda call: "")), [Extraction(group(episode()), ["l"], [], {LABELS: Labels()})])
     assert m.records() == []
 
 
@@ -100,7 +99,7 @@ def test_diagnose_rounds():
     model = Stub(lambda call: next(replies))
     memory = playbook("a", "b")
     retries = [episode("5", ok=False, target="4", final="USED: r1"), episode("4", ok=True, target="4")]
-    ex = Ex(model, retries)
+    ex = Retrying(model, retries)
     x = Diagnose(ids=named)(ex, group(episode("3", ok=False, target="4", final="USED: r2, r1")), memory)
     assert [n[1] for n in ex.notes] == [[(0, 1), (0, 0)], [(0, 2), (1, 0)]]     # метки раундов — в копию
     assert x.extras[LABELS] == Labels(["r2"], ["r1", "r1"])
@@ -115,7 +114,7 @@ def test_diagnose_tags_as_upstream():
     """update_bullet_counts: повтор id — последняя метка, ключ bullet вместо id, neutral и чужие метки не считаются."""
     reply = ('text "bullet_tags": [{"id": "r1", "tag": "helpful"}, {"id": "r1", "tag": "harmful"}, '
              '{"bullet": "r2", "tag": "helpful"}, {"id": "r3", "tag": "useful"}] tail')
-    x = Diagnose()(Ex(Stub(lambda call: reply)), group(episode("4", ok=True, target="4")), playbook("a", "b", "c"))
+    x = Diagnose()(experiment(Stub(lambda call: reply)), group(episode("4", ok=True, target="4")), playbook("a", "b", "c"))
     assert x.extras[LABELS] == Labels(["r2"], ["r1"]) and x.lessons == [reply]
 
 
@@ -124,13 +123,13 @@ def test_diagnose_bullets_used():
     for final, text in (("FINAL ANSWER: 4", "ace_no_bullets"), ("USED: none", "ace_no_bullets"),
                         ("USED: r9", "ace_bullets_not_found")):
         model = Stub(lambda call: "")
-        Diagnose(ids=named)(Ex(model), group(episode("4", ok=True, target="4", final=final)), playbook("a"))
+        Diagnose(ids=named)(experiment(model), group(episode("4", ok=True, target="4", final=final)), playbook("a"))
         assert prompts.text(text) in model.calls[0]["user"]
 
 
 def test_diagnose_right_answer_one_round():
     model = Stub(lambda call: diagnosis([("r1", "helpful")]))
-    ex = Ex(model)
+    ex = Retrying(model)
     x = Diagnose()(ex, group(episode("4", ok=True, target="4", final="USED: r1")), playbook("a"))
     assert len(model.calls) == 1 and ex.notes == [] and x.extras[LABELS] == Labels(["r1"], [])
 
@@ -138,7 +137,7 @@ def test_diagnose_right_answer_one_round():
 def test_diagnose_without_label():
     """Без верного ответа — промпт _nogt, без ground truth; раунд один, после него новая попытка, как в апстриме."""
     model = Stub(lambda call: diagnosis([]))
-    ex = Ex(model, [episode("5")])
+    ex = Retrying(model, [episode("5")])
     Diagnose()(ex, group(episode("4", ok=None)), playbook())
     assert len(ex.notes) == 1 and len(model.calls) == 1
     assert model.calls[0]["user"] == prompts.load("ace_reflector_nogt").fill(
@@ -154,7 +153,7 @@ def test_sectioned_playbook():
         dict(type="ADD", section="Formulas & Calculations", content="f"), dict(type="ADD", section="nowhere", content="o"),
         dict(type="UPDATE", section="others", content="skip")]))
     model = Stub(lambda call: reply)
-    m.learn(Ex(model), [Extraction(group(episode(target="4")), ["{json}"], [], {LABELS: Labels()})])
+    m.learn(experiment(model), [Extraction(group(episode(target="4")), ["{json}"], [], {LABELS: Labels()})])
     assert [(m.section_of(r.id), r.id, r.text) for r in m.records()] == [
         ("formulas_and_calculations", "calc-00001", "f"), ("others", "misc-00002", "o")]
     user = model.calls[0]["user"]

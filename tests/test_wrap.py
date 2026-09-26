@@ -8,7 +8,7 @@ from dataclasses import replace
 import pytest
 from types import SimpleNamespace
 
-from stub import TASK, Stub, episode, right
+from stub import TASK, Stub, episode, experiment, right
 
 from ace import fs, verdict
 from ace.extract import Raw
@@ -146,21 +146,15 @@ def meta_writes(skill):
     return act
 
 
-class Ex:
-    task, epoch, batch, i, skill = TASK, 0, 0, 1, "## Skill Overview\nCurate."
-
-    def solved(self, group):
-        return TASK.check(group.answer, group.target)
-
-
 def test_mce_base_agent():
     model = FileAgent(write("/workspace/iter1_sub0/context/new.md", "lesson"))
-    ex = Ex()
-    ex.model = model
+    ex = experiment(model, i=1, skill="## Skill Overview\nCurate.")
     context = Context()
     context.write("notes.md", "old")
-    groups = [Group("q1", [episode("1", ok=True, target="1", question="q1")], target="1", i=0),
-              Group("q2", [episode("2", ok=False, target="3", question="q2")], target="3", i=1)]
+    groups = [Group("q1", [episode("1", ok=True, target="1", question="q1")], target="1", i=0,
+                    item=dict(question="q1", target="1")),
+              Group("q2", [episode("2", ok=False, target="3", question="q2")], target="3", i=1,
+                    item=dict(question="q2", target="3"))]
     context.learn(ex, [Raw()(ex, g, context) for g in groups])
     call = model.calls[0]
     assert call["tools"] == fs.TOOLS and call["system"] == ""
@@ -180,8 +174,7 @@ def test_meta_agent_asks_for_skill():
     """SKILL.md не записан: просьба в том же разговоре (история прошлого прогона), до трёх раз; потом навык прошлой
     итерации."""
     model = FileAgent(lambda call, deps: None)
-    ex = Ex()
-    ex.model = model
+    ex = experiment(model)
     author = MetaAgent(META)
     assert author(ex, []) == ""
     assert len(model.calls) == 3 and model.calls[1]["user"] == MISSING.fill(
@@ -206,11 +199,8 @@ def test_mce_run():
 
 
 def test_skill_in_ace_prompts():
-    class Ex:
-        task, i, total, training, skill = TASK, 0, 1, True, "SKILL TEXT"
     model = Stub(schemas={"Reflection": Reflection(lessons=["l"]), "Ops": Ops(ops=[])})
-    ex = Ex()
-    ex.model = model
+    ex = experiment(model, total=1, skill="SKILL TEXT")
     inner = copy.deepcopy(mce_ace_stand.inner)
     x = inner.extract(ex, Group("q", [episode("1", ok=True, target="1")], target="1"), inner.memory)
     inner.memory.learn(ex, [x])

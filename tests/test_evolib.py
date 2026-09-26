@@ -4,7 +4,7 @@ import math
 import random
 
 import numpy as np
-from stub import TASK, Stub, episode
+from stub import TASK, Stub, episode, experiment
 
 from ace import verdict
 from ace.extract import ATTRIBUTION, BEST_ANSWER, IG, Extraction
@@ -17,13 +17,6 @@ from ace.methods.evolib import evolib, evolib_judge
 from ace.solver.evolib import SAMPLER, insight_weight, skill_weight
 
 SKILL = "<subtask>\n<description>{}</description>\n<solution>s</solution>\n<result>r</result>\n</subtask>"
-
-
-class Ex:
-    task, training = TASK, True
-
-    def __init__(self, model):
-        self.model = model
 
 
 def group(answers, vote=True, oks=None, shown=None):
@@ -48,7 +41,7 @@ def test_unevaluated():
     """Без оценки: баллы по большинству, лучшая — первая из согласных; insight есть — баллы пополам; IG до деления;
     лучшего решения ещё нет — улучшает."""
     model = Stub(lambda call: "```insight\nIf units differ, then convert.\n```")
-    x = Gains()(Ex(model), group(["1", "2", "2"], shown=[["r1"], ["r2"], []]), SkillLibrary())
+    x = Gains()(experiment(model), group(["1", "2", "2"], shown=[["r1"], ["r2"], []]), SkillLibrary())
     assert x.scores == [0, 0.5, 0.5] and math.isclose(x.extras[IG], math.log(1.5))
     assert x.lessons == ["If units differ, then convert."] and "solution 1" in model.calls[0]["user"]
     assert x.extras[BEST_ANSWER] == Best("solution 1\nFINAL ANSWER: 2", "2", 0.5)
@@ -56,7 +49,7 @@ def test_unevaluated():
 
 
 def test_no_insight_keeps_scores():
-    x = Gains()(Ex(Stub(lambda call: "N/A")), group(["1", "1", "2"]), SkillLibrary())
+    x = Gains()(experiment(Stub(lambda call: "N/A")), group(["1", "1", "2"]), SkillLibrary())
     assert x.lessons == [] and x.scores == [1, 1, 0]
 
 
@@ -68,8 +61,8 @@ def test_improving_and_compare():
         memory.solutions["q"] = old
         model = Stub(lambda call: judgment if "two solutions" in call["user"] else "N/A")
         g = group(["2", "2", "3"])
-        new = Gains()(Ex(model), g, memory).extras[BEST_ANSWER]
-        memory.learn(Ex(model), [Extraction(g, [], [1, 1, 0], {IG: 0, BEST_ANSWER: new, ATTRIBUTION: Attribution([[]] * 3, 0)})])
+        new = Gains()(experiment(model), g, memory).extras[BEST_ANSWER]
+        memory.learn(experiment(model), [Extraction(g, [], [1, 1, 0], {IG: 0, BEST_ANSWER: new, ATTRIBUTION: Attribution([[]] * 3, 0)})])
         return memory.best("q") is new, [c["user"] for c in model.calls]
     improved, calls = learn(Best("old", "2", 1.0), "")
     assert not improved and len(calls) == 1                            # только insight: сравнения нет
@@ -82,9 +75,9 @@ def test_improving_and_compare():
 def test_evaluated():
     """С оценкой: баллы по вердикту попытки, insight только при неудаче лучшей и с её вердиктом, без деления."""
     model = Stub(lambda call: "<insight>If a, then b.</insight>")
-    x = Gains(evaluated=True)(Ex(model), group(["1", "2", "3"], vote=False, oks=[False, True, True]), SkillLibrary())
+    x = Gains(evaluated=True)(experiment(model), group(["1", "2", "3"], vote=False, oks=[False, True, True]), SkillLibrary())
     assert model.calls == [] and x.scores == [0, 1, 1] and x.extras[ATTRIBUTION].best == 1
-    x = Gains(evaluated=True)(Ex(model), group(["1", "2", "3"], vote=False, oks=[False] * 3), SkillLibrary())
+    x = Gains(evaluated=True)(experiment(model), group(["1", "2", "3"], vote=False, oks=[False] * 3), SkillLibrary())
     assert "Evaluation: wrong" in model.calls[0]["user"] and x.lessons == ["If a, then b."] and x.scores == [0, 0, 0]
 
 
@@ -102,11 +95,11 @@ def test_library_learn(monkeypatch):
     fake_embed(monkeypatch, {"a": [1, 0], "<description>d1</description>": [0, 1], "<description>d2</description>": [1, 0]})
     m = SkillLibrary()
     best = Best("Plan.\n" + SKILL.format("d1") + "\n" + SKILL.format("d2") + "\nFINAL ANSWER: 1", "1", 1.0)
-    m.learn(Ex(Stub()), [extraction("If a, then b.", best, ig=0.4)])
+    m.learn(experiment(Stub()), [extraction("If a, then b.", best, ig=0.4)])
     assert [(r.id, type(r).__name__) for r in m.records()] == [("r1", "Insight"), ("r2", "Skill"), ("r3", "Skill")]
     assert m.get("r2").doc == "<description>d1</description>" and m.get("r2").ig == 0.4 and m.best("q") is best
     assert all(r.text != best.output for r in m.records())
-    m.learn(Ex(Stub()), [extraction(shown=[["r1", "r1", "r3"], ["r3"], []], scores=[1, 0, 0.5])])
+    m.learn(experiment(Stub()), [extraction(shown=[["r1", "r1", "r3"], ["r3"], []], scores=[1, 0, 0.5])])
     assert m.get("r1").outcomes == [math.log(4), math.log(4)] and m.get("r3").outcomes == [math.log(2)]
     assert m.best("q") is best                                             # не улучшило — старое остаётся
     assert [d["kind"] for d in m.dump()] == ["skill", "skill", "insight", "best"]
@@ -119,12 +112,12 @@ def test_merge_insight(monkeypatch):
     m = SkillLibrary()
     m.add(m.insights, "If a, then b.", [1, 0], outcomes=[0.3])
     one = Stub(lambda call: "```insights\nIf a or a2, then b.\n```")
-    m.add_insight(Ex(one), "If a2, then c.")
+    m.add_insight(experiment(one), "If a2, then c.")
     assert "If a, then b.\nIf a2, then c." in one.calls[0]["user"]
     assert [(r.text, r.outcomes) for r in m.records()] == [("If a or a2, then b.", [0.3])]
     fake_embed(monkeypatch, {"a or a2": [1, 0], "a2": [0.9, 0.436], "x": [1, 0], "y": [0, 1]})
     two = Stub(lambda call: "```insights\nIf x, then 1.\nIf y, then 2.\nnot an insight\n```")
-    m.add_insight(Ex(two), "If a2, then c.")
+    m.add_insight(experiment(two), "If a2, then c.")
     texts = [r.text for r in m.records()]
     assert texts == ["If a or a2, then b.", "If x, then 1.", "If y, then 2."]
     assert m.records()[1].outcomes is m.records()[2].outcomes
@@ -135,7 +128,7 @@ def test_merge_skill(monkeypatch):
     fake_embed(monkeypatch, {"d1": [1, 0], "d1b": [1, 0], "<description>d</description>": [1, 0]})
     m = SkillLibrary()
     m.add(m.skills, SKILL.format("d1"), [1, 0], doc="d1", ig=1.0, outcomes=[0.2])
-    m.add_skills(Ex(Stub(lambda call: SKILL.format("d"))), [(SKILL.format("d1b"), "d1b")], 0.0)
+    m.add_skills(experiment(Stub(lambda call: SKILL.format("d"))), [(SKILL.format("d1b"), "d1b")], 0.0)
     [r] = m.records()
     assert (r.doc, r.ig, r.outcomes) == ("<description>d</description>", 0.5, [0.2])
 
@@ -147,12 +140,12 @@ def test_weights_and_show():
     m = SkillLibrary()
     m.insights.add("If a, then b.")
     random.seed(1)                  # первое число 0.13: ветка skills пуста, ход переходит к insights
-    p = SAMPLER.prompt(Ex(Stub()), m, {"question": "q"}, 0)
+    p = SAMPLER.prompt(experiment(Stub()), m, {"question": "q"}, 0)
     user = p.solver.call("").messages[0]["content"]
     assert "Problem: q\n\nHere are some insights that may help you solve the problem:\nIf a, then b.\n" in user
     assert p.shown == ["r1"] and SAMPLER.random and swap(evolib, solver=SAMPLER).key() is None
     random.seed(0)                  # первое число 0.84: выше обоих порогов — ничего
-    assert SAMPLER.prompt(Ex(Stub()), m, {"question": "q"}, 0).shown == []
+    assert SAMPLER.prompt(experiment(Stub()), m, {"question": "q"}, 0).shown == []
 
 
 def test_judge_after_each_attempt():

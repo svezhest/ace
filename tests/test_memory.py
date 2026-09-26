@@ -109,17 +109,14 @@ def test_files():
 def test_dedup_unparsed_merge_keeps_group(monkeypatch):
     """Ответ слияния не разобрался — группа похожих пунктов остаётся целиком, как у апстрима."""
     import numpy as np
-    from stub import Stub
+    from stub import Stub, experiment
 
     from ace.memory import ace as A
     monkeypatch.setattr("ace.embed.embed", lambda texts: np.ones((len(texts), 4)) / 2.0)
     p = A.SectionedPlaybook(dedup=A.DEDUP)
     for t in ("rule a", "rule b", "rule c"):
         p.add(t, "formulas_and_calculations")
-
-    class Ex:
-        model = Stub(lambda call: "sorry, cannot merge")
-    p.merge_similar(Ex())
+    p.merge_similar(experiment(Stub(lambda call: "sorry, cannot merge")))
     assert [r.text for r in p.records()] == ["rule a", "rule b", "rule c"]
 
 

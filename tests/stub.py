@@ -1,9 +1,9 @@
 """Модель-заглушка для тестов цикла и уровней: ответ решателя — функция от промпта, ответ по схеме — из словаря
-по имени схемы. Запоминает все вызовы."""
+по имени схемы. Запоминает все вызовы. experiment — ex для уровней без прогона."""
 import numpy as np
 
 from ace import embed
-from ace.loop import Episode, Prompt
+from ace.loop import Episode, Experiment, Prompt
 from ace.model import Reply, roles, text_reply
 from ace.tasks import TASKS
 
@@ -51,6 +51,15 @@ class Stub:
 
     def solver_calls(self):
         return [c for c in self.calls if c["system"].startswith(TASK.system)]
+
+
+def experiment(model=None, task=TASK, **fields):
+    """Настоящий эксперимент без ученика и прогона: модель, задача и поля сверх умолчаний (training, i, skill...)."""
+    ex = Experiment(task, None, model)
+    for name, value in fields.items():
+        assert hasattr(ex, name), name          # только поля эксперимента: заглушка не выдумывает своих
+        setattr(ex, name, value)
+    return ex
 
 
 def right(call):
