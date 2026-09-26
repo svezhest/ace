@@ -91,7 +91,7 @@ class Meta(Wrapper):
         self.inner.on_pass_start(ex)
 
     def on_batch(self, ex, groups):
-        self.right += sum(bool(g.episodes[g.chosen].ok) for g in groups)
+        self.right += sum(ex.solved(g) for g in groups)
         self.seen += len(groups)
         self.inner.on_batch(ex, groups)
         memory = self.inner.memory
@@ -289,7 +289,7 @@ class Iterations(Wrapper):
         self.inner.memory.at(self.ws, folder)
 
     def on_batch(self, ex, groups):
-        right = sum(bool(g.episodes[g.chosen].ok) for g in groups)
+        right = sum(ex.solved(g) for g in groups)
         metrics = {"accuracy": right / len(groups)}
         self.subs.append(dict(batch_size=len(groups), metric=metrics["accuracy"], metrics=metrics))
         self.inner.on_batch(ex, groups)

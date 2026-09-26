@@ -23,15 +23,16 @@ SKILL = ".agent/skills/learning-context/SKILL.md"      # навык в папк�
 
 
 def train_json(ex, groups, ids, field="question"):
-    """data/train.json под-итерации (format_result_for_training): сводка батча и итоги его вопросов с id ids."""
-    eps = [g.episodes[g.chosen] for g in groups]
-    acc = sum(bool(e.ok) for e in eps) / len(eps) if eps else 0.0
-    summary = dict(train_accuracy=acc, train_metrics=dict(accuracy=acc) if eps else {}, train_total=len(eps),
+    """data/train.json под-итерации (format_result_for_training): сводка батча и итоги его вопросов с id ids; верно —
+    проверка задачи по метке (is_correct апстрима), а не вердикт попытки ученика."""
+    right = [bool(ex.solved(g)) for g in groups]
+    acc = sum(right) / len(groups) if groups else 0.0
+    summary = dict(train_accuracy=acc, train_metrics=dict(accuracy=acc) if groups else {}, train_total=len(groups),
                    train_errors=0, batch_idx=ex.batch, cumulative_rollouts=ex.i + 1)
     results = []
-    for rid, g, e in zip(ids, groups, eps):
-        results.append({"id": rid, field: g.question, "ground_truth": g.target, "llm_prediction": e.answer,
-                        "is_correct": bool(e.ok)})
+    for rid, g, ok in zip(ids, groups, right):
+        results.append({"id": rid, field: g.question, "ground_truth": g.target, "llm_prediction": g.answer,
+                        "is_correct": ok})
     return render.train_json(summary, results)
 
 

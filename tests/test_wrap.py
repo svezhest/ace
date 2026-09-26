@@ -10,7 +10,7 @@ from types import SimpleNamespace
 
 from stub import TASK, Stub, episode, right
 
-from ace import fs
+from ace import fs, verdict
 from ace.extract import Raw
 from ace.extract.ace import Reflection
 from ace.learner import Learner, swap
@@ -89,6 +89,14 @@ def test_meta(tmp_path):
     assert [r["text"] for r in dump if r["kind"] != "iterations"] == ["good", "x"]
 
 
+def test_meta_train_by_task_check(tmp_path):
+    """Доля верных на train для мета-агента — проверка задачи, а не вердикт попытки ученика (вердикт none)."""
+    meta = Meta(notes("good", every=3, flush=True, protocol=OFFLINE2, verdict=verdict.none), lambda ex, h: "s", "meta")
+    run(TASK, meta, Stub(good_only), 3, out=str(tmp_path))
+    dump = json.load(open(tmp_path / "memory.json"))
+    assert [r["train"] for r in dump if r["kind"] == "iterations"] == [0.0, 1.0]
+
+
 def test_meta_tie_keeps_first():
     model = Stub(good_only)
     meta = Meta(notes("good", "x", "good 2", "y", every=3, flush=True, protocol=OFFLINE2), lambda ex, h: "s", "meta")
@@ -139,6 +147,9 @@ def meta_writes(skill):
 
 class Ex:
     task, epoch, batch, i, skill = TASK, 0, 0, 1, "## Skill Overview\nCurate."
+
+    def solved(self, group):
+        return TASK.check(group.answer, group.target)
 
 
 def test_mce_base_agent():
