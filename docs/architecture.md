@@ -85,8 +85,8 @@ pydantic-ai: на проводе такой вызов — ошибка (`Runtim
 `Patch`, разбор схемы), иначе абляции на двух бэкендах разошлись бы не по методу. Методы под именами апстримов
 таких вызовов не делают; где у апстрима свой агентный цикл (TF-GRPO), он — в решателе, над `model.message`. Запись
 `bridge/live/scope_code` снята, когда провод ещё молча отдавал такие вызовы pydantic-ai (решатель — pydantic-ai,
-SCOPE — провод): воспроизводит её тестовая модель `tests/live.Mixed`; драйвер `bridge/live/scope/driver.py` на
-проводе scope_code больше не снимет — переснимать на одном бэкенде.
+SCOPE — провод): её не переснимаем, воспроизводит её тестовая модель `tests/live.Mixed` (bridge/README, DEVIATIONS
+SC2); драйвер `bridge/live/scope/driver.py` на проводе scope_code больше не снимет.
 
 Другие входы той же модели: `model.message(messages, params)` — ход агентного цикла
 TF-GRPO апстрима, только на проводе, ответ как есть (с `tool_calls`); `model.session(...)` — агенты mce,
