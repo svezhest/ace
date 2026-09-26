@@ -1,8 +1,8 @@
-"""Эталоны EvoLib: промпты HMMT, разборщики utils.py, операции над библиотекой, run_iteration на 4 задачах.
+"""Эталоны EvoLib: промпты HMMT, разборщики utils.py, операции над библиотекой, run_iteration на 4 вопросах.
 
 Запуск из корня стенда: $UPSTREAMS/.venvs/light/bin/python bridge/capture_evolib.py
 LLMAgent и EmbeddingModel — апстримные, подменён только клиент (fake). EvoLib последователен, поэтому
-разные ответы на одинаковый промпт (k_q сэмплов) выдаются по счётчику на маркер задачи.
+разные ответы на одинаковый промпт (k_q сэмплов) выдаются по счётчику на маркер вопроса.
 """
 import copy
 import math
@@ -629,7 +629,7 @@ def run_loop(gold):
     best_scores = [[0, 0] for _ in PROBLEMS]
     best_solutions = ["" for _ in PROBLEMS]
     iters = []
-    # как main() в eval_main.py:643-662, два прохода по задачам
+    # как main() в eval_main.py:643-662, два прохода по вопросам
     for kiter in range(2 * len(PROBLEMS)):
         i = kiter % len(PROBLEMS)
         problem, answer, _ = PROBLEMS[i]

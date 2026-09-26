@@ -379,7 +379,7 @@ def test_optimize_rules_two_passes():
 
 
 def test_limit_per_agent_across_tasks():
-    """max_rules_per_task=20 считается на агента и между задачами не сбрасывается: задачи 21 и 22 правила не
+    """max_rules_per_task=20 считается на агента и между вопросами не сбрасывается: вопросы 21 и 22 правила не
     получают, хотя синтезатор и классификатор зовутся; у другого агента (перспективы) счётчик свой."""
     case = MEMORY["max_rules_per_task=20 across tasks"]
     task_of = re.compile(r"answered 'n(\d+)'")
@@ -421,7 +421,7 @@ SYSTEM_BLOCK = re.compile(r"(Current system prompt \(for reference[^\n]*\n)(.*?)
 
 
 def with_system(prompt, system):
-    """Запрос апстрима с нашим текущим системным промптом: repro дописывает правила всех прошлых задач, у нас —
+    """Запрос апстрима с нашим текущим системным промптом: repro дописывает правила всех прошлых вопросов, у нас —
     strategic при запуске попытки и tactical только этой попытки (S2)."""
     return SYSTEM_BLOCK.sub(lambda m: m.group(1) + system + m.group(3), prompt)
 
@@ -467,7 +467,7 @@ def check_steps(done, model):
 
 
 def test_loop():
-    """Цикл эталона на 7 задачах: запросы синтезатора и классификатора, принятые правила, strategic память;
+    """Цикл эталона на 7 вопросах: запросы синтезатора и классификатора, принятые правила, strategic память;
     второй прогон со strategic из первого."""
     assert answer_step(Episode(TASK, 0, Prompt(), output="o", final="o", answer="Revenues", ok=False,
                                target="GainLossOnSale"))[1][1] == LOOP["run1"]["steps"][0]["error"]

@@ -1,6 +1,6 @@
 """Запись EvoLib: eval_main.main() апстрима как есть на HMMT, клиенты и данные подменены здесь, в раннере.
 
-    $UPSTREAMS/.venvs/light/bin/python run.py OUT URL [ЗАДАЧ]
+    $UPSTREAMS/.venvs/light/bin/python run.py OUT URL [ВОПРОСОВ]
     (URL — записывающий прокси tools/record с --seed и --embeddings-upstream на tools/record/embeddings.py;
     по готовой записи — tools/record/replay: прогон без модели, те же запросы и снимки)
 
@@ -8,14 +8,14 @@
     build_clients   Azure -> OpenAI(base_url=URL): LLMAgent и EmbeddingModel апстрима с его параметрами модели
                     задачи (HMMT: reasoning API, max_completion_tokens 50000, reasoning_effort high)
     azure           заглушка модуля: build_clients подменён, при импорте eval_main он всё равно нужен
-    load_dataset    первые ЗАДАЧ (3) задач hmmt_feb_2025, остальные наборы пусты: i = kiter % data_size, задачи
-                    повторяются, и на повторе работает сравнение решений
+    load_dataset    первые ВОПРОСОВ (3) вопросов hmmt_feb_2025, остальные наборы пусты: i = kiter % data_size,
+                    вопросы повторяются, и на повторе работает сравнение решений
     matharena       чекер — extract_and_grade matharena (e927660, последний коммит до коммита EvoLib) с конфигом
                     соревнования hmmt_feb_2025.yaml; EvoLib зовёт его как (решение, ответ), у matharena вызов —
                     (сообщения, число токенов, ответ, конфиг): решение — одно сообщение assistant; axle (Lean) —
                     заглушка, для HMMT не нужен
     random.seed     сида у апстрима нет: ставится перед циклом итераций (setup_state)
-Снимок после каждой итерации (log_iteration): библиотеки skills и insights без эмбеддингов и лучшие решения задач —
+Снимок после каждой итерации (log_iteration): библиотеки skills и insights без эмбеддингов и лучшие решения вопросов —
 OUT/steps.json."""
 import json
 import os

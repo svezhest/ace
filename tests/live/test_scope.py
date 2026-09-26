@@ -2,7 +2,7 @@
 нет: запись снята драйвером bridge/live/scope/driver.py — наша обвязка (цикл, решатель S1, formula, песочница) и
 библиотека SCOPE как есть (DEVIATIONS SC2). Запись воспроизводится без модели (tools/record/replay): каждый запрос
 нашего метода — агента, синтезатора, селектора, классификатора и оптимизатора домена — побайтно совпадает с
-записанным, все записанные ответы востребованы; память после каждой задачи (strategic по доменам, tactical задачи,
+записанным, все записанные ответы востребованы; память после каждого вопроса (strategic по доменам, tactical вопроса,
 принято за прогон), история правил (принято, отклонено, дубль) и ответы — как у апстрима.
 
     scope       max_rules_per_task 3 и max_strategic_rules_per_domain 3, strategic память из seed_rules.json
@@ -25,11 +25,11 @@ from ace.tasks import TASKS
 from . import LIVE, replay, replaying, requests
 
 AGENT = "formula_agent"
-STEPS, HISTORY = [], []         # память после каждой задачи; события правил (перспектива, текст, исход, ...)
+STEPS, HISTORY = [], []         # память после каждого вопроса; события правил (перспектива, текст, исход, ...)
 
 
 class Watched(Perspectives):
-    """Память после задачи: снимок в начале следующей (begin первой попытки) и в конце прогона (dump)."""
+    """Память после вопроса: снимок в начале следующей (begin первой попытки) и в конце прогона (dump)."""
     started = False
 
     def begin(self, k):
@@ -128,8 +128,8 @@ def test_requests(replayed):
 
 
 def test_memory(replayed):
-    """Память после каждой задачи: strategic по доменам (правило, rationale, confidence), tactical задачи, принято
-    за прогон (лимит без сброса между задачами)."""
+    """Память после каждого вопроса: strategic по доменам (правило, rationale, confidence), tactical вопроса,
+    принято за прогон (лимит без сброса между вопросами)."""
     name, _, _, steps, _, _ = replayed
     assert steps == [theirs_state(s) for s in json.load(open(LIVE / name / "steps.json"))]
 

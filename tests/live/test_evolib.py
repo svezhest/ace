@@ -1,8 +1,8 @@
-"""EvoLib против записи апстрима EvoLib 98266b2 на живой модели (bridge/live/evolib, run.json): HMMT, первые 3 задачи
-hmmt_feb_2025, 5 итераций по кругу (задачи 0, 1, 2, 0, 1 — i = kiter % data_size), 3 попытки. Запись воспроизводится
+"""EvoLib против записи апстрима EvoLib 98266b2 на живой модели (bridge/live/evolib, run.json): HMMT, первые 3 вопроса
+hmmt_feb_2025, 5 итераций по кругу (вопросы 0, 1, 2, 0, 1 — i = kiter % data_size), 3 попытки. Запись воспроизводится
 без модели (tools/record/replay): каждый запрос решателя, insight, слияний, сравнения решений и эмбеддингов побайтно
 совпадает с записанным, все записанные ответы востребованы; после каждой итерации библиотека skills (IG, Future IG,
-description) и insights (Future IG), лучшие решения задач, баллы, IG и улучшение — как в снимке апстрима
+description) и insights (Future IG), лучшие решения вопросов, баллы, IG и улучшение — как в снимке апстрима
 (steps.json)."""
 import json
 from dataclasses import dataclass
@@ -25,7 +25,7 @@ STEPS = []                  # после каждой итерации: (биб�
 
 @dataclass
 class Stream(Task):
-    """Поток итераций апстрима: задачи среза по кругу."""
+    """Поток итераций апстрима: вопросы среза по кругу."""
     def load(self, split="", size=None):
         items = super().load(split, size)[:RUN["tasks"]]
         return [items[k % len(items)] for k in range(RUN["iterations"])]

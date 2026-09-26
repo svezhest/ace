@@ -1,5 +1,5 @@
 """Мостик к EvoLib (98266b2, эталоны bridge/fixtures/evolib, снятые bridge/capture_evolib.py): промпты, разборщики,
-операции над библиотекой, run_iteration и цикл на 4 задачах в два прохода. Входы разборщиков и памяти — те же,
+операции над библиотекой, run_iteration и цикл на 4 вопросах в два прохода. Входы разборщиков и памяти — те же,
 что в скрипте снятия; задача — hmmt (тексты и параметры апстрима), проверка — строковая, как eval_function скрипта
 снятия. Разборщики кода (extract_functions, CODE_*, BIGCODE_*) не сравниваются: у нас вариант HMMT.
 Эмбеддинги — та же таблица «подстрока -> вектор»."""
@@ -425,7 +425,7 @@ def loop_model():
 
 @pytest.mark.parametrize("mode", ["nogold", "gold"])
 def test_loop(monkeypatch, mode):
-    """Два прохода по 4 задачам, как main() в eval_main.py: те же выборки из библиотеки (тот же поток random), та же
+    """Два прохода по 4 вопросам, как main() в eval_main.py: те же выборки из библиотеки (тот же поток random), та же
     библиотека, лучшие баллы и вызовы модели после каждой итерации."""
     table_embed(monkeypatch, LOOP_TABLE)
     task, model, snaps = Task([(p, a) for p, a, _ in PROBLEMS]), loop_model(), []

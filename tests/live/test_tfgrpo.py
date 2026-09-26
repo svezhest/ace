@@ -1,6 +1,6 @@
-"""TF-GRPO против записи апстрима youtu-agent c2caa53 на живой модели (bridge/live/tfgrpo, run.json): 4 задачи
-DAPO-Math-17k (первые 4 задачи dapo_train: DAPO-Math-17k-live апстрима), группа 3, батч 4, одна эпоха, затем
-итоговый агент на тех же задачах. Запись воспроизводится без модели (tools/record/replay): каждый запрос агента
+"""TF-GRPO против записи апстрима youtu-agent c2caa53 на живой модели (bridge/live/tfgrpo, run.json): 4 вопроса
+DAPO-Math-17k (первые 4 вопроса dapo_train: DAPO-Math-17k-live апстрима), группа 3, батч 4, одна эпоха, затем
+итоговый агент на тех же вопросах. Запись воспроизводится без модели (tools/record/replay): каждый запрос агента
 (rollout и итогового), сводок, групповых преимуществ, сверок и плана батча побайтно совпадает с записанным, все
 записанные ответы востребованы; библиотека после батча — experiences апстрима, награды rollout и ответы итогового
 агента — как в его БД (samples.json).
@@ -85,7 +85,7 @@ def test_library(replayed):
 
 
 def test_rollouts(replayed):
-    """Награды rollout по задачам в порядке БД апстрима."""
+    """Награды rollout по вопросам в порядке БД апстрима."""
     _, log, samples = replayed
     theirs = [s for s in samples if s["exp_id"].endswith("_epoch_0")]
     train = [r for r in log if r["phase"] == "train"]

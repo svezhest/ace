@@ -1,6 +1,6 @@
 """БД апстрима для записи (sqlite, UTU_DB_URL): DAPO-Math-17k и AIME24 — load_data из
 scripts/data/process_training_free_GRPO_data.py как есть (parquet DAPO скачан заранее в DIR/data/DAPO-Math-17k/data,
-snapshot_download — no-op); срез DAPO-Math-17k-live — первые 4 задачи DAPO в порядке апстрима на английском с
+snapshot_download — no-op); срез DAPO-Math-17k-live — первые 4 вопроса DAPO в порядке апстрима на английском с
 условием короче 160 символов (как data/dapo_train40.jsonl стенда), через scripts/data/upload_dataset.py.
 usage (venv youtu, UTU_* и UTU_DB_URL=sqlite:///DB): python prep.py DIR"""
 import importlib.util

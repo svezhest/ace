@@ -299,5 +299,5 @@ def test_settings():
     assert cfg["updater_query_params"] == {}            # обновление без температуры: test_loop
     # eval при обучении делит агента с rollout (T = 0.7): отсюда и итоговый агент без опытов при 0.7 (test_show)
     assert built["practice_and_eval_share_agent"] and built["eval_rollout_temperature"] == SHOW.ROLLOUT_TEMPERATURE
-    deviation("S3")             # батч 20 из 40 задач против 50 из 100: те же 2 шага за эпоху
+    deviation("S3")             # батч 20 из 40 вопросов против 50 из 100: те же 2 шага за эпоху
     assert (M.BATCH, practice["batch_size"]) == (20, 50)

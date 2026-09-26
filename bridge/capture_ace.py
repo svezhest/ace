@@ -70,13 +70,13 @@ PLAYBOOK = """## STRATEGIES & INSIGHTS
 ## OTHERS"""
 
 
-# --- фейковая модель: ответ по роли (маркер начала промпта) и по задаче (маркер в вопросе) ----------
+# --- фейковая модель: ответ по роли (маркер начала промпта) и по вопросу (маркер в нём) ----------
 
 GEN = "You are an analysis expert"
 REF = "You are an expert analyst and educator"
 CUR = "You are a master curator of knowledge"
 
-ANSWERS = {  # задача -> (ответ до рефлексии, после)
+ANSWERS = {  # вопрос -> (ответ до рефлексии, после)
     "Alpha": ("15.00", "15.00"),
     "Beta": ("$40.00", "40.00"),
     "Gamma": ("3.0", "3.0"),

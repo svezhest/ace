@@ -2,25 +2,25 @@
 
 В апстриме SCOPE — библиотека: агента, бенчмарка и чекера нет. Агентный цикл вокруг неё — наша обвязка, та же, что
 у метода scope стенда (DEVIATIONS SC2): цикл ace.loop, решатель S1, задачи и проверки стенда, run_python в
-песочнице (docker). SCOPE зовётся как есть, по examples/basic_usage.py: strategic правила — в начале задачи
+песочнице (docker). SCOPE зовётся как есть, по examples/basic_usage.py: strategic правила — в начале вопроса
 (get_strategic_rules_for_agent), после каждого шага — on_step_complete, принятое правило дописывается к системному
 промпту агента ("\\n\\n## Learned Guideline:\\n" + текст). Шаг — вызов инструмента (посреди попытки) и итоговый
 ответ (после неё); что агент сообщает о шаге (вывод, вызов, наблюдение, ошибка с именем типа) — поля обвязки, те же,
 что у нашего SCOPE (ace/extract/scope.py). Модель SCOPE — create_openai_model(base_url) без параметров запроса.
 
 Варианты (VARIANTS):
-    scope       formula, 5 задач; max_rules_per_task 3 и max_strategic_rules_per_domain 3; strategic память
+    scope       formula, 5 вопросов; max_rules_per_task 3 и max_strategic_rules_per_domain 3; strategic память
                 прошлых прогонов — seed_rules.json (по 3 правила на домен, о другой работе — веб-поиске, чтобы
                 классификатор не счёл новое правило дублем: новое strategic правило зовёт оптимизатор домена)
-    scope_code  formula с run_python в песочнице, 2 задачи
-    scope_bo2   use_best_of_n, candidate_models — та же модель с temperature 0.7; 2 задачи
+    scope_code  formula с run_python в песочнице, 2 вопроса
+    scope_bo2   use_best_of_n, candidate_models — та же модель с temperature 0.7; 2 вопроса
     scope_k2    два оптимизатора (efficiency, thoroughness), у попытки k — агент со своим; в зачёт лучшая по
-                метке; 2 задачи
+                метке; 2 вопроса
 
 usage (из корня стенда; запись — tools.record.record с --seed на PORT):
     PYTHONPATH=$UPSTREAMS/SCOPE uv run python bridge/live/scope/driver.py VARIANT OUT \\
         --base-url http://127.0.0.1:PORT/v1
-В OUT: log.json и summary.json цикла, steps.json — память после каждой задачи, exp/<перспектива>/ — exp_path SCOPE
+В OUT: log.json и summary.json цикла, steps.json — память после каждого вопроса, exp/<перспектива>/ — exp_path SCOPE
 (strategic_memory/global_rules.json, prompt_updates/)."""
 import argparse
 import asyncio
@@ -72,7 +72,7 @@ def error(failed):
 class Library(Learner):
     """Ученик-обвязка: цикл стенда зовёт хуки, хуки зовут SCOPE апстрима. optimizers[k] — SCOPE агента попытки k."""
     optimizers: list = field(default_factory=list)
-    steps: list = field(default_factory=list)       # память после каждой задачи
+    steps: list = field(default_factory=list)       # память после каждого вопроса
     current: dict = field(default_factory=dict)     # k -> системный промпт агента сейчас (None — как при запуске)
 
     def __deepcopy__(self, memo):
@@ -88,7 +88,7 @@ class Library(Learner):
         return f"{ex.task.name}_{ex.i}"
 
     def prompt(self, ex, item, k, memory=None):
-        """Начало задачи: базовый промпт (роль задачи и подсказку среды ставит цикл) + strategic правила."""
+        """Начало вопроса: базовый промпт (роль задачи и подсказку среды ставит цикл) + strategic правила."""
         self.current[k] = None
         p = Prompt(self.optimizers[k].get_strategic_rules_for_agent(self.agent(ex)))
         p.temperature, p.top_p = self.attempts.temperature(k), self.attempts.top_p(k)
@@ -121,7 +121,7 @@ class Library(Learner):
         self.steps.append(self.state(ex))
 
     def state(self, ex):
-        """Память SCOPE по перспективам: strategic на диске, tactical задачи, принято за прогон."""
+        """Память SCOPE по перспективам: strategic на диске, tactical вопроса, принято за прогон."""
         agent, out = self.agent(ex), []
         for o in self.optimizers:
             path = Path(o.strategic_store.global_rules_path)

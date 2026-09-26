@@ -342,7 +342,7 @@ async def capture_memory():
         "result": await MemoryOptimizer(adapter(mo2)).optimize_rules(five, target_count=3),
         "calls": mo2.calls}
 
-    # лимит max_rules_per_task=20: счётчик по агенту, между задачами не сбрасывается
+    # лимит max_rules_per_task=20: счётчик по агенту, между вопросами не сбрасывается
     def synth(text):
         tid = between(text, "Error Message: task ", ".")
         return js({"update_text": f"Tactical rule from task {tid}.", "rationale": "r", "confidence": "medium"})
