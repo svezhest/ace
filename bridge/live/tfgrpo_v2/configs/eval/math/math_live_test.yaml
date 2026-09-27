@@ -1,0 +1,18 @@
+# @package _global_
+# итоговый агент с опытом (configs/agents/practice/tf_live_agent.yaml, его пишет run_training_free_GRPO.py) на срезе
+# тестового набора апстрима: AIME24-live = первые 4 задачи AIME24 (prep.py); как configs/eval/math/math_practice_AIME24.yaml
+# апстрима, но pass_k 2 вместо 32 (бюджет) и concurrency 1
+defaults:
+  - /agents/practice/tf_live_agent@agent
+  - _self_
+
+exp_id: "tf_live_test"
+
+data:
+  dataset: "AIME24-live"
+
+concurrency: 1
+pass_k: 2
+
+verify_filename: "math.py"
+verify_func_name: "verify_func"
