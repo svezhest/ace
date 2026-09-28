@@ -1,0 +1,112 @@
+[
+  {
+    "epoch": 1,
+    "step": 10,
+    "val_results": {
+      "accuracy": 0.55,
+      "correct": 2,
+      "total": 10,
+      "no_answer": 0
+    },
+    "error_log": {
+      "accuracy": 0.55,
+      "errors": [
+        {
+          "index": 0,
+          "prediction": "MinorityInterestOwnershipPercentageByParent,RevenueFromRelatedParties,PaymentsToAcquireBusinessesGross,BusinessCombinationConsiderationTransferred1",
+          "ground_truth": "MinorityInterestOwnershipPercentageByParent,ConcentrationRiskPercentage1,BusinessCombinationConsiderationTransferred1,PaymentsToAcquireBusinessesGross"
+        },
+        {
+          "index": 2,
+          "prediction": "SaleOfStockPricePerShare,SaleOfStockNumberOfSharesIssuedInTransaction,BusinessAcquisitionEquityInterestsIssuedOrIssuableNumberOfSharesIssued,BusinessAcquisitionEquityInterestsIssuedOrIssuableNumberOfSharesIssued",
+          "ground_truth": "DebtInstrumentConvertibleConversionPrice1,StockIssuedDuringPeriodSharesNewIssues,StockIssuedDuringPeriodSharesNewIssues,StockIssuedDuringPeriodSharesNewIssues"
+        },
+        {
+          "index": 3,
+          "prediction": "MinorityInterestOwnershipPercentageByParent,MinorityInterestOwnershipPercentageByParent,BusinessCombinationConsiderationTransferred1,PaymentsToAcquireBusinessesGross",
+          "ground_truth": "MinorityInterestOwnershipPercentageByNoncontrollingOwners,MinorityInterestOwnershipPercentageByNoncontrollingOwners,BusinessCombinationConsiderationTransferred1,PaymentsToAcquireBusinessesGross"
+        },
+        {
+          "index": 4,
+          "prediction": "CommonStockParOrStatedValuePerShare,ClassOfWarrantOrRightExercisePriceOfWarrantsOrRights1,StockIssuedDuringPeriodSharesNewIssues,MinorityInterestOwnershipPercentageByNoncontrollingOwners",
+          "ground_truth": "CommonStockParOrStatedValuePerShare,ClassOfWarrantOrRightExercisePriceOfWarrantsOrRights1,SaleOfStockNumberOfSharesIssuedInTransaction,MinorityInterestOwnershipPercentageByNoncontrollingOwners"
+        },
+        {
+          "index": 5,
+          "prediction": "EquityMethodInvestmentOwnershipPercentage,EquityMethodInvestmentOwnershipPercentage,EquityMethodInvestmentOwnershipPercentage,BusinessAcquisitionPercentageOfVotingInterestsAcquired",
+          "ground_truth": "EquityMethodInvestmentOwnershipPercentage,EquityMethodInvestmentOwnershipPercentage,EquityMethodInvestmentOwnershipPercentage,EquityMethodInvestmentOwnershipPercentage"
+        },
+        {
+          "index": 6,
+          "prediction": "MinorityInterestOwnershipPercentageByParent,EquityMethodInvestmentOwnershipPercentage,EquityMethodInvestmentOwnershipPercentage,IncomeLossFromEquityMethodInvestments",
+          "ground_truth": "EquityMethodInvestmentOwnershipPercentage,EquityMethodInvestments,EquityMethodInvestments,IncomeLossFromEquityMethodInvestments"
+        },
+        {
+          "index": 7,
+          "prediction": "OperatingLeasesRentExpenseNet,BusinessCombinationConsiderationTransferred1,AreaOfRealEstateProperty,DisposalGroupIncludingDiscontinuedOperationConsideration",
+          "ground_truth": "ConcentrationRiskPercentage1,PaymentsToAcquireBusinessesGross,AreaOfRealEstateProperty,PaymentsToAcquireBusinessesGross"
+        },
+        {
+          "index": 8,
+          "prediction": "EquityMethodInvestmentOwnershipPercentage,EquityMethodInvestmentOwnershipPercentage,IncomeLossFromEquityMethodInvestments,IncomeLossFromEquityMethodInvestments",
+          "ground_truth": "EquityMethodInvestments,EquityMethodInvestmentOwnershipPercentage,IncomeLossFromEquityMethodInvestments,IncomeLossFromEquityMethodInvestments"
+        }
+      ]
+    }
+  },
+  {
+    "epoch": 2,
+    "step": 10,
+    "val_results": {
+      "accuracy": 0.5,
+      "correct": 2,
+      "total": 10,
+      "no_answer": 0
+    },
+    "error_log": {
+      "accuracy": 0.5,
+      "errors": [
+        {
+          "index": 1,
+          "prediction": "DebtInstrumentInterestRateStatedPercentage,DebtInstrumentInterestRateStatedPercentage,EffectiveIncomeTaxRateContinuingOperations,EffectiveIncomeTaxRateContinuingOperations",
+          "ground_truth": "DebtWeightedAverageInterestRate,DebtWeightedAverageInterestRate,EffectiveIncomeTaxRateReconciliationAtFederalStatutoryIncomeTaxRate,EffectiveIncomeTaxRateReconciliationAtFederalStatutoryIncomeTaxRate"
+        },
+        {
+          "index": 2,
+          "prediction": "SharePrice,StockIssuedDuringPeriodSharesNewIssues,StockIssuedDuringPeriodSharesNewIssues,StockIssuedDuringPeriodSharesNewIssues",
+          "ground_truth": "DebtInstrumentConvertibleConversionPrice1,StockIssuedDuringPeriodSharesNewIssues,StockIssuedDuringPeriodSharesNewIssues,StockIssuedDuringPeriodSharesNewIssues"
+        },
+        {
+          "index": 3,
+          "prediction": "MinorityInterestOwnershipPercentageByParent,MinorityInterestOwnershipPercentageByParent,BusinessCombinationConsiderationTransferred1,PaymentsToAcquireBusinessesGross",
+          "ground_truth": "MinorityInterestOwnershipPercentageByNoncontrollingOwners,MinorityInterestOwnershipPercentageByNoncontrollingOwners,BusinessCombinationConsiderationTransferred1,PaymentsToAcquireBusinessesGross"
+        },
+        {
+          "index": 4,
+          "prediction": "CommonStockParOrStatedValuePerShare,ClassOfWarrantOrRightExercisePriceOfWarrantsOrRights1,BusinessAcquisitionEquityInterestsIssuedOrIssuableNumberOfSharesIssued,MinorityInterestOwnershipPercentageByNoncontrollingOwners",
+          "ground_truth": "CommonStockParOrStatedValuePerShare,ClassOfWarrantOrRightExercisePriceOfWarrantsOrRights1,SaleOfStockNumberOfSharesIssuedInTransaction,MinorityInterestOwnershipPercentageByNoncontrollingOwners"
+        },
+        {
+          "index": 6,
+          "prediction": "MinorityInterestOwnershipPercentageByParent,IncomeLossFromEquityMethodInvestments,IncomeLossFromEquityMethodInvestments,IncomeLossFromEquityMethodInvestments",
+          "ground_truth": "EquityMethodInvestmentOwnershipPercentage,EquityMethodInvestments,EquityMethodInvestments,IncomeLossFromEquityMethodInvestments"
+        },
+        {
+          "index": 7,
+          "prediction": "OperatingLeasesRentExpenseNet,BusinessCombinationAcquisitionRelatedCosts,AreaOfRealEstateProperty,SaleOfStockNumberOfSharesIssuedInTransaction",
+          "ground_truth": "ConcentrationRiskPercentage1,PaymentsToAcquireBusinessesGross,AreaOfRealEstateProperty,PaymentsToAcquireBusinessesGross"
+        },
+        {
+          "index": 8,
+          "prediction": "PaymentsToAcquireBusinessesGross,BusinessAcquisitionPercentageOfVotingInterestsAcquired,IncomeLossFromEquityMethodInvestments,IncomeLossFromEquityMethodInvestments",
+          "ground_truth": "EquityMethodInvestments,EquityMethodInvestmentOwnershipPercentage,IncomeLossFromEquityMethodInvestments,IncomeLossFromEquityMethodInvestments"
+        },
+        {
+          "index": 9,
+          "prediction": "MinorityInterestOwnershipPercentageByParent,MinorityInterestOwnershipPercentageByParent,MinorityInterestOwnershipPercentageByParent,MinorityInterestOwnershipPercentageByParent",
+          "ground_truth": "EquityMethodInvestmentOwnershipPercentage,EquityMethodInvestmentOwnershipPercentage,EquityMethodInvestmentOwnershipPercentage,EquityMethodInvestmentOwnershipPercentage"
+        }
+      ]
+    }
+  }
+]

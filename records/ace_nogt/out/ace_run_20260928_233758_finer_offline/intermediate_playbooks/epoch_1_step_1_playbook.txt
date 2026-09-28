@@ -1,0 +1,15 @@
+## STRATEGIES & INSIGHTS
+
+## FORMULAS & CALCULATIONS
+
+## CODE SNIPPETS & TEMPLATES
+
+## COMMON MISTAKES TO AVOID
+
+[err-00002] helpful=0 harmful=0 :: MISTAKE: Mapping a cash component of acquisition consideration to the total consideration tag. The model incorrectly reasoned that 'cash paid is a component of total consideration transferred, therefore it maps to the total consideration tag.' This conflates a component with the aggregate. CORRECTION: A component value (e.g., cash paid of $99M) must map to its specific component tag ('PaymentsToAcquireBusinessesGross'), not the aggregate tag ('BusinessCombinationConsiderationTransferred1'). Do not let the logic 'X is part of Y, so X maps to Y's tag' drive your decision - instead, ask whether the entity represents the total or just a portion, and match accordingly.
+## PROBLEM-SOLVING HEURISTICS
+
+## CONTEXT CLUES & INDICATORS
+
+[ctx-00001] helpful=0 harmful=0 :: CRITICAL TAG DISTINCTION - Component vs. Aggregate: 'PaymentsToAcquireBusinessesGross' = gross CASH payments made to acquire businesses (a specific component). 'BusinessCombinationConsiderationTransferred1' = TOTAL consideration transferred (aggregate of cash + stock + debt + other non-cash components). When an entity represents a specific cash amount paid in an acquisition, it maps to 'PaymentsToAcquireBusinessesGross', NOT the total consideration tag. A component value should NEVER map to an aggregate tag - always match the specificity of the entity to the specificity of the tag. If the entity is the total consideration (including non-cash components), use 'BusinessCombinationConsiderationTransferred1'; if it is only the cash portion, use 'PaymentsToAcquireBusinessesGross'.
+## OTHERS

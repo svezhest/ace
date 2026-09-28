@@ -1,0 +1,30 @@
+{
+  "task_name": "finer",
+  "mode": "offline",
+  "generator_model": "ornith15-9b",
+  "reflector_model": "ornith15-9b",
+  "curator_model": "ornith15-9b",
+  "config": {
+    "num_epochs": 2,
+    "max_num_rounds": 3,
+    "curator_frequency": 1,
+    "eval_steps": 10,
+    "online_eval_frequency": 15,
+    "save_steps": 1,
+    "playbook_token_budget": 80000,
+    "task_name": "finer",
+    "mode": "offline",
+    "json_mode": false,
+    "no_ground_truth": true,
+    "save_dir": "/private/tmp/claude-501/-Users-user-Projects-itmo/a04e42db-becc-4c5f-a1a6-f26b7e31e71d/scratchpad/recq/runs/ace_nogt-0928-2337-1/out",
+    "test_workers": 1,
+    "initial_playbook_path": null,
+    "use_bulletpoint_analyzer": false,
+    "bulletpoint_analyzer_threshold": 0.9,
+    "api_provider": "openai",
+    "batch_size": 1,
+    "curator_batch_size": null,
+    "curator_num_groups": null,
+    "augmented_shuffling": true
+  }
+}
