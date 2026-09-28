@@ -1,0 +1,28 @@
+{
+  "upstream": "ace",
+  "commit": "82709de050e1db6e6ef2f07bcb0393560b94992a",
+  "commit_note": "закреп = онлайн HEAD на 27.09.2026",
+  "status": "раннер готов, живая запись не снята; два прогона на фейковой модели доходят до конца, наборы канонических запросов совпадают (70 = 70)",
+  "mode": "онлайн из README (--mode online): initial test на всём test, затем по окнам online_eval_frequency — тест окна текущим playbook, потом обучение на нём же (_online_train_and_test)",
+  "runner": "records/ace_online/run.sh OUT (UPSTREAMS по умолчанию ~/Projects/upstreams, PORT=8095, MODEL_URL=http://localhost:8080)",
+  "command": "python -m eval.finance.run --task_name finer --mode online --save_path <OUT>/out --api_provider openai --generator_model ornith15-9b --reflector_model ornith15-9b --curator_model ornith15-9b --test_workers 1 --online_eval_frequency 5 --save_steps 1",
+  "readme_command": "uv run python -m eval.finance.run --task_name finer --mode online --save_path results",
+  "knobs": {
+    "срез (sample_config.json в cwd)": {"value": "первые 10 test (только test_data: онлайн train/val не читает)", "default": "finer_test_subset_006_seed42 (441)", "class": "K", "note": "тот же срез test, что у ace_offline_finer"},
+    "--online_eval_frequency": {"value": 5, "default": 15, "class": "K", "note": "2 окна по 5: окно 2 тестируется playbook-ом после обучения на окне 1; при 15 > 10 окно одно и обученный playbook не тестируется ни разу"},
+    "--num_epochs": {"value": 1, "default": 1, "note": "онлайн требует 1"},
+    "--save_steps": {"value": 1, "default": 50, "class": "K", "note": "как у ace_offline_finer"},
+    "--api_provider": {"value": "openai", "default": "sambanova", "class": "K"},
+    "--test_workers": {"value": 1, "default": 20, "class": "T"},
+    "--generator/reflector/curator_model": {"value": "ornith15-9b", "default": "DeepSeek-V3.1", "class": "T"},
+    "--max_num_rounds / --curator_frequency / --max_tokens / --playbook_token_budget / --batch_size": {"value": "по умолчанию", "default": "3 / 1 / 4096 / 80000 / 1"}
+  },
+  "bridge": {
+    "sitecustomize.py": "base_url openai.OpenAI из ACE_BASE_URL (T: utils.py зашивает api.openai.com); random.seed(0) при старте интерпретатора (random у апстрима — только джиттер паузы перед повтором в llm.py)",
+    "PYTHONHASHSEED": "0"
+  },
+  "env": "venv .venvs/ace (uv.lock апстрима), cwd — свой каталог с eval/finance/data/{sample_config.json, срез}; PYTHONPATH=<site>:$UPSTREAMS/ace; OPENAI_API_KEY=x TIKTOKEN_CACHE_DIR HF_HUB_OFFLINE=1 PYTHONHASHSEED=0 PYTHONUNBUFFERED=1",
+  "sampling": "в запросах только model, messages, temperature=0.0, max_completion_tokens=4096",
+  "estimate": "10 initial test + 10 тестов окон + 10 шагов обучения по 4 (верно сразу) … 9 (3 раунда рефлексии) вызовов; по долям ace_offline_finer (5 на шаг) ≈70, предел 110. При 12–60 с/вызов 14–70 мин (до 110 мин); по фактическим средним ace_offline_finer (генератор 29 с, рефлектор 47 с, куратор 57 с, без одного зависшего вызова 8,6 ч) ≈45 мин",
+  "snapshot": "out/ — выход апстрима (run_config, playbook-и по шагам и окнам, initial_test_results, test_results с window_results, train_results), run.log — вывод"
+}
