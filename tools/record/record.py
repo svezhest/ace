@@ -5,7 +5,8 @@
 тела, ключи по алфавиту. Наверх уходит только он и seed = seed_for(запрос, n), так что ответ модели — функция
 ключа и не зависит от порядка вызовов. Строка записи:
 {"path", "request": канонический запрос, "n", "seed", "status", "response"}, плюс "dropped": true, если клиент
-оборвал соединение до ответа (таймаут, повтор) — такая запись негодна.
+оборвал соединение до ответа (таймаут, повтор) — такая запись негодна. Поле тела вне FIELDS и CLIENT — отказ 400:
+его нельзя молча потерять.
 Воспроизведение отдаёт k-му такому же запросу k-й записанный ответ; запроса нет в записи — 400 с diff против
 ближайшего записанного. GET /_status — сколько отдано и сколько не востребовано."""
 import argparse
@@ -24,13 +25,21 @@ from pathlib import Path
 
 CHAT = "/v1/chat/completions"
 EMBEDDINGS = "/v1/embeddings"
-# всё, что доходит до модели; остальное (stream, stream_options, seed, user, metadata, заголовки) в ключ не входит
+# всё, что доходит до модели и входит в ключ
 FIELDS = {
     CHAT: ("model", "messages", "tools", "tool_choice", "parallel_tool_calls", "response_format", "temperature",
            "top_p", "top_k", "min_p", "presence_penalty", "frequency_penalty", "max_tokens", "max_completion_tokens",
            "stop", "n", "logit_bias", "logprobs", "top_logprobs", "reasoning_effort", "enable_thinking",
            "thinking_budget"),
     EMBEDDINGS: ("model", "input", "dimensions", "encoding_format"),
+}
+# поля клиента, которые на ответ модели не влияют и отбрасываются: stream, stream_options — только раскладка ответа
+# (прокси выбирает её сам); seed — прокси ставит свой seed_for; user — метка конечного пользователя для модерации
+# у провайдера; metadata, store — хранение ответа у OpenAI; service_tier — тариф и очередь у OpenAI;
+# prompt_cache_key — подсказка кэшу промптов у провайдера (ставит LiteLLM)
+CLIENT = {
+    CHAT: {"stream", "stream_options", "seed", "user", "metadata", "store", "service_tier", "prompt_cache_key"},
+    EMBEDDINGS: {"user"},
 }
 UPSTREAM_TIMEOUT = 3600     # секунд на ответ модели
 
@@ -322,6 +331,11 @@ class Handler(BaseHTTPRequestHandler):
             body = json.loads(raw)
         except ValueError as e:
             return self.error(400, f"bad json: {e}")
+        unknown = sorted(set(body) - set(FIELDS[path]) - CLIENT[path])
+        if unknown:
+            msg = f"{path}: unknown request field(s) {', '.join(unknown)}: add to FIELDS or CLIENT in tools/record"
+            print(msg, file=sys.stderr, flush=True)
+            return self.error(400, msg)
         self.server.answer(path, body, self)
 
 

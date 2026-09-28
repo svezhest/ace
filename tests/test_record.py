@@ -242,3 +242,13 @@ def test_embeddings_server(monkeypatch):
     listed = c.embeddings.create(model="text-embedding-3-small", input="ab", encoding_format="float").data[0].embedding
     srv.shutdown()
     assert got == [[2.0, np.float32(0.1).item()], [1.0, np.float32(0.1).item()]] and listed == got[0]
+
+
+def test_unknown_field_rejected(fake, tmp_path, capsys):
+    rec = recorder(fake, tmp_path / "rec.jsonl")
+    with pytest.raises(openai.BadRequestError, match="chat_template_kwargs"):
+        client(rec).chat.completions.create(model="m", messages=[{"role": "user", "content": "q"}],
+                                            extra_body={"chat_template_kwargs": {"enable_thinking": False}})
+    rec.shutdown()
+    assert "unknown request field(s) chat_template_kwargs" in capsys.readouterr().err
+    assert not fake.got and not (tmp_path / "rec.jsonl").exists()
