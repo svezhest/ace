@@ -1,14 +1,13 @@
 """БД апстрима для записи (sqlite, UTU_DB_URL): DAPO-Math-17k и AIME24 — load_data из
 scripts/data/process_training_free_GRPO_data.py как есть (parquet DAPO скачан заранее в DIR/data/DAPO-Math-17k/data,
-snapshot_download — no-op); срезы через scripts/data/upload_dataset.py апстрима:
-DAPO-Math-17k-live — первые 16 вопросов DAPO в порядке апстрима на английском с условием короче 160 символов
-(как data/dapo_train40.jsonl стенда; четыре батча по 4), AIME24-live — первые 4 задачи AIME24 (итоговый тест).
+snapshot_download — no-op). Обучение берёт DAPO-Math-17k целиком, срез — ручкой апстрима --rollout_data_truncate.
+Итоговый тест — AIME24-live, первые 4 задачи AIME24 через scripts/data/upload_dataset.py апстрима (README, Option 2):
+у run_eval.py ручки среза нет.
 usage (venv youtu, UTU_* и UTU_DB_URL=sqlite:///DB): python prep.py DIR"""
 import importlib.util
 import json
 import os
 import pathlib
-import re
 import sqlite3
 import sys
 
@@ -41,8 +40,5 @@ for name in ("DAPO-Math-17k", "AIME24"):
 from utu.utils import EnvUtils  # noqa: E402
 
 db = sqlite3.connect(EnvUtils.get_env("UTU_DB_URL").removeprefix("sqlite:///"))
-rows = db.execute("select question, answer, source from data where dataset = ? order by \"index\"", ("DAPO-Math-17k",))
-cjk = re.compile(r"[　-鿿＀-￯]")
-upload([r for r in rows if len(r[0]) < 160 and not cjk.search(r[0])][:16], "DAPO-Math-17k-live")
 rows = db.execute("select question, answer, source from data where dataset = ? order by \"index\"", ("AIME24",))
 upload(list(rows)[:4], "AIME24-live")

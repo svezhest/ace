@@ -8,14 +8,19 @@
 # держит перехваченным stdout процесса. Поэтому шаг ждёт своей отметки в файлах (обучение — итоговый агент
 # configs/agents/practice/tf_live_agent.yaml, его пишут последним; тест — «> Cleaning up...» в logs/utu.log после
 # подсчёта) и гасит процесс, если тот ещё жив.
-# usage: run.sh OUT DB   (DB — sqlite апстрима от prep.py; в OUT: rec.jsonl — запись, test.db — БД прогона,
-# tf_live_agent.yaml — итоговый агент, train.log и test.log — вывод команд, utu_train/ и utu_test/ — их logs/)
+# Данные готовит prep.py на хосте без сети: parquet DAPO-Math-17k лежит в $UPSTREAMS/.data, AIME24 — в кэше HF.
+# usage: run.sh OUT   (в OUT: rec.jsonl — запись, test.db — БД прогона, tf_live_agent.yaml — итоговый агент,
+# train.log и test.log — вывод команд, utu_train/ и utu_test/ — их logs/)
 set -euo pipefail
 OUT=$(mkdir -p "$1" && cd "$1" && pwd)
-mkdir -p "$OUT/rec"
-cp "$2" "$OUT/test.db"
 HERE=$(cd "$(dirname "$0")" && pwd)
 U=${UPSTREAMS:-$HOME/Projects/upstreams}
+mkdir -p "$OUT/rec" "$OUT/prep/data"
+ln -s "$U/.data/DAPO-Math-17k" "$OUT/prep/data/"
+UTU_LLM_TYPE=chat.completions UTU_LLM_MODEL=x UTU_LLM_BASE_URL=http://127.0.0.1:9/v1 UTU_LLM_API_KEY=x \
+    UTU_DB_URL=sqlite:///$OUT/test.db HF_HUB_OFFLINE=1 HF_DATASETS_OFFLINE=1 UPSTREAMS=$U \
+    "$U/.venvs/youtu/bin/python" "$HERE/prep.py" "$OUT/prep" > "$OUT/prep.log" 2>&1
+rm -rf "$OUT/prep"
 ACE=${ACE:-$(cd "$HERE/../.." && pwd)}
 M=ornith15-9b
 docker image inspect youtu-upstream >/dev/null 2>&1 || docker build -q -t youtu-upstream "$HERE" >/dev/null
@@ -60,8 +65,7 @@ step() {
 cp -r /up /tmp/up && rm -rf /tmp/up/logs && cp -r /cfg/. /tmp/up/configs/ && cd /tmp/up
 step train.log "[ -s configs/agents/practice/tf_live_agent.yaml ]" \
     python scripts/run_training_free_GRPO.py --config_name math_live --experiment_name tf_live \
-    --batch_size 4 --grpo_n 3 --rollout_concurrency 1 --rollout_data_truncate 16 \
-    --practice_dataset_name DAPO-Math-17k-live
+    --batch_size 4 --grpo_n 3 --rollout_concurrency 1 --rollout_data_truncate 16
 cp configs/agents/practice/tf_live_agent.yaml /out/
 mv logs /out/utu_train
 step test.log "grep -qF \"> Cleaning up...\" logs/utu.log* 2>/dev/null" python scripts/run_eval.py --config_name math/math_live_test
