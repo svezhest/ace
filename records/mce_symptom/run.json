@@ -1,0 +1,53 @@
+{
+ "upstream": "meta-context-engineering",
+ "commit": "c4b7a7c2ce3ffc4bf4a74c52d2dd8a9a8fb14c30",
+ "runner": "records/mce_symptom/run.sh",
+ "command": "python -m mce.main --workspace workspace/symptom_diagnosis --env symptom_diagnosis --train-data env/symptom_diagnosis/data/train.jsonl --val-data env/symptom_diagnosis/data/val.jsonl --model ornith15-9b --iterations 2 --train-limit 4 --val-limit 2 --train-batch-size 2 --log-dir logs/symptom_diagnosis; python -m mce.eval --iter_dir workspace/symptom_diagnosis/<лучшая по val> --env symptom_diagnosis --data env/symptom_diagnosis/data/test.jsonl --limit 2 --model ornith15-9b --save-results-to test",
+ "knobs": {
+  "--iterations": {
+   "value": 2,
+   "default": "3 (scripts/train_symptom_diagnosis.sh)",
+   "class": "K"
+  },
+  "--train-limit": {
+   "value": 4,
+   "default": 50,
+   "class": "K"
+  },
+  "--train-batch-size": {
+   "value": 2,
+   "default": 25,
+   "class": "K",
+   "note": "2 под-итерации на итерацию"
+  },
+  "--val-limit": {
+   "value": 2,
+   "default": 20,
+   "class": "K"
+  },
+  "--model": {
+   "value": "ornith15-9b",
+   "default": "deepseek/deepseek-chat-v3.1",
+   "class": "T"
+  },
+  "mce.eval --limit": {
+   "value": 2,
+   "default": 500,
+   "class": "K",
+   "note": "тест в README нет; лучшая итерация — max по val_accuracy, как в mce.main"
+  },
+  "random.seed(0)": {
+   "value": 0,
+   "default": "без сида",
+   "class": "T",
+   "note": "выборка train (random.sample, shuffle) в процессе mce.main"
+  }
+ },
+ "env": "git archive c4b7a7c в /private/tmp/mce-symptom (путь входит в промпты), env -i + env.txt: HOME, TMPDIR в ROOT, PATH=ROOT/.venv/bin:uv, PYTHONHASHSEED=0, OPENROUTER_API_BASE=прокси записи, ANTHROPIC_BASE_URL=LiteLLM, ANTHROPIC_DEFAULT_{SONNET,OPUS,HAIKU}_MODEL=ornith15-9b (как .env.template), CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1; LiteLLM (litellm.yaml) -> прокси записи; MAX_CONCURRENCY апстрима (30) не трогается",
+ "forced": [
+  "LiteLLM 1.102.1 (use_chat_completions_url_for_anthropic_messages): агенты Claude CLI говорят Anthropic Messages, шлюз и прокси — только chat/completions",
+  ".venv — симлинк на общий $UPSTREAMS/.venvs/mce без установки проекта: UV_NO_SYNC=1 и PYTHONPATH=ROOT вместо editable (uv.lock апстрима указывает на зеркало aliyun, офлайн uv sync невозможен)"
+ ],
+ "snapshot": "workspace/ (под-итерации, meta_agent/evaluations.json, навыки), logs/ (журналы агентов), test/evaluation.json — выход апстрима; train.log, test.log — вывод",
+ "expected_calls": "≈550 (2 × (мета ≈40 + 2 × (батч 2 + базовый ≈110) + val 2) + тест 2), разброс ×2"
+}
