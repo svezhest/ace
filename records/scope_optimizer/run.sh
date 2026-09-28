@@ -4,8 +4,8 @@
 # usage: run.sh OUT   (OUT/rec.jsonl — запись, OUT/stdout.txt — вывод сценария с журналом SCOPE и памятью в конце)
 set -euo pipefail
 OUT=$(mkdir -p "$1" && cd "$1" && pwd)
-U=${UPSTREAMS:-$HOME/Projects/upstreams}
 ACE=${ACE:-$(cd "$(dirname "$0")/../.." && pwd)}
+U=${UPSTREAMS:-$ACE/upstreams}
 PORT=${PORT:-8097}
 (cd "$ACE" && exec .venv/bin/python -m tools.record.record "$OUT/rec.jsonl" --port $PORT \
     --upstream "${MODEL_URL:-http://localhost:8080}") &

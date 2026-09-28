@@ -22,7 +22,7 @@
     }
   },
   "record": "старый прокси tools/record (коммит d0e3c06, до 3ab1e3a): seed = seed_for(канонический запрос, n), канонический запрос — всё тело без stream, stream_options, id; наверх — тело без stream. В этой записи в запросах только model, messages, temperature, max_completion_tokens, поэтому ключ и seed те же, что у нового прокси",
-  "runner": "records/ace_offline_finer/run.sh (UPSTREAMS по умолчанию ~/Projects/upstreams)",
+  "runner": "records/ace_offline_finer/run.sh (UPSTREAMS по умолчанию upstreams/ репозитория)",
   "command": "python -m eval.finance.run --task_name finer --mode offline --save_path <OUT>/out --api_provider openai --generator_model ornith15-9b --reflector_model ornith15-9b --curator_model ornith15-9b --test_workers 1 --eval_steps 10 --num_epochs 2 --save_steps 1",
   "knobs": {
     "срез (sample_config.json в cwd)": {

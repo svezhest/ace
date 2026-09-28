@@ -5,7 +5,7 @@
   "status": "раннер готов, живая запись не снята; два прогона на фейковой модели доходят до конца, наборы канонических запросов совпадают (220 = 220)",
   "mode": "протокол ace_offline_finer + --no_ground_truth: рефлектор и куратор получают REFLECTOR_PROMPT_NO_GT и CURATOR_PROMPT_NO_GT без эталона; верность ответа (environment_feedback, остановка раундов) апстрим по-прежнему считает по target",
   "mode_choice": "офлайн: README не привязывает флаг к режиму, офлайн — режим по умолчанию и первый пример README, в статье (табл. 2, FiNER) ACE без GT есть и в офлайне; запись отличается от ace_offline_finer ровно одним флагом",
-  "runner": "records/ace_nogt/run.sh OUT (UPSTREAMS по умолчанию ~/Projects/upstreams, PORT=8096, MODEL_URL=http://localhost:8080)",
+  "runner": "records/ace_nogt/run.sh OUT (UPSTREAMS по умолчанию upstreams/ репозитория, PORT=8096, MODEL_URL=http://localhost:8080)",
   "command": "python -m eval.finance.run --task_name finer --mode offline --save_path <OUT>/out --api_provider openai --generator_model ornith15-9b --reflector_model ornith15-9b --curator_model ornith15-9b --test_workers 1 --eval_steps 10 --num_epochs 2 --save_steps 1 --no_ground_truth",
   "readme_command": "uv run python -m eval.finance.run --task_name finer --mode offline --save_path results (+ --no_ground_truth из таблицы аргументов README)",
   "knobs": {

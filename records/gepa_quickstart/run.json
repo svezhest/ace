@@ -23,7 +23,7 @@
    "class": "T"
   }
  },
- "env": "venv .venvs/gepa (uv.lock апстрима, extra full), апстрим из $UPSTREAMS/gepa/src через PYTHONPATH (в venv не установлен); OPENAI_BASE_URL=прокси записи OPENAI_API_KEY=x HF_HUB_OFFLINE=1 LITELLM_LOCAL_MODEL_COST_MAP=True PYTHONHASHSEED=0 PYTHONUNBUFFERED=1; cwd — OUT",
+ "env": "venv .venvs/gepa (uv.lock апстрима, extra full), апстрим из $UPSTREAMS/gepa/src через PYTHONPATH (в venv не установлен); OPENAI_BASE_URL=прокси записи OPENAI_API_KEY=x HF_HOME=$UPSTREAMS/.hf HF_HUB_OFFLINE=1 LITELLM_LOCAL_MODEL_COST_MAP=True PYTHONHASHSEED=0 PYTHONUNBUFFERED=1; cwd — OUT",
  "forced": "установка: extra full (datasets, litellm) — без него квикстарт падает на импорте",
  "snapshot": "gepa.log — вывод квикстарта (в конце Optimized prompt)",
  "expected_calls": "≈171 без принятых потомков (45 val + 18 итераций × 7), +45 на каждого принятого; до ≈260"
