@@ -1,0 +1,36 @@
+{
+  "upstream": "EvoLib",
+  "commit": "98266b2d22e146c19c651b1126ae81ff072f65e0",
+  "commit_note": "закреп = онлайн HEAD (единственный коммит main)",
+  "status": "раннер готов, живая запись не снята; прогон на фейковой модели доходит до конца",
+  "F": "переходник extract_and_grade (sitecustomize.py): EvoLib зовёт его как (решение, ответ), у matharena — (сообщения, число токенов, ответ, конфиг соревнования) в каждой версии с этой функцией (появилась в eae1e52 сразу с этой сигнатурой, на HEAD та же); логика оценки не меняется. Опубликованный код EvoLib не может посчитать HMMT ни с одной версией matharena, поэтому заявленные в статье результаты по математике не воспроизводимы опубликованным кодом",
+  "task": "hmmt: MathArena hmmt_feb_2025 + hmmt_nov_2025 + hmmt_feb_2026 (93 задачи) подряд, первые N (все из hmmt_feb_2025), без повторов",
+  "runner": "records/evolib_hmmt/run.sh OUT (UPSTREAMS по умолчанию ~/Projects/upstreams; N=12, EMB_PORT=8092; образ и кэш — bridge/setup_envs.sh evolib)",
+  "command": "cd /up/EvoLib/EvoLib && python eval_main.py --task hmmt --model ornith15-9b --n_iterations 12 --endpoint http://evorec:8080/v1 --embedding_endpoint http://evorec:8080/v1 --log_file /out/evolib.log",
+  "readme_command": "python eval_main.py --task hmmt --k_q_per_problem 10 --endpoint <chat_completions_endpoint> --embedding_endpoint <embeddings_endpoint> --log_file ./runs/hmmt.log",
+  "knobs": {
+    "--n_iterations": {"value": 12, "default": 5000, "class": "K", "note": "первые 12 из 93 задач, i = kiter % 93 — без повторов (сравнение решений на повторе не вызывается)"},
+    "--k_q_per_problem": {"value": 3, "default": 3, "class": "K", "note": "умолчание кода; README для HMMT — 10"},
+    "--model": {"value": "ornith15-9b", "default": "o4-mini", "class": "T"},
+    "--endpoint / --embedding_endpoint": {"value": "прокси записи /v1", "default": "Azure", "class": "T"},
+    "--log_file": {"value": "/out/evolib.log", "default": null, "class": "T", "note": "OUT пустой: по [Iter N] в логе апстрим возобновляется"},
+    "--k_sample_skills / --k_sample_insights / --w_IG / --IG_update_rate / --eps / порог слияния": {"value": "по умолчанию", "default": "10 / 10 / 1.0 / 0.5 / 0.01 / 0.8"}
+  },
+  "bridge": {
+    "sitecustomize.py": "openai.AzureOpenAI -> openai.OpenAI(base_url=--endpoint, api_key='x') (T); random.seed(0) при старте интерпретатора; переходник extract_and_grade (F, выше): решение — одно сообщение assistant, число токенов 0 (идёт только в предупреждение), конфиг — configs/competitions/hmmt/hmmt_feb_2025.yaml (все N задач из этого набора)",
+    "PYTHONHASHSEED": "0",
+    "cwd": "EvoLib/EvoLib, как в README"
+  },
+  "sampling": "путь o4-mini (reasoning API): в запросе только model, messages, max_completion_tokens=50000, reasoning_effort=high; temperature (0 у решателя и др.) в этой ветке апстрима выбрасывается — шлюз обязан стоять с GATEWAY_OPENAI_DEFAULTS=1 (T=1, top_p=1), run.sh проверяет это. reasoning_effort шлюз игнорирует",
+  "embeddings": "text-embedding-3-small апстрима -> BGE-M3 стенда (tools/record/embeddings.py на хосте) через прокси; порог слияния 0.8 откалиброван под OpenAI",
+  "data": {
+    "MathArena/hmmt_feb_2025": "HF 6fdc4277120810ff75aa22d2d5489b91f7a262a1",
+    "MathArena/hmmt_nov_2025": "HF 118dbfb45c4c9467c672268ed55166642897aa46",
+    "MathArena/hmmt_feb_2026": "HF 02fba4f74d8e68e73e66a02d540fd979c05c274c",
+    "cache": "$UPSTREAMS/.hf-evolib (в контейнер — копией datasets/ и modules/); ревизию апстрим не закрепляет",
+    "matharena": "e927660 (последний коммит до коммита EvoLib), /up/matharena/src через PYTHONPATH; axiom-axle стоит в образе (импорт грейдера), Lean не вызывается"
+  },
+  "env": "контейнер evolib-upstream (../evolib/Dockerfile, python 3.12.14 — requires-python matharena, все версии закреплены), пользователь runner; сеть evonet --internal, единственный выход — контейнер записи evorec; --cap-drop ALL --security-opt no-new-privileges --pids-limit 256 --memory 4g; апстримы и кэш — только на чтение",
+  "estimate": "вызовов модели на итерацию: 3 решателя + insight (если не N/A) + слияния skills/insights при сходстве > 0.8; прошлая запись HMMT — 4,8 на итерацию при 55 с/вызов, фейк — 5,6 (слияния завышены); N=12 -> 55–70 вызовов: ~50–65 мин при 55 с, 11–70 мин при 12–60 с",
+  "snapshot": "evolib.log — лог апстрима по итерациям (балл, IG, размеры библиотек, решение, [AvgScore]); чекпойнт evolib.*.json при N=12 не пишется (только на 20-й итерации): позадачный зачёт — приросты [AvgScore] в evolib.log (задачи не повторяются); run.log — вывод (результаты extract_and_grade)"
+}
