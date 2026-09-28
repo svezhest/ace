@@ -1,0 +1,30 @@
+{
+ "upstream": "gepa",
+ "commit": "d771eb21b5dd3228bc3f567293d2ccfc423fc900",
+ "runner": "records/gepa_quickstart/run.sh",
+ "command": "$UPSTREAMS/.venvs/gepa/bin/python quickstart.py",
+ "knobs": {
+  "trainset / valset": {
+   "value": "init_dataset() целиком (45 / 45)",
+   "default": "то же"
+  },
+  "max_metric_calls": {
+   "value": 150,
+   "default": 150
+  },
+  "task_lm": {
+   "value": "openai/ornith15-9b",
+   "default": "openai/gpt-4.1-mini",
+   "class": "T"
+  },
+  "reflection_lm": {
+   "value": "openai/ornith15-9b",
+   "default": "openai/gpt-5",
+   "class": "T"
+  }
+ },
+ "env": "venv .venvs/gepa (uv.lock апстрима, extra full), апстрим из $UPSTREAMS/gepa/src через PYTHONPATH (в venv не установлен); OPENAI_BASE_URL=прокси записи OPENAI_API_KEY=x HF_HUB_OFFLINE=1 LITELLM_LOCAL_MODEL_COST_MAP=True PYTHONHASHSEED=0 PYTHONUNBUFFERED=1; cwd — OUT",
+ "forced": "установка: extra full (datasets, litellm) — без него квикстарт падает на импорте",
+ "snapshot": "gepa.log — вывод квикстарта (в конце Optimized prompt)",
+ "expected_calls": "≈171 без принятых потомков (45 val + 18 итераций × 7), +45 на каждого принятого; до ≈260"
+}
