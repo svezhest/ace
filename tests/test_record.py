@@ -2,6 +2,7 @@
 import hashlib
 import json
 import random
+import socket
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -252,3 +253,24 @@ def test_unknown_field_rejected(fake, tmp_path, capsys):
     rec.shutdown()
     assert "unknown request field(s) chat_template_kwargs" in capsys.readouterr().err
     assert not fake.got and not (tmp_path / "rec.jsonl").exists()
+
+
+def test_sse_and_assemble_choices_reasoning_refusal():
+    """n=2: варианты не сливаются; reasoning и refusal доходят до собранного ответа."""
+    msgs = [{"role": "assistant", "content": "a", "reasoning": "r"}, {"role": "assistant", "content": None,
+                                                                      "refusal": "no"}]
+    resp = {"id": "a", "created": 1, "model": "m", "object": "chat.completion",
+            "choices": [{"index": i, "finish_reason": "stop", "message": m} for i, m in enumerate(msgs)]}
+    frames = [json.loads(x[6:]) for x in sse(resp, {}).decode().split("\n\n") if x and x != "data: [DONE]"]
+    assert assemble(frames) == resp
+
+
+def test_get_upstream_down(tmp_path):
+    s = socket.socket()
+    s.bind(("127.0.0.1", 0))
+    port = s.getsockname()[1]
+    s.close()
+    rec = start(Recorder(("127.0.0.1", 0), tmp_path / "rec.jsonl", f"http://127.0.0.1:{port}"))
+    with pytest.raises(openai.InternalServerError, match="upstream unreachable"):
+        client(rec).models.list()
+    rec.shutdown()

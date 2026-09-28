@@ -127,6 +127,8 @@ class Recorder(ThreadingHTTPServer):
                 out.send_raw(r.status, r.read())
         except urllib.error.HTTPError as e:
             out.send_raw(e.code, e.read())
+        except urllib.error.URLError as e:
+            out.error(502, f"upstream unreachable: {e}")
 
 
 class Replayer(ThreadingHTTPServer):
@@ -222,7 +224,7 @@ def sse(resp: dict, body: dict) -> bytes:
     for ch in resp.get("choices", []):
         msg = ch.get("message") or {}
         delta = {"role": msg.get("role", "assistant")}
-        for k in ("content", "reasoning_content", "refusal"):
+        for k in ("content", "reasoning_content", "reasoning", "refusal"):
             if msg.get(k) is not None:
                 delta[k] = msg[k]
         deltas = [delta]
@@ -243,16 +245,16 @@ def sse(resp: dict, body: dict) -> bytes:
 
 def assemble(frames: list[dict]) -> dict:
     """Кадры chat.completion.chunk -> chat.completion, как его отдаёт сервер без stream."""
-    msg = {"role": "assistant", "content": None}
-    calls = {}              # номер вызова -> собранный вызов инструмента
-    finish = None
+    choices = {}            # номер варианта -> сообщение, вызовы инструментов по номеру, finish_reason
     usage = None
     for f in frames:
         usage = f.get("usage") or usage
         for ch in f.get("choices") or []:
+            got = choices.setdefault(ch.get("index", 0), [{"role": "assistant", "content": None}, {}, None])
+            msg, calls = got[0], got[1]
             delta = ch.get("delta") or {}
             msg["role"] = delta.get("role") or msg["role"]
-            for k in ("content", "reasoning_content"):
+            for k in ("content", "reasoning_content", "reasoning", "refusal"):
                 if delta.get(k) is not None:
                     msg[k] = (msg.get(k) or "") + delta[k]
             for tc in delta.get("tool_calls") or []:
@@ -263,12 +265,17 @@ def assemble(frames: list[dict]) -> dict:
                 fn = tc.get("function") or {}
                 call["function"]["name"] += fn.get("name") or ""
                 call["function"]["arguments"] += fn.get("arguments") or ""
-            finish = ch.get("finish_reason") or finish
-    if calls:
-        msg["tool_calls"] = [dict(calls[i], index=i) for i in sorted(calls)]
+            got[2] = ch.get("finish_reason") or got[2]
+    if not choices:
+        choices[0] = [{"role": "assistant", "content": None}, {}, None]
+    out = []
+    for i, (msg, calls, finish) in sorted(choices.items()):
+        if calls:
+            msg["tool_calls"] = [dict(calls[j], index=j) for j in sorted(calls)]
+        out.append({"finish_reason": finish, "index": i, "message": msg})
     first = frames[0] if frames else {}
-    out = {"choices": [{"finish_reason": finish, "index": 0, "message": msg}], "created": first.get("created"),
-           "id": first.get("id"), "model": first.get("model"), "object": "chat.completion"}
+    out = {"choices": out, "created": first.get("created"), "id": first.get("id"), "model": first.get("model"),
+           "object": "chat.completion"}
     if usage:
         out["usage"] = usage
     return out
