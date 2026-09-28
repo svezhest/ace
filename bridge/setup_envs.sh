@@ -1,6 +1,6 @@
 #!/bin/sh
 # Окружения для снятия эталонов: чистые worktree апстримов на зафиксированных коммитах и venv через uv.
-# usage: bridge/setup_envs.sh [ace|mce|youtu|gepa|light|litellm ...]   (без аргументов — все)
+# usage: bridge/setup_envs.sh [ace|mce|youtu|gepa|light|evolib|litellm ...]   (без аргументов — все)
 set -e
 UP=${UPSTREAMS:-$HOME/Projects/upstreams}
 V=$UP/.venvs
@@ -40,6 +40,14 @@ if want light; then
   uv pip install -q -p "$V/light" -r "$UP/EvoLib/EvoLib/requirements.txt" \
     "openai>=1.0.0" "anthropic>=0.18.0" "litellm>=1.0.0" python-dotenv \
     numpy tiktoken scikit-learn
+fi
+# EvoLib на LiveCodeBench (records/evolib): lcb_runner — из клона LiveCodeBench, его зависимости — по его uv.lock
+if want evolib; then
+  [ -d "$UP/LiveCodeBench" ] || git clone -q https://github.com/LiveCodeBench/LiveCodeBench "$UP/LiveCodeBench"
+  git -C "$UP/LiveCodeBench" checkout -q --detach 28fef95
+  uv venv -q --allow-existing -p 3.11 "$V/evolib"
+  uv pip install -q -p "$V/evolib" --index-url https://pypi.org/simple -r "$UP/EvoLib/EvoLib/requirements.txt" \
+    anthropic==0.49.0 datasets==3.5.0 huggingface-hub==0.30.2 tqdm==4.67.1
 fi
 # LiteLLM proxy для агентов Claude SDK в MCE (запись bridge/live/mce и её воспроизведение в tests/live/test_mce.py)
 if want litellm; then
