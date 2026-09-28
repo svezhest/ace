@@ -1,0 +1,30 @@
+{
+  "upstream": "ace",
+  "commit": "82709de050e1db6e6ef2f07bcb0393560b94992a",
+  "commit_note": "закреп = онлайн HEAD на 27.09.2026",
+  "status": "раннер готов, живая запись не снята; два прогона на фейковой модели доходят до конца, наборы канонических запросов совпадают (220 = 220)",
+  "mode": "протокол ace_offline_finer + --no_ground_truth: рефлектор и куратор получают REFLECTOR_PROMPT_NO_GT и CURATOR_PROMPT_NO_GT без эталона; верность ответа (environment_feedback, остановка раундов) апстрим по-прежнему считает по target",
+  "mode_choice": "офлайн: README не привязывает флаг к режиму, офлайн — режим по умолчанию и первый пример README, в статье (табл. 2, FiNER) ACE без GT есть и в офлайне; запись отличается от ace_offline_finer ровно одним флагом",
+  "runner": "records/ace_nogt/run.sh OUT (UPSTREAMS по умолчанию ~/Projects/upstreams, PORT=8096, MODEL_URL=http://localhost:8080)",
+  "command": "python -m eval.finance.run --task_name finer --mode offline --save_path <OUT>/out --api_provider openai --generator_model ornith15-9b --reflector_model ornith15-9b --curator_model ornith15-9b --test_workers 1 --eval_steps 10 --num_epochs 2 --save_steps 1 --no_ground_truth",
+  "readme_command": "uv run python -m eval.finance.run --task_name finer --mode offline --save_path results (+ --no_ground_truth из таблицы аргументов README)",
+  "knobs": {
+    "--no_ground_truth": {"value": true, "default": false, "class": "K", "note": "режим записи"},
+    "срез (sample_config.json в cwd)": {"value": "первые 10 train / 10 val / 10 test", "class": "K", "default": "finer_train_batched_1000_samples / finer_val_batched_500_samples / finer_test_subset_006_seed42 (1000/500/441)"},
+    "--eval_steps": {"value": 10, "default": 100, "class": "K", "note": "= N_train: val раз в эпоху"},
+    "--num_epochs": {"value": 2, "default": 1, "class": "K"},
+    "--save_steps": {"value": 1, "default": 50, "class": "K"},
+    "--api_provider": {"value": "openai", "default": "sambanova", "class": "K"},
+    "--test_workers": {"value": 1, "default": 20, "class": "T"},
+    "--generator/reflector/curator_model": {"value": "ornith15-9b", "default": "DeepSeek-V3.1", "class": "T"},
+    "--max_num_rounds / --curator_frequency / --max_tokens / --playbook_token_budget / --batch_size": {"value": "по умолчанию", "default": "3 / 1 / 4096 / 80000 / 1"}
+  },
+  "bridge": {
+    "sitecustomize.py": "base_url openai.OpenAI из ACE_BASE_URL (T: utils.py зашивает api.openai.com); random.seed(0) при старте интерпретатора (random у апстрима — только джиттер паузы перед повтором в llm.py)",
+    "PYTHONHASHSEED": "0"
+  },
+  "env": "venv .venvs/ace (uv.lock апстрима), cwd — свой каталог с eval/finance/data/{sample_config.json, срезы}; PYTHONPATH=<site>:$UPSTREAMS/ace; OPENAI_API_KEY=x TIKTOKEN_CACHE_DIR HF_HUB_OFFLINE=1 PYTHONHASHSEED=0 PYTHONUNBUFFERED=1",
+  "sampling": "в запросах только model, messages, temperature=0.0, max_completion_tokens=4096",
+  "estimate": "40 тестовых (initial, 2 val, final) + 20 шагов по 4 (верно сразу) … 9 (3 раунда) вызовов. У ace_offline_finer 139 (9 шагов верно сразу, 10 исправлены за 1–2 раунда); без эталона исправления реже: ≈139–175, предел 220. При 12–60 с/вызов 0,5–3 ч (175 вызовов 35–175 мин); по фактическим средним ace_offline_finer (генератор 29 с, рефлектор 47 с, куратор 57 с, без одного зависшего вызова 8,6 ч) ≈1,5–1,8 ч",
+  "snapshot": "out/ — выход апстрима (run_config, playbook-и по шагам, результаты тестов и val), run.log — вывод"
+}
