@@ -1,0 +1,9 @@
+# @package _global_
+# math_live (records/tfgrpo) без ground truth: штатный переключатель апстрима practice.given_ground_truth
+# (utu/config/practice_config.py; ручки CLI у него нет)
+defaults:
+  - math_live
+  - _self_
+
+practice:
+  given_ground_truth: false

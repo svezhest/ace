@@ -1,0 +1,26 @@
+{
+ "upstream": "youtu-agent",
+ "commit": "c2caa539f4c95ae1c39ed24dc8a99cb3651e1d5d",
+ "commit_note": "тот же закреп, что у records/tfgrpo",
+ "status": "раннер готов, живая запись не снята; два прогона на фейковой модели доходят до конца, наборы канонических запросов совпадают (196 = 196): в 48 итогах rollout и 16 преимуществах эталон и награда — [REDACTED]",
+ "mode": "протокол records/tfgrpo + practice.given_ground_truth: false (utu/config/practice_config.py; ручки CLI нет, только конфиг) — configs/practice/math_live_nogt.yaml = math_live + этот ключ. Шаблоны experience.yaml те же, но в SINGLE_ROLLOUT_SUMMARY_TEMPLATE_UP и SINGLE_QUERY_GROUP_ADVANTAGE_UP вместо эталона [REDACTED], в Attempt i — Reward [REDACTED]; итог rollout и групповое преимущество получают все группы, а не только частично верные (utu/practice/experience_updater.py). Награду rollout апстрим по-прежнему считает по эталону (verify/math.py) и пишет в БД, в запросы она не попадает",
+ "runner": "records/tfgrpo_nogt/run.sh OUT (MODEL_URL — адрес модели для прокси, по умолчанию шлюз хоста); prep.py, Dockerfile, sitecustomize.py, configs — из records/tfgrpo; контейнеры tfng-rec, tfng-run",
+ "command": "python scripts/run_training_free_GRPO.py --config_name math_live_nogt --experiment_name tf_live --batch_size 4 --grpo_n 3 --rollout_concurrency 1 --rollout_data_truncate 16; python scripts/run_eval.py --config_name math/math_live_test",
+ "readme_command": "как у records/tfgrpo, с practice.given_ground_truth: false в конфиге практики",
+ "knobs": {
+  "practice.given_ground_truth": {
+   "value": false,
+   "default": true,
+   "class": "K",
+   "note": "режим записи; configs/practice/math_live_nogt.yaml"
+  },
+  "остальные": "как в records/tfgrpo/run.json"
+ },
+ "data": "как в records/tfgrpo/run.json (prep.py оттуда)",
+ "env": "как в records/tfgrpo/run.json; прокси — контейнер tfng-rec, апстрим — tfng-run, сеть tfnet",
+ "random": "как в records/tfgrpo/run.json (sitecustomize.py оттуда, PYTHONHASHSEED=0, libfaketime)",
+ "order": "как в records/tfgrpo/run.json",
+ "forced": "как в records/tfgrpo/run.json",
+ "snapshot": "как в records/tfgrpo/run.json",
+ "expected_calls": "≈420–700: rollout практики 48 × 6–10 (+ до 50 ходов на зацикливающихся вопросах), извлечение 21 на батч (12 итогов rollout, 4 преимущества, 4 групповых и 1 пакетное обновление; при GT — только частично верные группы), итоговый тест 8 × 6–15; ≈2,5–6 ч"
+}
