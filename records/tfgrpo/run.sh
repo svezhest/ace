@@ -8,6 +8,8 @@
 # держит перехваченным stdout процесса. Поэтому шаг ждёт своей отметки в файлах (обучение — итоговый агент
 # configs/agents/practice/tf_live_agent.yaml, его пишут последним; тест — «> Cleaning up...» в logs/utu.log после
 # подсчёта) и гасит процесс, если тот ещё жив.
+# Рандом: PYTHONHASHSEED=0, sitecustomize.py (random.seed и uuid4 от сида); стенные часы стоят (libfaketime,
+# монотонные идут) — метка времени в workdir python_executor, который видит модель, одна и та же.
 # Данные готовит prep.py на хосте без сети: parquet DAPO-Math-17k лежит в $UPSTREAMS/.data, AIME24 — в кэше HF.
 # usage: run.sh OUT   (в OUT: rec.jsonl — запись, test.db — БД прогона, tf_live_agent.yaml — итоговый агент,
 # train.log и test.log — вывод команд, utu_train/ и utu_test/ — их logs/)
@@ -23,7 +25,7 @@ UTU_LLM_TYPE=chat.completions UTU_LLM_MODEL=x UTU_LLM_BASE_URL=http://127.0.0.1:
 rm -rf "$OUT/prep"
 ACE=${ACE:-$(cd "$HERE/../.." && pwd)}
 M=ornith15-9b
-docker image inspect youtu-upstream >/dev/null 2>&1 || docker build -q -t youtu-upstream "$HERE" >/dev/null
+docker build -q -t youtu-upstream "$HERE" >/dev/null
 docker network inspect tfnet >/dev/null 2>&1 || docker network create --internal tfnet >/dev/null
 docker run -d --rm --name tfrec --network bridge -v "$ACE/tools":/ace/tools:ro -v "$OUT/rec":/out -e PYTHONPATH=/ace \
     -e PYTHONDONTWRITEBYTECODE=1 youtu-upstream python -c "
@@ -34,10 +36,12 @@ docker network connect tfnet tfrec
 trap 'docker rm -f tfrec >/dev/null' EXIT
 docker run --rm --name tfrun --network tfnet --cap-drop ALL --security-opt no-new-privileges --pids-limit 512 \
     --memory 8g -v "$U/youtu-agent":/up:ro -v "$HERE/configs":/cfg:ro -v "$U/.tiktoken":/tiktoken:ro -v "$OUT":/out \
+    -v "$HERE/sitecustomize.py":/site/sitecustomize.py:ro -e PYTHONHASHSEED=0 -e FAKETIME="2026-01-01 00:00:00" \
+    -e FAKETIME_DONT_FAKE_MONOTONIC=1 -e LD_PRELOAD=/usr/local/lib/libfaketimeMT.so.1 \
     -e UTU_LLM_TYPE=chat.completions -e UTU_LLM_MODEL=$M -e UTU_LLM_BASE_URL=http://tfrec:8080/v1 -e UTU_LLM_API_KEY=x \
     -e JUDGE_LLM_TYPE=chat.completions -e JUDGE_LLM_MODEL=$M -e JUDGE_LLM_BASE_URL=http://tfrec:8080/v1 \
     -e JUDGE_LLM_API_KEY=x -e UTU_DB_URL=sqlite:////out/test.db -e TIKTOKEN_CACHE_DIR=/tiktoken -e HF_HUB_OFFLINE=1 \
-    -e PYTHONUNBUFFERED=1 -e PYTHONPATH=/tmp/up -e PYTHONDONTWRITEBYTECODE=1 -e HOME=/tmp youtu-upstream sh -c '
+    -e PYTHONUNBUFFERED=1 -e PYTHONPATH=/site:/tmp/up -e PYTHONDONTWRITEBYTECODE=1 -e HOME=/tmp youtu-upstream sh -c '
 set -e
 # step LOG УСЛОВИЕ команда...: команда в фоне с выводом в /out/LOG; ждёт УСЛОВИЯ, потом гасит процесс
 step() {
