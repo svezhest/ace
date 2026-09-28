@@ -41,13 +41,23 @@ if want light; then
     "openai>=1.0.0" "anthropic>=0.18.0" "litellm>=1.0.0" python-dotenv \
     numpy tiktoken scikit-learn
 fi
-# EvoLib на LiveCodeBench (records/evolib): lcb_runner — из клона LiveCodeBench, его зависимости — по его uv.lock
+# EvoLib (records/evolib, records/evolib_hmmt): образ evolib-upstream, исходники lcb_runner и грейдера matharena
+# монтируются в контейнер; кэш HF для записей — $UP/.hf-evolib (LiveCodeBench v6: скрипт датасета качает все
+# test*.jsonl, ~4,2 ГБ; три набора HMMT)
 if want evolib; then
   [ -d "$UP/LiveCodeBench" ] || git clone -q https://github.com/LiveCodeBench/LiveCodeBench "$UP/LiveCodeBench"
   git -C "$UP/LiveCodeBench" checkout -q --detach 28fef95
-  uv venv -q --allow-existing -p 3.11 "$V/evolib"
-  uv pip install -q -p "$V/evolib" --index-url https://pypi.org/simple -r "$UP/EvoLib/EvoLib/requirements.txt" \
-    anthropic==0.49.0 datasets==3.5.0 huggingface-hub==0.30.2 tqdm==4.67.1
+  [ -d "$UP/matharena" ] || git clone -q https://github.com/eth-sri/matharena "$UP/matharena"
+  git -C "$UP/matharena" checkout -q --detach e927660
+  docker build -q -t evolib-upstream "$(dirname "$0")/../records/evolib" >/dev/null
+  mkdir -p "$UP/.hf-evolib"
+  docker run --rm -v "$UP/.hf-evolib":/hf -v "$UP/LiveCodeBench":/lcb:ro -w /lcb -e HF_HOME=/hf -e PYTHONPATH=/lcb \
+    -e PYTHONDONTWRITEBYTECODE=1 evolib-upstream python -c "
+from datasets import load_dataset
+from lcb_runner.benchmarks import load_code_generation_dataset
+load_code_generation_dataset(release_version='v6')
+for name in ['hmmt_feb_2025', 'hmmt_nov_2025', 'hmmt_feb_2026']:
+    load_dataset(f'MathArena/{name}', split='train')" >/dev/null
 fi
 # LiteLLM proxy для агентов Claude SDK в MCE (запись bridge/live/mce и её воспроизведение в tests/live/test_mce.py)
 if want litellm; then
