@@ -201,6 +201,23 @@ def test_sse_and_assemble_tool_calls():
     assert assemble([json.loads(f) for f in frames[:-1]]) == resp
 
 
+def test_sse_tool_calls_frame_by_frame():
+    """Каждый вызов своими кадрами: сначала id и имя, потом аргументы; конец — отдельным кадром."""
+    calls = [{"id": f"t{i}", "type": "function", "function": {"name": f"f{i}", "arguments": f'{{"a":{i}}}'},
+              "index": i} for i in range(2)]
+    resp = {"id": "a", "created": 1, "model": "m", "object": "chat.completion",
+            "choices": [{"index": 0, "finish_reason": "tool_calls",
+                         "message": {"role": "assistant", "content": None, "tool_calls": calls}}]}
+    frames = [json.loads(x[6:]) for x in sse(resp, {}).decode().split("\n\n") if x and x != "data: [DONE]"]
+    deltas = [f["choices"][0]["delta"].get("tool_calls") for f in frames]
+    assert deltas[1:5] == [[{"index": 0, "id": "t0", "type": "function", "function": {"name": "f0", "arguments": ""}}],
+                           [{"index": 0, "function": {"arguments": '{"a":0}'}}],
+                           [{"index": 1, "id": "t1", "type": "function", "function": {"name": "f1", "arguments": ""}}],
+                           [{"index": 1, "function": {"arguments": '{"a":1}'}}]]
+    assert [f["choices"][0]["finish_reason"] for f in frames] == [None] * 5 + ["tool_calls"]
+    assert assemble(frames) == resp
+
+
 def test_embeddings_server(monkeypatch):
     """Сервер эмбеддингов: клиент openai по умолчанию просит base64 и получает те же float32, что списком."""
     monkeypatch.setattr("ace.embed.embed", lambda texts: np.array([[len(t), 0.1] for t in texts], dtype="float32"))

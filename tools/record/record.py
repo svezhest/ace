@@ -194,7 +194,8 @@ def error_body(error) -> dict:
 
 
 def sse(resp: dict, body: dict) -> bytes:
-    """chat.completion -> кадры SSE, как их шлёт OpenAI: роль и текст, конец, usage (если просили)."""
+    """chat.completion -> кадры SSE, как их шлёт OpenAI: роль и текст, вызовы инструментов, конец, usage
+    (если просили)."""
     frames = []
     base = {k: resp.get(k) for k in ("id", "created", "model")}
     base["object"] = "chat.completion.chunk"
@@ -204,10 +205,15 @@ def sse(resp: dict, body: dict) -> bytes:
         for k in ("content", "reasoning_content", "refusal"):
             if msg.get(k) is not None:
                 delta[k] = msg[k]
-        if msg.get("tool_calls"):
-            delta["tool_calls"] = [dict(tc, index=i) for i, tc in enumerate(msg["tool_calls"])]
+        deltas = [delta]
+        # каждый вызов своими кадрами: из общего кадра LiteLLM передаёт дальше только первый вызов
+        for i, tc in enumerate(msg.get("tool_calls") or []):
+            fn = tc.get("function") or {}
+            deltas.append({"tool_calls": [{"index": i, "id": tc.get("id"), "type": tc.get("type", "function"),
+                                           "function": {"name": fn.get("name"), "arguments": ""}}]})
+            deltas.append({"tool_calls": [{"index": i, "function": {"arguments": fn.get("arguments") or ""}}]})
         idx = ch.get("index", 0)
-        frames.append(dict(base, choices=[{"index": idx, "delta": delta, "finish_reason": None}]))
+        frames += [dict(base, choices=[{"index": idx, "delta": d, "finish_reason": None}]) for d in deltas]
         frames.append(dict(base, choices=[{"index": idx, "delta": {}, "finish_reason": ch.get("finish_reason")}]))
     if (body.get("stream_options") or {}).get("include_usage") and "usage" in resp:
         frames.append(dict(base, choices=[], usage=resp["usage"]))
