@@ -1,143 +1,190 @@
-"""Записывающий прокси OpenAI-совместимого API (chat/completions, embeddings):
-    uv run python -m tools.record.record OUT.jsonl [--port 8090] [--upstream URL]
-        [--embeddings-upstream URL] [--seed] [--cache REC.jsonl --normalize mce]
---upstream — сервер модели, по умолчанию OPENAI_BASE_URL стенда без /v1. Клиенту — base_url
-http://127.0.0.1:PORT/v1. Каждая пара пишется строкой JSONL:
-{"path", "request": канонический JSON, "n": номер повтора такого же запроса, "seed", "status", "response"}.
---seed: если в запросе chat/completions нет seed, подставить seed_for(запрос, n) (--seed-salt S — другая серия).
-Клиенту, просившему stream, заголовки ответа идут сразу, наверх — тоже stream; в запись — ответ, собранный из
-кадров (wire.assemble), клиенту — он же кадрами wire.sse, как у воспроизведения. Остальное наверх — без stream.
---cache: ответ прошлой записи на запрос, совпавший с её запросом после normalize (k-й такой же запрос — её k-й
-ответ, как у replay), в модель не идёт, но пишется в новую запись как есть; остальное — как обычно. Так запись
-переснимается без повторных вызовов модели (MCE: вывод Bash хоста меняется от прогона к прогону, DEVIATIONS MCE7)."""
+"""Прокси записи и воспроизведение OpenAI-совместимого API (chat/completions, embeddings):
+    uv run python -m tools.record.record OUT.jsonl [--port 8090] [--upstream URL] [--embeddings-upstream URL]
+    uv run python -m tools.record.record REC.jsonl --replay [--port 8091]
+Ключ ответа — (путь, канонический запрос, номер повтора этого запроса в прогоне). Канонический запрос — поля FIELDS
+тела, ключи по алфавиту. Наверх уходит только он и seed = seed_for(запрос, n), так что ответ модели — функция
+ключа и не зависит от порядка вызовов. Строка записи:
+{"path", "request": канонический запрос, "n", "seed", "status", "response"}.
+Воспроизведение отдаёт k-му такому же запросу k-й записанный ответ; запроса нет в записи — 400 с diff против
+ближайшего записанного. GET /_status — сколько отдано и сколько не востребовано."""
 import argparse
+import difflib
+import hashlib
 import json
+import sys
 import threading
 import urllib.error
 import urllib.request
 from collections import Counter, defaultdict
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from tools.record import wire
+CHAT = "/v1/chat/completions"
+EMBEDDINGS = "/v1/embeddings"
+# всё, что доходит до модели; остальное (stream, stream_options, seed, user, metadata, заголовки) в ключ не входит
+FIELDS = {
+    CHAT: ("model", "messages", "tools", "tool_choice", "parallel_tool_calls", "response_format", "temperature",
+           "top_p", "top_k", "min_p", "presence_penalty", "frequency_penalty", "max_tokens", "max_completion_tokens",
+           "stop", "n", "logit_bias", "logprobs", "top_logprobs", "reasoning_effort", "enable_thinking",
+           "thinking_budget"),
+    EMBEDDINGS: ("model", "input", "dimensions", "encoding_format"),
+}
+UPSTREAM_TIMEOUT = 3600     # секунд на ответ модели
 
-UPSTREAM_TIMEOUT = 3600     # секунд на ответ модели наверху
+
+def canon(path: str, body: dict) -> str:
+    return json.dumps({k: body[k] for k in FIELDS[path] if k in body}, sort_keys=True, ensure_ascii=False,
+                      separators=(",", ":"))
 
 
-class Recorder(wire.Server):
-    def __init__(self, addr, out: Path, upstream: str, emb_upstream: str | None, seed: bool, cache: Path = None,
-                 normalize=None, salt=""):
-        super().__init__(addr, RecordHandler)
-        self.salt = salt
-        self.normalize = normalize or wire.as_is
-        self.cache = defaultdict(list)      # ключ после normalize -> записи прошлой записи (--cache)
-        self.hits = Counter()               # сколько из них уже отдано
-        for line in cache.read_text().splitlines() if cache else []:
-            r = json.loads(line)
-            self.cache[wire.key(r["path"], self.normalize(r["request"]))].append(r)
+def seed_for(c: str, n: int) -> int:
+    h = hashlib.sha256(f"{c}#{n}".encode()).digest()
+    return int.from_bytes(h[:8], "big") >> 1
+
+
+def load(rec: Path) -> dict:
+    """Запись -> {(путь, канонический запрос): [строки по номеру повтора]}. Ключ пересчитывается, поэтому читаются
+    и записи старого прокси, у которого в запросе были и клиентские поля."""
+    got = defaultdict(list)
+    for line in rec.read_text().splitlines() if rec.exists() else []:
+        r = json.loads(line)
+        got[r["path"], canon(r["path"], json.loads(r["request"]))].append(r)
+    return got
+
+
+class Recorder(ThreadingHTTPServer):
+    daemon_threads = True
+
+    def __init__(self, addr, out: Path, upstream: str, emb_upstream: str | None = None, seed=True):
+        assert seed, "seed подставляется всегда"      # аргумент оставлен для старых раннеров
+        super().__init__(addr, Handler)
         self.out = out
         self.upstream = upstream.rstrip("/")
         self.emb_upstream = (emb_upstream or upstream).rstrip("/")
-        self.seed = seed
+        self.count = Counter({k: len(v) for k, v in load(out).items()})
         self.lock = threading.Lock()
-        self.count = Counter()
-        if out.exists():        # дописываем: повторы считаются с учётом уже записанного
-            for line in out.read_text().splitlines():
-                r = json.loads(line)
-                self.count[wire.key(r["path"], r["request"])] += 1
 
-    def forward(self, path: str, body: dict, auth: str) -> tuple[int, dict]:
-        base = self.emb_upstream if path.endswith("embeddings") else self.upstream
-        try:
-            with post(base + path, body, auth) as r:
-                return r.status, json.loads(r.read())
-        except urllib.error.HTTPError as e:
-            return e.code, error_body(e)
-
-    def write(self, path, c, n, seed, status, resp, **more):
-        rec = {"path": path, "request": c, "n": n, "seed": seed, "status": status, "response": resp, **more}
-        with self.out.open("a") as f:
-            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
-        self.count[wire.key(path, c)] += 1
-
-    def cached(self, path, c, n):
-        """Ответ прошлой записи (--cache) на этот запрос; есть — он же пишется в новую запись."""
-        ck = wire.key(path, self.normalize(c))
-        if self.hits[ck] >= len(self.cache[ck]):
-            return None
-        old = self.cache[ck][self.hits[ck]]
-        self.hits[ck] += 1
-        self.write(path, c, n, old["seed"], old["status"], old["response"], cached=True)
-        return old["status"], old["response"]
-
-    def prepare(self, path, body, c, n):
-        """Запрос наверх: без stream, с seed_for, если просили --seed. -> (запрос, seed)."""
-        sent = {x: v for x, v in body.items() if x not in ("stream", "stream_options")}
-        seed = None
-        if self.seed and path == wire.CHAT and "seed" not in body:
-            seed = sent["seed"] = wire.seed_for(c, n, self.salt)
-        return sent, seed
-
-    def handle(self, path: str, body: dict, headers):
-        c = wire.canon(body)
-        k = wire.key(path, c)
-        # весь запрос под замком: номер повтора и порядок строк в файле совпадают с порядком вызовов
+    def answer(self, path: str, body: dict, out: "Handler"):
+        c = canon(path, body)
+        # вызовы по одному: модель не видит соседних запросов, строки в файле идут в порядке вызовов
         with self.lock:
-            n = self.count[k]
-            hit = self.cached(path, c, n)
-            if hit:
-                return hit
-            sent, seed = self.prepare(path, body, c, n)
+            n = self.count[path, c]
+            sent = json.loads(c)
+            seed = None
+            if path == CHAT:
+                seed = sent["seed"] = seed_for(c, n)
+            stream = path == CHAT and bool(body.get("stream"))
+            if stream:      # долгий ответ идёт кадрами сразу, иначе клиент бросает его по таймауту и шлёт заново
+                sent.update(stream=True, stream_options={"include_usage": True})
+            base = self.emb_upstream if path == EMBEDDINGS else self.upstream
+            req = urllib.request.Request(base + path, json.dumps(sent).encode(), method="POST", headers={
+                "Content-Type": "application/json", "Authorization": out.headers.get("Authorization") or "Bearer x"})
             try:
-                status, resp = self.forward(path, sent, headers.get("Authorization") or "Bearer none")
-            except urllib.error.URLError as e:     # шлюз недоступен: не пишем, номер повтора не тратим
-                return 502, f"upstream unreachable: {e}"
-            self.write(path, c, n, seed, status, resp)
-        return status, resp
-
-    def stream(self, path: str, body: dict, headers, out: wire.Handler):
-        """Клиент просит stream: заголовки ответа — сразу (долгий ответ не упирается в таймаут клиента: CLI
-        Claude через LiteLLM иначе бросает его и шлёт заново), наверх тоже stream; в запись — ответ, собранный из
-        кадров, как без stream, клиенту — он же кадрами wire.sse, как их отдаст воспроизведение."""
-        c = wire.canon(body)
-        with self.lock:
-            n = self.count[wire.key(path, c)]
-            hit = self.cached(path, c, n)
-            if hit:
-                status, resp = hit
-                if status == 200:
-                    return out.reply(status, wire.sse(resp, body), "text/event-stream")
-                return out.reply(status, json.dumps(resp).encode(), "application/json")
-            sent, seed = self.prepare(path, body, c, n)
-            sent.update(stream=True, stream_options={"include_usage": True})
-            try:
-                up = post(self.upstream + path, sent, headers.get("Authorization") or "Bearer none")
+                with urllib.request.urlopen(req, timeout=UPSTREAM_TIMEOUT) as up:
+                    status = up.status
+                    if stream:
+                        out.start_stream()
+                        resp = assemble([json.loads(x[6:]) for x in map(bytes.strip, up)
+                                         if x.startswith(b"data: ") and x != b"data: [DONE]"])
+                        out.send(sse(resp, body))
+                        out.end_stream()
+                    else:
+                        resp = json.loads(up.read())
+                        out.reply(status, resp, body)
             except urllib.error.HTTPError as e:
-                resp = error_body(e)
-                self.write(path, c, n, seed, e.code, resp)
-                return out.reply(e.code, json.dumps(resp).encode())
-            except urllib.error.URLError as e:
-                return out.error(502, f"upstream unreachable: {e}", "upstream")
-            out.start_stream()
-            frames = []
-            with up:
-                for line in up:
-                    line = line.strip()
-                    if line.startswith(b"data: ") and line != b"data: [DONE]":
-                        frames.append(json.loads(line[6:]))
-            resp = wire.assemble(frames)
-            out.send(wire.sse(resp, body))
-            out.end_stream()
-            self.write(path, c, n, seed, 200, resp)
+                status, resp = e.code, error_body(e)
+                out.reply(status, resp, body)
+            except urllib.error.URLError as e:     # модель недоступна: не пишем, номер повтора не тратим
+                return out.error(502, f"upstream unreachable: {e}")
+            rec = {"path": path, "request": c, "n": n, "seed": seed, "status": status, "response": resp}
+            with self.out.open("a") as f:
+                f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+            self.count[path, c] += 1
+
+    def get(self, out: "Handler"):
+        try:
+            with urllib.request.urlopen(self.upstream + out.path, timeout=60) as r:
+                out.send_raw(r.status, r.read())
+        except urllib.error.HTTPError as e:
+            out.send_raw(e.code, e.read())
 
 
-def post(url, body, auth):
-    """POST JSON наверх; ответ — открытый поток (HTTPError при коде ошибки)."""
-    req = urllib.request.Request(url, json.dumps(body).encode(), method="POST",
-                                 headers={"Content-Type": "application/json", "Authorization": auth})
-    return urllib.request.urlopen(req, timeout=UPSTREAM_TIMEOUT)
+class Replayer(ThreadingHTTPServer):
+    daemon_threads = True
+
+    def __init__(self, addr, rec: Path):
+        super().__init__(addr, Handler)
+        self.rec = load(rec)
+        self.used = Counter()
+        self.misses = 0
+        self.lock = threading.Lock()
+
+    def answer(self, path: str, body: dict, out: "Handler"):
+        c = canon(path, body)
+        with self.lock:
+            got = self.rec.get((path, c), [])
+            n = self.used[path, c]
+            if n < len(got):
+                self.used[path, c] += 1
+                return out.reply(got[n]["status"], got[n]["response"], body)
+            self.misses += 1
+        msg = self.miss(path, c, n)
+        print(msg, file=sys.stderr, flush=True)
+        out.error(400, msg)
+
+    def miss(self, path: str, c: str, n: int) -> str:
+        if n:
+            return f"{path}: request recorded {n} time(s), repeat n={n} was not recorded"
+        known = [k for p, k in self.rec if p == path]
+        if not known:
+            return f"{path}: nothing recorded for this path"
+        near = max(known, key=lambda k: common_prefix(c, k))
+        return f"{path}: request not recorded; diff against nearest recorded:\n" + diff(c, near)
+
+    def status(self) -> dict:
+        total = sum(len(v) for v in self.rec.values())
+        served = sum(self.used.values())
+        return {"recorded": total, "served": served, "misses": self.misses, "unused": total - served}
+
+    def get(self, out: "Handler"):
+        if out.path == "/_status":
+            return out.reply(200, self.status(), {})
+        if out.path == "/v1/models":
+            models = sorted({json.loads(c).get("model", "") for _, c in self.rec})
+            return out.reply(200, {"object": "list", "data": [{"id": m, "object": "model"} for m in models]}, {})
+        out.error(404, f"unsupported path {out.path}")
 
 
-def error_body(error):
+def common_prefix(a: str, b: str) -> int:
+    return next((i for i, (x, y) in enumerate(zip(a, b)) if x != y), min(len(a), len(b)))
+
+
+def render(c: str) -> list[str]:
+    """Канонический запрос построчно для diff: длинные строки (промпты) разворачиваются по \\n."""
+    lines = []
+
+    def walk(v, pre):
+        if isinstance(v, dict):
+            for k in v:
+                walk(v[k], f"{pre}.{k}" if pre else k)
+        elif isinstance(v, list):
+            for i, x in enumerate(v):
+                walk(x, f"{pre}[{i}]")
+        elif isinstance(v, str) and "\n" in v:
+            lines.append(f"{pre}:")
+            lines.extend("    " + s for s in v.split("\n"))
+        else:
+            lines.append(f"{pre}: {json.dumps(v, ensure_ascii=False)}")
+
+    walk(json.loads(c), "")
+    return lines
+
+
+def diff(got: str, want: str) -> str:
+    return "\n".join(difflib.unified_diff(render(want), render(got), "recorded", "request", lineterm="", n=2))
+
+
+def error_body(error) -> dict:
     """Тело ответа с ошибкой: JSON как есть, иначе текст в оболочке ошибки OpenAI."""
     data = error.read()
     try:
@@ -146,33 +193,131 @@ def error_body(error):
         return {"error": {"message": data.decode(errors="replace"), "type": "upstream"}}
 
 
-class RecordHandler(wire.Handler):
+def sse(resp: dict, body: dict) -> bytes:
+    """chat.completion -> кадры SSE, как их шлёт OpenAI: роль и текст, конец, usage (если просили)."""
+    frames = []
+    base = {k: resp.get(k) for k in ("id", "created", "model")}
+    base["object"] = "chat.completion.chunk"
+    for ch in resp.get("choices", []):
+        msg = ch.get("message") or {}
+        delta = {"role": msg.get("role", "assistant")}
+        for k in ("content", "reasoning_content", "refusal"):
+            if msg.get(k) is not None:
+                delta[k] = msg[k]
+        if msg.get("tool_calls"):
+            delta["tool_calls"] = [dict(tc, index=i) for i, tc in enumerate(msg["tool_calls"])]
+        idx = ch.get("index", 0)
+        frames.append(dict(base, choices=[{"index": idx, "delta": delta, "finish_reason": None}]))
+        frames.append(dict(base, choices=[{"index": idx, "delta": {}, "finish_reason": ch.get("finish_reason")}]))
+    if (body.get("stream_options") or {}).get("include_usage") and "usage" in resp:
+        frames.append(dict(base, choices=[], usage=resp["usage"]))
+    out = b"".join(b"data: " + json.dumps(f, ensure_ascii=False).encode() + b"\n\n" for f in frames)
+    return out + b"data: [DONE]\n\n"
+
+
+def assemble(frames: list[dict]) -> dict:
+    """Кадры chat.completion.chunk -> chat.completion, как его отдаёт сервер без stream."""
+    msg = {"role": "assistant", "content": None}
+    calls = {}              # номер вызова -> собранный вызов инструмента
+    finish = None
+    usage = None
+    for f in frames:
+        usage = f.get("usage") or usage
+        for ch in f.get("choices") or []:
+            delta = ch.get("delta") or {}
+            msg["role"] = delta.get("role") or msg["role"]
+            for k in ("content", "reasoning_content"):
+                if delta.get(k) is not None:
+                    msg[k] = (msg.get(k) or "") + delta[k]
+            for tc in delta.get("tool_calls") or []:
+                call = calls.setdefault(tc.get("index", 0), {"function": {"arguments": "", "name": ""}, "id": None,
+                                                             "type": "function"})
+                call["id"] = tc.get("id") or call["id"]
+                call["type"] = tc.get("type") or call["type"]
+                fn = tc.get("function") or {}
+                call["function"]["name"] += fn.get("name") or ""
+                call["function"]["arguments"] += fn.get("arguments") or ""
+            finish = ch.get("finish_reason") or finish
+    if calls:
+        msg["tool_calls"] = [dict(calls[i], index=i) for i in sorted(calls)]
+    first = frames[0] if frames else {}
+    out = {"choices": [{"finish_reason": finish, "index": 0, "message": msg}], "created": first.get("created"),
+           "id": first.get("id"), "model": first.get("model"), "object": "chat.completion"}
+    if usage:
+        out["usage"] = usage
+    return out
+
+
+class Handler(BaseHTTPRequestHandler):
+    """Разбор запроса и ответ клиенту; что отвечать, решает answer(path, body, self) у сервера."""
+    protocol_version = "HTTP/1.1"
+
+    def log_message(self, fmt, *args):
+        pass
+
+    def send_raw(self, status: int, data: bytes, ctype="application/json"):
+        self.send_response(status)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
+    def reply(self, status: int, resp: dict, body: dict):
+        """Ответ клиенту: кадрами, если он просил stream, иначе JSON."""
+        if status == 200 and body.get("stream"):
+            return self.send_raw(200, sse(resp, body), "text/event-stream")
+        self.send_raw(status, json.dumps(resp, ensure_ascii=False).encode())
+
+    def error(self, status: int, msg: str):
+        self.send_raw(status, json.dumps({"error": {"message": msg, "type": "record"}}, ensure_ascii=False).encode())
+
+    def start_stream(self):
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream")
+        self.send_header("Transfer-Encoding", "chunked")
+        self.end_headers()
+        self.wfile.flush()
+
+    def send(self, data: bytes):
+        self.wfile.write(b"%x\r\n%s\r\n" % (len(data), data))
+        self.wfile.flush()
+
+    def end_stream(self):
+        self.send(b"")
+
     def do_GET(self):
+        self.server.get(self)
+
+    def do_POST(self):
+        raw = self.rfile.read(int(self.headers.get("Content-Length") or 0))
+        path = self.path.split("?")[0]
+        if path not in FIELDS:
+            return self.error(404, f"unsupported path {path}")
         try:
-            with urllib.request.urlopen(self.server.upstream + self.path, timeout=60) as r:
-                self.reply(r.status, r.read())
-        except urllib.error.HTTPError as e:
-            self.reply(e.code, e.read())
+            body = json.loads(raw)
+        except ValueError as e:
+            return self.error(400, f"bad json: {e}")
+        self.server.answer(path, body, self)
 
 
 def main():
-    from ace import config      # не при импорте: контейнеры записи (bridge/live) монтируют только tools/
     ap = argparse.ArgumentParser()
-    ap.add_argument("out", type=Path)
-    ap.add_argument("--port", type=int, default=8090)
-    ap.add_argument("--upstream", default=config.OPENAI_BASE_URL.removesuffix("/v1"))
+    ap.add_argument("rec", type=Path)
+    ap.add_argument("--replay", action="store_true")
+    ap.add_argument("--port", type=int)
+    ap.add_argument("--upstream")
     ap.add_argument("--embeddings-upstream")
-    ap.add_argument("--seed", action="store_true")
-    ap.add_argument("--cache", type=Path)
-    ap.add_argument("--normalize", choices=["mce"])
-    ap.add_argument("--seed-salt", default="")
+    ap.add_argument("--seed", action="store_true", help="не нужен: seed подставляется всегда")
     a = ap.parse_args()
-    normalize = None
-    if a.normalize == "mce":
-        from tools.record.mce import normalize
-    server = wire.serve(Recorder, a.port, a.out, a.upstream, a.embeddings_upstream, a.seed, a.cache, normalize,
-                        a.seed_salt)
-    server.serve_forever()
+    if a.replay:
+        srv = Replayer(("127.0.0.1", a.port or 8091), a.rec)
+    else:
+        if a.upstream is None:
+            from ace import config      # не при импорте: контейнеры записи монтируют только tools/
+            a.upstream = config.OPENAI_BASE_URL.removesuffix("/v1")
+        srv = Recorder(("127.0.0.1", a.port or 8090), a.rec, a.upstream, a.embeddings_upstream)
+    print(f"listening on http://127.0.0.1:{srv.server_address[1]}/v1", flush=True)
+    srv.serve_forever()
 
 
 if __name__ == "__main__":

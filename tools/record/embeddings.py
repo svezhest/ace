@@ -6,11 +6,12 @@
 http://127.0.0.1:8092."""
 import argparse
 import base64
+from http.server import ThreadingHTTPServer
 
 import numpy as np
 
 from ace import embed
-from tools.record import wire
+from tools.record.record import EMBEDDINGS, Handler
 
 
 def response(body):
@@ -26,20 +27,27 @@ def response(body):
             "usage": {"prompt_tokens": 0, "total_tokens": 0}}
 
 
-class Embedder(wire.Server):
-    def __init__(self, addr):
-        super().__init__(addr, wire.Handler)
+class Embedder(ThreadingHTTPServer):
+    daemon_threads = True
 
-    def handle(self, path, body, headers):
-        if path != wire.EMBEDDINGS:
-            return 404, f"only {wire.EMBEDDINGS}"
-        return 200, response(body)
+    def __init__(self, addr):
+        super().__init__(addr, Handler)
+
+    def answer(self, path, body, out):
+        if path != EMBEDDINGS:
+            return out.error(404, f"only {EMBEDDINGS}")
+        out.reply(200, response(body), body)
+
+    def get(self, out):
+        out.error(404, f"only {EMBEDDINGS}")
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=8092)
-    wire.serve(Embedder, ap.parse_args().port).serve_forever()
+    srv = Embedder(("127.0.0.1", ap.parse_args().port))
+    print(f"listening on http://127.0.0.1:{srv.server_address[1]}/v1", flush=True)
+    srv.serve_forever()
 
 
 if __name__ == "__main__":
