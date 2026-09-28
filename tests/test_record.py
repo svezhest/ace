@@ -11,6 +11,7 @@ import numpy as np
 import openai
 import pytest
 
+from tools.record import record
 from tools.record.embeddings import Embedder
 from tools.record.record import CHAT, Recorder, Replayer, assemble, canon, seed_for, sse
 
@@ -57,6 +58,9 @@ class Fake(BaseHTTPRequestHandler):
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
+        if self.server.got[-1].get("messages", [{}])[-1].get("content") == "cut":    # обрыв посреди ответа
+            data = data[:len(data) // 2]
+            self.close_connection = True
         self.wfile.write(data)
 
 
@@ -274,3 +278,41 @@ def test_get_upstream_down(tmp_path):
     with pytest.raises(openai.InternalServerError, match="upstream unreachable"):
         client(rec).models.list()
     rec.shutdown()
+
+
+@pytest.mark.parametrize("stream", [False, True])
+def test_keepalive_outlasts_client_timeout(fake, tmp_path, monkeypatch, stream):
+    """Модель отвечает дольше read-timeout клиента: пока ждём, клиенту уходят байты, и он дожидается ответа."""
+    monkeypatch.setattr(record, "PING", 0.05)
+    rec = recorder(fake, tmp_path / "rec.jsonl")
+    c = openai.OpenAI(base_url=f"http://127.0.0.1:{rec.server_address[1]}/v1", api_key="k", max_retries=0, timeout=0.2)
+    got = c.chat.completions.create(model="m", messages=[{"role": "user", "content": "slow"}], stream=stream)
+    text = "".join(p.choices[0].delta.content or "" for p in got) if stream else got.choices[0].message.content
+    rec.shutdown()
+    [line] = lines(tmp_path / "rec.jsonl")
+    assert text == line["response"]["choices"][0]["message"]["content"] and len(text) == 12
+    assert "dropped" not in line and "error" not in line
+
+
+@pytest.mark.parametrize("q", [("chat", "cut"), ("stream", "cut"), ("chat", "slow"), ("stream", "slow")])
+def test_upstream_read_error_recorded(fake, tmp_path, monkeypatch, q):
+    """Обрыв или таймаут при чтении ответа шлюза: клиенту 502, в записи строка с error; прокси работает дальше."""
+    monkeypatch.setattr(record, "UPSTREAM_TIMEOUT", 0.2)
+    rec = recorder(fake, tmp_path / "rec.jsonl")
+    with pytest.raises(openai.InternalServerError, match="upstream read failed"):
+        ask(client(rec), q)
+    ask(client(rec), ("chat", "a"))
+    rec.shutdown()
+    bad, ok = lines(tmp_path / "rec.jsonl")
+    assert bad["status"] == 502 and "upstream read failed" in bad["error"] and "error" not in ok
+
+
+def test_read_error_after_ping_is_error_frame(fake, tmp_path, monkeypatch):
+    """Заголовки 200 уже ушли с ping, потом таймаут шлюза: в stream клиент получает кадр error."""
+    monkeypatch.setattr(record, "PING", 0.05)
+    monkeypatch.setattr(record, "UPSTREAM_TIMEOUT", 0.3)
+    rec = recorder(fake, tmp_path / "rec.jsonl")
+    with pytest.raises(openai.APIError, match="upstream read failed"):
+        ask(client(rec), ("stream", "slow"))
+    rec.shutdown()
+    assert lines(tmp_path / "rec.jsonl")[0]["status"] == 502

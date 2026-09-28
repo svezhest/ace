@@ -5,13 +5,14 @@
 тела, ключи по алфавиту. Наверх уходит только он и seed = seed_for(запрос, n), так что ответ модели — функция
 ключа и не зависит от порядка вызовов. Строка записи:
 {"path", "request": канонический запрос, "n", "seed", "status", "response"}, плюс "dropped": true, если клиент
-оборвал соединение до ответа (таймаут, повтор) — такая запись негодна. Поле тела вне FIELDS и CLIENT — отказ 400:
-его нельзя молча потерять.
+оборвал соединение до ответа (таймаут, повтор), и "error", если ответ шлюза не дочитан (таймаут, обрыв; клиенту
+502) — такая запись негодна. Поле тела вне FIELDS и CLIENT — отказ 400: его нельзя молча потерять.
 Воспроизведение отдаёт k-му такому же запросу k-й записанный ответ; запроса нет в записи — 400 с diff против
 ближайшего записанного. GET /_status — сколько отдано и сколько не востребовано."""
 import argparse
 import difflib
 import hashlib
+import http.client
 import json
 import select
 import socket
@@ -20,6 +21,7 @@ import threading
 import urllib.error
 import urllib.request
 from collections import Counter, defaultdict
+from concurrent.futures import ThreadPoolExecutor, wait
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -42,6 +44,7 @@ CLIENT = {
     EMBEDDINGS: {"user"},
 }
 UPSTREAM_TIMEOUT = 3600     # секунд на ответ модели
+PING = 15                   # раз во столько секунд ожидания клиенту уходят байты, чтобы не сработал его read-timeout
 
 
 def canon(path: str, body: dict) -> str:
@@ -91,32 +94,36 @@ class Recorder(ThreadingHTTPServer):
             base = self.emb_upstream if path == EMBEDDINGS else self.upstream
             req = urllib.request.Request(base + path, json.dumps(sent).encode(), method="POST", headers={
                 "Content-Type": "application/json", "Authorization": out.headers.get("Authorization") or "Bearer x"})
+            dropped = False
+            with ThreadPoolExecutor(1) as pool:
+                job = pool.submit(fetch, req, stream)
+                while not wait([job], PING).done:
+                    try:
+                        if not dropped:
+                            out.ping(bool(body.get("stream")))
+                    except OSError:
+                        dropped = True
+            error = None
             try:
-                with urllib.request.urlopen(req, timeout=UPSTREAM_TIMEOUT) as up:
-                    status = up.status
-                    if stream:
-                        out.start_stream()
-                        resp = assemble([json.loads(x[6:]) for x in map(bytes.strip, up)
-                                         if x.startswith(b"data: ") and x != b"data: [DONE]"])
-                    else:
-                        resp = json.loads(up.read())
-            except urllib.error.HTTPError as e:
-                status, resp, stream = e.code, error_body(e), False
-            except urllib.error.URLError as e:     # модель недоступна: не пишем, номер повтора не тратим
-                return out.error(502, f"upstream unreachable: {e}")
+                status, resp = job.result()
+            except (OSError, ValueError, http.client.HTTPException) as e:
+                if isinstance(e, urllib.error.URLError) and not out.started:
+                    # модель недоступна: не пишем, номер повтора не тратим
+                    return out.error(502, f"upstream unreachable: {e}")
+                error = f"upstream read failed: {e!r}"
+                status, resp = 502, {"error": {"message": error, "type": "record"}}
             # клиент не дождался ответа (таймаут, повтор): апстрим его не увидел, запись негодна
-            dropped = out.gone()
+            dropped = dropped or out.gone()
             try:
-                if not dropped and stream:
-                    out.send(sse(resp, body))
-                    out.end_stream()
-                elif not dropped:
+                if not dropped:
                     out.reply(status, resp, body)
             except OSError:
                 dropped = True
             rec = {"path": path, "request": c, "n": n, "seed": seed, "status": status, "response": resp}
             if dropped:
                 rec["dropped"] = True
+            if error:
+                rec["error"] = error
             with self.out.open("a") as f:
                 f.write(json.dumps(rec, ensure_ascii=False) + "\n")
             self.count[path, c] += 1
@@ -129,6 +136,23 @@ class Recorder(ThreadingHTTPServer):
             out.send_raw(e.code, e.read())
         except urllib.error.URLError as e:
             out.error(502, f"upstream unreachable: {e}")
+
+
+def fetch(req, stream: bool) -> tuple[int, dict]:
+    """(код, ответ) шлюза; stream собирается в chat.completion. Таймаут или обрыв при чтении — исключение, как и
+    stream с кадром error (так шлюз сообщает об ошибке после заголовков 200) или без [DONE]."""
+    try:
+        with urllib.request.urlopen(req, timeout=UPSTREAM_TIMEOUT) as up:
+            if not stream:
+                return up.status, json.loads(up.read())
+            lines = [x.strip() for x in up]
+            frames = [json.loads(x[6:]) for x in lines if x.startswith(b"data: ") and x != b"data: [DONE]"]
+            errors = [f["error"] for f in frames if "error" in f]
+            if errors or b"data: [DONE]" not in lines:
+                raise ValueError(f"broken stream: {errors or 'no [DONE]'}")
+            return up.status, assemble(frames)
+    except urllib.error.HTTPError as e:
+        return e.code, error_body(e)
 
 
 class Replayer(ThreadingHTTPServer):
@@ -284,6 +308,7 @@ def assemble(frames: list[dict]) -> dict:
 class Handler(BaseHTTPRequestHandler):
     """Разбор запроса и ответ клиенту; что отвечать, решает answer(path, body, self) у сервера."""
     protocol_version = "HTTP/1.1"
+    started = False         # заголовки ответа уже ушли (ping)
 
     def log_message(self, fmt, *args):
         pass
@@ -296,27 +321,35 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def reply(self, status: int, resp: dict, body: dict):
-        """Ответ клиенту: кадрами, если он просил stream, иначе JSON."""
-        if status == 200 and body.get("stream"):
+        """Ответ клиенту: кадрами, если он просил stream, иначе JSON. После ping заголовки 200 уже ушли: ответ
+        дописывается в начатое тело, ошибка в stream — кадром error (клиент openai бросает APIError)."""
+        data = json.dumps(resp, ensure_ascii=False).encode()
+        if not self.started and status == 200 and body.get("stream"):
             return self.send_raw(200, sse(resp, body), "text/event-stream")
-        self.send_raw(status, json.dumps(resp, ensure_ascii=False).encode())
+        if not self.started:
+            return self.send_raw(status, data)
+        if body.get("stream"):
+            data = sse(resp, body) if status == 200 else b"data: " + data + b"\n\n"
+        self.send(data)
+        self.send(b"")
 
     def error(self, status: int, msg: str):
         self.send_raw(status, json.dumps({"error": {"message": msg, "type": "record"}}, ensure_ascii=False).encode())
 
-    def start_stream(self):
-        self.send_response(200)
-        self.send_header("Content-Type", "text/event-stream")
-        self.send_header("Transfer-Encoding", "chunked")
-        self.end_headers()
-        self.wfile.flush()
+    def ping(self, stream: bool):
+        """Байты, пока ждём модель: SSE-комментарий в stream, пробел перед JSON иначе (JSON его допускает)."""
+        if not self.started:
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream" if stream else "application/json")
+            self.send_header("Transfer-Encoding", "chunked")
+            self.end_headers()
+            self.started = True
+        self.send(b": ping\n\n" if stream else b" ")
 
     def send(self, data: bytes):
+        """Кусок chunked-тела; пустой — конец."""
         self.wfile.write(b"%x\r\n%s\r\n" % (len(data), data))
         self.wfile.flush()
-
-    def end_stream(self):
-        self.send(b"")
 
     def gone(self) -> bool:
         """Клиент закрыл соединение: тело запроса уже прочитано, так что читаемый сокет без данных — это конец."""
@@ -327,6 +360,7 @@ class Handler(BaseHTTPRequestHandler):
             return True
 
     def do_GET(self):
+        self.started = False
         self.server.get(self)
 
     def do_POST(self):
@@ -343,6 +377,7 @@ class Handler(BaseHTTPRequestHandler):
             msg = f"{path}: unknown request field(s) {', '.join(unknown)}: add to FIELDS or CLIENT in tools/record"
             print(msg, file=sys.stderr, flush=True)
             return self.error(400, msg)
+        self.started = False
         self.server.answer(path, body, self)
 
 
