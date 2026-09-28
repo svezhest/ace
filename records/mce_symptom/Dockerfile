@@ -3,6 +3,9 @@
 # /opt/litellm — LiteLLM для агентов Claude CLI: python 3.12.8 и версии litellm.req.txt, как $UPSTREAMS/.venvs/litellm.
 FROM python:3.11.11-slim-bookworm@sha256:081075da77b2b55c23c088251026fb69a7b2bf92471e491ff5fd75c192fd38e5
 COPY --from=ghcr.io/astral-sh/uv:0.5.9@sha256:ba36ea627a75e2a879b7f36efe01db5a24038f8d577bd7214a6c99d5d4f4b20c /uv /uvx /usr/local/bin/
+# libfaketime: часы процессов апстрима стоят на дате записи (FAKETIME в env.txt) — дата входит в запросы CLI
+RUN apt-get update && apt-get install -y --no-install-recommends libfaketime=0.9.10-2.1 && rm -rf /var/lib/apt/lists/* \
+    && ln -s /usr/lib/*-linux-gnu/faketime/libfaketime.so.1 /usr/local/lib/libfaketime.so.1
 COPY litellm.req.txt /opt/
 RUN UV_PYTHON_DOWNLOADS=automatic UV_PYTHON_INSTALL_DIR=/opt/python uv venv -p 3.12.8 /opt/litellm \
     && uv pip install --no-cache -p /opt/litellm -r /opt/litellm.req.txt \
