@@ -1,0 +1,27 @@
+{
+ "upstream": "youtu-agent",
+ "commit": "c2caa539f4c95ae1c39ed24dc8a99cb3651e1d5d",
+ "commit_note": "закреп = онлайн HEAD main (utu/practice, стабильная версия метода); ветка training_free_GRPO (7612f86) в README помечена устаревшей",
+ "status": "раннер готов, живая запись не снята; прогон на фейковой модели доходит до конца, повисшие процессы гасятся",
+ "runner": "records/tfgrpo/run.sh OUT DB (DB — sqlite апстрима от prep.py; MODEL_URL — адрес модели для прокси, по умолчанию шлюз хоста)",
+ "command": "python scripts/run_training_free_GRPO.py --config_name math_live --experiment_name tf_live --batch_size 4 --grpo_n 3 --rollout_concurrency 1 --rollout_data_truncate 16 --practice_dataset_name DAPO-Math-17k-live; python scripts/run_eval.py --config_name math/math_live_test",
+ "readme_command": "python scripts/run_training_free_GRPO.py --config_name math_reasoning; python scripts/run_eval.py --config_name math/math_practice_AIME24 (utu/practice/README.md, Math Step 5 и Step 6)",
+ "knobs": {
+  "--batch_size": {"value": 4, "default": 50, "class": "K"},
+  "--grpo_n": {"value": 3, "default": 5, "class": "K"},
+  "--rollout_data_truncate": {"value": 16, "default": 100, "class": "K", "note": "4 батча по 4"},
+  "--practice_dataset_name": {"value": "DAPO-Math-17k-live", "default": "DAPO-Math-17k", "class": "K",
+                              "note": "первые 16 английских вопросов DAPO короче 160 символов (prep.py)"},
+  "--epochs": {"value": 1, "default": 1},
+  "--rollout_concurrency": {"value": 1, "default": 128, "class": "T"},
+  "evaluation.concurrency (rollout)": {"value": 1, "default": 128, "class": "T", "note": "configs/eval/math/math_live.yaml"},
+  "--experiment_name": {"value": "tf_live", "default": null, "class": "T"},
+  "итоговый тест: dataset": {"value": "AIME24-live", "default": "AIME24", "class": "K", "note": "первые 4 задачи AIME24 (prep.py)"},
+  "итоговый тест: pass_k": {"value": 2, "default": 32, "class": "K", "note": "configs/eval/math/math_live_test.yaml; Mean@2"},
+  "итоговый тест: concurrency": {"value": 1, "default": 128, "class": "T", "note": "configs/eval/math/math_live_test.yaml"}
+ },
+ "env": "апстрим целиком в контейнере youtu-upstream (Dockerfile рядом: python 3.12, версии .venvs/youtu с local-python и math-verify); сеть — внутренняя tfnet, единственный выход — контейнер записи tfrec к шлюзу; UTU_LLM_*/JUDGE_LLM_* = ornith15-9b на http://tfrec:8080/v1, ключ x; TIKTOKEN_CACHE_DIR, HF_HUB_OFFLINE=1, PYTHONUNBUFFERED=1; sitecustomize нет",
+ "forced": "обучение и тест — отдельные процессы; процесс гасится раннером после своего результата (итоговый агент / «> Cleaning up...» в logs/utu.log): поток python_executor с кодом модели не умирает по таймауту и не даёт процессу выйти (issue #256)",
+ "snapshot": "test.db — БД апстрима (evaluation_data: rollout практики и итогового теста с reward, cache_experience: опыты по шагам), tf_live_agent.yaml — итоговый агент, train.log и test.log — вывод команд, utu_train/ и utu_test/ — logs/ апстрима (в utu_test Mean@2 и Pass@2)",
+ "expected_calls": "≈390–650: rollout практики 48 × 6–10, извлечение ≈11 на батч (3 сводки и по одному преимуществу и сверке на смешанную группу, план), итоговый тест 8 × 6–15; ≈1–4 ч по замерам прошлых попыток"
+}
