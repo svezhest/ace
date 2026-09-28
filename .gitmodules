@@ -1,0 +1,27 @@
+[submodule "upstreams/ace"]
+	path = upstreams/ace
+	url = https://github.com/ace-agent/ace
+[submodule "upstreams/dynamic-cheatsheet"]
+	path = upstreams/dynamic-cheatsheet
+	url = https://github.com/suzgunmirac/dynamic-cheatsheet
+[submodule "upstreams/EvoLib"]
+	path = upstreams/EvoLib
+	url = https://github.com/microsoft/EvoLib
+[submodule "upstreams/gepa"]
+	path = upstreams/gepa
+	url = https://github.com/gepa-ai/gepa.git
+[submodule "upstreams/LiveCodeBench"]
+	path = upstreams/LiveCodeBench
+	url = https://github.com/LiveCodeBench/LiveCodeBench
+[submodule "upstreams/matharena"]
+	path = upstreams/matharena
+	url = https://github.com/eth-sri/matharena.git
+[submodule "upstreams/meta-context-engineering"]
+	path = upstreams/meta-context-engineering
+	url = https://github.com/metaevo-ai/meta-context-engineering
+[submodule "upstreams/SCOPE"]
+	path = upstreams/SCOPE
+	url = https://github.com/JarvisPei/SCOPE
+[submodule "upstreams/youtu-agent"]
+	path = upstreams/youtu-agent
+	url = https://github.com/TencentCloudADP/youtu-agent
