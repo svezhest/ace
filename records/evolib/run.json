@@ -1,0 +1,35 @@
+{
+  "upstream": "EvoLib",
+  "commit": "98266b2d22e146c19c651b1126ae81ff072f65e0",
+  "commit_note": "закреп = онлайн HEAD (единственный коммит main)",
+  "status": "раннер готов, живая запись не снята; прогон на фейковой модели доходит до конца",
+  "task": "livecodebench: LiveCodeBench v6, только hard (80 задач), первые N по порядку данных, без повторов",
+  "runner": "records/evolib/run.sh OUT (UPSTREAMS по умолчанию ~/Projects/upstreams, N=15, PORT=8090, EMB_PORT=8092)",
+  "command": "cd $UPSTREAMS/LiveCodeBench && python $UPSTREAMS/EvoLib/EvoLib/eval_main.py --task livecodebench --model ornith15-9b --k_q_per_problem 3 --n_iterations 15 --endpoint <прокси>/v1 --embedding_endpoint <прокси>/v1 --syn_test_data_file OUT/syn_tests.json --log_file OUT/evolib.log",
+  "readme_command": "python eval_main.py --task livecodebench --k_q_per_problem 3 --endpoint <chat_completions_endpoint> --embedding_endpoint <embeddings_endpoint> --syn_test_data_file <livecodebench_synthetic_tests.json> --log_file ./runs/livecode.log",
+  "knobs": {
+    "--n_iterations": {"value": 15, "default": 5000, "class": "K", "note": "первые 15 из 80 задач, i = kiter % 80 — без повторов"},
+    "--k_q_per_problem": {"value": 3, "default": 3, "note": "как в README"},
+    "--model": {"value": "ornith15-9b", "default": "o4-mini", "class": "T"},
+    "--endpoint / --embedding_endpoint": {"value": "прокси записи /v1", "default": "Azure", "class": "T"},
+    "--syn_test_data_file": {"value": "OUT/syn_tests.json (syn_tests.py)", "default": "../data/livecodebench_v6_hard_synthetic_test_v2.json", "class": "F",
+                             "note": "файл апстрима не опубликован (нет в репозитории, релизах, HF); вместо него — публичные тесты задачи (примеры из условия, 1–4 на задачу) в формате get_evaluation_sample"},
+    "--log_file": {"value": "OUT/evolib.log", "default": null, "class": "T", "note": "OUT пустой: по [Iter N] в логе апстрим возобновляется"},
+    "--k_sample_skills / --k_sample_insights / --w_IG / --IG_update_rate / --eps / порог слияния": {"value": "по умолчанию", "default": "10 / 10 / 1.0 / 0.5 / 0.01 / 0.8"}
+  },
+  "bridge": {
+    "sitecustomize.py": "openai.AzureOpenAI -> openai.OpenAI(base_url=--endpoint, api_key='x') (T: апстрим знает только Azure AD); random.seed(0) при старте интерпретатора (проверено: до setup_state глобальный random не расходуется, состояние = seed(0))",
+    "PYTHONHASHSEED": "0",
+    "cwd": "корень LiveCodeBench: lcb_runner открывает lcb_runner/prompts/few_shot_examples/... относительным путём"
+  },
+  "sampling": "путь o4-mini (reasoning API): в запросе только model, messages, max_completion_tokens=50000, reasoning_effort=high; temperature не передаётся — шлюз обязан стоять с GATEWAY_OPENAI_DEFAULTS=1 (T=1, top_p=1), run.sh проверяет это по окружению процесса qwen-gateway. reasoning_effort шлюз игнорирует",
+  "embeddings": "text-embedding-3-small апстрима -> BGE-M3 стенда (tools/record/embeddings.py) через --embeddings-upstream прокси; порог слияния 0.8 откалиброван под OpenAI",
+  "data": {
+    "livecodebench/code_generation_lite": "HF, ревизия 0fe84c3912ea0c4d4a78037083943e8f0c4dd505 (2025-06-05), загрузка скриптом датасета (version_tag v6); прогрев кэша ~4.2 ГБ (скрипт качает все test*.jsonl)",
+    "lcb_runner": "LiveCodeBench 28fef95 (онлайн HEAD, последний коммит до коммита EvoLib), из клона через PYTHONPATH"
+  },
+  "env": "venv .venvs/evolib (python 3.11): requirements.txt EvoLib + по uv.lock LiveCodeBench anthropic==0.49.0 (HUMAN_PROMPT), datasets==3.5.0 (скрипт датасета), huggingface-hub==0.30.2, tqdm==4.67.1; HF_HUB_OFFLINE=1 HF_DATASETS_OFFLINE=1 TIKTOKEN_CACHE_DIR=$UPSTREAMS/.tiktoken PYTHONDONTWRITEBYTECODE=1",
+  "code_execution": "код модели исполняет codegen_metrics lcb_runner на хосте: процесс multiprocessing на каждую проверку, reliability_guard (отключает os.kill/remove/system, subprocess.Popen и т. п.; сам lcb_runner пишет, что это не песочница), timeout 10 с на тест",
+  "estimate": "вызовов модели на итерацию: 3 решателя + insight (если лучший балл < 1) + слияния skills/insights при сходстве > 0.8 — на фейковой модели 5,0; N=15 -> ~75 вызовов, 15–75 мин при 12–60 с/вызов (~70 мин при 55 с, как в прошлой записи EvoLib); плюс ~10 с/итерацию на тесты",
+  "snapshot": "evolib.log — лог апстрима по итерациям (балл, IG, размеры библиотек, решение); evolib.{skill,insight,score,solution}.json — его чекпойнт (только при kiter+1 кратном 20, при N=15 не пишется); run.log — вывод (результаты тестов); syn_tests.json"
+}
