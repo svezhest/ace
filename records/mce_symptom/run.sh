@@ -5,7 +5,7 @@
 # пишут файлы только там), mcellm — LiteLLM (агенты Claude CLI говорят Anthropic Messages), mcerec — прокси записи
 # (tools/record) к шлюзу на хосте, единственный выход. Окружение процессов апстрима — только env.txt (env -i).
 # usage: run.sh OUT   (OUT/rec.jsonl — запись, OUT/train.log и OUT/test.log — вывод, OUT/workspace, OUT/logs,
-# OUT/test — выход апстрима).
+# OUT/test — выход апстрима). Строка записи с "dropped" (клиент не дождался ответа) — запись негодна, код 1.
 set -euo pipefail
 OUT=$(mkdir -p "$1" && cd "$1" && pwd)
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -58,3 +58,7 @@ docker exec mcerun env -i $E .venv/bin/python -m mce.eval --iter_dir "workspace/
 for d in workspace logs test; do docker cp -q mcerun:$ROOT/$d "$OUT/"; done
 mv "$OUT/rec/rec.jsonl" "$OUT/rec.jsonl"
 rmdir "$OUT/rec"
+if grep -q '"dropped": true' "$OUT/rec.jsonl"; then
+    echo "запись негодна: клиент не дождался ответа (dropped)" >&2
+    exit 1
+fi

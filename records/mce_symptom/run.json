@@ -46,5 +46,6 @@
  "env": "docker: образ mce-upstream:c4b7a7c (Dockerfile: python 3.11.11-slim по digest, uv 0.5.9, git archive c4b7a7c в /private/tmp/mce-symptom — путь входит в промпты, uv sync --frozen по uv.lock апстрима с хешами, проект editable, кэш uv в home агентов); контейнер mcerun в сети mcenet без выхода наружу, --cap-drop ALL, no-new-privileges, --pids-limit 1024, --memory 8g, --init; процессы апстрима — env -i + env.txt: HOME, TMPDIR в ROOT, PATH=.venv/bin:/usr/local/bin, PYTHONHASHSEED=0, OPENROUTER_API_BASE=http://mcerec:8080/v1 (прокси записи), ANTHROPIC_BASE_URL=http://mcellm:4000 (LiteLLM), ANTHROPIC_DEFAULT_{SONNET,OPUS,HAIKU}_MODEL=ornith15-9b (как .env.template), CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1; mcerec — единственный выход к шлюзу; MAX_CONCURRENCY апстрима (30) не трогается",
  "forced": "LiteLLM 1.102.1 (контейнер mcellm, python 3.12.8, версии litellm.req.txt; use_chat_completions_url_for_anthropic_messages): агенты Claude CLI говорят Anthropic Messages, шлюз и прокси — только chat/completions",
  "snapshot": "workspace/ (под-итерации, meta_agent/evaluations.json, навыки), logs/ (журналы агентов), test/evaluation.json — выход апстрима; train.log, test.log — вывод",
- "expected_calls": "≈550 (2 × (мета ≈40 + 2 × (батч 2 + базовый ≈110) + val 2) + тест 2), разброс ×2"
+ "expected_calls": "≈550 (2 × (мета ≈40 + 2 × (батч 2 + базовый ≈110) + val 2) + тест 2), разброс ×2",
+ "valid": "строка rec.jsonl с \"dropped\": true (клиент не дождался ответа и повторил запрос) — запись негодна, run.sh выходит с кодом 1"
 }
