@@ -342,3 +342,20 @@ def test_keepalive_while_waiting_for_lock(fake, tmp_path, monkeypatch, stream):
     assert sorted(texts) == sorted(x["response"]["choices"][0]["message"]["content"] for x in got)
     assert len(set(texts)) == 3 and not any("dropped" in x or "error" in x for x in got)
 
+
+@pytest.mark.parametrize("where", ["assemble", "canon"])
+def test_proxy_failure_recorded(fake, tmp_path, monkeypatch, where):
+    """Любое исключение в прокси (TypeError в assemble на странном кадре и т. п.): клиенту 502, в записи строка
+    с error; прокси работает дальше."""
+    def odd(*a):
+        raise TypeError("odd")
+
+    monkeypatch.setattr(record, where, odd)
+    rec = recorder(fake, tmp_path / "rec.jsonl")
+    with pytest.raises(openai.InternalServerError, match="odd"):
+        ask(client(rec), ("stream", "a"))
+    monkeypatch.undo()
+    ask(client(rec), ("chat", "a"))
+    rec.shutdown()
+    bad, ok = lines(tmp_path / "rec.jsonl")
+    assert bad["status"] == 502 and "TypeError('odd')" in bad["error"] and "error" not in ok

@@ -13,7 +13,6 @@
 import argparse
 import difflib
 import hashlib
-import http.client
 import json
 import select
 import socket
@@ -111,7 +110,7 @@ class Recorder(ThreadingHTTPServer):
             error = None
             try:
                 status, resp = job.result()
-            except (OSError, ValueError, http.client.HTTPException) as e:
+            except Exception as e:      # и сбой разбора ответа (assemble на странном кадре)
                 unreachable = isinstance(e, urllib.error.URLError)
                 error = f"upstream unreachable: {e}" if unreachable else f"upstream read failed: {e!r}"
                 status, resp = 502, {"error": {"message": error, "type": "record"}}
@@ -339,6 +338,9 @@ class Handler(BaseHTTPRequestHandler):
         self.send(b"")
 
     def error(self, status: int, msg: str):
+        if self.started:        # заголовки 200 ушли с ping: рвём тело, клиент увидит обрыв, а не успех
+            self.close_connection = True
+            return
         self.send_raw(status, json.dumps({"error": {"message": msg, "type": "record"}}, ensure_ascii=False).encode())
 
     def refuse(self, path: str, raw: bytes, status: int, msg: str):
@@ -395,12 +397,17 @@ class Handler(BaseHTTPRequestHandler):
             body = json.loads(raw)
         except ValueError as e:
             return self.refuse(path, raw, 400, f"bad json: {e}")
-        unknown = sorted(set(body) - set(FIELDS[path]) - CLIENT[path])
-        if unknown:
-            msg = f"{path}: unknown request field(s) {', '.join(unknown)}: add to FIELDS or CLIENT in tools/record"
+        try:
+            unknown = sorted(set(body) - set(FIELDS[path]) - CLIENT[path])
+            if unknown:
+                msg = f"{path}: unknown request field(s) {', '.join(unknown)}: add to FIELDS or CLIENT in tools/record"
+                print(msg, file=sys.stderr, flush=True)
+                return self.refuse(path, raw, 400, msg)
+            self.server.answer(path, body, self)
+        except Exception as e:      # сбой прокси: клиенту 502, в записи строка с error
+            msg = f"record failed: {e!r}"
             print(msg, file=sys.stderr, flush=True)
-            return self.refuse(path, raw, 400, msg)
-        self.server.answer(path, body, self)
+            self.refuse(path, raw, 502, msg)
 
 
 def main():
