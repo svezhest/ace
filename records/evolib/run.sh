@@ -5,7 +5,7 @@
 # (tools/record) к шлюзу и к эмбеддингам на хосте (tools/record/embeddings.py, BGE-M3 вместо text-embedding-3-small).
 # sitecustomize.py: AzureOpenAI -> OpenAI на --endpoint, random.seed(0). Синтетических тестов апстрим не выложил —
 # syn_tests.py строит их файл из публичных тестов задач. Шлюз обязан стоять с GATEWAY_OPENAI_DEFAULTS=1: апстрим
-# (путь o4-mini) не передаёт temperature. Кэш данных — $UPSTREAMS/.hf-evolib (bridge/setup_envs.sh evolib).
+# (путь o4-mini) не передаёт temperature. Кэш данных — $UPSTREAMS/.hf-evolib (records/setup_envs.sh evolib).
 # usage: run.sh OUT   (OUT/rec.jsonl — запись, OUT/evolib.log и OUT/evolib.*.json — лог и чекпойнт апстрима,
 # OUT/run.log — его вывод, OUT/syn_tests.json; MODEL_URL — другой сервер модели, тогда шлюз не проверяется)
 set -euo pipefail

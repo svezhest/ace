@@ -1,6 +1,6 @@
 #!/bin/sh
 # Окружения для снятия эталонов: чистые worktree апстримов на зафиксированных коммитах и venv через uv.
-# usage: bridge/setup_envs.sh [ace|mce|youtu|gepa|light|evolib|litellm ...]   (без аргументов — все)
+# usage: records/setup_envs.sh [ace|mce|youtu|gepa|light|evolib|litellm ...]   (без аргументов — все)
 set -e
 UP=${UPSTREAMS:-$HOME/Projects/upstreams}
 V=$UP/.venvs
@@ -59,7 +59,7 @@ load_code_generation_dataset(release_version='v6')
 for name in ['hmmt_feb_2025', 'hmmt_nov_2025', 'hmmt_feb_2026']:
     load_dataset(f'MathArena/{name}', split='train')" >/dev/null
 fi
-# LiteLLM proxy для агентов Claude SDK в MCE (запись bridge/live/mce и её воспроизведение в tests/live/test_mce.py)
+# LiteLLM proxy для агентов Claude SDK в MCE (запись records/mce_symptom)
 if want litellm; then
   uv venv -q --allow-existing -p 3.12 "$V/litellm"
   uv pip install -q -p "$V/litellm" --index-url https://pypi.org/simple "litellm[proxy]==1.102.1"

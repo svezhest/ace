@@ -1,0 +1,58 @@
+{
+ "attempt": 1,
+ "limit_minutes": 60,
+ "command": [
+  "/Users/user/Projects/ace/records/dc_rs_nocode/run.sh",
+  "/private/tmp/claude-501/-Users-user-Projects-itmo/a04e42db-becc-4c5f-a1a6-f26b7e31e71d/scratchpad/recq/runs/dc_rs_nocode-0928-2019-1"
+ ],
+ "started": "2026-09-28 20:19:11",
+ "upstream_head": "5cfe3c37e8e52b1d858d0f3df46e7f17c50991b9",
+ "upstream_at_pinned_commit": true,
+ "upstream_dirty": "",
+ "ace_head": "dfaed4e87c25f8c903e34d8262691381da53e099",
+ "runner_dirty": "",
+ "worker": {
+  "pids": [
+   33807
+  ],
+  "port": 50051,
+  "env": {
+   "QWEN_KV_BITS": "0",
+   "QWEN_MODEL": "../../weights/ornith15-9b-mlx-8bit",
+   "QWEN_PROMPT_CACHE": "1"
+  }
+ },
+ "gateway": {
+  "pids": [
+   87436
+  ],
+  "env": {
+   "GATEWAY_JOURNAL": "/Users/user/Projects/llm/logs/journal.jsonl",
+   "GATEWAY_OPENAI_DEFAULTS": "1"
+  }
+ },
+ "gateway_openai_defaults": true,
+ "model_alive_before": true,
+ "finished": "2026-09-28 20:32:15",
+ "minutes": 13.1,
+ "exit": 0,
+ "calls": 10,
+ "statuses": {
+  "200": 10
+ },
+ "verdicts": {
+  "ok": 10
+ },
+ "infra": [],
+ "refused": null,
+ "rec_sha256": "49f3cffad0999367f413770678a0cfdd058953151b19ec0529465768fc3c1881",
+ "caffeinate": "caffeinate -i на всю очередь",
+ "files": {
+  "outputs.jsonl": 139840,
+  "params.json": 9211,
+  "rec.jsonl": 170778,
+  "run.log": 28951
+ },
+ "host_paths": [],
+ "discarded_attempts": []
+}

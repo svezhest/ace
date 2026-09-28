@@ -1,0 +1,80 @@
+INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+### Example 1 ###
+@ CHEATSHEET:
+None
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+Input: Below is an equation with missing operators. Your task is to fill in the blanks with the correct mathematical operators: +, -, *, or /. Ensure that the equation is correct once the operators are added. The operators should be placed in the sequence they appear from left to right. Include the full equation with the operators filled in. For instance, for the equation 1 ? 2 ? 3 = 6, the correct answer is 1 + 2 + 3 = 6.
+
+Equation: Question #1:
+19 ? 8 ? 28 = -205
+Target: 19 - 8 * 28 = -205
+Final answer: 19 × 8 + 28 = 180
+****************************************************************************************************
+---- Correct so far: 0/1
+######################################################################################################################################################
+### Example 2 ###
+@ CHEATSHEET:
+None
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+Input: Below is an equation with missing operators. Your task is to fill in the blanks with the correct mathematical operators: +, -, *, or /. Ensure that the equation is correct once the operators are added. The operators should be placed in the sequence they appear from left to right. Include the full equation with the operators filled in. For instance, for the equation 1 ? 2 ? 3 = 6, the correct answer is 1 + 2 + 3 = 6.
+
+Equation: Question #2:
+10 ? 6 ? 21 = -5
+Target: 10 + 6 - 21 = -5
+Final answer: 10 - 6 - 21 = -5
+****************************************************************************************************
+---- Correct so far: 0/2
+######################################################################################################################################################
+### Example 3 ###
+@ CHEATSHEET:
+None
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+Input: Below is an equation with missing operators. Your task is to fill in the blanks with the correct mathematical operators: +, -, *, or /. Ensure that the equation is correct once the operators are added. The operators should be placed in the sequence they appear from left to right. Include the full equation with the operators filled in. For instance, for the equation 1 ? 2 ? 3 = 6, the correct answer is 1 + 2 + 3 = 6.
+
+Equation: Question #3:
+28 ? 15 ? 22 = 9240
+Target: 28 * 15 * 22 = 9240
+Final answer: 28 × 15 × 22 = 9240
+****************************************************************************************************
+---- Correct so far: 0/3
+######################################################################################################################################################
+### Example 4 ###
+@ CHEATSHEET:
+None
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+Input: Below is an equation with missing operators. Your task is to fill in the blanks with the correct mathematical operators: +, -, *, or /. Ensure that the equation is correct once the operators are added. The operators should be placed in the sequence they appear from left to right. Include the full equation with the operators filled in. For instance, for the equation 1 ? 2 ? 3 = 6, the correct answer is 1 + 2 + 3 = 6.
+
+Equation: Question #4:
+8 ? 3 ? 20 ? 4 = -75
+Target: 8 - 3 - 20 * 4 = -75
+Final answer: 8 - 3 - 20 * 4 = -75
+****************************************************************************************************
+---- Correct so far: 1/4
+######################################################################################################################################################
+### Example 5 ###
+@ CHEATSHEET:
+None
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+Input: Below is an equation with missing operators. Your task is to fill in the blanks with the correct mathematical operators: +, -, *, or /. Ensure that the equation is correct once the operators are added. The operators should be placed in the sequence they appear from left to right. Include the full equation with the operators filled in. For instance, for the equation 1 ? 2 ? 3 = 6, the correct answer is 1 + 2 + 3 = 6.
+
+Equation: Question #5:
+15 ? 19 ? 8 ? 2 ? 24 = 42
+Target: 15 + 19 - 8 * 2 + 24 = 42
+Final answer: 15 + 19 - 8 * 2 + 24 = 42
+****************************************************************************************************
+---- Correct so far: 2/5
+######################################################################################################################################################
+
+============================================================
+FINAL RESULTS: 2/5 correct (40.0%)
+Results saved to: /out/MathEquationBalancer/openai/ornith15-9b_default_2026-09-28-17-41__no-code-execution.jsonl
+============================================================

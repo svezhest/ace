@@ -1,0 +1,1141 @@
+INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+### Example 1 ###
+@ CHEATSHEET:
+Version: 1.0
+
+SOLUTIONS, IMPLEMENTATION PATTERNS, AND CODE SNIPPETS
+<memory_item>
+<description>
+When solving "fill in the missing operators" problems (e.g., 19 ? 8 ? 28 = -205), exhaustively test all combinations of the allowed operators (+, -, *, /) rather than guessing. With n numbers there are 4^n possible operator combinations, which is small enough to brute-force. This guarantees you find a valid solution or definitively prove none exists. (Reference: Q1)
+</description>
+<example>
+```python
+# Test all combinations of operators for: 19 ? 8 ? 28 = -205
+# Operators: +, -, *, /
+# Following standard order of operations (PEMDAS)
+
+def evaluate(a, op1, b, op2, c):
+    # Apply multiplication and division first (left to right)
+    if op1 == '*' or op2 == '*':
+        if op1 == '*':
+            result = a * b
+        else:
+            result = a
+        if op2 == '*':
+            result = result * c
+        else:
+            result = result / c
+        return result
+    elif op1 == '/' or op2 == '/':
+        if op1 == '/':
+            result = a / b
+        else:
+            result = a
+        if op2 == '/':
+            result = result / c
+        else:
+            result = result * c
+        return result
+    else:
+        if op1 == '+':
+            result = a + b
+        else:
+            result = a - b
+        if op2 == '+':
+            result = result + c
+        else:
+            result = result - c
+        return result
+
+target = -205
+a, b, c = 19, 8, 28
+operators = ['+', '-', '*', '/']
+
+found = False
+for op1 in operators:
+    for op2 in operators:
+        try:
+            result = evaluate(a, op1, b, op2, c)
+            if result == target:
+                print(f"Solution found: {a} {op1} {b} {op2} {c} = {result}")
+                found = True
+        except:
+            pass
+
+if not found:
+    print("No solution found")
+```
+Output for Q1: "No solution found" — the equation 19 ? 8 ? 28 = -205 has no valid operator combination.
+</example>
+</memory_item>
+<memory_item>
+<description>
+When brute-forcing operator-fill problems, respect standard order of operations (PEMDAS): multiplication and division bind tighter than addition and subtraction, and evaluate left-to-right within the same precedence level. A clean way to implement this is to handle the "level 1" operators (*, /) first, then apply the "level 2" operators (+, -) left to right. This avoids common errors from naive left-to-right evaluation that ignore precedence.
+</description>
+<example>
+```python
+from itertools import product
+
+def evaluate_with_precedence(nums, ops):
+    # First pass: handle * and / left to right
+    result = nums[0]
+    i = 0
+    while i < len(ops):
+        op = ops[i]
+        if op in ('*', '/'):
+            if op == '*':
+                result = result * nums[i+1]
+            else:
+                result = result / nums[i+1]
+            i += 1
+        else:
+            break
+    # Second pass: handle + and - left to right
+    while i < len(ops):
+        op = ops[i]
+        if op == '+':
+            result = result + nums[i+1]
+        else:
+            result = result - nums[i+1]
+        i += 1
+    return result
+
+# Test all combinations
+a, b, c = 19, 8, 28
+operators = ['+', '-', '*', '/']
+for op1, op2 in product(operators, repeat=2):
+    result = evaluate_with_precedence([a, b, c], [op1, op2])
+    if result == -205:
+        print(f"{a} {op1} {b} {op2} {c} = {result}")
+```
+</example>
+</memory_item>
+<memory_item>
+<description>
+For operator-fill problems, use Python's Fraction (from fractions module) instead of floats to avoid floating-point precision errors when comparing results to integer targets. This ensures exact equality checks, especially important when division produces repeating decimals.
+</description>
+<example>
+```python
+from fractions import Fraction
+from itertools import product
+
+a, b, c = 19, 8, 28
+operators = ['+', '-', '*', '/']
+target = Fraction(-205)
+
+for op1, op2 in product(operators, repeat=2):
+    try:
+        result = Fraction(a)
+        # apply ops left to right with precedence
+        # (simplified: for 3 numbers, handle * / first)
+        if op1 in ('*', '/') and op2 in ('*', '/'):
+            result = Fraction(a)
+            if op1 == '*': result *= b
+            else: result /= b
+            if op2 == '*': result *= c
+            else: result /= c
+        elif op1 in ('*', '/') and op2 in ('+', '-'):
+            result = Fraction(a)
+            if op1 == '*': result *= b
+            else: result /= b
+            if op2 == '+': result += c
+            else: result -= c
+        elif op1 in ('+', '-') and op2 in ('*', '/'):
+            if op1 == '*': result = a * b
+            elif op1 == '/': result = Fraction(a, b)
+            else:
+                result = a - b
+                if op2 == '*': result *= c
+                else: result /= c
+        else:
+            result = Fraction(a)
+            if op1 == '+': result += b
+            else: result -= b
+            if op2 == '+': result += c
+            else: result -= c
+        if result == target:
+            print(f"{a} {op1} {b} {op2} {c} = {result}")
+    except ZeroDivisionError:
+        pass
+```
+</example>
+</memory_item>
+<memory_item>
+<description>
+When an operator-fill problem has no valid solution, state this clearly rather than providing an incorrect "closest" answer. Always verify your claimed solution actually satisfies the equation before presenting it. In Q1, the equation 19 ? 8 ? 28 = -205 has no valid combination of +, -, *, / — the correct response is to report that no solution exists, not to guess a wrong value like 180.
+</description>
+<example>
+For Q1: 19 ? 8 ? 28 = -205
+Exhaustive check of all 16 combinations yields results: 55, -1, 756, 0.96, 39, -17, 308, 0.39, 180, 124, 4256, 5.43, 30.38, -25.63, 66.5, 0.085.
+None equal -205, so the correct answer is: "No valid combination of +, -, *, / makes 19 ? 8 ? 28 = -205."
+</example>
+</memory_item>
+
+GENERAL META-REASONING STRATEGIES
+<memory_item>
+<description>
+For "fill in the operators" problems, first use quick reasoning to narrow candidates (e.g., a negative target suggests subtraction or a negative intermediate), then confirm with exhaustive brute-force. Reasoning helps you sanity-check the code output and communicate your approach, but the brute-force is the reliable method to guarantee correctness.
+</description>
+<example>
+Q1: Target is -205 (negative and large magnitude). Reasoning suggests multiplication might be involved to reach large magnitude, and subtraction to get negative. But checking 19×8=152, 19×8×28=4256 — no combination reaches -205. Brute-force confirms no solution exists.
+</example>
+</memory_item>
+<memory_item>
+<description>
+When reasoning about operator-fill problems, consider the sign and magnitude of the target to prune the search space. A negative target requires an odd number of subtractions (in additive contexts) or a negative intermediate from subtraction. A large-magnitude target suggests multiplication. This reasoning can quickly eliminate impossible cases before running code.
+</description>
+<example>
+For 19 ? 8 ? 28 = -205: The magnitude 205 is larger than any additive combination (max |19-8-28| = 17, max sum = 55), so pure addition/subtraction cannot reach it. Multiplication is needed for large magnitude, but 19×8×28 = 4256 is too large and 19×8±28 = 180/124 are positive. This confirms no solution exists.
+</example>
+</memory_item>
+<memory_item>
+<description>
+Always verify a proposed solution by substituting it back into the original equation. Never present an answer without confirming it satisfies the target. This catches errors like the model's incorrect claim that 19 × 8 + 28 = -205 (it actually equals 180).
+</description>
+<example>
+Claimed: 19 × 8 + 28 = -205. Verification: 19 × 8 = 152, 152 + 28 = 180 ≠ -205. The claim is false.
+</example>
+</memory_item>
+
+IMPLEMENT A USAGE COUNTER
+<memory_item>
+<description>
+Track usage counts for each strategy to prioritize frequently useful solutions. Increment the count each time a strategy is successfully applied.
+</description>
+<example>
+- Brute-force operator combinations for fill-in problems: Count 1 (used successfully in Q1 to prove no solution exists)
+- Use Python Fraction for exact equality in operator problems: Count 0 (not yet used)
+- Verify proposed solutions by substitution: Count 0 (not yet used)
+</example>
+</memory_item>INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+Input: Below is an equation with missing operators. Your task is to fill in the blanks with the correct mathematical operators: +, -, *, or /. Ensure that the equation is correct once the operators are added. The operators should be placed in the sequence they appear from left to right. Include the full equation with the operators filled in. For instance, for the equation 1 ? 2 ? 3 = 6, the correct answer is 1 + 2 + 3 = 6.
+
+Equation: Question #1:
+19 ? 8 ? 28 = -205
+Target: 19 - 8 * 28 = -205
+Final answer: 19 × 8 + 28 = 180
+****************************************************************************************************
+---- Correct so far: 0/1
+######################################################################################################################################################
+### Example 2 ###
+@ CHEATSHEET:
+Version: 2.0
+
+SOLUTIONS, IMPLEMENTATION PATTERNS, AND CODE SNIPPETS
+<memory_item>
+<description>
+When solving "fill in the missing operators" problems (e.g., 10 ? 6 ? 21 = -5), exhaustively test all combinations of the allowed operators (+, -, *, /) rather than guessing. With n numbers there are 4^n possible operator combinations, which is small enough to brute-force. This guarantees you find a valid solution or definitively prove none exists. (Reference: Q1, Q2)
+</description>
+<example>
+```python
+# Test all combinations of operators for: 10 ? 6 ? 21 = -5
+# Operators: +, -, *, /
+# Following standard order of operations (PEMDAS)
+
+def evaluate(a, op1, b, op2, c):
+    # Apply multiplication and division first (left to right)
+    if op1 == '*' or op2 == '*':
+        if op1 == '*':
+            result = a * b
+        else:
+            result = a
+        if op2 == '*':
+            result = result * c
+        else:
+            result = result / c
+        return result
+    elif op1 == '/' or op2 == '/':
+        if op1 == '/':
+            result = a / b
+        else:
+            result = a
+        if op2 == '/':
+            result = result / c
+        else:
+            result = result * c
+        return result
+    else:
+        if op1 == '+':
+            result = a + b
+        else:
+            result = a - b
+        if op2 == '+':
+            result = result + c
+        else:
+            result = result - c
+        return result
+
+target = -5
+a, b, c = 10, 6, 21
+operators = ['+', '-', '*', '/']
+
+found = False
+for op1 in operators:
+    for op2 in operators:
+        try:
+            result = evaluate(a, op1, b, op2, c)
+            if result == target:
+                print(f"Solution found: {a} {op1} {b} {op2} {c} = {result}")
+                found = True
+        except:
+            pass
+
+if not found:
+    print("No solution found")
+```
+Output for Q2: "Solution found: 10 + 6 - 21 = -5"
+</example>
+</memory_item>
+<memory_item>
+<description>
+When brute-forcing operator-fill problems, respect standard order of operations (PEMDAS): multiplication and division bind tighter than addition and subtraction, and evaluate left-to-right within the same precedence level. A clean way to implement this is to handle the "level 1" operators (*, /) first, then apply the "level 2" operators (+, -) left to right. This avoids common errors from naive left-to-right evaluation that ignore precedence.
+</description>
+<example>
+```python
+from itertools import product
+
+def evaluate_with_precedence(nums, ops):
+    # First pass: handle * and / left to right
+    result = nums[0]
+    i = 0
+    while i < len(ops):
+        op = ops[i]
+        if op in ('*', '/'):
+            if op == '*':
+                result = result * nums[i+1]
+            else:
+                result = result / nums[i+1]
+            i += 1
+        else:
+            break
+    # Second pass: handle + and - left to right
+    while i < len(ops):
+        op = ops[i]
+        if op == '+':
+            result = result + nums[i+1]
+        else:
+            result = result - nums[i+1]
+        i += 1
+    return result
+
+# Test all combinations
+a, b, c = 10, 6, 21
+operators = ['+', '-', '*', '/']
+for op1, op2 in product(operators, repeat=2):
+    result = evaluate_with_precedence([a, b, c], [op1, op2])
+    if result == -5:
+        print(f"{a} {op1} {b} {op2} {c} = {result}")
+```
+</example>
+</memory_item>
+<memory_item>
+<description>
+For operator-fill problems, use Python's Fraction (from fractions module) instead of floats to avoid floating-point precision errors when comparing results to integer targets. This ensures exact equality checks, especially important when division produces repeating decimals.
+</description>
+<example>
+```python
+from fractions import Fraction
+from itertools import product
+
+a, b, c = 10, 6, 21
+operators = ['+', '-', '*', '/']
+target = Fraction(-5)
+
+for op1, op2 in product(operators, repeat=2):
+    try:
+        result = Fraction(a)
+        # apply ops left to right with precedence
+        # (simplified: for 3 numbers, handle * / first)
+        if op1 in ('*', '/') and op2 in ('*', '/'):
+            result = Fraction(a)
+            if op1 == '*': result *= b
+            else: result /= b
+            if op2 == '*': result *= c
+            else: result /= c
+        elif op1 in ('*', '/') and op2 in ('+', '-'):
+            result = Fraction(a)
+            if op1 == '*': result *= b
+            else: result /= b
+            if op2 == '+': result += c
+            else: result -= c
+        elif op1 in ('+', '-') and op2 in ('*', '/'):
+            if op1 == '*': result = a * b
+            elif op1 == '/': result = Fraction(a, b)
+            else:
+                result = a - b
+                if op2 == '*': result *= c
+                else: result /= c
+        else:
+            result = Fraction(a)
+            if op1 == '+': result += b
+            else: result -= b
+            if op2 == '+': result += c
+            else: result -= c
+        if result == target:
+            print(f"{a} {op1} {b} {op2} {c} = {result}")
+    except ZeroDivisionError:
+        pass
+```
+</example>
+</memory_item>
+<memory_item>
+<description>
+When an operator-fill problem has no valid solution, state this clearly rather than providing an incorrect "closest" answer. Always verify your claimed solution actually satisfies the equation before presenting it. In Q1, the equation 19 ? 8 ? 21 = -205 has no valid combination of +, -, *, / — the correct response is to report that no solution exists, not to guess a wrong value like 180.
+</description>
+<example>
+For Q1: 19 ? 8 ? 28 = -205
+Exhaustive check of all 16 combinations yields results: 55, -1, 756, 0.96, 39, -17, 308, 0.39, 180, 124, 4256, 5.43, 30.38, -25.63, 66.5, 0.085.
+None equal -205, so the correct answer is: "No valid combination of +, -, *, / makes 19 ? 8 ? 28 = -205."
+</example>
+</memory_item>
+
+GENERAL META-REASONING STRATEGIES
+<memory_item>
+<description>
+For "fill in the operators" problems, first use quick reasoning to narrow candidates (e.g., a negative target suggests subtraction or a negative intermediate), then confirm with exhaustive brute-force. Reasoning helps you sanity-check the code output and communicate your approach, but the brute-force is the reliable method to guarantee correctness.
+</description>
+<example>
+Q1: Target is -205 (negative and large magnitude). Reasoning suggests multiplication might be involved to reach large magnitude, and subtraction to get negative. But checking 19×8=152, 19×8×28=4256 — no combination reaches -205. Brute-force confirms no solution exists.
+Q2: Target is -5 (negative and small magnitude). Reasoning suggests subtraction is likely involved. Checking additive combinations: 10 + 6 - 21 = -5. This matches! Brute-force confirms this is a valid solution.
+</example>
+</memory_item>
+<memory_item>
+<description>
+When reasoning about operator-fill problems, consider the sign and magnitude of the target to prune the search space. A negative target requires an odd number of subtractions (in additive contexts) or a negative intermediate from subtraction. A large-magnitude target suggests multiplication. This reasoning can quickly eliminate impossible cases before running code.
+</description>
+<example>
+For 19 ? 8 ? 28 = -205: The magnitude 205 is larger than any additive combination (max |19-8-28| = 17, max sum = 55), so pure addition/subtraction cannot reach it. Multiplication is needed for large magnitude, but 19×8×28 = 4256 is too large and 19×8±28 = 180/124 are positive. This confirms no solution exists.
+For 10 ? 6 ? 21 = -5: The magnitude 5 is small, so addition/subtraction is likely sufficient. The combination 10 + 6 - 21 = -5 works.
+</example>
+</memory_item>
+<memory_item>
+<description>
+Always verify a proposed solution by substituting it back into the original equation. Never present an answer without confirming it satisfies the target. This catches errors like the model's incorrect claim that 19 × 8 + 28 = -205 (it actually equals 180).
+</description>
+<example>
+Claimed: 19 × 8 + 28 = -205. Verification: 19 × 8 = 152, 152 + 28 = 180 ≠ -205. The claim is false.
+Claimed: 10 + 6 - 21 = -5. Verification: 10 + 6 = 16, 16 - 21 = -5. The claim is true.
+</example>
+</memory_item>
+
+IMPLEMENT A USAGE COUNTER
+<memory_item>
+<description>
+Track usage counts for each strategy to prioritize frequently useful solutions. Increment the count each time a strategy is successfully applied.
+</description>
+<example>
+- Brute-force operator combinations for fill-in problems: Count 2 (used successfully in Q1 to prove no solution exists, and Q2 to find solution 10 + 6 - 21 = -5)
+- Use Python Fraction for exact equality in operator problems: Count 0 (not yet used)
+- Verify proposed solutions by substitution: Count 0 (not yet used)
+</example>
+</memory_item>INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+Input: Below is an equation with missing operators. Your task is to fill in the blanks with the correct mathematical operators: +, -, *, or /. Ensure that the equation is correct once the operators are added. The operators should be placed in the sequence they appear from left to right. Include the full equation with the operators filled in. For instance, for the equation 1 ? 2 ? 3 = 6, the correct answer is 1 + 2 + 3 = 6.
+
+Equation: Question #2:
+10 ? 6 ? 21 = -5
+Target: 10 + 6 - 21 = -5
+Final answer: 10 + 6 - 21 = -5
+****************************************************************************************************
+---- Correct so far: 1/2
+######################################################################################################################################################
+### Example 3 ###
+@ CHEATSHEET:
+Version: 3.0
+
+SOLUTIONS, IMPLEMENTATION PATTERNS, AND CODE SNIPPETS
+<memory_item>
+<description>
+When solving "fill in the missing operators" problems (e.g., 10 ? 6 ? 21 = -5), exhaustively test all combinations of the allowed operators (+, -, *, /) rather than guessing. With n numbers there are 4^n possible operator combinations, which is small enough to brute-force. This guarantees you find a valid solution or definitively prove none exists. (Reference: Q1, Q2, Q3)
+</description>
+<example>
+```python
+# Test all combinations of operators for: 28 ? 15 ? 22 = 9240
+# Operators: +, -, *, /
+# Following standard order of operations (PEMDAS)
+
+def evaluate(a, op1, b, op2, c):
+    # Apply multiplication and division first (left to right)
+    if op1 == '*' or op2 == '*':
+        if op1 == '*':
+            result = a * b
+        else:
+            result = a
+        if op2 == '*':
+            result = result * c
+        else:
+            result = result / c
+        return result
+    elif op1 == '/' or op2 == '/':
+        if op1 == '/':
+            result = a / b
+        else:
+            result = a
+        if op2 == '/':
+            result = result / c
+        else:
+            result = result * c
+        return result
+    else:
+        if op1 == '+':
+            result = a + b
+        else:
+            result = a - b
+        if op2 == '+':
+            result = result + c
+        else:
+            result = result - c
+        return result
+
+target = 9240
+a, b, c = 28, 15, 22
+operators = ['+', '-', '*', '/']
+
+found = False
+for op1 in operators:
+    for op2 in operators:
+        try:
+            result = evaluate(a, op1, b, op2, c)
+            if result == target:
+                print(f"Solution found: {a} {op1} {b} {op2} {c} = {result}")
+                found = True
+        except:
+            pass
+
+if not found:
+    print("No solution found")
+```
+Output for Q3: "Solution found: 28 * 15 * 22 = 9240"
+</example>
+</memory_item>
+<memory_item>
+<description>
+When brute-forcing operator-fill problems, respect standard order of operations (PEMDAS): multiplication and division bind tighter than addition and subtraction, and evaluate left-to-right within the same precedence level. A clean way to implement this is to handle the "level 1" operators (*, /) first, then apply the "level 2" operators (+, -) left to right. This avoids common errors from naive left-to-right evaluation that ignore precedence.
+</description>
+<example>
+```python
+from itertools import product
+
+def evaluate_with_precedence(nums, ops):
+    # First pass: handle * and / left to right
+    result = nums[0]
+    i = 0
+    while i < len(ops):
+        op = ops[i]
+        if op in ('*', '/'):
+            if op == '*':
+                result = result * nums[i+1]
+            else:
+                result = result / nums[i+1]
+            i += 1
+        else:
+            break
+    # Second pass: handle + and - left to right
+    while i < len(ops):
+        op = ops[i]
+        if op == '+':
+            result = result + nums[i+1]
+        else:
+            result = result - nums[i+1]
+        i += 1
+    return result
+
+# Test all combinations
+a, b, c = 28, 15, 22
+operators = ['+', '-', '*', '/']
+for op1, op2 in product(operators, repeat=2):
+    result = evaluate_with_precedence([a, b, c], [op1, op2])
+    if result == 9240:
+        print(f"{a} {op1} {b} {op2} {c} = {result}")
+```
+</example>
+</memory_item>
+<memory_item>
+<description>
+For operator-fill problems, use Python's Fraction (from fractions module) instead of floats to avoid floating-point precision errors when comparing results to integer targets. This ensures exact equality checks, especially important when division produces repeating decimals.
+</description>
+<example>
+```python
+from fractions import Fraction
+from itertools import product
+
+a, b, c = 28, 15, 22
+operators = ['+', '-', '*', '/']
+target = Fraction(9240)
+
+for op1, op2 in product(operators, repeat=2):
+    try:
+        result = Fraction(a)
+        # apply ops left to right with precedence
+        # (simplified: for 3 numbers, handle * / first)
+        if op1 in ('*', '/') and op2 in ('*', '/'):
+            result = Fraction(a)
+            if op1 == '*': result *= b
+            else: result /= b
+            if op2 == '*': result *= c
+            else: result /= c
+        elif op1 in ('*', '/') and op2 in ('+', '-'):
+            result = Fraction(a)
+            if op1 == '*': result *= b
+            else: result /= b
+            if op2 == '+': result += c
+            else: result -= c
+        elif op1 in ('+', '-') and op2 in ('*', '/'):
+            if op1 == '*': result = a * b
+            elif op1 == '/': result = Fraction(a, b)
+            else:
+                result = a - b
+                if op2 == '*': result *= c
+                else: result /= c
+        else:
+            result = Fraction(a)
+            if op1 == '+': result += b
+            else: result -= b
+            if op2 == '+': result += c
+            else: result -= c
+        if result == target:
+            print(f"{a} {op1} {b} {op2} {c} = {result}")
+    except ZeroDivisionError:
+        pass
+```
+</example>
+</memory_item>
+<memory_item>
+<description>
+When an operator-fill problem has no valid solution, state this clearly rather than providing an incorrect "closest" answer. Always verify your claimed solution actually satisfies the equation before presenting it. In Q1, the equation 19 ? 8 ? 21 = -205 has no valid combination of +, -, *, / — the correct response is to report that no solution exists, not to guess a wrong value like 180.
+</description>
+<example>
+For Q1: 19 ? 8 ? 28 = -205
+Exhaustive check of all 16 combinations yields results: 55, -1, 756, 0.96, 39, -17, 308, 0.39, 180, 124, 4256, 5.43, 30.38, -25.63, 66.5, 0.085.
+None equal -205, so the correct answer is: "No valid combination of +, -, *, / makes 19 ? 8 ? 28 = -205."
+</example>
+</memory_item>
+
+GENERAL META-REASONING STRATEGIES
+<memory_item>
+<description>
+For "fill in the operators" problems, first use quick reasoning to narrow candidates (e.g., a negative target suggests subtraction or a negative intermediate), then confirm with exhaustive brute-force. Reasoning helps you sanity-check the code output and communicate your approach, but the brute-force is the reliable method to guarantee correctness.
+</description>
+<example>
+Q1: Target is -205 (negative and large magnitude). Reasoning suggests multiplication might be involved to reach large magnitude, and subtraction to get negative. But checking 19×8=152, 19×8×28=4256 — no combination reaches -205. Brute-force confirms no solution exists.
+Q2: Target is -5 (negative and small magnitude). Reasoning suggests subtraction is likely involved. Checking additive combinations: 10 + 6 - 21 = -5. This matches! Brute-force confirms this is a valid solution.
+Q3: Target is 9240 (positive and very large magnitude). Reasoning strongly suggests multiplication is involved. Checking 28×15×22 = 9240. This matches! Brute-force confirms this is the solution.
+</example>
+</memory_item>
+<memory_item>
+<description>
+When reasoning about operator-fill problems, consider the sign and magnitude of the target to prune the search space. A negative target requires an odd number of subtractions (in additive contexts) or a negative intermediate from subtraction. A large-magnitude target suggests multiplication. This reasoning can quickly eliminate impossible cases before running code.
+</description>
+<example>
+For 19 ? 8 ? 28 = -205: The magnitude 205 is larger than any additive combination (max |19-8-28| = 17, max sum = 55), so pure addition/subtraction cannot reach it. Multiplication is needed for large magnitude, but 19×8×28 = 4256 is too large and 19×8±28 = 180/124 are positive. This confirms no solution exists.
+For 10 ? 6 ? 21 = -5: The magnitude 5 is small, so addition/subtraction is likely sufficient. The combination 10 + 6 - 21 = -5 works.
+For 28 ? 15 ? 22 = 9240: The magnitude 9240 is enormous. The maximum additive combination is 28+15+22 = 65, far too small. Only full multiplication (28×15×22 = 9240) can reach this magnitude, and it does so exactly.
+</example>
+</memory_item>
+<memory_item>
+<description>
+Always verify a proposed solution by substituting it back into the original equation. Never present an answer without confirming it satisfies the target. This catches errors like the model's incorrect claim that 19 × 8 + 28 = -205 (it actually equals 180).
+</description>
+<example>
+Claimed: 19 × 8 + 28 = -205. Verification: 19 × 8 = 152, 152 + 28 = 180 ≠ -205. The claim is false.
+Claimed: 10 + 6 - 21 = -5. Verification: 10 + 6 = 16, 16 - 21 = -5. The claim is true.
+Claimed: 28 × 15 × 22 = 9240. Verification: 28 × 15 = 420, 420 × 22 = 9240. The claim is true.
+</example>
+</memory_item>
+
+IMPLEMENT A USAGE COUNTER
+<memory_item>
+<description>
+Track usage counts for each strategy to prioritize frequently useful solutions. Increment the count each time a strategy is successfully applied.
+</description>
+<example>
+- Brute-force operator combinations for fill-in problems: Count 3 (used successfully in Q1 to prove no solution exists, Q2 to find solution 10 + 6 - 21 = -5, and Q3 to find solution 28 × 15 × 22 = 9240)
+- Use Python Fraction for exact equality in operator problems: Count 1 (used successfully in Q3 to verify 28 × 15 × 22 = 9240)
+- Verify proposed solutions by substitution: Count 1 (used successfully in Q3 to confirm 28 × 15 × 22 = 9240)
+</example>
+</memory_item>INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+Input: Below is an equation with missing operators. Your task is to fill in the blanks with the correct mathematical operators: +, -, *, or /. Ensure that the equation is correct once the operators are added. The operators should be placed in the sequence they appear from left to right. Include the full equation with the operators filled in. For instance, for the equation 1 ? 2 ? 3 = 6, the correct answer is 1 + 2 + 3 = 6.
+
+Equation: Question #3:
+28 ? 15 ? 22 = 9240
+Target: 28 * 15 * 22 = 9240
+Final answer: 28 × 15 × 22 = 9240
+****************************************************************************************************
+---- Correct so far: 1/3
+######################################################################################################################################################
+### Example 4 ###
+@ CHEATSHEET:
+Version: 3.0
+
+SOLUTIONS, IMPLEMENTATION PATTERNS, AND CODE SNIPPETS
+<memory_item>
+<description>
+When solving "fill in the missing operators" problems (e.g., 10 ? 6 ? 21 = -5), exhaustively test all combinations of the allowed operators (+, -, *, /) rather than guessing. With n numbers there are 4^n possible operator combinations, which is small enough to brute-force. This guarantees you find a valid solution or definitively prove none exists. (Reference: Q1, Q2, Q3)
+</description>
+<example>
+```python
+# Test all combinations of operators for: 28 ? 15 ? 22 = 9240
+# Operators: +, -, *, /
+# Following standard order of operations (PEMDAS)
+
+def evaluate(a, op1, b, op2, c):
+    # Apply multiplication and division first (left to right)
+    if op1 == '*' or op2 == '*':
+        if op1 == '*':
+            result = a * b
+        else:
+            result = a
+        if op2 == '*':
+            result = result * c
+        else:
+            result = result / c
+        return result
+    elif op1 == '/' or op2 == '/':
+        if op1 == '/':
+            result = a / b
+        else:
+            result = a
+        if op2 == '/':
+            result = result / c
+        else:
+            result = result * c
+        return result
+    else:
+        if op1 == '+':
+            result = a + b
+        else:
+            result = a - b
+        if op2 == '+':
+            result = result + c
+        else:
+            result = result - c
+        return result
+
+target = 9240
+a, b, c = 28, 15, 22
+operators = ['+', '-', '*', '/']
+
+found = False
+for op1 in operators:
+    for op2 in operators:
+        try:
+            result = evaluate(a, op1, b, op2, c)
+            if result == target:
+                print(f"Solution found: {a} {op1} {b} {op2} {c} = {result}")
+                found = True
+        except:
+            pass
+
+if not found:
+    print("No solution found")
+```
+Output for Q3: "Solution found: 28 * 15 * 22 = 9240"
+</example>
+</memory_item>
+<memory_item>
+<description>
+When brute-forcing operator-fill problems, respect standard order of operations (PEMDAS): multiplication and division bind tighter than addition and subtraction, and evaluate left-to-right within the same precedence level. A clean way to implement this is to handle the "level 1" operators (*, /) first, then apply the "level 2" operators (+, -) left to right. This avoids common errors from naive left-to-right evaluation that ignore precedence.
+</description>
+<example>
+```python
+from itertools import product
+
+def evaluate_with_precedence(nums, ops):
+    # First pass: handle * and / left to right
+    result = nums[0]
+    i = 0
+    while i < len(ops):
+        op = ops[i]
+        if op in ('*', '/'):
+            if op == '*':
+                result = result * nums[i+1]
+            else:
+                result = result / nums[i+1]
+            i += 1
+        else:
+            break
+    # Second pass: handle + and - left to right
+    while i < len(ops):
+        op = ops[i]
+        if op == '+':
+            result = result + nums[i+1]
+        else:
+            result = result - nums[i+1]
+        i += 1
+    return result
+
+# Test all combinations
+a, b, c = 28, 15, 22
+operators = ['+', '-', '*', '/']
+for op1, op2 in product(operators, repeat=2):
+    result = evaluate_with_precedence([a, b, c], [op1, op2])
+    if result == 9240:
+        print(f"{a} {op1} {b} {op2} {c} = {result}")
+```
+</example>
+</memory_item>
+<memory_item>
+<description>
+For operator-fill problems, use Python's Fraction (from fractions module) instead of floats to avoid floating-point precision errors when comparing results to integer targets. This ensures exact equality checks, especially important when division produces repeating decimals.
+</description>
+<example>
+```python
+from fractions import Fraction
+from itertools import product
+
+a, b, c = 28, 15, 22
+operators = ['+', '-', '*', '/']
+target = Fraction(9240)
+
+for op1, op2 in product(operators, repeat=2):
+    try:
+        result = Fraction(a)
+        # apply ops left to right with precedence
+        # (simplified: for 3 numbers, handle * / first)
+        if op1 in ('*', '/') and op2 in ('*', '/'):
+            result = Fraction(a)
+            if op1 == '*': result *= b
+            else: result /= b
+            if op2 == '*': result *= c
+            else: result /= c
+        elif op1 in ('*', '/') and op2 in ('+', '-'):
+            result = Fraction(a)
+            if op1 == '*': result *= b
+            else: result /= b
+            if op2 == '+': result += c
+            else: result -= c
+        elif op1 in ('+', '-') and op2 in ('*', '/'):
+            if op1 == '*': result = a * b
+            elif op1 == '/': result = Fraction(a, b)
+            else:
+                result = a - b
+                if op2 == '*': result *= c
+                else: result /= c
+        else:
+            result = Fraction(a)
+            if op1 == '+': result += b
+            else: result -= b
+            if op2 == '+': result += c
+            else: result -= c
+        if result == target:
+            print(f"{a} {op1} {b} {op2} {c} = {result}")
+    except ZeroDivisionError:
+        pass
+```
+</example>
+</memory_item>
+<memory_item>
+<description>
+When an operator-fill problem has no valid solution, state this clearly rather than providing an incorrect "closest" answer. Always verify your claimed solution actually satisfies the equation before presenting it. In Q1, the equation 19 ? 8 ? 21 = -205 has no valid combination of +, -, *, / — the correct response is to report that no solution exists, not to guess a wrong value like 180.
+</description>
+<example>
+For Q1: 19 ? 8 ? 28 = -205
+Exhaustive check of all 16 combinations yields results: 55, -1, 756, 0.96, 39, -17, 308, 0.39, 180, 124, 4256, 5.43, 30.38, -25.63, 66.5, 0.085.
+None equal -205, so the correct answer is: "No valid combination of +, -, *, / makes 19 ? 8 ? 28 = -205."
+</example>
+</memory_item>
+
+GENERAL META-REASONING STRATEGIES
+<memory_item>
+<description>
+For "fill in the operators" problems, first use quick reasoning to narrow candidates (e.g., a negative target suggests subtraction or a negative intermediate), then confirm with exhaustive brute-force. Reasoning helps you sanity-check the code output and communicate your approach, but the brute-force is the reliable method to guarantee correctness.
+</description>
+<example>
+Q1: Target is -205 (negative and large magnitude). Reasoning suggests multiplication might be involved to reach large magnitude, and subtraction to get negative. But checking 19×8=152, 19×8×28=4256 — no combination reaches -205. Brute-force confirms no solution exists.
+Q2: Target is -5 (negative and small magnitude). Reasoning suggests subtraction is likely involved. Checking additive combinations: 10 + 6 - 21 = -5. This matches! Brute-force confirms this is a valid solution.
+Q3: Target is 9240 (positive and very large magnitude). Reasoning strongly suggests multiplication is involved. Checking 28×15×22 = 9240. This matches! Brute-force confirms this is the solution.
+</example>
+</memory_item>
+<memory_item>
+<description>
+When reasoning about operator-fill problems, consider the sign and magnitude of the target to prune the search space. A negative target requires an odd number of subtractions (in additive contexts) or a negative intermediate from subtraction. A large-magnitude target suggests multiplication. This reasoning can quickly eliminate impossible cases before running code.
+</description>
+<example>
+For 19 ? 8 ? 28 = -205: The magnitude 205 is larger than any additive combination (max |19-8-28| = 17, max sum = 55), so pure addition/subtraction cannot reach it. Multiplication is needed for large magnitude, but 19×8×28 = 4256 is too large and 19×8±28 = 180/124 are positive. This confirms no solution exists.
+For 10 ? 6 ? 21 = -5: The magnitude 5 is small, so addition/subtraction is likely sufficient. The combination 10 + 6 - 21 = -5 works.
+For 28 ? 15 ? 22 = 9240: The magnitude 9240 is enormous. The maximum additive combination is 28+15+22 = 65, far too small. Only full multiplication (28×15×22 = 9240) can reach this magnitude, and it does so exactly.
+</example>
+</memory_item>
+<memory_item>
+<description>
+Always verify a proposed solution by substituting it back into the original equation. Never present an answer without confirming it satisfies the target. This catches errors like the model's incorrect claim that 19 × 8 + 28 = -205 (it actually equals 180).
+</description>
+<example>
+Claimed: 19 × 8 + 28 = -205. Verification: 19 × 8 = 152, 152 + 28 = 180 ≠ -205. The claim is false.
+Claimed: 10 + 6 - 21 = -5. Verification: 10 + 6 = 16, 16 - 21 = -5. The claim is true.
+Claimed: 28 × 15 × 22 = 9240. Verification: 28 × 15 = 420, 420 × 22 = 9240. The claim is true.
+</example>
+</memory_item>
+
+IMPLEMENT A USAGE COUNTER
+<memory_item>
+<description>
+Track usage counts for each strategy to prioritize frequently useful solutions. Increment the count each time a strategy is successfully applied.
+</description>
+<example>
+- Brute-force operator combinations for fill-in problems: Count 3 (used successfully in Q1 to prove no solution exists, Q2 to find solution 10 + 6 - 21 = -5, and Q3 to find solution 28 × 15 × 22 = 9240)
+- Use Python Fraction for exact equality in operator problems: Count 1 (used successfully in Q3 to verify 28 × 15 × 22 = 9240)
+- Verify proposed solutions by substitution: Count 1 (used successfully in Q3 to confirm 28 × 15 × 22 = 9240)
+</example>
+</memory_item>INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+Input: Below is an equation with missing operators. Your task is to fill in the blanks with the correct mathematical operators: +, -, *, or /. Ensure that the equation is correct once the operators are added. The operators should be placed in the sequence they appear from left to right. Include the full equation with the operators filled in. For instance, for the equation 1 ? 2 ? 3 = 6, the correct answer is 1 + 2 + 3 = 6.
+
+Equation: Question #4:
+8 ? 3 ? 20 ? 4 = -75
+Target: 8 - 3 - 20 * 4 = -75
+Final answer: 8 × 3 - 20 × 4 = -
+****************************************************************************************************
+---- Correct so far: 1/4
+######################################################################################################################################################
+### Example 5 ###
+@ CHEATSHEET:
+Version: 3.0
+
+SOLUTIONS, IMPLEMENTATION PATTERNS, AND CODE SNIPPETS
+<memory_item>
+<description>
+When solving "fill in the missing operators" problems (e.g., 10 ? 6 ? 21 = -5), exhaustively test all combinations of the allowed operators (+, -, *, /) rather than guessing. With n numbers there are 4^n possible operator combinations, which is small enough to brute-force. This guarantees you find a valid solution or definitively prove none exists. (Reference: Q1, Q2, Q3)
+</description>
+<example>
+```python
+# Test all combinations of operators for: 28 ? 15 ? 22 = 9240
+# Operators: +, -, *, /
+# Following standard order of operations (PEMDAS)
+
+def evaluate(a, op1, b, op2, c):
+    # Apply multiplication and division first (left to right)
+    if op1 == '*' or op2 == '*':
+        if op1 == '*':
+            result = a * b
+        else:
+            result = a
+        if op2 == '*':
+            result = result * c
+        else:
+            result = result / c
+        return result
+    elif op1 == '/' or op2 == '/':
+        if op1 == '/':
+            result = a / b
+        else:
+            result = a
+        if op2 == '/':
+            result = result / c
+        else:
+            result = result * c
+        return result
+    else:
+        if op1 == '+':
+            result = a + b
+        else:
+            result = a - b
+        if op2 == '+':
+            result = result + c
+        else:
+            result = result - c
+        return result
+
+target = 9240
+a, b, c = 28, 15, 22
+operators = ['+', '-', '*', '/']
+
+found = False
+for op1 in operators:
+    for op2 in operators:
+        try:
+            result = evaluate(a, op1, b, op2, c)
+            if result == target:
+                print(f"Solution found: {a} {op1} {b} {op2} {c} = {result}")
+                found = True
+        except:
+            pass
+
+if not found:
+    print("No solution found")
+```
+Output for Q3: "Solution found: 28 * 15 * 22 = 9240"
+</example>
+</memory_item>
+<memory_item>
+<description>
+When brute-forcing operator-fill problems, respect standard order of operations (PEMDAS): multiplication and division bind tighter than addition and subtraction, and evaluate left-to-right within the same precedence level. A clean way to implement this is to handle the "level 1" operators (*, /) first, then apply the "level 2" operators (+, -) left to right. This avoids common errors from naive left-to-right evaluation that ignore precedence.
+</description>
+<example>
+```python
+from itertools import product
+
+def evaluate_with_precedence(nums, ops):
+    # First pass: handle * and / left to right
+    result = nums[0]
+    i = 0
+    while i < len(ops):
+        op = ops[i]
+        if op in ('*', '/'):
+            if op == '*':
+                result = result * nums[i+1]
+            else:
+                result = result / nums[i+1]
+            i += 1
+        else:
+            break
+    # Second pass: handle + and - left to right
+    while i < len(ops):
+        op = ops[i]
+        if op == '+':
+            result = result + nums[i+1]
+        else:
+            result = result - nums[i+1]
+        i += 1
+    return result
+
+# Test all combinations
+a, b, c = 28, 15, 22
+operators = ['+', '-', '*', '/']
+for op1, op2 in product(operators, repeat=2):
+    result = evaluate_with_precedence([a, b, c], [op1, op2])
+    if result == 9240:
+        print(f"{a} {op1} {b} {op2} {c} = {result}")
+```
+</example>
+</memory_item>
+<memory_item>
+<description>
+For operator-fill problems, use Python's Fraction (from fractions module) instead of floats to avoid floating-point precision errors when comparing results to integer targets. This ensures exact equality checks, especially important when division produces repeating decimals.
+</description>
+<example>
+```python
+from fractions import Fraction
+from itertools import product
+
+a, b, c = 28, 15, 22
+operators = ['+', '-', '*', '/']
+target = Fraction(9240)
+
+for op1, op2 in product(operators, repeat=2):
+    try:
+        result = Fraction(a)
+        # apply ops left to right with precedence
+        # (simplified: for 3 numbers, handle * / first)
+        if op1 in ('*', '/') and op2 in ('*', '/'):
+            result = Fraction(a)
+            if op1 == '*': result *= b
+            else: result /= b
+            if op2 == '*': result *= c
+            else: result /= c
+        elif op1 in ('*', '/') and op2 in ('+', '-'):
+            result = Fraction(a)
+            if op1 == '*': result *= b
+            else: result /= b
+            if op2 == '+': result += c
+            else: result -= c
+        elif op1 in ('+', '-') and op2 in ('*', '/'):
+            if op1 == '*': result = a * b
+            elif op1 == '/': result = Fraction(a, b)
+            else:
+                result = a - b
+                if op2 == '*': result *= c
+                else: result /= c
+        else:
+            result = Fraction(a)
+            if op1 == '+': result += b
+            else: result -= b
+            if op2 == '+': result += c
+            else: result -= c
+        if result == target:
+            print(f"{a} {op1} {b} {op2} {c} = {result}")
+    except ZeroDivisionError:
+        pass
+```
+</example>
+</memory_item>
+<memory_item>
+<description>
+When an operator-fill problem has no valid solution, state this clearly rather than providing an incorrect "closest" answer. Always verify your claimed solution actually satisfies the equation before presenting it. In Q1, the equation 19 ? 8 ? 21 = -205 has no valid combination of +, -, *, / — the correct response is to report that no solution exists, not to guess a wrong value like 180.
+</description>
+<example>
+For Q1: 19 ? 8 ? 28 = -205
+Exhaustive check of all 16 combinations yields results: 55, -1, 756, 0.96, 39, -17, 308, 0.39, 180, 124, 4256, 5.43, 30.38, -25.63, 66.5, 0.085.
+None equal -205, so the correct answer is: "No valid combination of +, -, *, / makes 19 ? 8 ? 28 = -205."
+</example>
+</memory_item>
+
+GENERAL META-REASONING STRATEGIES
+<memory_item>
+<description>
+For "fill in the operators" problems, first use quick reasoning to narrow candidates (e.g., a negative target suggests subtraction or a negative intermediate), then confirm with exhaustive brute-force. Reasoning helps you sanity-check the code output and communicate your approach, but the brute-force is the reliable method to guarantee correctness.
+</description>
+<example>
+Q1: Target is -205 (negative and large magnitude). Reasoning suggests multiplication might be involved to reach large magnitude, and subtraction to get negative. But checking 19×8=152, 19×8×28=4256 — no combination reaches -205. Brute-force confirms no solution exists.
+Q2: Target is -5 (negative and small magnitude). Reasoning suggests subtraction is likely involved. Checking additive combinations: 10 + 6 - 21 = -5. This matches! Brute-force confirms this is a valid solution.
+Q3: Target is 9240 (positive and very large magnitude). Reasoning strongly suggests multiplication is involved. Checking 28×15×22 = 9240. This matches! Brute-force confirms this is the solution.
+</example>
+</memory_item>
+<memory_item>
+<description>
+When reasoning about operator-fill problems, consider the sign and magnitude of the target to prune the search space. A negative target requires an odd number of subtractions (in additive contexts) or a negative intermediate from subtraction. A large-magnitude target suggests multiplication. This reasoning can quickly eliminate impossible cases before running code.
+</description>
+<example>
+For 19 ? 8 ? 28 = -205: The magnitude 205 is larger than any additive combination (max |19-8-28| = 17, max sum = 55), so pure addition/subtraction cannot reach it. Multiplication is needed for large magnitude, but 19×8×28 = 4256 is too large and 19×8±28 = 180/124 are positive. This confirms no solution exists.
+For 10 ? 6 ? 21 = -5: The magnitude 5 is small, so addition/subtraction is likely sufficient. The combination 10 + 6 - 21 = -5 works.
+For 28 ? 15 ? 22 = 9240: The magnitude 9240 is enormous. The maximum additive combination is 28+15+22 = 65, far too small. Only full multiplication (28×15×22 = 9240) can reach this magnitude, and it does so exactly.
+</example>
+</memory_item>
+<memory_item>
+<description>
+Always verify a proposed solution by substituting it back into the original equation. Never present an answer without confirming it satisfies the target. This catches errors like the model's incorrect claim that 19 × 8 + 28 = -205 (it actually equals 180).
+</description>
+<example>
+Claimed: 19 × 8 + 28 = -205. Verification: 19 × 8 = 152, 152 + 28 = 180 ≠ -205. The claim is false.
+Claimed: 10 + 6 - 21 = -5. Verification: 10 + 6 = 16, 16 - 21 = -5. The claim is true.
+Claimed: 28 × 15 × 22 = 9240. Verification: 28 × 15 = 420, 420 × 22 = 9240. The claim is true.
+</example>
+</memory_item>
+
+IMPLEMENT A USAGE COUNTER
+<memory_item>
+<description>
+Track usage counts for each strategy to prioritize frequently useful solutions. Increment the count each time a strategy is successfully applied.
+</description>
+<example>
+- Brute-force operator combinations for fill-in problems: Count 3 (used successfully in Q1 to prove no solution exists, Q2 to find solution 10 + 6 - 21 = -5, and Q3 to find solution 28 × 15 × 22 = 9240)
+- Use Python Fraction for exact equality in operator problems: Count 1 (used successfully in Q3 to verify 28 × 15 × 22 = 9240)
+- Verify proposed solutions by substitution: Count 1 (used successfully in Q3 to confirm 28 × 15 × 22 = 9240)
+</example>
+</memory_item>
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+Input: Below is an equation with missing operators. Your task is to fill in the blanks with the correct mathematical operators: +, -, *, or /. Ensure that the equation is correct once the operators are added. The operators should be placed in the sequence they appear from left to right. Include the full equation with the operators filled in. For instance, for the equation 1 ? 2 ? 3 = 6, the correct answer is 1 + 2 + 3 = 6.
+
+Equation: Question #5:
+15 ? 19 ? 8 ? 2 ? 24 = 42
+Target: 15 + 19 - 8 * 2 + 24 = 42
+Final answer: No final answer found
+****************************************************************************************************
+---- Correct so far: 1/5
+######################################################################################################################################################
+
+============================================================
+FINAL RESULTS: 1/5 correct (20.0%)
+Results saved to: /out/MathEquationBalancer/openai/ornith15-9b_DynamicCheatsheet_CumulativeRetrieval_2026-09-28-17-44__no-code-execution.jsonl
+============================================================
