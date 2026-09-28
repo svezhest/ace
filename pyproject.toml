@@ -23,8 +23,5 @@ dev = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = [".", "tests"]         # tests — для stub и в tests/bridge
+pythonpath = ["."]
 filterwarnings = ["ignore::DeprecationWarning:pydantic_graph"]
-
-[tool.ruff]
-extend-exclude = ["ace/matharena", "ace/memory/mce_utils"]   # дословный код MathArena и утилит workspace MCE
