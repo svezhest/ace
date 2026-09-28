@@ -1,0 +1,49 @@
+{
+ "upstream": "dynamic-cheatsheet",
+ "commit": "5cfe3c37e8e52b1d858d0f3df46e7f17c50991b9",
+ "runner": "records/dc_default_nocode/run.sh -> records/dc_common/run.sh",
+ "command": "python run_benchmark.py --task MathEquationBalancer --model_name openai/ornith15-9b --generator_prompt_path prompts/generator_prompt.txt --max_n_samples 5 --save_directory /out --approach_name default --execute_python_code",
+ "approach": "default",
+ "execute_python_code": false,
+ "knobs": {
+  "--task": {
+   "value": "MathEquationBalancer",
+   "default": "GameOf24",
+   "class": "K"
+  },
+  "--max_n_samples": {
+   "value": 5,
+   "default": -1,
+   "class": "K",
+   "note": "первые 5 после shuffle(seed=10)"
+  },
+  "--model_name": {
+   "value": "openai/ornith15-9b",
+   "default": "openai/gpt-4o-mini",
+   "class": "T"
+  },
+  "--save_directory": {
+   "value": "/out",
+   "default": "results",
+   "class": "T"
+  },
+  "--approach_name": {
+   "value": "default",
+   "default": "DynamicCheatsheet_Cumulative"
+  },
+  "--execute_python_code": {
+   "value": false,
+   "default": true,
+   "class": "K",
+   "note": "флаг передан: у Tap bool с умолчанием True флаг выключает код (params.json апстрима: false)"
+  },
+  "--max_tokens / --temperature / --max_num_rounds / --retrieve_top_k": {
+   "value": "по умолчанию",
+   "default": "2048 / 0.0 / 1 / 3"
+  }
+ },
+ "env": "как у records/dc_code_v2: апстрим целиком в контейнере dc-upstream (records/dc_code_v2/Dockerfile), cwd /up — корень апстрима только на чтение, сеть dcnet без выхода наружу, выход — контейнер записи dcrec к шлюзу; OPENAI_BASE_URL=http://dcrec:8080/v1 OPENAI_API_KEY=x TIKTOKEN_CACHE_DIR HF_HUB_OFFLINE=1 HF_DATASETS_OFFLINE=1 PYTHONPATH=/site (records/dc_code_v2/sitecustomize.py: сид имён tempfile 0)",
+ "forced": "TIKTOKEN_CACHE_DIR: кэш o200k_base смонтирован, в контейнере без сети tiktoken иначе не стартует",
+ "snapshot": "outputs.jsonl и params.json — выход апстрима, run.log — его вывод",
+ "expected_calls": "5 (5 генераций)"
+}
