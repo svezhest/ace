@@ -10,5 +10,4 @@ RUN UV_PYTHON_DOWNLOADS=automatic UV_PYTHON_INSTALL_DIR=/opt/python uv venv -p 3
 COPY --chown=runner up/ /private/tmp/mce-symptom/
 USER runner
 WORKDIR /private/tmp/mce-symptom
-# кэш uv — в home агентов (HOME из env.txt): uv run агента пересобирает editable-проект из кэша без сети
-RUN mkdir home tmp && HOME=/private/tmp/mce-symptom/home UV_PYTHON_DOWNLOADS=never uv sync --frozen
+RUN mkdir home tmp && UV_PYTHON_DOWNLOADS=never uv sync --frozen --no-cache
