@@ -1,0 +1,22 @@
+{
+  "upstream": "SCOPE",
+  "commit": "4dc0da5e7843dce84a851bd7a53e4e45932b27d0",
+  "commit_note": "закреп = онлайн HEAD на 27.09.2026, как у scope_deep",
+  "status": "раннер готов, живая запись не снята; два прогона на фейковой модели доходят до конца, оптимизатор срабатывает (2 раза, все четыре его промпта), наборы канонических запросов совпадают (70 = 70)",
+  "why": "scope_deep (examples/test_scope_deep.py) до MemoryOptimizer не доходит: он вызывается в StrategicMemoryStore.add_strategic_rule, когда после добавления правила в домене одного агента правил больше max_strategic_rules_per_domain (10); правило попадает туда, только если классификатор не счёл его дубликатом, scope = strategic, confidence >= 0.85 (strategic_confidence_threshold и жёсткий порог в add_strategic_rule) и _is_duplicate (подстрока или > 70% общих слов) не сработал. В примере у каждого агента 1–3 шага",
+  "scenario": "records/scope_optimizer/scenario.py: тест 1 примера (json_agent, роль, задача, промпт «You are a JSON processing agent.», SCOPEOptimizer(auto_accept_threshold=\"low\"), остальное по умолчанию: оптимизатор включён, optimizer_model = synthesizer_model, 10 правил на домен); вывод агента — документ fail*.json JSON_checker, ошибка — Exception(\"JSONDecodeError: <сообщение json.loads>\") в формате примера. Задача — новый SCOPEOptimizer на общем exp_path, промпт = базовый + get_strategic_rules_for_agent (Quick Start README); один агент, поэтому правила копятся в одном домене. Проходы по набору до трёх, проход, в котором оптимизатор сработал, — последний. parse_args и create_model — из самого примера",
+  "data": {
+    "file": "records/scope_optimizer/json_checker.zip",
+    "source": "https://www.json.org/JSON_checker/test.zip (набор JSON_checker, fail1..fail33; тот же набор — JSONDOCS в CPython Lib/test/test_json/test_fail.py)",
+    "sha256": "5abaf51d15cd19beb36db16a659bc4fe298c5e5f870f5ae0d6831ea2eb7c02c0",
+    "why": "у примера и апстрима нет данных на десяток разных ошибок одного рода: в примере ~10 разных ошибок у разных агентов и в разных доменах. Ошибка теста 1 — невалидный JSON, JSON_checker — готовый набор таких документов, 31 из 33 json.loads отвергает (fail1, fail18 принимает — их нет)"
+  },
+  "runner": "records/scope_optimizer/run.sh OUT (UPSTREAMS по умолчанию ~/Projects/upstreams, PORT=8097, MODEL_URL=http://localhost:8080)",
+  "command": "cd $UPSTREAMS/SCOPE && PYTHONPATH=. $UPSTREAMS/.venvs/light/bin/python $ACE/records/scope_optimizer/scenario.py --provider openai --model ornith15-9b --api-key x --base-url http://127.0.0.1:8097/v1",
+  "knobs": "те же, что у scope_deep: --provider openai, --model ornith15-9b, --api-key x, --base-url прокси записи (все T)",
+  "bridge": "только адрес (прокси записи); рандома у сценария нет: вызовы последовательные, в запросы не попадают ни пути, ни время",
+  "env": "venv .venvs/light (python 3.11), cwd = корень апстрима, PYTHONPATH=. (scope и examples из подмодуля)",
+  "sampling": "в запросах только model, messages (как у scope_deep)",
+  "estimate": "задача — 2 вызова (синтез + классификатор; 1, если ответ синтеза не разобран), срабатывание оптимизатора — 1–2 анализа + разрешение конфликтов, проверки поглощения, слияния (≈3–8). Проход — 31 задача ≈ 62–75 вызовов, предел трёх проходов ≈ 190–210. По scope_deep (23 вызова за 2,1 мин, 5,4 с/вызов) проход 6–7 мин, предел ≈ 18 мин; при 20 с/вызов 21–25 мин и ≈ 65–70 мин. Запас: в scope_deep на 9B правило ушло в стратегическую память примерно на каждом втором шаге (6 из 12), домен правила про JSON — general. Если доля задач, дающих правило в самом частом домене, p: для 11 правил с вероятностью 0,9 нужно ≈ 36 задач при p = 0,4, 49 при 0,3, 59 при 0,25, 75 при 0,2, 100 при 0,15. Один проход (31) хватает только при p >= 0,4 (P = 0,75); три прохода (93) — P = 0,99 при p = 0,2 и 0,84 при p = 0,15. Повторы документов во 2–3 проходах классификатор чаще сочтёт дубликатами, так что их p ниже, чем в первом",
+  "snapshot": "stdout.txt — строка на задачу (strategic / tactical / no guideline), журнал SCOPE (logger scope на INFO: RuleOptimization, Orchestrator, RuleAnalyzer и шаги), число срабатываний и strategic_memory/global_rules.json в конце; exp_path — временный каталог, сценарий его удаляет"
+}
