@@ -3,6 +3,7 @@ import hashlib
 import json
 import random
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import numpy as np
@@ -30,6 +31,8 @@ class Fake(BaseHTTPRequestHandler):
             return self.send(200, out)
         if body["messages"][-1]["content"] == "fail":
             return self.send(500, {"error": {"message": "boom", "type": "server"}})
+        if body["messages"][-1]["content"] == "slow":
+            time.sleep(0.5)
         seen = {k: v for k, v in body.items() if k not in ("stream", "stream_options")}
         seen.setdefault("seed", random.random())
         text = hashlib.sha256(json.dumps(seen, sort_keys=True).encode()).hexdigest()[:12]
@@ -216,6 +219,18 @@ def test_sse_tool_calls_frame_by_frame():
                            [{"index": 1, "function": {"arguments": '{"a":1}'}}]]
     assert [f["choices"][0]["finish_reason"] for f in frames] == [None] * 5 + ["tool_calls"]
     assert assemble(frames) == resp
+
+
+@pytest.mark.parametrize("stream", [False, True])
+def test_client_drop_marked(fake, tmp_path, stream):
+    """Клиент бросил запрос по таймауту — строка записи помечена dropped; дождавшийся — нет."""
+    rec = recorder(fake, tmp_path / "rec.jsonl")
+    c = openai.OpenAI(base_url=f"http://127.0.0.1:{rec.server_address[1]}/v1", api_key="k", max_retries=0, timeout=0.1)
+    with pytest.raises(openai.APITimeoutError):
+        list(c.chat.completions.create(model="m", messages=[{"role": "user", "content": "slow"}], stream=stream))
+    ask(client(rec), ("stream" if stream else "chat", "a"))       # ждёт за брошенным: вызовы по одному
+    rec.shutdown()
+    assert [x.get("dropped") for x in lines(tmp_path / "rec.jsonl")] == [True, None]
 
 
 def test_embeddings_server(monkeypatch):

@@ -4,13 +4,16 @@
 Ключ ответа — (путь, канонический запрос, номер повтора этого запроса в прогоне). Канонический запрос — поля FIELDS
 тела, ключи по алфавиту. Наверх уходит только он и seed = seed_for(запрос, n), так что ответ модели — функция
 ключа и не зависит от порядка вызовов. Строка записи:
-{"path", "request": канонический запрос, "n", "seed", "status", "response"}.
+{"path", "request": канонический запрос, "n", "seed", "status", "response"}, плюс "dropped": true, если клиент
+оборвал соединение до ответа (таймаут, повтор) — такая запись негодна.
 Воспроизведение отдаёт k-му такому же запросу k-й записанный ответ; запроса нет в записи — 400 с diff против
 ближайшего записанного. GET /_status — сколько отдано и сколько не востребовано."""
 import argparse
 import difflib
 import hashlib
 import json
+import select
+import socket
 import sys
 import threading
 import urllib.error
@@ -86,17 +89,25 @@ class Recorder(ThreadingHTTPServer):
                         out.start_stream()
                         resp = assemble([json.loads(x[6:]) for x in map(bytes.strip, up)
                                          if x.startswith(b"data: ") and x != b"data: [DONE]"])
-                        out.send(sse(resp, body))
-                        out.end_stream()
                     else:
                         resp = json.loads(up.read())
-                        out.reply(status, resp, body)
             except urllib.error.HTTPError as e:
-                status, resp = e.code, error_body(e)
-                out.reply(status, resp, body)
+                status, resp, stream = e.code, error_body(e), False
             except urllib.error.URLError as e:     # модель недоступна: не пишем, номер повтора не тратим
                 return out.error(502, f"upstream unreachable: {e}")
+            # клиент не дождался ответа (таймаут, повтор): апстрим его не увидел, запись негодна
+            dropped = out.gone()
+            try:
+                if not dropped and stream:
+                    out.send(sse(resp, body))
+                    out.end_stream()
+                elif not dropped:
+                    out.reply(status, resp, body)
+            except OSError:
+                dropped = True
             rec = {"path": path, "request": c, "n": n, "seed": seed, "status": status, "response": resp}
+            if dropped:
+                rec["dropped"] = True
             with self.out.open("a") as f:
                 f.write(json.dumps(rec, ensure_ascii=False) + "\n")
             self.count[path, c] += 1
@@ -290,6 +301,14 @@ class Handler(BaseHTTPRequestHandler):
 
     def end_stream(self):
         self.send(b"")
+
+    def gone(self) -> bool:
+        """Клиент закрыл соединение: тело запроса уже прочитано, так что читаемый сокет без данных — это конец."""
+        try:
+            ready = select.select([self.connection], [], [], 0)[0]
+            return bool(ready) and not self.connection.recv(1, socket.MSG_PEEK)
+        except OSError:
+            return True
 
     def do_GET(self):
         self.server.get(self)
