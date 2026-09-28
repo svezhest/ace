@@ -1,0 +1,77 @@
+{
+  "upstream": "ace",
+  "commit": "82709de050e1db6e6ef2f07bcb0393560b94992a",
+  "commit_note": "закреп = онлайн HEAD на 27.09.2026",
+  "date": "2026-09-27",
+  "started": "2026-09-28 03:13:01",
+  "finished": "2026-09-28 13:11:04",
+  "minutes": 598.0,
+  "model": "ornith15-9b (ornith15-9b-mlx-8bit через шлюз :8080)",
+  "gateway": {
+    "env": {
+      "GATEWAY_JOURNAL": "~/Projects/llm/logs/journal.jsonl",
+      "GATEWAY_OPENAI_DEFAULTS": "1"
+    },
+    "note": "без max_tokens в запросе шлюз ставит 16384 (GATEWAY_OPENAI_DEFAULTS)"
+  },
+  "worker": {
+    "env": {
+      "QWEN_KV_BITS": "0",
+      "QWEN_MODEL": "../../weights/ornith15-9b-mlx-8bit",
+      "QWEN_PROMPT_CACHE": "1"
+    }
+  },
+  "record": "старый прокси tools/record (коммит d0e3c06, до 3ab1e3a): seed = seed_for(канонический запрос, n), канонический запрос — всё тело без stream, stream_options, id; наверх — тело без stream. В этой записи в запросах только model, messages, temperature, max_completion_tokens, поэтому ключ и seed те же, что у нового прокси",
+  "runner": "records/ace_offline_finer/run.sh (UPSTREAMS по умолчанию ~/Projects/upstreams)",
+  "command": "python -m eval.finance.run --task_name finer --mode offline --save_path <OUT>/out --api_provider openai --generator_model ornith15-9b --reflector_model ornith15-9b --curator_model ornith15-9b --test_workers 1 --eval_steps 10 --num_epochs 2 --save_steps 1",
+  "knobs": {
+    "срез (sample_config.json в cwd)": {
+      "value": "первые 10 train / 10 val / 10 test",
+      "class": "K",
+      "default": "finer_train_batched_1000_samples / finer_val_batched_500_samples / finer_test_subset_006_seed42 (1000/500/441)"
+    },
+    "--eval_steps": {
+      "value": 10,
+      "default": 100,
+      "class": "K",
+      "note": "= N_train: val раз в эпоху"
+    },
+    "--num_epochs": {
+      "value": 2,
+      "default": 1,
+      "class": "K"
+    },
+    "--save_steps": {
+      "value": 1,
+      "default": 50,
+      "class": "K"
+    },
+    "--api_provider": {
+      "value": "openai",
+      "default": "sambanova",
+      "class": "K"
+    },
+    "--test_workers": {
+      "value": 1,
+      "default": 20,
+      "class": "T"
+    },
+    "--generator/reflector/curator_model": {
+      "value": "ornith15-9b",
+      "default": "DeepSeek-V3.1",
+      "class": "T"
+    },
+    "--max_num_rounds / --curator_frequency / --max_tokens / --playbook_token_budget / --batch_size": {
+      "value": "по умолчанию",
+      "default": "3 / 1 / 4096 / 80000 / 1"
+    }
+  },
+  "env": "venv .venvs/ace (uv.lock апстрима), cwd — свой каталог с eval/finance/data/{sample_config.json, срезы}; PYTHONPATH=<site>:$UPSTREAMS/ace; sitecustomize.py: base_url openai.OpenAI из ACE_BASE_URL (utils.py зашивает api.openai.com); OPENAI_API_KEY=x TIKTOKEN_CACHE_DIR HF_HUB_OFFLINE=1 PYTHONUNBUFFERED=1",
+  "snapshot": "out/ — выход апстрима (run_config, playbook-и по шагам, результаты тестов и val), run.log — вывод",
+  "calls": 139,
+  "statuses": {
+    "200": 139
+  },
+  "attempt": 1,
+  "rec_sha256": "c00363f462c789b76ae991fb0468f309df4590f1729ecd88cf4dfc0e93a820f8"
+}

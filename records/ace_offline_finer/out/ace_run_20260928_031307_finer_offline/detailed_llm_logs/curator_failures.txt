@@ -1,0 +1,35 @@
+
+============================================================
+CURATOR FAILURE LOG
+============================================================
+Timestamp: 2026-09-28 03:27:55
+Epoch: 0
+Step: 3
+Failure Type: json_parse_error
+Error Details: Failed to extract valid JSON from curator response
+
+Raw Curator Response (first 1000 chars):
+----------------------------------------
+{
+  "reasoning": "The reflection reveals two distinct, recurring errors that are NOT yet captured in the playbook: (1) The maximum vs. remaining borrowing capacity distinction for revolving credit facilities, and (2) The basis spread vs. stated interest rate distinction for variable-rate debt margins. The existing playbook has a 'PaymentsToAcquireBusinessesGross' vs 'BusinessCombinationConsiderationTransferred1' distinction (acquisition payments), but nothing about revolving credit facility capacity or variable-rate spreads. These are semantically similar tag-selection errors that follow the same root cause (prioritizing plausible general matches over precise specific ones), so they deserve dedicated, precise bullets. I will add two ADD operations: one for the maximum/remaining borrowing capacity distinction (section: context_clues_and_indicators, since it's about recognizing specific contextual signals) and one for the basis spread vs stated percentage distinction (section: common_mis
+----------------------------------------
+
+Full Raw Curator Response:
+----------------------------------------
+{
+  "reasoning": "The reflection reveals two distinct, recurring errors that are NOT yet captured in the playbook: (1) The maximum vs. remaining borrowing capacity distinction for revolving credit facilities, and (2) The basis spread vs. stated interest rate distinction for variable-rate debt margins. The existing playbook has a 'PaymentsToAcquireBusinessesGross' vs 'BusinessCombinationConsiderationTransferred1' distinction (acquisition payments), but nothing about revolving credit facility capacity or variable-rate spreads. These are semantically similar tag-selection errors that follow the same root cause (prioritizing plausible general matches over precise specific ones), so they deserve dedicated, precise bullets. I will add two ADD operations: one for the maximum/remaining borrowing capacity distinction (section: context_clues_and_indicators, since it's about recognizing specific contextual signals) and one for the basis spread vs stated percentage distinction (section: common_mistakes_to_avoid, since it's a classic mis-selection error). Both bullets will be concise, actionable, and use the precise financial terminology to help the user match the most specific tag.",
+  "operations": [
+    {
+      "type": "ADD",
+      "section": "context_clues_and_indicators",
+      "content": "When a revolving credit facility states a dollar amount (e.g., 'up to $225.0 million'), this represents the MAXIMUM borrowing capacity, not the remaining capacity. The correct tag is 'LineOfCreditFacilityMaximumBorrowingCapacity'. Key contextual signals: phrases like 'up to', 'maximum amount available', 'total facility size', 'committed facility', or 'principal amount of up to' all indicate the maximum capacity. 'Remaining borrowing capacity' (→ 'LineOfCreditFacilityRemainingBorrowingCapacity') is reserved for the UNUSED amount AFTER existing borrowings, typically signaled by phrases like 'remaining', 'unused', 'available balance', or 'after outstanding borrowings'. The critical distinction: maximum = the ceiling of what can be borrowed; remaining = what is left after current usage. Match the precise term: 'up to $X' = maximum, not remaining. Do not default to 'remaining' just because the facility is not fully drawn.
+    },
+    {
+      "type": "ADD",
+      "section": "common_mistakes_to_avoid",
+      "content": "Do NOT default to 'DebtInstrumentInterestRateStatedPercentage' for interest margins/spreads applied to variable rates. When a margin (e.g., 1.00%, 2.00%, 0.00%) is ADDED TO A VARIABLE RATE BASIS (LIBOR, SOFR, ABR, prime), the correct tag is 'DebtInstrumentBasisSpreadOnVariableRate1'. The key distinction: 'basis spread' = a margin/spread added to a variable rate basis (the spread is the extra percentage layered on top of the floating rate); 'stated percentage' = the rate itself (a fixed or standalone rate, not a spread added to a base). Contextual signals for basis spread: the margin is described as being 'plus LIBOR', 'plus ABR', 'plus SOFR', 'over LIBOR', or 'added to the reference rate'. Always check whether the percentage is a SPREAD layered on a variable rate (→ basis spread) versus the rate itself (→ stated percentage). Prioritize the most specific tag: 'basis spread on variable rate' is more precise than 'stated percentage' when a variable-rate basis is involved.
+    }
+  ]
+}
+----------------------------------------
+

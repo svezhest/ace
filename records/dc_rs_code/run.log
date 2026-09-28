@@ -1,0 +1,675 @@
+INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+### Example 1 ###
+@ CHEATSHEET:
+Version: 1
+
+## Reusable Code Snippets and Solution Strategies
+
+<memory_item>
+<description>
+Strategy for solving "missing operator" equations (fill in blanks with +, -, *, /). The key is to recognize that operator precedence matters: multiplication and division bind tighter than addition and subtraction. When the target result is negative and large in magnitude, subtraction combined with multiplication is often the winning combination. Systematically test combinations while respecting standard order of operations (PEMDAS/BODMAS).
+</description>
+<example>
+For 19 ? 8 ? 28 = -205:
+- Recognize target is negative and large (-205), suggesting subtraction + multiplication.
+- Test 19 - 8 * 28 = 19 - 224 = -205 ✓ (multiplication binds first)
+- Answer: 19 - 8 * 28 = -205
+
+General approach: enumerate operator combinations, but prioritize those using * or / when the magnitude is large, since these create larger intermediate values.
+</example>
+</memory_item>
+** Count:  1
+
+<memory_item>
+<description>
+When solving missing-operator problems, use brute-force enumeration of all operator combinations (4^n where n = number of blanks) and evaluate each respecting operator precedence. This guarantees finding a valid solution if one exists. For 2 blanks, there are only 16 combinations to check.
+</description>
+<example>
+For 19 ? 8 ? 28 = -205, enumerate all 16 combinations:
+- 19+8+28=55, 19+8-28=-1, 19+8*28=263, 19+8/28≈19.29
+- 19-8+28=39, 19-8-28=-17, 19-8*28=-205 ✓, 19-8/28≈17.71
+- 19*8+28=180, 19*8-28=124, 19*8/28≈5.43, 19*8/28≈5.43
+- 19/8+28≈28.25, 19/8-28≈-25.63, 19/8*28≈66.5, 19/8/28≈0.085
+Result: 19 - 8 * 28 = -205 ✓
+</example>
+</memory_item>
+** Count:  1
+
+## General Problem-Solving Heuristics
+
+<memory_item>
+<description>
+Heuristic for missing-operator puzzles: the sign and magnitude of the target result guide operator selection. A large negative target suggests subtraction (to make it negative) combined with multiplication (to reach large magnitude). A large positive target suggests addition or multiplication. Small results suggest division. Always respect operator precedence—multiplication/division are evaluated before addition/subtraction.
+</description>
+<example>
+Target -205 (large negative): use subtraction + multiplication → 19 - 8 * 28 = -205 ✓
+Target +6 (small positive): use addition → 1 + 2 + 3 = 6 ✓
+</example>
+</memory_item>
+** Count:  1
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+Input: Below is an equation with missing operators. Your task is to fill in the blanks with the correct mathematical operators: +, -, *, or /. Ensure that the equation is correct once the operators are added. The operators should be placed in the sequence they appear from left to right. Include the full equation with the operators filled in. For instance, for the equation 1 ? 2 ? 3 = 6, the correct answer is 1 + 2 + 3 = 6.
+
+Equation: Question #1:
+19 ? 8 ? 28 = -205
+Target: 19 - 8 * 28 = -205
+Final answer: 19 - 8 * 28 = -205
+****************************************************************************************************
+---- Correct so far: 1/1
+######################################################################################################################################################
+### Example 2 ###
+@ CHEATSHEET:
+Version: 2
+
+## Reusable Code Snippets and Solution Strategies
+
+<memory_item>
+<description>
+Strategy for solving "missing operator" equations (fill in blanks with +, -, *, /). The key is to recognize that operator precedence matters: multiplication and division bind tighter than addition and subtraction. When the target result is negative and large in magnitude, subtraction combined with multiplication is often the winning combination. When the target is a small negative number, simple addition followed by subtraction (or vice versa) usually suffices—avoid multiplication since it creates large intermediate values. Systematically test combinations while respecting standard order of operations (PEMDAS/BODMAS). (Reference: Q1, Q2)
+</description>
+<example>
+For 19 ? 8 ? 28 = -205 (large negative):
+- Target is large negative → subtraction + multiplication.
+- 19 - 8 * 28 = 19 - 224 = -205 ✓
+
+For 10 ? 6 ? 21 = -5 (small negative):
+- Target is small negative → addition + subtraction (avoid multiplication).
+- 10 + 6 - 21 = 16 - 21 = -5 ✓
+
+General approach: enumerate operator combinations, but prioritize those using * or / when the magnitude is large, since these create larger intermediate values. For small-magnitude targets, prefer + and - only.
+</example>
+</memory_item>
+** Count:  2
+
+<memory_item>
+<description>
+When solving missing-operator problems, use brute-force enumeration of all operator combinations (4^n where n = number of blanks) and evaluate each respecting operator precedence. This guarantees finding a valid solution if one exists. For 2 blanks, there are only 16 combinations to check. Use Python's eval() to respect operator precedence correctly (a hand-written evaluator is error-prone). (Reference: Q1, Q2)
+</description>
+<example>
+For 10 ? 6 ? 21 = -5, enumerate all 16 combinations:
+- 10+6+21=37, 10+6-21=-5 ✓, 10+6*21=136, 10+6/21≈10.29
+- 10-6+21=25, 10-6-21=-17, 10-6*21=-116, 10-6/21≈9.71
+- 10*6+21=81, 10*6-21=39, 10*6/21≈2.86, 10*6/21≈2.86
+- 10/6+21≈22.67, 10/6-21≈-18.33, 10/6*21=35, 10/6/21≈0.079
+Result: 10 + 6 - 21 = -5 ✓
+</example>
+</memory_item>
+** Count:  2
+
+## General Problem-Solving Heuristics
+
+<memory_item>
+<description>
+Heuristic for missing-operator puzzles: the sign AND magnitude of the target result guide operator selection. A large-magnitude negative target suggests subtraction (to make it negative) combined with multiplication (to reach large magnitude). A large positive target suggests addition or multiplication. A small-magnitude result (positive or negative) suggests addition/subtraction only—avoid multiplication, which overshoots. Small results suggest division. Always respect operator precedence—multiplication/division are evaluated before addition/subtraction. (Reference: Q1, Q2)
+</description>
+<example>
+Target -205 (large negative): use subtraction + multiplication → 19 - 8 * 28 = -205 ✓
+Target +6 (small positive): use addition → 1 + 2 + 3 = 6 ✓
+Target -5 (small negative): use addition + subtraction → 10 + 6 - 21 = -5 ✓
+</example>
+</memory_item>
+** Count:  2
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+Input: Below is an equation with missing operators. Your task is to fill in the blanks with the correct mathematical operators: +, -, *, or /. Ensure that the equation is correct once the operators are added. The operators should be placed in the sequence they appear from left to right. Include the full equation with the operators filled in. For instance, for the equation 1 ? 2 ? 3 = 6, the correct answer is 1 + 2 + 3 = 6.
+
+Equation: Question #2:
+10 ? 6 ? 21 = -5
+Target: 10 + 6 - 21 = -5
+Final answer: 10 + 6 - 21 = -5
+****************************************************************************************************
+---- Correct so far: 2/2
+######################################################################################################################################################
+### Example 3 ###
+@ CHEATSHEET:
+Version: 3
+
+## Reusable Code Snippets and Solution Strategies
+
+<memory_item>
+<description>
+Strategy for solving "missing operator" equations (fill in blanks with +, -, *, /). The key is to recognize that operator precedence matters: multiplication and division bind tighter than addition and subtraction. When the target result is negative and large in magnitude, subtraction combined with multiplication is often the winning combination. When the target is a small negative number, simple addition followed by subtraction (or vice versa) usually suffices—avoid multiplication since it creates large intermediate values. When the target is a large positive number, multiply all operands together (triple multiplication) if the product matches; otherwise try multiplication of two operands plus addition. When the target is a small positive number, simple addition usually suffices. Systematically test combinations while respecting standard order of operations (PEMDAS/BODMAS). (Reference: Q1, Q2, Q3)
+</description>
+<example>
+For 19 ? 8 ? 28 = -205 (large negative):
+- Target is large negative → subtraction + multiplication.
+- 19 - 8 * 28 = 19 - 224 = -205 ✓
+
+For 10 ? 6 ? 21 = -5 (small negative):
+- Target is small negative → addition + subtraction (avoid multiplication).
+- 10 + 6 - 21 = 16 - 21 = -5 ✓
+
+For 28 ? 15 ? 22 = 9240 (large positive):
+- Target is large positive → multiply all operands.
+- 28 * 15 * 22 = 9240 ✓
+
+General approach: enumerate operator combinations, but prioritize based on target magnitude and sign:
+- Large negative → subtraction + multiplication.
+- Small negative → addition + subtraction (avoid multiplication).
+- Large positive → full multiplication of all operands.
+- Small positive → addition.
+</example>
+</memory_item>
+** Count:  3
+
+<memory_item>
+<description>
+When solving missing-operator problems, use brute-force enumeration of all operator combinations (4^n where n = number of blanks) and evaluate each respecting operator precedence. This guarantees finding a valid solution if one exists. For 2 blanks, there are only 16 combinations to check. Use Python's eval() to respect operator precedence correctly (a hand-written evaluator is error-prone). (Reference: Q1, Q2, Q3)
+</description>
+<example>
+For 28 ? 15 ? 22 = 9240, enumerate all 16 combinations:
+- 28*15*22 = 9240 ✓ (found among the 16)
+Brute-force confirms the solution and catches edge cases like division and zero-division.
+</example>
+</memory_item>
+** Count:  3
+
+## General Problem-Solving Heuristics
+
+<memory_item>
+<description>
+Heuristic for missing-operator puzzles: the sign AND magnitude of the target result guide operator selection. A large-magnitude negative target suggests subtraction (to make it negative) combined with multiplication (to reach large magnitude). A large positive target suggests multiplication—specifically, if the product of all operands equals the target, use full multiplication of all operands (triple multiplication for 2 blanks). A small-magnitude result (positive or negative) suggests addition/subtraction only—avoid multiplication, which overshoots. Small positive results suggest addition. Large positive results suggest multiplication. Always respect operator precedence—multiplication/division are evaluated before addition/subtraction. (Reference: Q1, Q2, Q3)
+</description>
+<example>
+Target -205 (large negative): use subtraction + multiplication → 19 - 8 * 28 = -205 ✓
+Target +6 (small positive): use addition → 1 + 2 + 3 = 6 ✓
+Target -5 (small negative): use addition + subtraction → 10 + 6 - 21 = -5 ✓
+Target 9240 (large positive): use full multiplication → 28 * 15 * 22 = 9240 ✓
+</example>
+</memory_item>
+** Count:  3
+
+<memory_item>
+<description>
+Meta-strategy for missing-operator problems: before manually reasoning about the target, always run a brute-force enumeration of all operator combinations using Python's eval(). This is the most reliable way to find a valid solution and avoids manual errors in reasoning about operator precedence. If brute-force finds a solution, report it directly. This is especially valuable when the target magnitude is ambiguous (e.g., distinguishing between multiplication of two operands plus addition vs. full multiplication). (Reference: Q1, Q2, Q3)
+</description>
+<example>
+```python
+from itertools import product
+operators = ['+', '-', '*', '/']
+numbers = [28, 15, 22]
+target = 9240
+solutions = []
+for ops in product(operators, repeat=2):
+    expr = f"{numbers[0]} {ops[0]} {numbers[1]} {ops[1]} {numbers[2]}"
+    try:
+        result = eval(expr)
+        if abs(result - target) < 1e-9:
+            solutions.append((expr, result))
+    except ZeroDivisionError:
+        continue
+print(solutions)  # ['28 * 15 * 22', 9240]
+```
+</example>
+</memory_item>
+** Count:  3INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+Input: Below is an equation with missing operators. Your task is to fill in the blanks with the correct mathematical operators: +, -, *, or /. Ensure that the equation is correct once the operators are added. The operators should be placed in the sequence they appear from left to right. Include the full equation with the operators filled in. For instance, for the equation 1 ? 2 ? 3 = 6, the correct answer is 1 + 2 + 3 = 6.
+
+Equation: Question #3:
+28 ? 15 ? 22 = 9240
+Target: 28 * 15 * 22 = 9240
+Final answer: 28 * 15 * 22 = 9240
+****************************************************************************************************
+---- Correct so far: 3/3
+######################################################################################################################################################
+### Example 4 ###
+@ CHEATSHEET:
+### PREVIOUS SOLUTIONS (START)
+
+Note: The input-output pairs listed below are taken from previous test cases and are meant to assist you in understanding potential solution strategies or tool usages. While they can offer insight and inspiration, they should not be blindly copied, as they may contain errors or may not fit your specific use case. Approach them with a critical mindset—analyze their logic, verify their correctness, and adapt them as needed. Your goal should be to develop a well-reasoned solution that best addresses the problem at hand.
+
+#### Previous Input #1 (Similarity: 0.50):
+
+28 ? 15 ? 22 = 9240
+
+#### Model Solution to Previous Input  #1:
+
+## ANALYSIS & STRATEGY
+
+I need to fill in the missing operators in `28 ? 15 ? 22 = 9240`.
+
+**Key observations:**
+- The target is **9240**, which is a **large positive number**.
+- The operands are 28, 15, and 22.
+- Let me check: 28 × 15 × 22 = 28 × 15 = 420, then 420 × 22 = **9240**. ✓
+
+This matches the cheatsheet strategy perfectly: **large positive target → multiply all operands (triple multiplication)**.
+
+Let me verify this with brute-force enumeration to be thorough.
+
+```python
+from itertools import product
+
+operators = ['+', '-', '*', '/']
+numbers = [28, 15, 22]
+target = 9240
+solutions = []
+
+for ops in product(operators, repeat=2):
+    expr = f"{numbers[0]} {ops[0]} {numbers[1]} {ops[1]} {numbers[2]}"
+    try:
+        result = eval(expr)
+        if abs(result - target) < 1e-9:
+            solutions.append((expr, result))
+    except ZeroDivisionError:
+        continue
+
+print("Solutions:", solutions)
+```
+EXECUTE CODE!
+
+Output of the Python code above:
+```
+Solutions: [('28 * 15 * 22', 9240)]
+```
+
+## SOLUTION DEVELOPMENT
+
+The brute-force enumeration confirms my analysis. Let me verify the solution:
+
+**Verification:**
+- 28 × 15 = 420
+- 420 × 22 = 9240 ✓
+
+The equation `28 * 15 * 22 = 9240` is correct.
+
+This aligns perfectly with the cheatsheet strategy: since the target (9240) is a **large positive number**, the winning approach is to **multiply all operands together** (triple multiplication).
+
+FINAL ANSWER:
+<answer>
+28 * 15 * 22 = 9240
+</answer>
+---
+---
+
+#### Previous Input #2 (Similarity: 0.72):
+
+10 ? 6 ? 21 = -5
+
+#### Model Solution to Previous Input  #2:
+
+## ANALYSIS & STRATEGY
+
+I need to fill in the missing operators in: `10 ? 6 ? 21 = -5`
+
+The target is **-5**, a small negative number. According to the cheatsheet, for small negative targets, I should use addition and subtraction (avoiding multiplication, which creates large intermediate values).
+
+Let me verify by brute-force enumeration of all 16 combinations.
+
+## SOLUTION DEVELOPMENT
+
+Let me enumerate all operator combinations for the two blanks:
+
+**Testing addition + subtraction (per heuristic):**
+- `10 + 6 - 21 = 16 - 21 = -5` ✓
+
+Let me verify this with code to be thorough.
+
+```python
+# Brute-force enumeration of all operator combinations for 10 ? 6 ? 21 = -5
+from itertools import product
+
+operators = ['+', '-', '*', '/']
+numbers = [10, 6, 21]
+target = -5
+
+solutions = []
+for ops in product(operators, repeat=2):
+    expr = f"{numbers[0]} {ops[0]} {numbers[1]} {ops[1]} {numbers[2]}"
+    try:
+        result = eval(expr)
+        # Check for exact match (avoid floating point issues)
+        if abs(result - target) < 1e-9:
+            solutions.append((expr, result))
+    except ZeroDivisionError:
+        continue
+
+print("All valid solutions:")
+for expr, result in solutions:
+    print(f"  {expr} = {result}")
+
+if solutions:
+    print(f"\nTarget -5 is a small negative number.")
+    print("Heuristic: use addition + subtraction (avoid multiplication).")
+    print(f"Winning solution: {solutions[0][0]} = {solutions[0][1]}")
+else:
+    print("No solution found.")
+```
+EXECUTE CODE!
+
+Output of the Python code above:
+```
+All valid solutions:
+  10 + 6 - 21 = -5
+
+Target -5 is a small negative number.
+Heuristic: use addition + subtraction (avoid multiplication).
+Winning solution: 10 + 6 - 21 = -5
+```
+
+## VERIFICATION
+
+Let me verify the solution `10 + 6 - 21 = -5`:
+
+**Step 1:** `10 + 6 = 16`
+**Step 2:** `16 - 21 = -5` ✓
+
+The result matches the target of **-5**.
+
+**Checking operator precedence:** In this expression, there are only addition and subtraction operations (left to right), so:
+- `10 + 6 - 21` evaluates as `(10 + 6) - 21 = 16 - 21 = -5` ✓
+
+This is the unique solution found by brute-force enumeration of all 16 possible operator combinations.
+
+## FINAL ANSWER
+
+FINAL ANSWER:
+<answer>
+10 + 6 - 21 = -5
+</answer>
+---
+---
+
+#### Previous Input #3 (Similarity: 0.75):
+
+19 ? 8 ? 28 = -205
+
+#### Model Solution to Previous Input  #3:
+
+## ANALYSIS & STRATEGY
+
+I need to fill in the missing operators in: `19 ? 8 ? 28 = -205`
+
+The cheatsheet provides clear guidance:
+- The target is **-205**, which is a **large negative** number
+- This suggests **subtraction combined with multiplication**
+- Multiplication binds tighter than addition/subtraction (PEMDAS)
+
+Let me verify my reasoning with a brute-force check of all 16 possible operator combinations.
+
+## SOLUTION DEVELOPMENT
+
+**Key insight:** To get a large negative result (-205), I need:
+1. A multiplication to create a large magnitude (8 × 28 = 224)
+2. Subtraction to make it negative (19 - 224 = -205)
+
+**Testing the hypothesis:**
+- `19 - 8 * 28` = 19 - 224 = **-205** ✓
+
+Let me verify this with code to be thorough.
+
+```python
+# Brute-force enumeration of all operator combinations for 19 ? 8 ? 28 = -205
+from itertools import product
+
+operators = ['+', '-', '*', '/']
+target = -205
+
+# Evaluate each combination respecting operator precedence
+def evaluate(a, op1, b, op2, c):
+    # Handle multiplication/division first (higher precedence)
+    if op1 == '*' and op2 == '*':
+        return a * b * c
+    elif op1 == '*' and op2 == '/':
+        return a * b / c
+    elif op1 == '/' and op2 == '*':
+        return a / b * c
+    elif op1 == '/' and op2 == '/':
+        return a / b / c
+    elif op1 == '*':
+        # a * b then +/- c
+        return a * b + c if op2 == '+' else a * b - c
+    elif op2 == '*':
+        # a +/- b then * c
+        return (a + b) * c if op1 == '+' else (a - b) * c
+    elif op1 == '/':
+        return a / b + c if op2 == '+' else a / b - c
+    else:
+        # all + and -
+        return a + b + c if op1 == '+' and op2 == '+' else \
+               a + b - c if op1 == '+' and op2 == '-' else \
+               a - b + c if op1 == '-' and op2 == '+' else \
+               a - b - c
+
+found = False
+for op1, op2 in product(operators, repeat=2):
+    try:
+        result = evaluate(19, op1, 8, op2, 28)
+        if abs(result - target) < 1e-9:
+            print(f"19 {op1} 8 {op2} 28 = {result} ✓")
+            found = True
+    except (ZeroDivisionError, ValueError):
+        continue
+
+if not found:
+    print("No solution found")
+```
+EXECUTE CODE!
+
+Output of the Python code above:
+```
+No solution found
+```
+
+## RE-ANALYSIS
+
+My previous evaluation function had a bug. Let me carefully re-implement the evaluation respecting standard operator precedence (PEMDAS) using Python's own evaluation, which handles precedence correctly.
+
+```python
+# Brute-force enumeration of all operator combinations for 19 ? 8 ? 28 = -205
+from itertools import product
+
+operators = ['+', '-', '*', '/']
+target = -205
+
+def evaluate(expr):
+    # Use Python's eval which respects operator precedence (PEMDAS)
+    return eval(expr)
+
+found = False
+for op1, op2 in product(operators, repeat=2):
+    expr = f"19 {op1} 8 {op2} 28"
+    try:
+        result = evaluate(expr)
+        if abs(result - target) < 1e-9:
+            print(f"{expr} = {result} ✓")
+            found = True
+    except (ZeroDivisionError, ValueError, SyntaxError):
+        continue
+
+if not found:
+    print("No solution found")
+```
+EXECUTE CODE!
+
+Output of the Python code above:
+```
+19 - 8 * 28 = -205 ✓
+```
+
+## VERIFICATION
+
+The code confirms my analysis. Let me verify the solution once more manually:
+
+**Equation:** `19 ? 8 ? 28 = -205`
+
+**Solution:** `19 - 8 * 28`
+
+**Step-by-step (respecting PEMDAS):**
+1. Multiplication first: `8 * 28 = 224`
+2. Then subtraction: `19 - 224 = -205` ✓
+
+This matches the target exactly. The large negative result (-205) was achieved by combining subtraction (to make it negative) with multiplication (to reach the large magnitude), exactly as the cheatsheet predicted.
+
+FINAL ANSWER:
+<answer>
+19 - 8 * 28 = -205
+</answer>
+---
+---
+
+#### PREVIOUS SOLUTIONS (END)INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+Input: Below is an equation with missing operators. Your task is to fill in the blanks with the correct mathematical operators: +, -, *, or /. Ensure that the equation is correct once the operators are added. The operators should be placed in the sequence they appear from left to right. Include the full equation with the operators filled in. For instance, for the equation 1 ? 2 ? 3 = 6, the correct answer is 1 + 2 + 3 = 6.
+
+Equation: Question #4:
+8 ? 3 ? 20 ? 4 = -75
+Target: 8 - 3 - 20 * 4 = -75
+Final answer: 8 - 3 - 20 * 4 = -75
+****************************************************************************************************
+---- Correct so far: 4/4
+######################################################################################################################################################
+### Example 5 ###
+@ CHEATSHEET:
+Version: 2
+
+## Reusable Code Snippets and Solution Strategies
+
+<memory_item>
+<description>
+Universal brute-force solver for "fill in the missing operators" problems (operands with ? between them equaling a target). Enumerate all combinations of +, -, *, / using itertools.product, build the expression string, and evaluate with Python's eval (which correctly handles operator precedence/PEMDAS). Skip ZeroDivisionError. Compare result to target with a small tolerance (1e-9) to avoid floating-point issues. This handles any number of operands and blanks. (Reference: Q1, Q2, Q3, Q5)
+</description>
+<example>
+```python
+from itertools import product
+
+operators = ['+', '-', '*', '/']
+numbers = [15, 19, 8, 2, 24]
+target = 42
+
+solutions = []
+for ops in product(operators, repeat=len(numbers) - 1):
+    expr = " ".join([str(numbers[0])] + [f"{ops[i]} {numbers[i+1]}" for i in range(len(ops))])
+    try:
+        result = eval(expr)
+        if abs(result - target) < 1e-9:
+            solutions.append((expr, result))
+    except ZeroDivisionError:
+        continue
+
+for expr, result in solutions:
+    print(f"{expr} = {result}")
+```
+</example>
+</memory_item>
+** Count:  5
+
+<memory_item>
+<description>
+Quick heuristic for classifying the target to guide operator selection: (1) Large positive target → multiply all operands (triple/multiple multiplication). (2) Small positive target → use addition and subtraction, possibly with one multiplication to fine-tune magnitude. (3) Large negative target → subtraction combined with multiplication (multiplication creates large magnitude, subtraction makes it negative). (4) Small negative target → addition and subtraction (avoid multiplication which creates large intermediate values). This heuristic narrows the search space before brute-force verification. (Reference: Q1, Q2, Q3, Q5)
+</description>
+<example>
+- Target 9240 (large positive) with [28, 15, 22] → 28 * 15 * 22 = 9240
+- Target -5 (small negative) with [10, 6, 21] → 10 + 6 - 21 = -5
+- Target -205 (large negative) with [19, 8, 28] → 19 - 8 * 28 = -205 (multiplication for magnitude, subtraction for sign)
+- Target 42 (small positive) with [15, 19, 8, 2, 24] → 15 + 19 - 8 * 2 + 24 = 42 (mix of +, -, and one *)
+</example>
+</memory_item>
+** Count:  4
+
+<memory_item>
+<description>
+Critical: Always respect standard operator precedence (PEMDAS) when evaluating expressions. Multiplication and division bind tighter than addition and subtraction. When writing a custom evaluator (instead of using eval), implement two-level evaluation: first compute all * and / operations, then combine with + and -. Never assume left-to-right evaluation for mixed operators. Python's built-in eval handles this correctly, so prefer it for brute-force enumeration. (Reference: Q2, Q3, Q5)
+</description>
+<example>
+`15 + 19 - 8 * 2 + 24`: Multiplication first gives 8*2=16, then left-to-right: 15+19=34, 34-16=18, 18+24=42. A naive left-to-right evaluator would wrongly compute 15+19=34, 34-8=26, 26*2=52, 52+24=76.
+</example>
+</memory_item>
+** Count:  3
+
+## General Problem-Solving Heuristics
+
+<memory_item>
+<description>
+For "insert operators" problems, always verify candidate solutions by manual step-by-step evaluation respecting operator precedence, not just by trusting the expression at a glance. When multiple solutions exist (common for small targets with many operands), any valid solution is acceptable—select one and verify it. Brute-force enumeration is reliable and fast (4^n combinations) and should be used to confirm the heuristic's prediction. (Reference: Q1, Q2, Q3, Q5)
+</description>
+<example>
+For 15 ? 19 ? 8 ? 2 ? 24 = 42, brute-force found 12 solutions. Verified 15 + 19 - 8 * 2 + 24 = 42 manually: 8*2=16, 15+19=34, 34-16=18, 18+24=42. ✓
+</example>
+</memory_item>
+** Count:  2
+
+<memory_item>
+<description>
+When writing a custom expression evaluator for operator-insertion problems, be careful to handle all operator combinations correctly and respect precedence. A common bug is an incomplete custom evaluator that fails on certain operator mixes (e.g., returning "No solution found" incorrectly). When in doubt, use Python's eval() which correctly handles precedence, and wrap in try/except for ZeroDivisionError and SyntaxError. (Reference: Q3)
+</description>
+<example>
+The buggy custom evaluate() function in Q3 incorrectly returned "No solution found" for 19 ? 8 ? 28 = -205. Switching to eval(f"19 {op1} 8 {op2} 28") correctly found 19 - 8 * 28 = -205.
+</example>
+</memory_item>
+** Count:  1
+
+## Optimization Techniques & Edge Cases
+
+<memory_item>
+<description>
+Edge case: Division operations can produce floating-point results. When comparing to an integer target, use a tolerance (abs(result - target) < 1e-9) rather than exact equality to avoid floating-point representation errors. Also, division by zero raises ZeroDivisionError—always guard against it in brute-force loops. (Reference: Q1, Q2, Q5)
+</description>
+<example>
+```python
+try:
+    result = eval(expr)
+    if abs(result - target) < 1e-9:
+        solutions.append((expr, result))
+except ZeroDivisionError:
+    continue
+```
+</example>
+</memory_item>
+** Count:  3
+
+<memory_item>
+<description>
+Optimization: For problems with many operands (4+ blanks), the number of combinations grows (4^4=256, 4^5=1024), but brute-force remains fast. If the target is very large relative to operands, multiplication is likely required; if very small, addition/subtraction dominates. This lets you prune the search or set expectations before enumerating. (Reference: Q5)
+</description>
+<example>
+Target 42 with 5 operands is small relative to operands → expect + and - to dominate, with at most one * to adjust magnitude. Confirmed: 15 + 19 - 8 * 2 + 24 = 42.
+</example>
+</memory_item>
+** Count:  1
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+Input: Below is an equation with missing operators. Your task is to fill in the blanks with the correct mathematical operators: +, -, *, or /. Ensure that the equation is correct once the operators are added. The operators should be placed in the sequence they appear from left to right. Include the full equation with the operators filled in. For instance, for the equation 1 ? 2 ? 3 = 6, the correct answer is 1 + 2 + 3 = 6.
+
+Equation: Question #5:
+15 ? 19 ? 8 ? 2 ? 24 = 42
+Target: 15 + 19 - 8 * 2 + 24 = 42
+Final answer: 15 + 19 - 8 * 2 + 24 = 42
+****************************************************************************************************
+---- Correct so far: 5/5
+######################################################################################################################################################
+
+============================================================
+FINAL RESULTS: 5/5 correct (100.0%)
+Results saved to: /out/MathEquationBalancer/openai/ornith15-9b_DynamicCheatsheet_RetrievalSynthesis_2026-09-27-11-45_.jsonl
+============================================================

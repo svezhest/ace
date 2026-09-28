@@ -1,0 +1,1500 @@
+INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+### Example 1 ###
+@ CHEATSHEET:
+(empty)
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+Input: Below is an equation with missing operators. Your task is to fill in the blanks with the correct mathematical operators: +, -, *, or /. Ensure that the equation is correct once the operators are added. The operators should be placed in the sequence they appear from left to right. Include the full equation with the operators filled in. For instance, for the equation 1 ? 2 ? 3 = 6, the correct answer is 1 + 2 + 3 = 6.
+
+Equation: Question #1:
+19 ? 8 ? 28 = -205
+Target: 19 - 8 * 28 = -205
+Final answer: 19 - 8 * 28 = -205
+****************************************************************************************************
+---- Correct so far: 1/1
+######################################################################################################################################################
+### Example 2 ###
+@ CHEATSHEET:
+### PREVIOUS SOLUTIONS (START)
+
+Note: The input-output pairs listed below are taken from previous test cases and are meant to assist you in understanding potential solution strategies or tool usages. While they can offer insight and inspiration, they should not be blindly copied, as they may contain errors or may not fit your specific use case. Approach them with a critical mindset—analyze their logic, verify their correctness, and adapt them as needed. Your goal should be to develop a well-reasoned solution that best addresses the problem at hand.
+
+#### Previous Input #1 (Similarity: 0.69):
+
+19 ? 8 ? 28 = -205
+
+#### Model Solution to Previous Input  #1:
+
+## ANALYSIS & STRATEGY
+
+I need to find operators (+, -, *, /) for the equation:
+**19 ? 8 ? 28 = -205**
+
+Since the result is **negative (-205)**, I need subtraction somewhere. Let me analyze the possible combinations.
+
+**Key observations:**
+- The result is negative, so at least one subtraction is needed
+- The magnitude 205 is relatively large, suggesting multiplication might be involved
+- Let me check: 19 × 8 = 152, and 152 + 28 = 180 (not enough)
+- But 152 + 28 = 180, and I need 205... Let me reconsider
+- Actually: 19 × 8 = 152, then 152 + 28 = 180. That's not 205.
+- Let me try: 19 × 8 = 152, then 152 + 28 = 180. Hmm, still not matching.
+
+Let me systematically test all combinations using code.
+
+## SOLUTION DEVELOPMENT
+
+I'll write code to test all 16 possible operator combinations, respecting standard order of operations (multiplication and division before addition and subtraction).
+
+```python
+# Test all combinations of operators for: 19 ? 8 ? 28 = -205
+# Operators: +, -, *, /
+# Following standard order of operations (PEMDAS)
+
+def evaluate(a, op1, b, op2, c):
+    # Apply multiplication and division first (left to right)
+    if op1 == '*' or op2 == '*':
+        # Both are multiplication - evaluate left to right
+        if op1 == '*':
+            result = a * b
+        else:
+            result = a
+        if op2 == '*':
+            result = result * c
+        else:
+            result = result / c
+        return result
+    elif op1 == '/' or op2 == '/':
+        # Division involved
+        if op1 == '/':
+            result = a / b
+        else:
+            result = a
+        if op2 == '/':
+            result = result / c
+        else:
+            result = result * c
+        return result
+    else:
+        # Both are addition or subtraction - evaluate left to right
+        if op1 == '+':
+            result = a + b
+        else:
+            result = a - b
+        if op2 == '+':
+            result = result + c
+        else:
+            result = result - c
+        return result
+
+target = -205
+a, b, c = 19, 8, 28
+operators = ['+', '-', '*', '/']
+
+found = False
+for op1 in operators:
+    for op2 in operators:
+        try:
+            result = evaluate(a, op1, b, op2, c)
+            if result == target:
+                print(f"Solution found: {a} {op1} {b} {op2} {c} = {result}")
+                found = True
+        except:
+            pass
+
+if not found:
+    print("No solution found")
+```
+EXECUTE CODE!
+
+Output of the Python code above:
+```
+No solution found
+```
+
+## RE-EVALUATION
+
+My previous code reported "No solution found," but let me verify this carefully. The issue may be with my order-of-operations handling. Let me reconsider.
+
+**Testing 19 × 8 - 28:**
+- 19 × 8 = 152
+- 152 - 28 = 124 (not -205)
+
+**Testing 19 × 8 + 28:**
+- 152 + 28 = 180 (not -205)
+
+**Testing 19 - 8 × 28:**
+- 8 × 28 = 224
+- 19 - 224 = -205 ✓
+
+This works! The problem is that my previous code had a bug in handling mixed multiplication and subtraction. Let me rewrite it correctly.
+
+## SOLUTION DEVELOPMENT
+
+I'll rewrite the code with proper order-of-operations handling using Python's built-in `eval` function, which correctly follows PEMDAS.
+
+```python
+# Test all combinations of operators for: 19 ? 8 ? 28 = -205
+# Operators: +, -, *, /
+# Using Python's eval which correctly handles order of operations (PEMDAS)
+
+target = -205
+a, b, c = 19, 8, 28
+operators = ['+', '-', '*', '/']
+
+found = False
+for op1 in operators:
+    for op2 in operators:
+        expression = f"{a} {op1} {b} {op2} {c}"
+        try:
+            result = eval(expression)
+            if result == target:
+                print(f"Solution found: {expression} = {result}")
+                found = True
+        except:
+            pass
+
+if not found:
+    print("No solution found")
+```
+EXECUTE CODE!
+
+Output of the Python code above:
+```
+Solution found: 19 - 8 * 28 = -205
+```
+
+## VERIFICATION
+
+My code has now correctly identified the solution. Let me verify it manually:
+
+**Testing 19 - 8 × 28:**
+- Following order of operations (multiplication first): 8 × 28 = 224
+- Then subtraction: 19 - 224 = -205 ✓
+
+This confirms the solution is correct. The key insight is that multiplication takes precedence over subtraction, so we compute 8 × 28 = 224 first, then subtract from 19.
+
+Let me do a final verification with clean code:
+
+```python
+# Final verification of the solution
+expression = "19 - 8 * 28"
+result = eval(expression)
+print(f"{expression} = {result}")
+print(f"Target was -205, Match: {result == -205}")
+```
+EXECUTE CODE!
+
+Output of the Python code above:
+```
+19 - 8 * 28 = -205
+Target was -205, Match: True
+```
+
+## FINAL VERIFICATION
+
+Let me confirm the solution one final time through manual calculation:
+
+**Equation: 19 - 8 × 28**
+
+Following the order of operations (PEMDAS/BODMAS), multiplication is performed before subtraction:
+
+1. **Multiplication first:** 8 × 28 = 224
+2. **Then subtraction:** 19 - 224 = -205 ✓
+
+The result is **-205**, which matches the target exactly.
+
+**Verification of why this works:**
+- The negative result requires subtraction
+- The large magnitude (205) requires multiplication to create a large intermediate value
+- Placing the multiplication on the right side (8 × 28 = 224) and subtracting it from 19 gives us the negative result
+
+All other combinations fail:
+- 19 + 8 × 28 = 242 (positive, too large)
+- 19 - 8 + 28 = 39 (positive)
+- 19 - 8 - 28 = -17 (positive magnitude too small)
+- 19 × 8 - 28 = 124 (positive)
+- 19 × 8 + 28 = 180 (positive)
+- 19 × 8 × 28 = 4256 (too large)
+- 19 × 8 / 28 = 5.43 (not integer)
+- 19 / 8 × 28 = 66.5 (not integer)
+- 19 / 8 + 28 = 30.375 (not integer)
+- 19 / 8 - 28 = -24.625 (not integer)
+
+Only **19 - 8 × 28 = -205** satisfies the equation.
+
+FINAL ANSWER:
+<answer>
+19 - 8 * 28 = -205
+</answer>
+---
+---
+
+#### PREVIOUS SOLUTIONS (END)
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+Input: Below is an equation with missing operators. Your task is to fill in the blanks with the correct mathematical operators: +, -, *, or /. Ensure that the equation is correct once the operators are added. The operators should be placed in the sequence they appear from left to right. Include the full equation with the operators filled in. For instance, for the equation 1 ? 2 ? 3 = 6, the correct answer is 1 + 2 + 3 = 6.
+
+Equation: Question #2:
+10 ? 6 ? 21 = -5
+Target: 10 + 6 - 21 = -5
+Final answer: 10 + 6 - 21 = -5
+****************************************************************************************************
+---- Correct so far: 2/2INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+
+######################################################################################################################################################
+### Example 3 ###
+@ CHEATSHEET:
+### PREVIOUS SOLUTIONS (START)
+
+Note: The input-output pairs listed below are taken from previous test cases and are meant to assist you in understanding potential solution strategies or tool usages. While they can offer insight and inspiration, they should not be blindly copied, as they may contain errors or may not fit your specific use case. Approach them with a critical mindset—analyze their logic, verify their correctness, and adapt them as needed. Your goal should be to develop a well-reasoned solution that best addresses the problem at hand.
+
+#### Previous Input #1 (Similarity: 0.45):
+
+10 ? 6 ? 21 = -5
+
+#### Model Solution to Previous Input  #1:
+
+## ANALYSIS & STRATEGY
+
+I need to find operators (+, -, *, /) for the equation:
+**10 ? 6 ? 21 = -5**
+
+**Key observations:**
+- The result is **negative (-5)**, so at least one subtraction is needed
+- The magnitude 5 is relatively small, suggesting the operations should roughly balance out
+- I'll systematically test all 16 possible operator combinations using Python's `eval`, which correctly follows order of operations (PEMDAS)
+
+## SOLUTION DEVELOPMENT
+
+Let me write code to test all combinations.
+
+```python
+# Test all combinations of operators for: 10 ? 6 ? 21 = -5
+# Operators: +, -, *, /
+# Using Python's eval which correctly handles order of operations (PEMDAS)
+
+target = -5
+a, b, c = 10, 6, 21
+operators = ['+', '-', '*', '/']
+
+found = False
+for op1 in operators:
+    for op2 in operators:
+        expression = f"{a} {op1} {b} {op2} {c}"
+        try:
+            result = eval(expression)
+            # Check for exact match (avoid floating point issues)
+            if abs(result - target) < 1e-9:
+                print(f"Solution found: {expression} = {result}")
+                found = True
+        except:
+            pass
+
+if not found:
+    print("No solution found")
+```
+EXECUTE CODE!
+
+Output of the Python code above:
+```
+Solution found: 10 + 6 - 21 = -5
+```
+
+## VERIFICATION
+
+Let me verify the solution manually:
+
+**Equation: 10 + 6 - 21**
+
+Following the order of operations (left to right for + and -):
+
+1. **First addition:** 10 + 6 = 16
+2. **Then subtraction:** 16 - 21 = -5 ✓
+
+The result is **-5**, which matches the target exactly.
+
+**Checking why this works:**
+- The negative result requires subtraction
+- 10 + 6 = 16, and subtracting 21 gives -5
+- This is a clean, simple solution using only addition and subtraction
+
+Let me do a final verification with clean code:
+
+```python
+# Final verification of the solution
+expression = "10 + 6 - 21"
+result = eval(expression)
+print(f"{expression} = {result}")
+print(f"Target was -5, Match: {result == -5}")
+```
+EXECUTE CODE!
+
+Output of the Python code above:
+```
+10 + 6 - 21 = -5
+Target was -5, Match: True
+```
+
+## FINAL VERIFICATION
+
+The solution has been confirmed through both manual calculation and code execution:
+
+**Equation: 10 + 6 - 21**
+
+1. **First addition:** 10 + 6 = 16
+2. **Then subtraction:** 16 - 21 = -5 ✓
+
+The result is **-5**, which matches the target exactly.
+
+This is a clean solution using only addition and subtraction, with no division complications.
+
+FINAL ANSWER:
+<answer>
+10 + 6 - 21 = -5
+</answer>
+---
+---
+
+#### Previous Input #2 (Similarity: 0.59):
+
+19 ? 8 ? 28 = -205
+
+#### Model Solution to Previous Input  #2:
+
+## ANALYSIS & STRATEGY
+
+I need to find operators (+, -, *, /) for the equation:
+**19 ? 8 ? 28 = -205**
+
+Since the result is **negative (-205)**, I need subtraction somewhere. Let me analyze the possible combinations.
+
+**Key observations:**
+- The result is negative, so at least one subtraction is needed
+- The magnitude 205 is relatively large, suggesting multiplication might be involved
+- Let me check: 19 × 8 = 152, and 152 + 28 = 180 (not enough)
+- But 152 + 28 = 180, and I need 205... Let me reconsider
+- Actually: 19 × 8 = 152, then 152 + 28 = 180. That's not 205.
+- Let me try: 19 × 8 = 152, then 152 + 28 = 180. Hmm, still not matching.
+
+Let me systematically test all combinations using code.
+
+## SOLUTION DEVELOPMENT
+
+I'll write code to test all 16 possible operator combinations, respecting standard order of operations (multiplication and division before addition and subtraction).
+
+```python
+# Test all combinations of operators for: 19 ? 8 ? 28 = -205
+# Operators: +, -, *, /
+# Following standard order of operations (PEMDAS)
+
+def evaluate(a, op1, b, op2, c):
+    # Apply multiplication and division first (left to right)
+    if op1 == '*' or op2 == '*':
+        # Both are multiplication - evaluate left to right
+        if op1 == '*':
+            result = a * b
+        else:
+            result = a
+        if op2 == '*':
+            result = result * c
+        else:
+            result = result / c
+        return result
+    elif op1 == '/' or op2 == '/':
+        # Division involved
+        if op1 == '/':
+            result = a / b
+        else:
+            result = a
+        if op2 == '/':
+            result = result / c
+        else:
+            result = result * c
+        return result
+    else:
+        # Both are addition or subtraction - evaluate left to right
+        if op1 == '+':
+            result = a + b
+        else:
+            result = a - b
+        if op2 == '+':
+            result = result + c
+        else:
+            result = result - c
+        return result
+
+target = -205
+a, b, c = 19, 8, 28
+operators = ['+', '-', '*', '/']
+
+found = False
+for op1 in operators:
+    for op2 in operators:
+        try:
+            result = evaluate(a, op1, b, op2, c)
+            if result == target:
+                print(f"Solution found: {a} {op1} {b} {op2} {c} = {result}")
+                found = True
+        except:
+            pass
+
+if not found:
+    print("No solution found")
+```
+EXECUTE CODE!
+
+Output of the Python code above:
+```
+No solution found
+```
+
+## RE-EVALUATION
+
+My previous code reported "No solution found," but let me verify this carefully. The issue may be with my order-of-operations handling. Let me reconsider.
+
+**Testing 19 × 8 - 28:**
+- 19 × 8 = 152
+- 152 - 28 = 124 (not -205)
+
+**Testing 19 × 8 + 28:**
+- 152 + 28 = 180 (not -205)
+
+**Testing 19 - 8 × 28:**
+- 8 × 28 = 224
+- 19 - 224 = -205 ✓
+
+This works! The problem is that my previous code had a bug in handling mixed multiplication and subtraction. Let me rewrite it correctly.
+
+## SOLUTION DEVELOPMENT
+
+I'll rewrite the code with proper order-of-operations handling using Python's built-in `eval` function, which correctly follows PEMDAS.
+
+```python
+# Test all combinations of operators for: 19 ? 8 ? 28 = -205
+# Operators: +, -, *, /
+# Using Python's eval which correctly handles order of operations (PEMDAS)
+
+target = -205
+a, b, c = 19, 8, 28
+operators = ['+', '-', '*', '/']
+
+found = False
+for op1 in operators:
+    for op2 in operators:
+        expression = f"{a} {op1} {b} {op2} {c}"
+        try:
+            result = eval(expression)
+            if result == target:
+                print(f"Solution found: {expression} = {result}")
+                found = True
+        except:
+            pass
+
+if not found:
+    print("No solution found")
+```
+EXECUTE CODE!
+
+Output of the Python code above:
+```
+Solution found: 19 - 8 * 28 = -205
+```
+
+## VERIFICATION
+
+My code has now correctly identified the solution. Let me verify it manually:
+
+**Testing 19 - 8 × 28:**
+- Following order of operations (multiplication first): 8 × 28 = 224
+- Then subtraction: 19 - 224 = -205 ✓
+
+This confirms the solution is correct. The key insight is that multiplication takes precedence over subtraction, so we compute 8 × 28 = 224 first, then subtract from 19.
+
+Let me do a final verification with clean code:
+
+```python
+# Final verification of the solution
+expression = "19 - 8 * 28"
+result = eval(expression)
+print(f"{expression} = {result}")
+print(f"Target was -205, Match: {result == -205}")
+```
+EXECUTE CODE!
+
+Output of the Python code above:
+```
+19 - 8 * 28 = -205
+Target was -205, Match: True
+```
+
+## FINAL VERIFICATION
+
+Let me confirm the solution one final time through manual calculation:
+
+**Equation: 19 - 8 × 28**
+
+Following the order of operations (PEMDAS/BODMAS), multiplication is performed before subtraction:
+
+1. **Multiplication first:** 8 × 28 = 224
+2. **Then subtraction:** 19 - 224 = -205 ✓
+
+The result is **-205**, which matches the target exactly.
+
+**Verification of why this works:**
+- The negative result requires subtraction
+- The large magnitude (205) requires multiplication to create a large intermediate value
+- Placing the multiplication on the right side (8 × 28 = 224) and subtracting it from 19 gives us the negative result
+
+All other combinations fail:
+- 19 + 8 × 28 = 242 (positive, too large)
+- 19 - 8 + 28 = 39 (positive)
+- 19 - 8 - 28 = -17 (positive magnitude too small)
+- 19 × 8 - 28 = 124 (positive)
+- 19 × 8 + 28 = 180 (positive)
+- 19 × 8 × 28 = 4256 (too large)
+- 19 × 8 / 28 = 5.43 (not integer)
+- 19 / 8 × 28 = 66.5 (not integer)
+- 19 / 8 + 28 = 30.375 (not integer)
+- 19 / 8 - 28 = -24.625 (not integer)
+
+Only **19 - 8 × 28 = -205** satisfies the equation.
+
+FINAL ANSWER:
+<answer>
+19 - 8 * 28 = -205
+</answer>
+---
+---
+
+#### PREVIOUS SOLUTIONS (END)INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+Input: Below is an equation with missing operators. Your task is to fill in the blanks with the correct mathematical operators: +, -, *, or /. Ensure that the equation is correct once the operators are added. The operators should be placed in the sequence they appear from left to right. Include the full equation with the operators filled in. For instance, for the equation 1 ? 2 ? 3 = 6, the correct answer is 1 + 2 + 3 = 6.
+
+Equation: Question #3:
+28 ? 15 ? 22 = 9240
+Target: 28 * 15 * 22 = 9240
+Final answer: 28 * 15 * 22 = 9240
+****************************************************************************************************
+---- Correct so far: 3/3
+######################################################################################################################################################
+### Example 4 ###
+@ CHEATSHEET:
+### PREVIOUS SOLUTIONS (START)
+
+Note: The input-output pairs listed below are taken from previous test cases and are meant to assist you in understanding potential solution strategies or tool usages. While they can offer insight and inspiration, they should not be blindly copied, as they may contain errors or may not fit your specific use case. Approach them with a critical mindset—analyze their logic, verify their correctness, and adapt them as needed. Your goal should be to develop a well-reasoned solution that best addresses the problem at hand.
+
+#### Previous Input #1 (Similarity: 0.50):
+
+28 ? 15 ? 22 = 9240
+
+#### Model Solution to Previous Input  #1:
+
+## ANALYSIS & STRATEGY
+
+I need to find operators (+, -, *, /) for the equation:
+**28 ? 15 ? 22 = 9240**
+
+**Key observations:**
+- The result is **positive (9240)** and quite **large**
+- The numbers are 28, 15, and 22
+- A large positive result strongly suggests **multiplication** is involved
+- Let me check: 28 × 15 × 22 = 9240? Let me verify: 28 × 15 = 420, and 420 × 22 = 9240 ✓
+
+This looks very promising! Let me systematically test all combinations using Python's `eval`, which correctly follows order of operations (PEMDAS).
+
+## SOLUTION DEVELOPMENT
+
+```python
+# Test all combinations of operators for: 28 ? 15 ? 22 = 9240
+# Operators: +, -, *, /
+# Using Python's eval which correctly handles order of operations (PEMDAS)
+
+target = 9240
+a, b, c = 28, 15, 22
+operators = ['+', '-', '*', '/']
+
+found = False
+for op1 in operators:
+    for op2 in operators:
+        expression = f"{a} {op1} {b} {op2} {c}"
+        try:
+            result = eval(expression)
+            # Check for exact match (avoid floating point issues)
+            if abs(result - target) < 1e-9:
+                print(f"Solution found: {expression} = {result}")
+                found = True
+        except:
+            pass
+
+if not found:
+    print("No solution found")
+```
+EXECUTE CODE!
+
+Output of the Python code above:
+```
+Solution found: 28 * 15 * 22 = 9240
+```
+
+## VERIFICATION
+
+Let me verify the solution manually:
+
+**Equation: 28 × 15 × 22**
+
+Following the order of operations (left to right for multiplication):
+
+1. **First multiplication:** 28 × 15 = 420
+2. **Then multiplication:** 420 × 22 = 9240 ✓
+
+The result is **9240**, which matches the target exactly.
+
+**Checking why this works:**
+- The large positive result (9240) requires multiplication
+- 28 × 15 = 420, and 420 × 22 = 9240
+- This is a clean solution using only multiplication
+
+Let me do a final verification with clean code:
+
+```python
+# Final verification of the solution
+expression = "28 * 15 * 22"
+result = eval(expression)
+print(f"{expression} = {result}")
+print(f"Target was 9240, Match: {result == 9240}")
+```
+EXECUTE CODE!
+
+Output of the Python code above:
+```
+28 * 15 * 22 = 9240
+Target was 9240, Match: True
+```
+
+## FINAL VERIFICATION
+
+The solution has been confirmed through both manual calculation and code execution:
+
+**Equation: 28 × 15 × 22**
+
+1. **First multiplication:** 28 × 15 = 420
+2. **Then multiplication:** 420 × 22 = 9240 ✓
+
+The result is **9240**, which matches the target exactly.
+
+This is a clean solution using only multiplication, with no addition, subtraction, or division complications.
+
+FINAL ANSWER:
+<answer>
+28 * 15 * 22 = 9240
+</answer>
+---
+---
+
+#### Previous Input #2 (Similarity: 0.72):
+
+10 ? 6 ? 21 = -5
+
+#### Model Solution to Previous Input  #2:
+
+## ANALYSIS & STRATEGY
+
+I need to find operators (+, -, *, /) for the equation:
+**10 ? 6 ? 21 = -5**
+
+**Key observations:**
+- The result is **negative (-5)**, so at least one subtraction is needed
+- The magnitude 5 is relatively small, suggesting the operations should roughly balance out
+- I'll systematically test all 16 possible operator combinations using Python's `eval`, which correctly follows order of operations (PEMDAS)
+
+## SOLUTION DEVELOPMENT
+
+Let me write code to test all combinations.
+
+```python
+# Test all combinations of operators for: 10 ? 6 ? 21 = -5
+# Operators: +, -, *, /
+# Using Python's eval which correctly handles order of operations (PEMDAS)
+
+target = -5
+a, b, c = 10, 6, 21
+operators = ['+', '-', '*', '/']
+
+found = False
+for op1 in operators:
+    for op2 in operators:
+        expression = f"{a} {op1} {b} {op2} {c}"
+        try:
+            result = eval(expression)
+            # Check for exact match (avoid floating point issues)
+            if abs(result - target) < 1e-9:
+                print(f"Solution found: {expression} = {result}")
+                found = True
+        except:
+            pass
+
+if not found:
+    print("No solution found")
+```
+EXECUTE CODE!
+
+Output of the Python code above:
+```
+Solution found: 10 + 6 - 21 = -5
+```
+
+## VERIFICATION
+
+Let me verify the solution manually:
+
+**Equation: 10 + 6 - 21**
+
+Following the order of operations (left to right for + and -):
+
+1. **First addition:** 10 + 6 = 16
+2. **Then subtraction:** 16 - 21 = -5 ✓
+
+The result is **-5**, which matches the target exactly.
+
+**Checking why this works:**
+- The negative result requires subtraction
+- 10 + 6 = 16, and subtracting 21 gives -5
+- This is a clean, simple solution using only addition and subtraction
+
+Let me do a final verification with clean code:
+
+```python
+# Final verification of the solution
+expression = "10 + 6 - 21"
+result = eval(expression)
+print(f"{expression} = {result}")
+print(f"Target was -5, Match: {result == -5}")
+```
+EXECUTE CODE!
+
+Output of the Python code above:
+```
+10 + 6 - 21 = -5
+Target was -5, Match: True
+```
+
+## FINAL VERIFICATION
+
+The solution has been confirmed through both manual calculation and code execution:
+
+**Equation: 10 + 6 - 21**
+
+1. **First addition:** 10 + 6 = 16
+2. **Then subtraction:** 16 - 21 = -5 ✓
+
+The result is **-5**, which matches the target exactly.
+
+This is a clean solution using only addition and subtraction, with no division complications.
+
+FINAL ANSWER:
+<answer>
+10 + 6 - 21 = -5
+</answer>
+---
+---
+
+#### Previous Input #3 (Similarity: 0.75):
+
+19 ? 8 ? 28 = -205
+
+#### Model Solution to Previous Input  #3:
+
+## ANALYSIS & STRATEGY
+
+I need to find operators (+, -, *, /) for the equation:
+**19 ? 8 ? 28 = -205**
+
+Since the result is **negative (-205)**, I need subtraction somewhere. Let me analyze the possible combinations.
+
+**Key observations:**
+- The result is negative, so at least one subtraction is needed
+- The magnitude 205 is relatively large, suggesting multiplication might be involved
+- Let me check: 19 × 8 = 152, and 152 + 28 = 180 (not enough)
+- But 152 + 28 = 180, and I need 205... Let me reconsider
+- Actually: 19 × 8 = 152, then 152 + 28 = 180. That's not 205.
+- Let me try: 19 × 8 = 152, then 152 + 28 = 180. Hmm, still not matching.
+
+Let me systematically test all combinations using code.
+
+## SOLUTION DEVELOPMENT
+
+I'll write code to test all 16 possible operator combinations, respecting standard order of operations (multiplication and division before addition and subtraction).
+
+```python
+# Test all combinations of operators for: 19 ? 8 ? 28 = -205
+# Operators: +, -, *, /
+# Following standard order of operations (PEMDAS)
+
+def evaluate(a, op1, b, op2, c):
+    # Apply multiplication and division first (left to right)
+    if op1 == '*' or op2 == '*':
+        # Both are multiplication - evaluate left to right
+        if op1 == '*':
+            result = a * b
+        else:
+            result = a
+        if op2 == '*':
+            result = result * c
+        else:
+            result = result / c
+        return result
+    elif op1 == '/' or op2 == '/':
+        # Division involved
+        if op1 == '/':
+            result = a / b
+        else:
+            result = a
+        if op2 == '/':
+            result = result / c
+        else:
+            result = result * c
+        return result
+    else:
+        # Both are addition or subtraction - evaluate left to right
+        if op1 == '+':
+            result = a + b
+        else:
+            result = a - b
+        if op2 == '+':
+            result = result + c
+        else:
+            result = result - c
+        return result
+
+target = -205
+a, b, c = 19, 8, 28
+operators = ['+', '-', '*', '/']
+
+found = False
+for op1 in operators:
+    for op2 in operators:
+        try:
+            result = evaluate(a, op1, b, op2, c)
+            if result == target:
+                print(f"Solution found: {a} {op1} {b} {op2} {c} = {result}")
+                found = True
+        except:
+            pass
+
+if not found:
+    print("No solution found")
+```
+EXECUTE CODE!
+
+Output of the Python code above:
+```
+No solution found
+```
+
+## RE-EVALUATION
+
+My previous code reported "No solution found," but let me verify this carefully. The issue may be with my order-of-operations handling. Let me reconsider.
+
+**Testing 19 × 8 - 28:**
+- 19 × 8 = 152
+- 152 - 28 = 124 (not -205)
+
+**Testing 19 × 8 + 28:**
+- 152 + 28 = 180 (not -205)
+
+**Testing 19 - 8 × 28:**
+- 8 × 28 = 224
+- 19 - 224 = -205 ✓
+
+This works! The problem is that my previous code had a bug in handling mixed multiplication and subtraction. Let me rewrite it correctly.
+
+## SOLUTION DEVELOPMENT
+
+I'll rewrite the code with proper order-of-operations handling using Python's built-in `eval` function, which correctly follows PEMDAS.
+
+```python
+# Test all combinations of operators for: 19 ? 8 ? 28 = -205
+# Operators: +, -, *, /
+# Using Python's eval which correctly handles order of operations (PEMDAS)
+
+target = -205
+a, b, c = 19, 8, 28
+operators = ['+', '-', '*', '/']
+
+found = False
+for op1 in operators:
+    for op2 in operators:
+        expression = f"{a} {op1} {b} {op2} {c}"
+        try:
+            result = eval(expression)
+            if result == target:
+                print(f"Solution found: {expression} = {result}")
+                found = True
+        except:
+            pass
+
+if not found:
+    print("No solution found")
+```
+EXECUTE CODE!
+
+Output of the Python code above:
+```
+Solution found: 19 - 8 * 28 = -205
+```
+
+## VERIFICATION
+
+My code has now correctly identified the solution. Let me verify it manually:
+
+**Testing 19 - 8 × 28:**
+- Following order of operations (multiplication first): 8 × 28 = 224
+- Then subtraction: 19 - 224 = -205 ✓
+
+This confirms the solution is correct. The key insight is that multiplication takes precedence over subtraction, so we compute 8 × 28 = 224 first, then subtract from 19.
+
+Let me do a final verification with clean code:
+
+```python
+# Final verification of the solution
+expression = "19 - 8 * 28"
+result = eval(expression)
+print(f"{expression} = {result}")
+print(f"Target was -205, Match: {result == -205}")
+```
+EXECUTE CODE!
+
+Output of the Python code above:
+```
+19 - 8 * 28 = -205
+Target was -205, Match: True
+```
+
+## FINAL VERIFICATION
+
+Let me confirm the solution one final time through manual calculation:
+
+**Equation: 19 - 8 × 28**
+
+Following the order of operations (PEMDAS/BODMAS), multiplication is performed before subtraction:
+
+1. **Multiplication first:** 8 × 28 = 224
+2. **Then subtraction:** 19 - 224 = -205 ✓
+
+The result is **-205**, which matches the target exactly.
+
+**Verification of why this works:**
+- The negative result requires subtraction
+- The large magnitude (205) requires multiplication to create a large intermediate value
+- Placing the multiplication on the right side (8 × 28 = 224) and subtracting it from 19 gives us the negative result
+
+All other combinations fail:
+- 19 + 8 × 28 = 242 (positive, too large)
+- 19 - 8 + 28 = 39 (positive)
+- 19 - 8 - 28 = -17 (positive magnitude too small)
+- 19 × 8 - 28 = 124 (positive)
+- 19 × 8 + 28 = 180 (positive)
+- 19 × 8 × 28 = 4256 (too large)
+- 19 × 8 / 28 = 5.43 (not integer)
+- 19 / 8 × 28 = 66.5 (not integer)
+- 19 / 8 + 28 = 30.375 (not integer)
+- 19 / 8 - 28 = -24.625 (not integer)
+
+Only **19 - 8 × 28 = -205** satisfies the equation.
+
+FINAL ANSWER:
+<answer>
+19 - 8 * 28 = -205
+</answer>
+---
+---
+
+#### PREVIOUS SOLUTIONS (END)INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+Input: Below is an equation with missing operators. Your task is to fill in the blanks with the correct mathematical operators: +, -, *, or /. Ensure that the equation is correct once the operators are added. The operators should be placed in the sequence they appear from left to right. Include the full equation with the operators filled in. For instance, for the equation 1 ? 2 ? 3 = 6, the correct answer is 1 + 2 + 3 = 6.
+
+Equation: Question #4:
+8 ? 3 ? 20 ? 4 = -75
+Target: 8 - 3 - 20 * 4 = -75
+Final answer: 8 - 3 - 20 * 4 = -75
+****************************************************************************************************
+---- Correct so far: 4/4
+######################################################################################################################################################
+### Example 5 ###
+@ CHEATSHEET:
+### PREVIOUS SOLUTIONS (START)
+
+Note: The input-output pairs listed below are taken from previous test cases and are meant to assist you in understanding potential solution strategies or tool usages. While they can offer insight and inspiration, they should not be blindly copied, as they may contain errors or may not fit your specific use case. Approach them with a critical mindset—analyze their logic, verify their correctness, and adapt them as needed. Your goal should be to develop a well-reasoned solution that best addresses the problem at hand.
+
+#### Previous Input #1 (Similarity: 0.56):
+
+8 ? 3 ? 20 ? 4 = -75
+
+#### Model Solution to Previous Input  #1:
+
+## ANALYSIS & STRATEGY
+
+I need to find operators (+, -, *, /) for the equation:
+**8 ? 3 ? 20 ? 4 = -75**
+
+**Key observations:**
+- The result is **negative (-75)**, so at least one subtraction is needed
+- The magnitude 75 is moderate, suggesting multiplication might be involved
+- There are **3 blanks** (between 4 numbers), so 4 × 4 × 4 = **64 possible combinations**
+- I'll systematically test all combinations using Python's `eval`, which correctly follows order of operations (PEMDAS)
+
+## SOLUTION DEVELOPMENT
+
+```python
+# Test all combinations of operators for: 8 ? 3 ? 20 ? 4 = -75
+# Operators: +, -, *, /
+# Using Python's eval which correctly handles order of operations (PEMDAS)
+
+target = -75
+a, b, c, d = 8, 3, 20, 4
+operators = ['+', '-', '*', '/']
+
+found = False
+for op1 in operators:
+    for op2 in operators:
+        for op3 in operators:
+            expression = f"{a} {op1} {b} {op2} {c} {op3} {d}"
+            try:
+                result = eval(expression)
+                # Check for exact match (avoid floating point issues)
+                if abs(result - target) < 1e-9:
+                    print(f"Solution found: {expression} = {result}")
+                    found = True
+            except:
+                pass
+
+if not found:
+    print("No solution found")
+```
+EXECUTE CODE!
+
+Output of the Python code above:
+```
+Solution found: 8 - 3 - 20 * 4 = -75
+```
+
+## VERIFICATION
+
+Let me verify the solution manually:
+
+**Equation: 8 - 3 - 20 × 4**
+
+Following the order of operations (PEMDAS — multiplication before subtraction):
+
+1. **Multiplication first:** 20 × 4 = 80
+2. **Then subtraction (left to right):** 8 - 3 = 5
+3. **Then:** 5 - 80 = -75 ✓
+
+The result is **-75**, which matches the target exactly.
+
+**Why this works:**
+- The negative result requires subtraction
+- The multiplication 20 × 4 = 80 creates a large intermediate value
+- Computing 8 - 3 = 5 first, then subtracting 80 gives us -75
+
+Let me do a final verification with clean code:
+
+```python
+# Final verification of the solution
+expression = "8 - 3 - 20 * 4"
+result = eval(expression)
+print(f"{expression} = {result}")
+print(f"Target was -75, Match: {result == -75}")
+```
+EXECUTE CODE!
+
+Output of the Python code above:
+```
+8 - 3 - 20 * 4 = -75
+Target was -75, Match: True
+```
+
+## FINAL VERIFICATION
+
+The solution has been confirmed through both manual calculation and code execution:
+
+**Equation: 8 - 3 - 20 × 4**
+
+1. **Multiplication first:** 20 × 4 = 80
+2. **Subtraction (left to right):** 8 - 3 = 5, then 5 - 80 = -75 ✓
+
+The result is **-75**, which matches the target exactly.
+
+This is a clean solution using subtraction and multiplication, correctly following order of operations (multiplication before subtraction).
+
+FINAL ANSWER:
+<answer>
+8 - 3 - 20 * 4 = -75
+</answer>
+---
+---
+
+#### Previous Input #2 (Similarity: 0.59):
+
+19 ? 8 ? 28 = -205
+
+#### Model Solution to Previous Input  #2:
+
+## ANALYSIS & STRATEGY
+
+I need to find operators (+, -, *, /) for the equation:
+**19 ? 8 ? 28 = -205**
+
+Since the result is **negative (-205)**, I need subtraction somewhere. Let me analyze the possible combinations.
+
+**Key observations:**
+- The result is negative, so at least one subtraction is needed
+- The magnitude 205 is relatively large, suggesting multiplication might be involved
+- Let me check: 19 × 8 = 152, and 152 + 28 = 180 (not enough)
+- But 152 + 28 = 180, and I need 205... Let me reconsider
+- Actually: 19 × 8 = 152, then 152 + 28 = 180. That's not 205.
+- Let me try: 19 × 8 = 152, then 152 + 28 = 180. Hmm, still not matching.
+
+Let me systematically test all combinations using code.
+
+## SOLUTION DEVELOPMENT
+
+I'll write code to test all 16 possible operator combinations, respecting standard order of operations (multiplication and division before addition and subtraction).
+
+```python
+# Test all combinations of operators for: 19 ? 8 ? 28 = -205
+# Operators: +, -, *, /
+# Following standard order of operations (PEMDAS)
+
+def evaluate(a, op1, b, op2, c):
+    # Apply multiplication and division first (left to right)
+    if op1 == '*' or op2 == '*':
+        # Both are multiplication - evaluate left to right
+        if op1 == '*':
+            result = a * b
+        else:
+            result = a
+        if op2 == '*':
+            result = result * c
+        else:
+            result = result / c
+        return result
+    elif op1 == '/' or op2 == '/':
+        # Division involved
+        if op1 == '/':
+            result = a / b
+        else:
+            result = a
+        if op2 == '/':
+            result = result / c
+        else:
+            result = result * c
+        return result
+    else:
+        # Both are addition or subtraction - evaluate left to right
+        if op1 == '+':
+            result = a + b
+        else:
+            result = a - b
+        if op2 == '+':
+            result = result + c
+        else:
+            result = result - c
+        return result
+
+target = -205
+a, b, c = 19, 8, 28
+operators = ['+', '-', '*', '/']
+
+found = False
+for op1 in operators:
+    for op2 in operators:
+        try:
+            result = evaluate(a, op1, b, op2, c)
+            if result == target:
+                print(f"Solution found: {a} {op1} {b} {op2} {c} = {result}")
+                found = True
+        except:
+            pass
+
+if not found:
+    print("No solution found")
+```
+EXECUTE CODE!
+
+Output of the Python code above:
+```
+No solution found
+```
+
+## RE-EVALUATION
+
+My previous code reported "No solution found," but let me verify this carefully. The issue may be with my order-of-operations handling. Let me reconsider.
+
+**Testing 19 × 8 - 28:**
+- 19 × 8 = 152
+- 152 - 28 = 124 (not -205)
+
+**Testing 19 × 8 + 28:**
+- 152 + 28 = 180 (not -205)
+
+**Testing 19 - 8 × 28:**
+- 8 × 28 = 224
+- 19 - 224 = -205 ✓
+
+This works! The problem is that my previous code had a bug in handling mixed multiplication and subtraction. Let me rewrite it correctly.
+
+## SOLUTION DEVELOPMENT
+
+I'll rewrite the code with proper order-of-operations handling using Python's built-in `eval` function, which correctly follows PEMDAS.
+
+```python
+# Test all combinations of operators for: 19 ? 8 ? 28 = -205
+# Operators: +, -, *, /
+# Using Python's eval which correctly handles order of operations (PEMDAS)
+
+target = -205
+a, b, c = 19, 8, 28
+operators = ['+', '-', '*', '/']
+
+found = False
+for op1 in operators:
+    for op2 in operators:
+        expression = f"{a} {op1} {b} {op2} {c}"
+        try:
+            result = eval(expression)
+            if result == target:
+                print(f"Solution found: {expression} = {result}")
+                found = True
+        except:
+            pass
+
+if not found:
+    print("No solution found")
+```
+EXECUTE CODE!
+
+Output of the Python code above:
+```
+Solution found: 19 - 8 * 28 = -205
+```
+
+## VERIFICATION
+
+My code has now correctly identified the solution. Let me verify it manually:
+
+**Testing 19 - 8 × 28:**
+- Following order of operations (multiplication first): 8 × 28 = 224
+- Then subtraction: 19 - 224 = -205 ✓
+
+This confirms the solution is correct. The key insight is that multiplication takes precedence over subtraction, so we compute 8 × 28 = 224 first, then subtract from 19.
+
+Let me do a final verification with clean code:
+
+```python
+# Final verification of the solution
+expression = "19 - 8 * 28"
+result = eval(expression)
+print(f"{expression} = {result}")
+print(f"Target was -205, Match: {result == -205}")
+```
+EXECUTE CODE!
+
+Output of the Python code above:
+```
+19 - 8 * 28 = -205
+Target was -205, Match: True
+```
+
+## FINAL VERIFICATION
+
+Let me confirm the solution one final time through manual calculation:
+
+**Equation: 19 - 8 × 28**
+
+Following the order of operations (PEMDAS/BODMAS), multiplication is performed before subtraction:
+
+1. **Multiplication first:** 8 × 28 = 224
+2. **Then subtraction:** 19 - 224 = -205 ✓
+
+The result is **-205**, which matches the target exactly.
+
+**Verification of why this works:**
+- The negative result requires subtraction
+- The large magnitude (205) requires multiplication to create a large intermediate value
+- Placing the multiplication on the right side (8 × 28 = 224) and subtracting it from 19 gives us the negative result
+
+All other combinations fail:
+- 19 + 8 × 28 = 242 (positive, too large)
+- 19 - 8 + 28 = 39 (positive)
+- 19 - 8 - 28 = -17 (positive magnitude too small)
+- 19 × 8 - 28 = 124 (positive)
+- 19 × 8 + 28 = 180 (positive)
+- 19 × 8 × 28 = 4256 (too large)
+- 19 × 8 / 28 = 5.43 (not integer)
+- 19 / 8 × 28 = 66.5 (not integer)
+- 19 / 8 + 28 = 30.375 (not integer)
+- 19 / 8 - 28 = -24.625 (not integer)
+
+Only **19 - 8 × 28 = -205** satisfies the equation.
+
+FINAL ANSWER:
+<answer>
+19 - 8 * 28 = -205
+</answer>
+---
+---
+
+#### Previous Input #3 (Similarity: 0.73):
+
+28 ? 15 ? 22 = 9240
+
+#### Model Solution to Previous Input  #3:
+
+## ANALYSIS & STRATEGY
+
+I need to find operators (+, -, *, /) for the equation:
+**28 ? 15 ? 22 = 9240**
+
+**Key observations:**
+- The result is **positive (9240)** and quite **large**
+- The numbers are 28, 15, and 22
+- A large positive result strongly suggests **multiplication** is involved
+- Let me check: 28 × 15 × 22 = 9240? Let me verify: 28 × 15 = 420, and 420 × 22 = 9240 ✓
+
+This looks very promising! Let me systematically test all combinations using Python's `eval`, which correctly follows order of operations (PEMDAS).
+
+## SOLUTION DEVELOPMENT
+
+```python
+# Test all combinations of operators for: 28 ? 15 ? 22 = 9240
+# Operators: +, -, *, /
+# Using Python's eval which correctly handles order of operations (PEMDAS)
+
+target = 9240
+a, b, c = 28, 15, 22
+operators = ['+', '-', '*', '/']
+
+found = False
+for op1 in operators:
+    for op2 in operators:
+        expression = f"{a} {op1} {b} {op2} {c}"
+        try:
+            result = eval(expression)
+            # Check for exact match (avoid floating point issues)
+            if abs(result - target) < 1e-9:
+                print(f"Solution found: {expression} = {result}")
+                found = True
+        except:
+            pass
+
+if not found:
+    print("No solution found")
+```
+EXECUTE CODE!
+
+Output of the Python code above:
+```
+Solution found: 28 * 15 * 22 = 9240
+```
+
+## VERIFICATION
+
+Let me verify the solution manually:
+
+**Equation: 28 × 15 × 22**
+
+Following the order of operations (left to right for multiplication):
+
+1. **First multiplication:** 28 × 15 = 420
+2. **Then multiplication:** 420 × 22 = 9240 ✓
+
+The result is **9240**, which matches the target exactly.
+
+**Checking why this works:**
+- The large positive result (9240) requires multiplication
+- 28 × 15 = 420, and 420 × 22 = 9240
+- This is a clean solution using only multiplication
+
+Let me do a final verification with clean code:
+
+```python
+# Final verification of the solution
+expression = "28 * 15 * 22"
+result = eval(expression)
+print(f"{expression} = {result}")
+print(f"Target was 9240, Match: {result == 9240}")
+```
+EXECUTE CODE!
+
+Output of the Python code above:
+```
+28 * 15 * 22 = 9240
+Target was 9240, Match: True
+```
+
+## FINAL VERIFICATION
+
+The solution has been confirmed through both manual calculation and code execution:
+
+**Equation: 28 × 15 × 22**
+
+1. **First multiplication:** 28 × 15 = 420
+2. **Then multiplication:** 420 × 22 = 9240 ✓
+
+The result is **9240**, which matches the target exactly.
+
+This is a clean solution using only multiplication, with no addition, subtraction, or division complications.
+
+FINAL ANSWER:
+<answer>
+28 * 15 * 22 = 9240
+</answer>
+---
+---
+
+#### PREVIOUS SOLUTIONS (END)
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+Input: Below is an equation with missing operators. Your task is to fill in the blanks with the correct mathematical operators: +, -, *, or /. Ensure that the equation is correct once the operators are added. The operators should be placed in the sequence they appear from left to right. Include the full equation with the operators filled in. For instance, for the equation 1 ? 2 ? 3 = 6, the correct answer is 1 + 2 + 3 = 6.
+
+Equation: Question #5:
+15 ? 19 ? 8 ? 2 ? 24 = 42
+Target: 15 + 19 - 8 * 2 + 24 = 42
+Final answer: 15 + 19 - 8 * 2 + 24 = 42
+****************************************************************************************************
+---- Correct so far: 5/5
+######################################################################################################################################################
+
+============================================================
+FINAL RESULTS: 5/5 correct (100.0%)
+Results saved to: /out/MathEquationBalancer/openai/ornith15-9b_Dynamic_Retrieval_2026-09-27-11-58_.jsonl
+============================================================

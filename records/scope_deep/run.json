@@ -1,0 +1,58 @@
+{
+  "upstream": "SCOPE",
+  "commit": "4dc0da5e7843dce84a851bd7a53e4e45932b27d0",
+  "commit_note": "закреп = онлайн HEAD на 27.09.2026",
+  "date": "2026-09-27",
+  "started": "2026-09-27 14:21:54",
+  "finished": "2026-09-27 14:23:58",
+  "minutes": 2.1,
+  "model": "ornith15-9b (ornith15-9b-mlx-8bit через шлюз :8080)",
+  "gateway": {
+    "env": {
+      "GATEWAY_JOURNAL": "~/Projects/llm/logs/journal.jsonl",
+      "GATEWAY_OPENAI_DEFAULTS": "1"
+    },
+    "note": "без max_tokens в запросе шлюз ставит 16384 (GATEWAY_OPENAI_DEFAULTS)"
+  },
+  "worker": {
+    "env": {
+      "QWEN_KV_BITS": "0",
+      "QWEN_MODEL": "../../weights/ornith15-9b-mlx-8bit",
+      "QWEN_PROMPT_CACHE": "1"
+    }
+  },
+  "record": "старый прокси tools/record (коммит d0e3c06, до 3ab1e3a): seed = seed_for(канонический запрос, n), канонический запрос — всё тело без stream, stream_options, id; наверх — тело без stream. В этой записи в запросах только model, messages, temperature, max_completion_tokens, поэтому ключ и seed те же, что у нового прокси",
+  "runner": "records/scope_deep/run.sh (UPSTREAMS по умолчанию ~/Projects/upstreams)",
+  "command": "cd $UPSTREAMS/SCOPE && $UPSTREAMS/.venvs/light/bin/python examples/test_scope_deep.py --provider openai --model ornith15-9b --api-key x --base-url http://127.0.0.1:8094/v1",
+  "knobs": {
+    "--provider": {
+      "value": "openai",
+      "default": "litellm",
+      "class": "T",
+      "note": "адаптер openai из Quick Start README"
+    },
+    "--model": {
+      "value": "ornith15-9b",
+      "default": "gpt-4o-mini",
+      "class": "T"
+    },
+    "--api-key": {
+      "value": "x",
+      "default": null,
+      "class": "T"
+    },
+    "--base-url": {
+      "value": "прокси записи",
+      "default": null,
+      "class": "T"
+    }
+  },
+  "env": "venv .venvs/light (python 3.11), cwd = корень апстрима; K нет",
+  "snapshot": "stdout.txt — вывод сценария; память сценарий держит во временном каталоге и сам удаляет в конце",
+  "calls": 23,
+  "statuses": {
+    "200": 23
+  },
+  "attempt": 1,
+  "rec_sha256": "e37383ca05760cd461fe1d9424bc863d7449d78458641c6757739447575a86ac"
+}

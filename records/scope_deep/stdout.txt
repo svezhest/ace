@@ -1,0 +1,79 @@
+
+============================================================
+SCOPE Deep Functionality Tests
+============================================================
+
+Provider: openai
+Model: ornith15-9b
+API Key: x...
+Base URL: http://127.0.0.1:8094/v1
+
+Using temp directory: /var/folders/xm/4w11w8_j0rs2_j03n2y05s080000gn/T/tmpbe3zo2g7
+
+
+============================================================
+TEST 1: Error-Driven Guideline Synthesis
+============================================================
+Testing that SCOPE generates guidelines when errors occur...
+
+  ✓ Error generates guideline
+    → Generated strategic guideline: ALWAYS validate response with json.dumps() and quote all str...
+
+============================================================
+TEST 2: Quality-Driven Guideline Synthesis
+============================================================
+Testing that SCOPE analyzes successful steps for improvements...
+
+  ✓ Quality analysis generates guideline
+    → Generated 2 guideline(s)
+
+============================================================
+TEST 3: Strategic Memory Persistence
+============================================================
+Testing that strategic guidelines are persisted to disk...
+
+  Generated strategic guideline (attempt 2)
+  ✓ Strategic rules persisted to disk
+    → Found 1 rule(s) in strategic memory
+  ✓ Strategic rules retrievable
+    → Retrieved 315 chars
+
+============================================================
+TEST 4: Cross-Instance Memory Persistence
+============================================================
+Testing that strategic memory survives optimizer restart...
+
+  ✓ Memory persists across instances
+    → Rules available in new optimizer instance
+
+============================================================
+TEST 5: Multiple Agents Support
+============================================================
+Testing that SCOPE handles multiple agents independently...
+
+  ✓ Multiple agents have separate rules
+    → Both agents have independent rule sets
+
+============================================================
+TEST 6: Guideline History Tracking
+============================================================
+Testing that guideline history is recorded when enabled...
+
+  ✓ Guideline history recorded
+    → active_rules: 2 tasks, agent JSONL: 2 entries
+
+============================================================
+TEST 7: Statistics Tracking
+============================================================
+Testing that optimizer tracks statistics correctly...
+
+  ✓ Statistics available
+    → Keys: ['total_agents', 'agents', 'strategic_rules_count']
+
+============================================================
+TEST SUMMARY
+============================================================
+
+Passed: 8/8
+
+🎉 All tests passed!

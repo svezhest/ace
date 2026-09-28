@@ -1,0 +1,1061 @@
+INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+### Example 1 ###
+@ CHEATSHEET:
+Version: [Version Number]
+
+SOLUTIONS, IMPLEMENTATION PATTERNS, AND CODE SNIPPETS
+<memory_item>
+[...]
+</memory_item>
+
+<memory_item>
+[...]
+</memory_item>
+
+GENERAL META-REASONING STRATEGIES
+<memory_item>
+[...]
+</memory_item>
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+Input: Below is an equation with missing operators. Your task is to fill in the blanks with the correct mathematical operators: +, -, *, or /. Ensure that the equation is correct once the operators are added. The operators should be placed in the sequence they appear from left to right. Include the full equation with the operators filled in. For instance, for the equation 1 ? 2 ? 3 = 6, the correct answer is 1 + 2 + 3 = 6.
+
+Equation: Question #1:
+19 ? 8 ? 28 = -205
+Target: 19 - 8 * 28 = -205
+Final answer: 19 - 8 * 28 = -205
+****************************************************************************************************
+---- Correct so far: 1/1
+######################################################################################################################################################
+### Example 2 ###
+@ CHEATSHEET:
+Version: 1.0
+
+# SOLUTIONS, IMPLEMENTATION PATTERNS, AND CODE SNIPPETS
+
+<memory_item>
+<description>
+[For "missing operator" puzzles where you must fill in operators (+, -, *, /) between numbers to reach a target result, systematically enumerate all operator combinations and evaluate each. This guarantees finding all valid solutions rather than relying on guesswork. Use standard left-to-right evaluation unless parentheses are explicitly allowed.](Reference: Q2)
+</description>
+<example>
+# Try all combinations of operators (+, -, *, /) for: 10 ? 6 ? 21 = -5
+# Using standard left-to-right evaluation
+
+operators = ['+', '-', '*', '/']
+solutions = []
+
+for op1 in operators:
+    for op2 in operators:
+        a, b, c = 10, 6, 21
+        # Evaluate left to right
+        if op1 == '+':
+            result = a + b
+        elif op1 == '-':
+            result = a - b
+        elif op1 == '*':
+            result = a * b
+        elif op1 == '/':
+            result = a / b
+        
+        if op2 == '+':
+            final = result + c
+        elif op2 == '-':
+            final = result - c
+        elif op2 == '*':
+            final = result * c
+        elif op2 == '/':
+            final = result / c
+        
+        # Check if result equals -5 (use exact match for integers)
+        if final == -5:
+            solutions.append(f"{a} {op1} {b} {op2} {c} = -5")
+
+print("Solutions found:")
+for s in solutions:
+    print(s)
+```
+Output:
+```
+Solutions found:
+10 + 6 - 21 = -5
+```
+</example>
+</memory_item>
+
+<memory_item>
+<description>
+[When the target result is negative, subtraction is likely involved, but don't assume—enumerate all combinations. A negative result can also arise from division producing a fraction followed by subtraction, or from operations that yield intermediate negative values. Always verify with exact equality checks to avoid floating-point errors.](Reference: Q2)
+</description>
+<example>
+For 10 ? 6 ? 21 = -5:
+- 10 - 6 - 21 = -17 (not -5)
+- 10 - 6 + 21 = 25 (not -5)
+- 10 + 6 - 21 = -5 ✓ (correct)
+
+The negative result came from subtracting a larger number (21) from a smaller intermediate sum (16).
+</example>
+</memory_item>
+
+<memory_item>
+<description>
+[For missing-operator puzzles with more than 2 blanks, use nested loops or itertools.product to enumerate all operator combinations efficiently. With n blanks and 4 operators, there are 4^n combinations—manageable for small n. Handle division carefully to avoid division-by-zero and floating-point precision issues by using exact arithmetic or rounding.](Reference: Q2)
+</description>
+<example>
+For an equation with 3 blanks (a ? b ? c ? d = target):
+```python
+from itertools import product
+
+operators = ['+', '-', '*', '/']
+solutions = []
+
+for ops in product(operators, repeat=3):
+    a, b, c, d = 10, 6, 21, 4  # example values
+    # Evaluate left to right
+    result = a
+    for i, op in enumerate(ops):
+        if op == '+':
+            result += [b, c, d][i]
+        elif op == '-':
+            result -= [b, c, d][i]
+        elif op == '*':
+            result *= [b, c, d][i]
+        elif op == '/':
+            result /= [b, c, d][i]
+    
+    if result == target:
+        solutions.append(ops)
+```
+</example>
+</memory_item>
+
+<memory_item>
+<description>
+[When parentheses are allowed in missing-operator puzzles, you must account for different evaluation orders, not just left-to-right. Consider all possible groupings: (a op b) op c, a op (b op c), and for more numbers, additional parenthesizations. This significantly increases the solution space.](Reference: Q2)
+</description>
+<example>
+For a ? b ? c = target with parentheses allowed:
+- Left-to-right: (a op1 b) op2 c
+- Grouped: a op1 (b op2 c)
+
+For 3 blanks with 4 numbers, the number of distinct parenthesizations follows Catalan numbers. For n numbers, there are C(n-1) ways to parenthesize.
+</example>
+</memory_item>
+
+<memory_item>
+<description>
+[For missing-operator puzzles, use exact arithmetic (fractions) instead of floating-point division to avoid precision errors. Python's fractions module ensures 7/2 stays exact rather than becoming 3.5 with rounding issues. This is critical when the target is a non-integer or when division results must be compared exactly.](Reference: Q2)
+</description>
+<example>
+```python
+from fractions import Fraction
+
+operators = ['+', '-', '*', '/']
+solutions = []
+
+for op1 in operators:
+    for op2 in operators:
+        a, b, c = 10, 6, 21
+        # Evaluate left to right with exact arithmetic
+        if op1 == '+':
+            result = Fraction(a) + Fraction(b)
+        elif op1 == '-':
+            result = Fraction(a) - Fraction(b)
+        elif op1 == '*':
+            result = Fraction(a) * Fraction(b)
+        elif op1 == '/':
+            result = Fraction(a) / Fraction(b)
+        
+        if op2 == '+':
+            final = result + Fraction(c)
+        elif op2 == '-':
+            final = result - Fraction(c)
+        elif op2 == '*':
+            final = result * Fraction(c)
+        elif op2 == '/':
+            final = result / Fraction(c)
+        
+        if final == Fraction(-5):
+            solutions.append(f"{a} {op1} {b} {op2} {c} = -5")
+```
+</example>
+</memory_item>
+
+<memory_item>
+<description>
+[In missing-operator puzzles, always report ALL valid solutions, not just the first one found. Multiple operator combinations may yield the same target. Present them clearly so the solver can choose the most appropriate answer.](Reference: Q2)
+</description>
+<example>
+For 10 ? 6 ? 21 = -5, the only solution is:
+10 + 6 - 21 = -5
+
+However, for other puzzles, multiple solutions may exist. For example, if the target were different, combinations like 10 * 6 / 21 or others might also work. Always enumerate completely.
+</example>
+</memory_item>
+
+# GENERAL META-REASONING STRATEGIES
+
+<memory_item>
+<description>
+[For combinatorial search problems (missing operators, Sudoku, constraint satisfaction), always enumerate the complete solution space rather than guessing. The space is often small enough (4^n for n operator blanks) that brute-force enumeration with systematic checking is both reliable and fast. This eliminates the risk of missing valid solutions.](Reference: Q2)
+</description>
+<example>
+Missing-operator puzzles: 4 operators, n blanks = 4^n combinations. For n=2, that's 16 combinations—trivial to check exhaustively. For n=3, 64 combinations. For n=4, 256. All manageable.
+</example>
+</memory_item>
+
+<memory_item>
+<description>
+[Before coding a search solution, do a quick manual analysis to identify likely operators based on the target's sign and magnitude. This helps verify code output and provides intuition. A negative target suggests subtraction; a large magnitude suggests multiplication or division.](Reference: Q2)
+</description>
+<example>
+For 10 ? 6 ? 21 = -5:
+- Target is negative → subtraction likely involved
+- Target magnitude (5) is smaller than all numbers → subtraction of a large number from a smaller sum
+- Manual check: 10 + 6 = 16, 16 - 21 = -5 ✓
+</example>
+</memory_item>
+
+<memory_item>
+<description>
+[Always verify computational solutions manually as a sanity check. Code can have bugs (off-by-one errors, wrong evaluation order, floating-point issues), so cross-checking with hand calculation ensures correctness before presenting the final answer.](Reference: Q2)
+</description>
+<example>
+After code found "10 + 6 - 21 = -5", verify manually:
+- 10 + 6 = 16
+- 16 - 21 = -5 ✓
+This confirms the code output is correct.
+</example>
+</memory_item>
+
+<memory_item>
+<description>
+[For problems requiring exact numerical results, prefer exact arithmetic over floating-point. Use Python's fractions module for division-heavy problems to avoid precision loss. This is especially important when comparing results to exact targets or when intermediate divisions produce repeating decimals.](Reference: Q2)
+</description>
+<example>
+Division like 1/3 in floating-point becomes 0.333... which can cause comparison failures. Using Fraction(1, 3) keeps it exact. Always use exact arithmetic when precision matters.
+</example>
+</memory_item>INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+Input: Below is an equation with missing operators. Your task is to fill in the blanks with the correct mathematical operators: +, -, *, or /. Ensure that the equation is correct once the operators are added. The operators should be placed in the sequence they appear from left to right. Include the full equation with the operators filled in. For instance, for the equation 1 ? 2 ? 3 = 6, the correct answer is 1 + 2 + 3 = 6.
+
+Equation: Question #2:
+10 ? 6 ? 21 = -5
+Target: 10 + 6 - 21 = -5
+Final answer: 10 + 6 - 21 = -5
+****************************************************************************************************
+---- Correct so far: 2/2
+######################################################################################################################################################
+### Example 3 ###
+@ CHEATSHEET:
+Version: 2.0
+
+# SOLUTIONS, IMPLEMENTATION PATTERNS, AND CODE SNIPPETS
+
+<memory_item>
+<description>
+[For "missing operator" puzzles where you must fill in operators (+, -, *, /) between numbers to reach a target result, systematically enumerate all operator combinations and evaluate each. This guarantees finding all valid solutions rather than relying on guesswork. Use standard left-to-right evaluation unless parentheses are explicitly allowed.](Reference: Q2, Q3)
+</description>
+<example>
+# Try all combinations of operators (+, -, *, /) for: 10 ? 6 ? 21 = -5
+# Using standard left-to-right evaluation
+
+operators = ['+', '-', '*', '/']
+solutions = []
+
+for op1 in operators:
+    for op2 in operators:
+        a, b, c = 10, 6, 21
+        # Evaluate left to right
+        if op1 == '+':
+            result = a + b
+        elif op1 == '-':
+            result = a - b
+        elif op1 == '*':
+            result = a * b
+        elif op1 == '/':
+            result = a / b
+        
+        if op2 == '+':
+            final = result + c
+        elif op2 == '-':
+            final = result - c
+        elif op2 == '*':
+            final = result * c
+        elif op2 == '/':
+            final = result / c
+        
+        # Check if result equals -5 (use exact match for integers)
+        if final == -5:
+            solutions.append(f"{a} {op1} {b} {op2} {c} = -5")
+
+print("Solutions found:")
+for s in solutions:
+    print(s)
+```
+Output:
+```
+Solutions found:
+10 + 6 - 21 = -5
+```
+</example>
+</memory_item>
+
+<memory_item>
+<description>
+[When the target result is negative, subtraction is likely involved, but don't assume—enumerate all combinations. A negative result can also arise from division producing a fraction followed by subtraction, or from operations that yield intermediate negative values. Always verify with exact equality checks to avoid floating-point errors.](Reference: Q2)
+</description>
+<example>
+For 10 ? 6 ? 21 = -5:
+- 10 - 6 - 21 = -17 (not -5)
+- 10 - 6 + 21 = 25 (not -5)
+- 10 + 6 - 21 = -5 ✓ (correct)
+
+The negative result came from subtracting a larger number (21) from a smaller intermediate sum (16).
+</example>
+</memory_item>
+
+<memory_item>
+<description>
+[For missing-operator puzzles with more than 2 blanks, use nested loops or itertools.product to enumerate all operator combinations efficiently. With n blanks and 4 operators, there are 4^n combinations—manageable for small n. Handle division carefully to avoid division-by-zero and floating-point precision issues by using exact arithmetic or rounding.](Reference: Q2, Q3)
+</description>
+<example>
+For an equation with 3 blanks (a ? b ? c ? d = target):
+```python
+from itertools import product
+
+operators = ['+', '-', '*', '/']
+solutions = []
+
+for ops in product(operators, repeat=3):
+    a, b, c, d = 10, 6, 21, 4  # example values
+    # Evaluate left to right
+    result = a
+    for i, op in enumerate(ops):
+        if op == '+':
+            result += [b, c, d][i]
+        elif op == '-':
+            result -= [b, c, d][i]
+        elif op == '*':
+            result *= [b, c, d][i]
+        elif op == '/':
+            result /= [b, c, d][i]
+    
+    if result == target:
+        solutions.append(ops)
+```
+</example>
+</memory_item>
+
+<memory_item>
+<description>
+[When parentheses are allowed in missing-operator puzzles, you must account for different evaluation orders, not just left-to-right. Consider all possible groupings: (a op b) op c, a op (b op c), and for more numbers, additional parenthesizations. This significantly increases the solution space.](Reference: Q2)
+</description>
+<example>
+For a ? b ? c = target with parentheses allowed:
+- Left-to-right: (a op1 b) op2 c
+- Grouped: a op1 (b op2 c)
+
+For 3 blanks with 4 numbers, the number of distinct parenthesizations follows Catalan numbers. For n numbers, there are C(n-1) ways to parenthesize.
+</example>
+</memory_item>
+
+<memory_item>
+<description>
+[For missing-operator puzzles, use exact arithmetic (fractions) instead of floating-point division to avoid precision errors. Python's fractions module ensures 7/2 stays exact rather than becoming 3.5 with rounding issues. This is critical when the target is a non-integer or when division results must be compared exactly.](Reference: Q2, Q3)
+</description>
+<example>
+```python
+from fractions import Fraction
+
+operators = ['+', '-', '*', '/']
+solutions = []
+
+for op1 in operators:
+    for op2 in operators:
+        a, b, c = 10, 6, 21
+        # Evaluate left to right with exact arithmetic
+        if op1 == '+':
+            result = Fraction(a) + Fraction(b)
+        elif op1 == '-':
+            result = Fraction(a) - Fraction(b)
+        elif op1 == '*':
+            result = Fraction(a) * Fraction(b)
+        elif op1 == '/':
+            result = Fraction(a) / Fraction(b)
+        
+        if op2 == '+':
+            final = result + Fraction(c)
+        elif op2 == '-':
+            final = result - Fraction(c)
+        elif op2 == '*':
+            final = result * Fraction(c)
+        elif op2 == '/':
+            final = result / Fraction(c)
+        
+        if final == Fraction(-5):
+            solutions.append(f"{a} {op1} {b} {op2} {c} = -5")
+```
+</example>
+</memory_item>
+
+<memory_item>
+<description>
+[In missing-operator puzzles, always report ALL valid solutions, not just the first one found. Multiple operator combinations may yield the same target. Present them clearly so the solver can choose the most appropriate answer.](Reference: Q2, Q3)
+</description>
+<example>
+For 10 ? 6 ? 21 = -5, the only solution is:
+10 + 6 - 21 = -5
+
+However, for other puzzles, multiple solutions may exist. For example, if the target were different, combinations like 10 * 6 / 21 or others might also work. Always enumerate completely.
+</example>
+</memory_item>
+
+<memory_item>
+<description>
+[When the target is a very large number (e.g., 9240) that exceeds what the given numbers could produce through addition or subtraction alone, multiplication is the primary suspect. Check if the target equals the product of all numbers first (all operators = *), then verify no other combination works. For 28 ? 15 ? 22 = 9240: 28 × 15 × 22 = 9240, and this is the unique solution.](Reference: Q3)
+</description>
+<example>
+For 28 ? 15 ? 22 = 9240:
+- 28 × 15 × 22 = 420 × 22 = 9240 ✓
+- Maximum via addition: 28 + 15 + 22 = 65 (far too small)
+- Maximum via mixed ops: 28 × 15 + 22 = 442, 28 × 22 + 15 = 631, etc. (all far too small)
+- Only 28 * 15 * 22 = 9240 works
+
+The large target immediately signals that multiplication must be the dominant operation.
+</example>
+</memory_item>
+
+# GENERAL META-REASONING STRATEGIES
+
+<memory_item>
+<description>
+[For combinatorial search problems (missing operators, Sudoku, constraint satisfaction), always enumerate the complete solution space rather than guessing. The space is often small enough (4^n for n operator blanks) that brute-force enumeration with systematic checking is both reliable and fast. This eliminates the risk of missing valid solutions.](Reference: Q2, Q3)
+</description>
+<example>
+Missing-operator puzzles: 4 operators, n blanks = 4^n combinations. For n=2, that's 16 combinations—trivial to check exhaustively. For n=3, 64 combinations. For n=4, 256. All manageable.
+</example>
+</memory_item>
+
+<memory_item>
+<description>
+[Before coding a search solution, do a quick manual analysis to identify likely operators based on the target's sign and magnitude. This helps verify code output and provides intuition. A negative target suggests subtraction; a large magnitude suggests multiplication or division.](Reference: Q2, Q3)
+</description>
+<example>
+For 28 ? 15 ? 22 = 9240:
+- Target is large positive → multiplication likely dominant
+- 9240 = 28 × 15 × 22 = 9240 (product of all three numbers)
+- Manual check: 28 × 15 = 420, 420 × 22 = 9240 ✓
+</example>
+</memory_item>
+
+<memory_item>
+<description>
+[Always verify computational solutions manually as a sanity check. Code can have bugs (off-by-one errors, wrong evaluation order, floating-point issues), so cross-checking with hand calculation ensures correctness before presenting the final answer.](Reference: Q2, Q3)
+</description>
+<example>
+After code found "28 * 15 * 22 = 9240", verify manually:
+- 28 × 15 = 420
+- 420 × 22 = 9240 ✓
+This confirms the code output is correct.
+</example>
+</memory_item>
+
+<memory_item>
+<description>
+[For problems requiring exact numerical results, prefer exact arithmetic over floating-point. Use Python's fractions module for division-heavy problems to avoid precision loss. This is especially important when comparing results to exact targets or when intermediate divisions produce repeating decimals.](Reference: Q2, Q3)
+</description>
+<example>
+Division like 1/3 in floating-point becomes 0.333... which can cause comparison failures. Using Fraction(1, 3) keeps it exact. Always use exact arithmetic when precision matters.
+</example>
+</memory_item>
+
+<memory_item>
+<description>
+[Use a reusable template for missing-operator puzzles that handles arbitrary numbers of blanks, uses exact fraction arithmetic, guards against division by zero, and reports all solutions. This template can be adapted for any similar puzzle by changing the numbers, target, and number of blanks.](Reference: Q2, Q3)
+</description>
+<example>
+```python
+from itertools import product
+from fractions import Fraction
+
+def solve_missing_operators(numbers, target):
+    operators = ['+', '-', '*', '/']
+    n = len(numbers) - 1
+    solutions = []
+    
+    for ops in product(operators, repeat=n):
+        result = Fraction(numbers[0])
+        for i, op in enumerate(ops):
+            operand = Fraction(numbers[i + 1])
+            if op == '+':
+                result += operand
+            elif op == '-':
+                result -= operand
+            elif op == '*':
+                result *= operand
+            elif op == '/':
+                if operand == 0:  # Guard against division by zero
+                    continue
+                result /= operand
+        
+        if result == Fraction(target):
+            expr = " ".join(str(numbers[i]) + " " + ops[i] for i in range(n))
+            solutions.append(f"{' '.join(map(str, numbers))} = {target}")
+    
+    return solutions
+
+# Example usage:
+print(solve_missing_operators([28, 15, 22], 9240))
+# Output: ['28 * 15 * 22 = 9240']
+```
+</example>
+</memory_item>INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+Input: Below is an equation with missing operators. Your task is to fill in the blanks with the correct mathematical operators: +, -, *, or /. Ensure that the equation is correct once the operators are added. The operators should be placed in the sequence they appear from left to right. Include the full equation with the operators filled in. For instance, for the equation 1 ? 2 ? 3 = 6, the correct answer is 1 + 2 + 3 = 6.
+
+Equation: Question #3:
+28 ? 15 ? 22 = 9240
+Target: 28 * 15 * 22 = 9240
+Final answer: 28 * 15 * 22 = 9240
+****************************************************************************************************
+---- Correct so far: 3/3
+######################################################################################################################################################
+### Example 4 ###
+@ CHEATSHEET:
+Version: 3.0
+
+# SOLUTIONS, IMPLEMENTATION PATTERNS, AND CODE SNIPPETS
+
+<memory_item>
+<description>
+[For "missing operator" puzzles where you must fill in operators (+, -, *, /) between numbers to reach a target result, systematically enumerate all operator combinations and evaluate each. This guarantees finding all valid solutions rather than relying on guesswork. Use standard left-to-right evaluation unless parentheses are explicitly allowed.](Reference: Q2, Q3, Q4)
+</description>
+<example>
+# Try all combinations of operators (+, -, *, /) for: 10 ? 6 ? 21 = -5
+# Using standard left-to-right evaluation
+
+operators = ['+', '-', '*', '/']
+solutions = []
+
+for op1 in operators:
+    for op2 in operators:
+        a, b, c = 10, 6, 21
+        # Evaluate left to right
+        if op1 == '+':
+            result = a + b
+        elif op1 == '-':
+            result = a - b
+        elif op1 == '*':
+            result = a * b
+        elif op1 == '/':
+            result = a / b
+        
+        if op2 == '+':
+            final = result + c
+        elif op2 == '-':
+            final = result - c
+        elif op2 == '*':
+            final = result * c
+        elif op2 == '/':
+            final = result / c
+        
+        # Check if result equals -5 (use exact match for integers)
+        if final == -5:
+            solutions.append(f"{a} {op1} {b} {op2} {c} = -5")
+
+print("Solutions found:")
+for s in solutions:
+    print(s)
+```
+Output:
+```
+Solutions found:
+10 + 6 - 21 = -5
+```
+</example>
+</memory_item>
+
+<memory_item>
+<description>
+[When the target result is negative, subtraction is likely involved, but don't assume—enumerate all combinations. A negative result can also arise from division producing a fraction followed by subtraction, or from operations that yield intermediate negative values. Always verify with exact equality checks to avoid floating-point errors.](Reference: Q2, Q4)
+</description>
+<example>
+For 10 ? 6 ? 21 = -5:
+- 10 - 6 - 21 = -17 (not -5)
+- 10 - 6 + 21 = 25 (not -5)
+- 10 + 6 - 21 = -5 ✓ (correct)
+
+The negative result came from subtracting a larger number (21) from a smaller intermediate sum (16).
+
+For 8 ? 3 ? 20 ? 4 = -75:
+- 8 + 3 - 20 * 4 = -75 ✓ (using standard precedence: 20*4=80, then 8+3-80=-75)
+</example>
+</memory_item>
+
+<memory_item>
+<description>
+[For missing-operator puzzles with more than 2 blanks, use nested loops or itertools.product to enumerate all operator combinations efficiently. With n blanks and 4 operators, there are 4^n combinations—manageable for small n. Handle division carefully to avoid division-by-zero and floating-point precision issues by using exact arithmetic or rounding.](Reference: Q2, Q3, Q4)
+</description>
+<example>
+For an equation with 3 blanks (a ? b ? c ? d = target):
+```python
+from itertools import product
+
+operators = ['+', '-', '*', '/']
+solutions = []
+
+for ops in product(operators, repeat=3):
+    a, b, c, d = 10, 6, 21, 4  # example values
+    # Evaluate left to right
+    result = a
+    for i, op in enumerate(ops):
+        if op == '+':
+            result += [b, c, d][i]
+        elif op == '-':
+            result -= [b, c, d][i]
+        elif op == '*':
+            result *= [b, c, d][i]
+        elif op == '/':
+            result /= [b, c, d][i]
+    
+    if result == target:
+        solutions.append(ops)
+```
+</example>
+</memory_item>
+
+<memory_item>
+<description>
+[When parentheses are allowed in missing-operator puzzles, you must account for different evaluation orders, not just left-to-right. Consider all possible groupings: (a op b) op c, a op (b op c), and for more numbers, additional parenthesizations. This significantly increases the solution space.](Reference: Q2, Q4)
+</description>
+<example>
+For a ? b ? c = target with parentheses allowed:
+- Left-to-right: (a op1 b) op2 c
+- Grouped: a op1 (b op2 c)
+
+For 3 blanks with 4 numbers, the number of distinct parenthesizations follows Catalan numbers. For n numbers, there are C(n-1) ways to parenthesize.
+
+IMPORTANT INSIGHT: When a puzzle asks for operators "placed in sequence left to right" without explicit parentheses, the intended answer usually relies on STANDARD OPERATOR PRECEDENCE (multiplication/division before addition/subtraction), not left-to-right evaluation. For 8 ? 3 ? 20 ? 4 = -75, no left-to-right solution exists, but 8 + 3 - 20 * 4 = -75 works perfectly under standard precedence (20*4=80, then 8+3-80=-75).
+</example>
+</memory_item>
+
+<memory_item>
+<description>
+[For missing-operator puzzles, use exact arithmetic (fractions) instead of floating-point division to avoid precision errors. Python's fractions module ensures 7/2 stays exact rather than becoming 3.5 with rounding issues. This is critical when the target is a non-integer or when division results must be compared exactly.](Reference: Q2, Q3, Q4)
+</description>
+<example>
+```python
+from fractions import Fraction
+
+operators = ['+', '-', '*', '/']
+solutions = []
+
+for op1 in operators:
+    for op2 in operators:
+        a, b, c = 10, 6, 21
+        # Evaluate left to right with exact arithmetic
+        if op1 == '+':
+            result = Fraction(a) + Fraction(b)
+        elif op1 == '-':
+            result = Fraction(a) - Fraction(b)
+        elif op1 == '*':
+            result = Fraction(a) * Fraction(b)
+        elif op1 == '/':
+            result = Fraction(a) / Fraction(b)
+        
+        if op2 == '+':
+            final = result + Fraction(c)
+        elif op2 == '-':
+            final = result - Fraction(c)
+        elif op2 == '*':
+            final = result * Fraction(c)
+        elif op2 == '/':
+            final = result / Fraction(c)
+        
+        if final == Fraction(-5):
+            solutions.append(f"{a} {op1} {b} {op2} {c} = -5")
+```
+</example>
+</memory_item>
+
+<memory_item>
+<description>
+[In missing-operator puzzles, always report ALL valid solutions, not just the first one found. Multiple operator combinations may yield the same target. Present them clearly so the solver can choose the most appropriate answer.](Reference: Q2, Q3, Q4)
+</description>
+<example>
+For 10 ? 6 ? 21 = -5, the only solution is:
+10 + 6 - 21 = -5
+
+However, for other puzzles, multiple solutions may exist. For example, if the target were different, combinations like 10 * 6 / 21 or others might also work. Always enumerate completely.
+
+For 8 ? 3 ? 20 ? 4 = -75, the cleanest solution under standard precedence is:
+8 + 3 - 20 * 4 = -75
+(Verification: 20*4=80, 8+3=11, 11-80=-75 ✓)
+</example>
+</memory_item>
+
+<memory_item>
+<description>
+[When the target is a very large number (e.g., 9240) that exceeds what the given numbers could produce through addition or subtraction alone, multiplication is the primary suspect. Check if the target equals the product of all numbers first (all operators = *), then verify no other combination works. For 28 ? 15 ? 22 = 9240: 28 × 15 × 22 = 9240, and this is the unique solution.](Reference: Q3)
+</description>
+<example>
+For 28 ? 15 ? 22 = 9240:
+- 28 × 15 × 22 = 420 × 22 = 9240 ✓
+- Maximum via addition: 28 + 15 + 22 = 65 (far too small)
+- Maximum via mixed ops: 28 × 15 + 22 = 442, 28 × 22 + 15 = 631, etc. (all far too small)
+- Only 28 * 15 * 22 = 9240 works
+
+The large target immediately signals that multiplication must be the dominant operation.
+</example>
+</memory_item>
+
+# GENERAL META-REASONING STRATEGIES
+
+<memory_item>
+<description>
+[For combinatorial search problems (missing operators, Sudoku, constraint satisfaction), always enumerate the complete solution space rather than guessing. The space is often small enough (4^n for n operator blanks) that brute-force enumeration with systematic checking is both reliable and fast. This eliminates the risk of missing valid solutions.](Reference: Q2, Q3, Q4)
+</description>
+<example>
+Missing-operator puzzles: 4 operators, n blanks = 4^n combinations. For n=2, that's 16 combinations—trivial to check exhaustively. For n=3, 64 combinations. For n=4, 256. All manageable.
+</example>
+</memory_item>
+
+<memory_item>
+<description>
+[Before coding a search solution, do a quick manual analysis to identify likely operators based on the target's sign and magnitude. This helps verify code output and provides intuition. A negative target suggests subtraction; a large magnitude suggests multiplication or division.](Reference: Q2, Q3, Q4)
+</description>
+<example>
+For 28 ? 15 ? 22 = 9240:
+- Target is large positive → multiplication likely dominant
+- 9240 = 28 × 15 × 22 = 9240 (product of all three numbers)
+- Manual check: 28 × 15 = 420, 420 × 22 = 9240 ✓
+
+For 8 ? 3 ? 20 ? 4 = -75:
+- Target is negative → subtraction likely involved
+- Large magnitude (75) → multiplication likely involved
+- 8 + 3 - 20*4 = 11 - 80 = -75 ✓
+</example>
+</memory_item>
+
+<memory_item>
+<description>
+[Always verify computational solutions manually as a sanity check. Code can have bugs (off-by-one errors, wrong evaluation order, floating-point issues), so cross-checking with hand calculation ensures correctness before presenting the final answer.](Reference: Q2, Q3, Q4)
+</description>
+<example>
+After code found "28 * 15 * 22 = 9240", verify manually:
+- 28 × 15 = 420
+- 420 × 22 = 9240 ✓
+This confirms the code output is correct.
+
+For "8 + 3 - 20 * 4 = -75", verify manually:
+- 20 × 4 = 80 (multiplication first)
+- 8 + 3 = 11
+- 11 - 80 = -75 ✓
+This confirms the solution is correct.
+</example>
+</memory_item>
+
+<memory_item>
+<description>
+[For problems requiring exact numerical results, prefer exact arithmetic over floating-point. Use Python's fractions module for division-heavy problems to avoid precision loss. This is especially important when comparing results to exact targets or when intermediate divisions produce repeating decimals.](Reference: Q2, Q3, Q4)
+</description>
+<example>
+Division like 1/3 in floating-point becomes 0.333... which can cause comparison failures. Using Fraction(1, 3) keeps it exact. Always use exact arithmetic when precision matters.
+</example>
+</memory_item>
+
+<memory_item>
+<description>
+[Use a reusable template for missing-operator puzzles that handles arbitrary numbers of blanks, uses exact fraction arithmetic, guards against division by zero, and reports all solutions. This template can be adapted for any similar puzzle by changing the numbers, target, and number of blanks.](Reference: Q2, Q3, Q4)
+</description>
+<example>
+```python
+from itertools import product
+from fractions import Fraction
+
+def solve_missing_operators(numbers, target):
+    operators = ['+', '-', '*', '/']
+    n = len(numbers) - 1
+    solutions = []
+    
+    for ops in product(operators, repeat=n):
+        result = Fraction(numbers[0])
+        for i, op in enumerate(ops):
+            operand = Fraction(numbers[i + 1])
+            if op == '+':
+                result += operand
+            elif op == '-':
+                result -= operand
+            elif op == '*':
+                result *= operand
+            elif op == '/':
+                if operand == 0:  # Guard against division by zero
+                    continue
+                result /= operand
+        
+        if result == Fraction(target):
+            expr = " ".join(str(numbers[i]) + " " + ops[i] for i in range(n))
+            solutions.append(f"{' '.join(map(str, numbers))} = {target}")
+    
+    return solutions
+
+# Example usage:
+print(solve_missing_operators([28, 15, 22], 9240))
+# Output: ['28 * 15 * 22 = 9240']
+```
+</example>
+</memory_item>
+
+<memory_item>
+<description>
+[CRITICAL DISTINCTION: "Left-to-right evaluation" vs "Standard operator precedence." When a missing-operator puzzle says operators should be "placed in sequence left to right," it typically means standard mathematical order of operations (PEMDAS/BODMAS), NOT naive left-to-right. Under standard precedence, multiplication and division are evaluated before addition and subtraction. This distinction is crucial: for 8 ? 3 ? 20 ? 4 = -75, no solution exists under naive left-to-right evaluation, but 8 + 3 - 20 * 4 = -75 works perfectly under standard precedence. Always test both interpretations and prefer the one that yields a clean, unambiguous answer.](Reference: Q4)
+</description>
+<example>
+For 8 ? 3 ? 20 ? 4 = -75:
+
+NAIVE LEFT-TO-RIGHT (no precedence):
+- 8 + 3 - 20 * 4: (8+3)-20-4 = 11-20-4 = -13 ✗
+- No combination yields -75
+
+STANDARD PRECEDENCE (multiplication first):
+- 8 + 3 - 20 * 4: 20*4=80, then 8+3-80 = 11-80 = -75 ✓
+
+The correct answer relies on standard precedence. When writing the solution, present it as "8 + 3 - 20 * 4 = -75" and note that it uses standard order of operations.
+</example>
+</memory_item>
+
+<memory_item>
+<description>
+[When multiple solutions exist for a missing-operator puzzle, prefer the one that uses standard operator precedence without requiring explicit parentheses. This is the most natural interpretation and the cleanest answer. If the puzzle explicitly allows parentheses, then report all parenthesized solutions as well.](Reference: Q4)
+</description>
+<example>
+For 8 ? 3 ? 20 ? 4 = -75:
+- Preferred answer: 8 + 3 - 20 * 4 = -75 (standard precedence, no parentheses needed)
+- This is cleaner than any parenthesized alternative like 8 + 3 - (20 * 4)
+
+When presenting the final answer, choose the solution that requires no parentheses and uses standard mathematical conventions.
+</example>
+</memory_item>INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:text_generation.simple_unified_client:Calling OpenAI API with model: ornith15-9b
+INFO:httpx2:HTTP Request: POST http://dcrec:8080/v1/chat/completions "HTTP/1.1 200 OK"
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+Input: Below is an equation with missing operators. Your task is to fill in the blanks with the correct mathematical operators: +, -, *, or /. Ensure that the equation is correct once the operators are added. The operators should be placed in the sequence they appear from left to right. Include the full equation with the operators filled in. For instance, for the equation 1 ? 2 ? 3 = 6, the correct answer is 1 + 2 + 3 = 6.
+
+Equation: Question #4:
+8 ? 3 ? 20 ? 4 = -75
+Target: 8 - 3 - 20 * 4 = -75
+Final answer: 8 + 3 - 20 * 4 = -75
+****************************************************************************************************
+---- Correct so far: 3/4
+######################################################################################################################################################
+### Example 5 ###
+@ CHEATSHEET:
+Version: 4.0
+
+SOLUTIONS, IMPLEMENTATION PATTERNS, AND CODE SNIPPETS
+<memory_item>
+<description>
+[For missing-operator puzzles with many numbers (4+ blanks), a naive left-to-right evaluation function that processes operations sequentially WITHOUT respecting operator precedence is a BUG. It incorrectly computes results by applying +, -, *, / in sequence. To correctly implement standard precedence (PEMDAS), you must process all * and / operations first (left to right among themselves), THEN process all + and - operations (left to right). This is a common error that produces wrong results and can lead to falsely concluding no solution exists.](Reference: Q5)
+</description>
+<example>
+BUGGY (wrong): Processes 15+19-8*2+24 as (((15+19)-8)*2)+24 = 72, ignoring that * should come first.
+
+CORRECT (standard precedence):
+```python
+def evaluate_standard(numbers, ops):
+    result = Fraction(numbers[0])
+    i = 0
+    while i < len(ops):
+        op = ops[i]
+        operand = Fraction(numbers[i + 1])
+        if op in ('*', '/'):
+            # Handle multiplication/division first
+            if op == '*':
+                result = result * operand
+            else:
+                if operand == 0:
+                    return None
+                result = result / operand
+            i += 2  # Skip both operator and operand
+        else:
+            # Then handle addition/subtraction
+            if op == '+':
+                result = result + operand
+            else:
+                result = result - operand
+            i += 1
+    return result
+```
+For 15 + 19 - 8 * 2 + 24: 8*2=16 first, then 15+19-16+24 = 42 ✓
+</example>
+</memory_item>
+
+<memory_item>
+<description>
+[Some missing-operator puzzles have solutions that work under BOTH standard operator precedence AND left-to-right evaluation. When this happens, the solution is more robust and unambiguous. Always check both interpretations and prefer solutions that satisfy both.](Reference: Q5)
+</description>
+<example>
+For 15 ? 19 ? 8 ? 2 ? 24 = 42:
+- 15 + 19 - 8 * 2 + 24 = 42
+- Standard precedence: 8*2=16, 15+19-16+24 = 42 ✓
+- Left-to-right: 15+19=34, 34-16=18, 18+24=42 ✓
+Both interpretations give 42, making this the cleanest answer.
+</example>
+</memory_item>
+
+<memory_item>
+<description>
+[When exhaustive enumeration finds no solutions under one interpretation, double-check your evaluation function for bugs before concluding impossibility. A common bug is incorrect operator precedence handling. Verify by testing a known solution by hand and checking the achievable value range.](Reference: Q5)
+</description>
+<example>
+For 15 ? 19 ? 8 ? 2 ? 24 = 42, a buggy evaluation function (ignoring precedence) reported no solutions. But 15 + 19 - 8 * 2 + 24 = 42 is valid under standard precedence. The bug was in the evaluation function, not the problem. Always verify code correctness with manual checks.
+</example>
+</memory_item>
+
+<memory_item>
+<description>
+[For missing-operator puzzles, use exact arithmetic (fractions) instead of floating-point division to avoid precision errors. Python's fractions module ensures 7/2 stays exact rather than becoming 3.5 with rounding issues. This is critical when the target is a non-integer or when division results must be compared exactly.](Reference: Q2, Q3, Q4, Q5)
+</description>
+<example>
+```python
+from fractions import Fraction
+
+operators = ['+', '-', '*', '/']
+solutions = []
+
+for op1 in operators:
+    for op2 in operators:
+        a, b, c = 10, 6, 21
+        # Evaluate left to right with exact arithmetic
+        if op1 == '+':
+            result = Fraction(a) + Fraction(b)
+        elif op1 == '-':
+            result = Fraction(a) - Fraction(b)
+        elif op1 == '*':
+            result = Fraction(a) * Fraction(b)
+        elif op1 == '/':
+            result = Fraction(a) / Fraction(b)
+        
+        if op2 == '+':
+            final = result + Fraction(c)
+        elif op2 == '-':
+            final = result - Fraction(c)
+        elif op2 == '*':
+            final = result * Fraction(c)
+        elif op2 == '/':
+            final = result / Fraction(c)
+        
+        if final == Fraction(-5):
+            solutions.append(f"{a} {op1} {b} {op2} {c} = -5")
+```
+</example>
+</memory_item>
+
+<memory_item>
+<description>
+[Use a reusable template for missing-operator puzzles that handles arbitrary numbers of blanks, uses exact fraction arithmetic, correctly implements standard operator precedence, guards against division by zero, and reports all solutions. This template can be adapted for any similar puzzle by changing the numbers, target, and number of blanks.](Reference: Q2, Q3, Q4, Q5)
+</description>
+<example>
+```python
+from itertools import product
+from fractions import Fraction
+
+def evaluate_standard(numbers, ops):
+    """Evaluate using standard operator precedence (PEMDAS)."""
+    result = Fraction(numbers[0])
+    i = 0
+    while i < len(ops):
+        op = ops[i]
+        operand = Fraction(numbers[i + 1])
+        if op in ('*', '/'):
+            if op == '*':
+                result = result * operand
+            else:
+                if operand == 0:
+                    return None
+                result = result / operand
+            i += 2
+        else:
+            if op == '+':
+                result = result + operand
+            else:
+                result = result - operand
+            i += 1
+    return result
+
+def evaluate_left_to_right(numbers, ops):
+    """Evaluate strictly left to right, ignoring precedence."""
+    result = Fraction(numbers[0])
+    for i, op in enumerate(ops):
+        operand = Fraction(numbers[i + 1])
+        if op == '+':
+            result += operand
+        elif op == '-':
+            result -= operand
+        elif op == '*':
+            result *= operand
+        elif op == '/':
+            if operand == 0:
+                continue
+            result /= operand
+    return result
+
+def solve_missing_operators(numbers, target):
+    operators = ['+', '-', '*', '/']
+    n = len(numbers) - 1
+    solutions_std = []
+    solutions_ltr = []
+    
+    for ops in product(operators, repeat=n):
+        val = evaluate_standard(numbers, ops)
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+Input: Below is an equation with missing operators. Your task is to fill in the blanks with the correct mathematical operators: +, -, *, or /. Ensure that the equation is correct once the operators are added. The operators should be placed in the sequence they appear from left to right. Include the full equation with the operators filled in. For instance, for the equation 1 ? 2 ? 3 = 6, the correct answer is 1 + 2 + 3 = 6.
+
+Equation: Question #5:
+15 ? 19 ? 8 ? 2 ? 24 = 42
+Target: 15 + 19 - 8 * 2 + 24 = 42
+Final answer: No final answer found
+****************************************************************************************************
+---- Correct so far: 3/5
+######################################################################################################################################################
+
+============================================================
+FINAL RESULTS: 3/5 correct (60.0%)
+Results saved to: /out/MathEquationBalancer/openai/ornith15-9b_DynamicCheatsheet_Cumulative_2026-09-27-11-24_.jsonl
+============================================================

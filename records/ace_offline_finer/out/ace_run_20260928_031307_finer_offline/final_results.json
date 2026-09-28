@@ -1,0 +1,17 @@
+{
+  "initial_test_results": {
+    "accuracy": 0.625,
+    "correct": 3,
+    "total": 10,
+    "no_answer": 0
+  },
+  "training_results": {
+    "best_validation_accuracy": 0.45
+  },
+  "final_test_results": {
+    "accuracy": 0.65,
+    "correct": 3,
+    "total": 10,
+    "no_answer": 0
+  }
+}
