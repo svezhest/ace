@@ -257,7 +257,8 @@ def test_unknown_field_rejected(fake, tmp_path, capsys):
                                             extra_body={"chat_template_kwargs": {"enable_thinking": False}})
     rec.shutdown()
     assert "unknown request field(s) chat_template_kwargs" in capsys.readouterr().err
-    assert not fake.got and not (tmp_path / "rec.jsonl").exists()
+    [line] = lines(tmp_path / "rec.jsonl")
+    assert not fake.got and line["status"] == 400 and "chat_template_kwargs" in line["error"]
 
 
 def test_sse_and_assemble_choices_reasoning_refusal():
@@ -270,7 +271,7 @@ def test_sse_and_assemble_choices_reasoning_refusal():
     assert assemble(frames) == resp
 
 
-def test_get_upstream_down(tmp_path):
+def test_upstream_down(tmp_path):
     s = socket.socket()
     s.bind(("127.0.0.1", 0))
     port = s.getsockname()[1]
@@ -278,7 +279,11 @@ def test_get_upstream_down(tmp_path):
     rec = start(Recorder(("127.0.0.1", 0), tmp_path / "rec.jsonl", f"http://127.0.0.1:{port}"))
     with pytest.raises(openai.InternalServerError, match="upstream unreachable"):
         client(rec).models.list()
+    with pytest.raises(openai.InternalServerError, match="upstream unreachable"):
+        ask(client(rec), ("chat", "a"))
     rec.shutdown()
+    [line] = lines(tmp_path / "rec.jsonl")
+    assert line["status"] == 502 and "upstream unreachable" in line["error"]
 
 
 @pytest.mark.parametrize("stream", [False, True])

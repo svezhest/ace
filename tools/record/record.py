@@ -5,8 +5,9 @@
 тела, ключи по алфавиту. Наверх уходит только он и seed = seed_for(запрос, n), так что ответ модели — функция
 ключа и не зависит от порядка вызовов. Строка записи:
 {"path", "request": канонический запрос, "n", "seed", "status", "response"}, плюс "dropped": true, если клиент
-оборвал соединение до ответа (таймаут, повтор), и "error", если ответ шлюза не дочитан (таймаут, обрыв; клиенту
-502) — такая запись негодна. Поле тела вне FIELDS и CLIENT — отказ 400: его нельзя молча потерять.
+оборвал соединение до ответа (таймаут, повтор), и "error", если шлюз недоступен или его ответ не дочитан (клиенту
+502) — такая запись негодна. Поле тела вне FIELDS и CLIENT — отказ 400: его нельзя молча потерять. Отказ и сбой
+самого прокси — строка {"path", "request": тело как пришло, "status", "error"} без n.
 Воспроизведение отдаёт k-му такому же запросу k-й записанный ответ; запроса нет в записи — 400 с diff против
 ближайшего записанного. GET /_status — сколько отдано и сколько не востребовано."""
 import argparse
@@ -65,6 +66,8 @@ def load(rec: Path) -> dict:
     got = defaultdict(list)
     for line in rec.read_text().splitlines() if rec.exists() else []:
         r = json.loads(line)
+        if "n" not in r:        # отказ прокси, запроса к модели не было
+            continue
         got[r["path"], canon(r["path"], json.loads(r["request"]))].append(r)
     return got
 
@@ -80,6 +83,11 @@ class Recorder(ThreadingHTTPServer):
         self.emb_upstream = (emb_upstream or upstream).rstrip("/")
         self.count = Counter({k: len(v) for k, v in load(out).items()})
         self.lock = threading.Lock()
+        self.write_lock = threading.Lock()
+
+    def write(self, rec: dict):
+        with self.write_lock, self.out.open("a") as f:
+            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
 
     def answer(self, path: str, body: dict, out: "Handler"):
         c = canon(path, body)
@@ -104,10 +112,8 @@ class Recorder(ThreadingHTTPServer):
             try:
                 status, resp = job.result()
             except (OSError, ValueError, http.client.HTTPException) as e:
-                if isinstance(e, urllib.error.URLError) and not out.started:
-                    # модель недоступна: не пишем, номер повтора не тратим
-                    return out.error(502, f"upstream unreachable: {e}")
-                error = f"upstream read failed: {e!r}"
+                unreachable = isinstance(e, urllib.error.URLError)
+                error = f"upstream unreachable: {e}" if unreachable else f"upstream read failed: {e!r}"
                 status, resp = 502, {"error": {"message": error, "type": "record"}}
             # клиент не дождался ответа (таймаут, повтор): апстрим его не увидел, запись негодна
             dropped = out.dropped or out.gone()
@@ -121,8 +127,7 @@ class Recorder(ThreadingHTTPServer):
                 rec["dropped"] = True
             if error:
                 rec["error"] = error
-            with self.out.open("a") as f:
-                f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+            self.write(rec)
             self.count[path, c] += 1
         finally:
             self.lock.release()
@@ -336,6 +341,12 @@ class Handler(BaseHTTPRequestHandler):
     def error(self, status: int, msg: str):
         self.send_raw(status, json.dumps({"error": {"message": msg, "type": "record"}}, ensure_ascii=False).encode())
 
+    def refuse(self, path: str, raw: bytes, status: int, msg: str):
+        """Отказ без вызова модели: клиенту status, в запись (если это Recorder) строка с error."""
+        if isinstance(self.server, Recorder):
+            self.server.write({"path": path, "request": raw.decode(errors="replace"), "status": status, "error": msg})
+        self.error(status, msg)
+
     def ping(self, stream: bool):
         """Байты, пока ждём модель: SSE-комментарий в stream, пробел перед JSON иначе (JSON его допускает)."""
         if not self.started:
@@ -383,12 +394,12 @@ class Handler(BaseHTTPRequestHandler):
         try:
             body = json.loads(raw)
         except ValueError as e:
-            return self.error(400, f"bad json: {e}")
+            return self.refuse(path, raw, 400, f"bad json: {e}")
         unknown = sorted(set(body) - set(FIELDS[path]) - CLIENT[path])
         if unknown:
             msg = f"{path}: unknown request field(s) {', '.join(unknown)}: add to FIELDS or CLIENT in tools/record"
             print(msg, file=sys.stderr, flush=True)
-            return self.error(400, msg)
+            return self.refuse(path, raw, 400, msg)
         self.server.answer(path, body, self)
 
 
