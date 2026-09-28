@@ -18,6 +18,7 @@ import select
 import socket
 import sys
 import threading
+import time
 import urllib.error
 import urllib.request
 from collections import Counter, defaultdict
@@ -44,7 +45,8 @@ CLIENT = {
     EMBEDDINGS: {"user"},
 }
 UPSTREAM_TIMEOUT = 3600     # секунд на ответ модели
-PING = 15                   # раз во столько секунд ожидания клиенту уходят байты, чтобы не сработал его read-timeout
+PING = 15                   # раз во столько секунд ожидания (замка или модели) клиенту уходят байты, чтобы не сработал
+                            # его read-timeout
 
 
 def canon(path: str, body: dict) -> str:
@@ -82,7 +84,8 @@ class Recorder(ThreadingHTTPServer):
     def answer(self, path: str, body: dict, out: "Handler"):
         c = canon(path, body)
         # вызовы по одному: модель не видит соседних запросов, строки в файле идут в порядке вызовов
-        with self.lock:
+        out.wait(lambda t: self.lock.acquire(timeout=t), bool(body.get("stream")))
+        try:
             n = self.count[path, c]
             sent = json.loads(c)
             seed = None
@@ -94,15 +97,9 @@ class Recorder(ThreadingHTTPServer):
             base = self.emb_upstream if path == EMBEDDINGS else self.upstream
             req = urllib.request.Request(base + path, json.dumps(sent).encode(), method="POST", headers={
                 "Content-Type": "application/json", "Authorization": out.headers.get("Authorization") or "Bearer x"})
-            dropped = False
             with ThreadPoolExecutor(1) as pool:
                 job = pool.submit(fetch, req, stream)
-                while not wait([job], PING).done:
-                    try:
-                        if not dropped:
-                            out.ping(bool(body.get("stream")))
-                    except OSError:
-                        dropped = True
+                out.wait(lambda t: wait([job], t).done, bool(body.get("stream")))
             error = None
             try:
                 status, resp = job.result()
@@ -113,7 +110,7 @@ class Recorder(ThreadingHTTPServer):
                 error = f"upstream read failed: {e!r}"
                 status, resp = 502, {"error": {"message": error, "type": "record"}}
             # клиент не дождался ответа (таймаут, повтор): апстрим его не увидел, запись негодна
-            dropped = dropped or out.gone()
+            dropped = out.dropped or out.gone()
             try:
                 if not dropped:
                     out.reply(status, resp, body)
@@ -127,6 +124,8 @@ class Recorder(ThreadingHTTPServer):
             with self.out.open("a") as f:
                 f.write(json.dumps(rec, ensure_ascii=False) + "\n")
             self.count[path, c] += 1
+        finally:
+            self.lock.release()
 
     def get(self, out: "Handler"):
         try:
@@ -309,6 +308,7 @@ class Handler(BaseHTTPRequestHandler):
     """Разбор запроса и ответ клиенту; что отвечать, решает answer(path, body, self) у сервера."""
     protocol_version = "HTTP/1.1"
     started = False         # заголовки ответа уже ушли (ping)
+    dropped = False         # ping не ушёл: клиент бросил запрос
 
     def log_message(self, fmt, *args):
         pass
@@ -346,6 +346,16 @@ class Handler(BaseHTTPRequestHandler):
             self.started = True
         self.send(b": ping\n\n" if stream else b" ")
 
+    def wait(self, done, stream: bool):
+        """Ждёт done(таймаут), раз в PING секунд шлёт клиенту ping; ping не ушёл — клиент бросил запрос."""
+        while not done(max(0.0, self.last + PING - time.monotonic())):
+            self.last = time.monotonic()
+            try:
+                if not self.dropped:
+                    self.ping(stream)
+            except OSError:
+                self.dropped = True
+
     def send(self, data: bytes):
         """Кусок chunked-тела; пустой — конец."""
         self.wfile.write(b"%x\r\n%s\r\n" % (len(data), data))
@@ -364,6 +374,8 @@ class Handler(BaseHTTPRequestHandler):
         self.server.get(self)
 
     def do_POST(self):
+        self.started = self.dropped = False
+        self.last = time.monotonic()
         raw = self.rfile.read(int(self.headers.get("Content-Length") or 0))
         path = self.path.split("?")[0]
         if path not in FIELDS:
@@ -377,7 +389,6 @@ class Handler(BaseHTTPRequestHandler):
             msg = f"{path}: unknown request field(s) {', '.join(unknown)}: add to FIELDS or CLIENT in tools/record"
             print(msg, file=sys.stderr, flush=True)
             return self.error(400, msg)
-        self.started = False
         self.server.answer(path, body, self)
 
 

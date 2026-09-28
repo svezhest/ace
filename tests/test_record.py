@@ -5,6 +5,7 @@ import random
 import socket
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import numpy as np
@@ -316,3 +317,23 @@ def test_read_error_after_ping_is_error_frame(fake, tmp_path, monkeypatch):
         ask(client(rec), ("stream", "slow"))
     rec.shutdown()
     assert lines(tmp_path / "rec.jsonl")[0]["status"] == 502
+
+
+@pytest.mark.parametrize("stream", [False, True])
+def test_keepalive_while_waiting_for_lock(fake, tmp_path, monkeypatch, stream):
+    """Три клиента разом, модель 0,5 с, read-timeout 0,75 с: ping получают и ждущие замка, все дожидаются ответа."""
+    monkeypatch.setattr(record, "PING", 0.05)
+    rec = recorder(fake, tmp_path / "rec.jsonl")
+    c = openai.OpenAI(base_url=f"http://127.0.0.1:{rec.server_address[1]}/v1", api_key="k", max_retries=0, timeout=0.75)
+
+    def one(_):
+        got = c.chat.completions.create(model="m", messages=[{"role": "user", "content": "slow"}], stream=stream)
+        return "".join(p.choices[0].delta.content or "" for p in got) if stream else got.choices[0].message.content
+
+    with ThreadPoolExecutor(3) as pool:
+        texts = list(pool.map(one, range(3)))
+    rec.shutdown()
+    got = lines(tmp_path / "rec.jsonl")
+    assert sorted(texts) == sorted(x["response"]["choices"][0]["message"]["content"] for x in got)
+    assert len(set(texts)) == 3 and not any("dropped" in x or "error" in x for x in got)
+
