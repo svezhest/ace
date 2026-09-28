@@ -241,7 +241,7 @@ def test_client_drop_marked(fake, tmp_path, stream):
 
 def test_embeddings_server(monkeypatch):
     """Сервер эмбеддингов: клиент openai по умолчанию просит base64 и получает те же float32, что списком."""
-    monkeypatch.setattr("ace.embed.embed", lambda texts: np.array([[len(t), 0.1] for t in texts], dtype="float32"))
+    monkeypatch.setattr("tools.record.embeddings.embed", lambda texts: np.array([[len(t), 0.1] for t in texts], dtype="float32"))
     srv = start(Embedder(("127.0.0.1", 0)))
     c = client(srv)
     got = [d.embedding for d in c.embeddings.create(model="text-embedding-3-small", input=["ab", "c"]).data]
