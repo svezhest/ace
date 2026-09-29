@@ -5,7 +5,7 @@
   "status": "раннер готов, живая запись не снята; прогон на фейковой модели доходит до конца",
   "F": "переходник extract_and_grade (sitecustomize.py): EvoLib зовёт его как (решение, ответ), у matharena — (сообщения, число токенов, ответ, конфиг соревнования) в каждой версии с этой функцией (появилась в eae1e52 сразу с этой сигнатурой, на HEAD та же); логика оценки не меняется. Опубликованный код EvoLib не может посчитать HMMT ни с одной версией matharena, поэтому заявленные в статье результаты по математике не воспроизводимы опубликованным кодом",
   "task": "hmmt: MathArena hmmt_feb_2025 + hmmt_nov_2025 + hmmt_feb_2026 (93 задачи) подряд, первые N (все из hmmt_feb_2025), без повторов",
-  "runner": "records/evolib_hmmt/run.sh OUT (UPSTREAMS по умолчанию ~/Projects/upstreams; N=12, EMB_PORT=8092; образ и кэш — bridge/setup_envs.sh evolib)",
+  "runner": "records/evolib_hmmt/run.sh OUT (UPSTREAMS по умолчанию upstreams/ репозитория; N=12, EMB_PORT=8092; образ и кэш — records/setup_envs.sh evolib)",
   "command": "cd /up/EvoLib/EvoLib && python eval_main.py --task hmmt --model ornith15-9b --n_iterations 12 --endpoint http://evorec:8080/v1 --embedding_endpoint http://evorec:8080/v1 --log_file /out/evolib.log",
   "readme_command": "python eval_main.py --task hmmt --k_q_per_problem 10 --endpoint <chat_completions_endpoint> --embedding_endpoint <embeddings_endpoint> --log_file ./runs/hmmt.log",
   "knobs": {

@@ -6,8 +6,8 @@
 set -euo pipefail
 OUT=$(mkdir -p "$1" && cd "$1" && pwd)
 HERE=$(cd "$(dirname "$0")" && pwd)
-U=${UPSTREAMS:-$HOME/Projects/upstreams}
 ACE=${ACE:-$(cd "$HERE/../.." && pwd)}
+U=${UPSTREAMS:-$ACE/upstreams}
 PORT=${PORT:-8093}
 W=$OUT/.work
 D=$U/ace/eval/finance/data

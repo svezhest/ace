@@ -9,14 +9,14 @@ set -euo pipefail
 OUT=$(mkdir -p "$1" && cd "$1" && pwd)
 HERE=$(cd "$(dirname "$0")" && pwd)
 T=$(cd "$HERE/../tfgrpo" && pwd)
-U=${UPSTREAMS:-$HOME/Projects/upstreams}
+ACE=${ACE:-$(cd "$HERE/../.." && pwd)}
+U=${UPSTREAMS:-$ACE/upstreams}
 mkdir -p "$OUT/rec" "$OUT/prep/data"
 ln -s "$U/.data/DAPO-Math-17k" "$OUT/prep/data/"
 UTU_LLM_TYPE=chat.completions UTU_LLM_MODEL=x UTU_LLM_BASE_URL=http://127.0.0.1:9/v1 UTU_LLM_API_KEY=x \
-    UTU_DB_URL=sqlite:///$OUT/test.db HF_HUB_OFFLINE=1 HF_DATASETS_OFFLINE=1 UPSTREAMS=$U \
+    UTU_DB_URL=sqlite:///$OUT/test.db HF_HOME=$U/.hf HF_HUB_OFFLINE=1 HF_DATASETS_OFFLINE=1 UPSTREAMS=$U \
     "$U/.venvs/youtu/bin/python" "$T/prep.py" "$OUT/prep" > "$OUT/prep.log" 2>&1
 rm -rf "$OUT/prep"
-ACE=${ACE:-$(cd "$HERE/../.." && pwd)}
 M=ornith15-9b
 docker build -q -t youtu-upstream "$T" >/dev/null
 docker network inspect tfnet >/dev/null 2>&1 || docker network create --internal tfnet >/dev/null

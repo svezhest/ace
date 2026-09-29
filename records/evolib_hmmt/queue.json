@@ -2,8 +2,8 @@
  "attempt": 1,
  "limit_minutes": 150,
  "command": [
-  "/Users/user/Projects/ace/records/evolib_hmmt/run.sh",
-  "/private/tmp/claude-501/-Users-user-Projects-itmo/a04e42db-becc-4c5f-a1a6-f26b7e31e71d/scratchpad/recq/runs/evolib_hmmt-0928-2132-1"
+  "records/evolib_hmmt/run.sh",
+  "<work>/runs/evolib_hmmt-0928-2132-1"
  ],
  "started": "2026-09-28 21:32:49",
  "upstream_head": "98266b2d22e146c19c651b1126ae81ff072f65e0",
@@ -27,7 +27,7 @@
    87436
   ],
   "env": {
-   "GATEWAY_JOURNAL": "/Users/user/Projects/llm/logs/journal.jsonl",
+   "GATEWAY_JOURNAL": "~/Projects/llm/logs/journal.jsonl",
    "GATEWAY_OPENAI_DEFAULTS": "1"
   }
  },

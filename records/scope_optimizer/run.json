@@ -11,7 +11,7 @@
     "sha256": "5abaf51d15cd19beb36db16a659bc4fe298c5e5f870f5ae0d6831ea2eb7c02c0",
     "why": "у примера и апстрима нет данных на десяток разных ошибок одного рода: в примере ~10 разных ошибок у разных агентов и в разных доменах. Ошибка теста 1 — невалидный JSON, JSON_checker — готовый набор таких документов, 31 из 33 json.loads отвергает (fail1, fail18 принимает — их нет)"
   },
-  "runner": "records/scope_optimizer/run.sh OUT (UPSTREAMS по умолчанию ~/Projects/upstreams, PORT=8097, MODEL_URL=http://localhost:8080)",
+  "runner": "records/scope_optimizer/run.sh OUT (UPSTREAMS по умолчанию upstreams/ репозитория, PORT=8097, MODEL_URL=http://localhost:8080)",
   "command": "cd $UPSTREAMS/SCOPE && PYTHONPATH=. $UPSTREAMS/.venvs/light/bin/python $ACE/records/scope_optimizer/scenario.py --provider openai --model ornith15-9b --api-key x --base-url http://127.0.0.1:8097/v1",
   "knobs": "те же, что у scope_deep: --provider openai, --model ornith15-9b, --api-key x, --base-url прокси записи (все T)",
   "bridge": "только адрес (прокси записи); рандома у сценария нет: вызовы последовательные, в запросы не попадают ни пути, ни время",

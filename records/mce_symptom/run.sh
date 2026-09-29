@@ -9,8 +9,8 @@
 set -euo pipefail
 OUT=$(mkdir -p "$1" && cd "$1" && pwd)
 HERE=$(cd "$(dirname "$0")" && pwd)
-U=${UPSTREAMS:-$HOME/Projects/upstreams}
 ACE=${ACE:-$(cd "$HERE/../.." && pwd)}
+U=${UPSTREAMS:-$ACE/upstreams}
 IMG=mce-upstream:c4b7a7c-$(cat "$HERE/Dockerfile" "$HERE/litellm.req.txt" | shasum | cut -c1-12)
 ROOT=/private/tmp/mce-symptom
 if ! docker image inspect $IMG >/dev/null 2>&1; then

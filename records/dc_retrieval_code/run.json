@@ -22,7 +22,7 @@
     }
   },
   "record": "старый прокси tools/record (коммит d0e3c06, до 3ab1e3a): seed = seed_for(канонический запрос, n), канонический запрос — всё тело без stream, stream_options, id; наверх — тело без stream. В этой записи в запросах только model, messages, temperature, max_completion_tokens, поэтому ключ и seed те же, что у нового прокси",
-  "runner": "records/dc_retrieval_code/run.sh (UPSTREAMS по умолчанию ~/Projects/upstreams)",
+  "runner": "records/dc_retrieval_code/run.sh (UPSTREAMS по умолчанию upstreams/ репозитория)",
   "command": "python run_benchmark.py --task MathEquationBalancer --approach_name Dynamic_Retrieval --model_name openai/ornith15-9b --generator_prompt_path prompts/generator_prompt.txt --max_n_samples 5 --save_directory /out",
   "knobs": {
     "--max_n_samples": {

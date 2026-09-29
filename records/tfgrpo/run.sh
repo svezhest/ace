@@ -10,20 +10,21 @@
 # подсчёта) и гасит процесс, если тот ещё жив.
 # Рандом: PYTHONHASHSEED=0, sitecustomize.py (random.seed и uuid4 от сида); стенные часы стоят (libfaketime,
 # монотонные идут) — метка времени в workdir python_executor, который видит модель, одна и та же.
-# Данные готовит prep.py на хосте без сети: parquet DAPO-Math-17k лежит в $UPSTREAMS/.data, AIME24 — в кэше HF.
+# Данные готовит prep.py на хосте без сети: parquet DAPO-Math-17k лежит в $UPSTREAMS/.data, AIME24 — в кэше HF
+# $UPSTREAMS/.hf (records/setup_envs.sh youtu).
 # usage: run.sh OUT   (в OUT: rec.jsonl — запись, test.db — БД прогона, tf_live_agent.yaml — итоговый агент,
 # train.log и test.log — вывод команд, utu_train/ и utu_test/ — их logs/)
 set -euo pipefail
 OUT=$(mkdir -p "$1" && cd "$1" && pwd)
 HERE=$(cd "$(dirname "$0")" && pwd)
-U=${UPSTREAMS:-$HOME/Projects/upstreams}
+ACE=${ACE:-$(cd "$HERE/../.." && pwd)}
+U=${UPSTREAMS:-$ACE/upstreams}
 mkdir -p "$OUT/rec" "$OUT/prep/data"
 ln -s "$U/.data/DAPO-Math-17k" "$OUT/prep/data/"
 UTU_LLM_TYPE=chat.completions UTU_LLM_MODEL=x UTU_LLM_BASE_URL=http://127.0.0.1:9/v1 UTU_LLM_API_KEY=x \
-    UTU_DB_URL=sqlite:///$OUT/test.db HF_HUB_OFFLINE=1 HF_DATASETS_OFFLINE=1 UPSTREAMS=$U \
+    UTU_DB_URL=sqlite:///$OUT/test.db HF_HOME=$U/.hf HF_HUB_OFFLINE=1 HF_DATASETS_OFFLINE=1 UPSTREAMS=$U \
     "$U/.venvs/youtu/bin/python" "$HERE/prep.py" "$OUT/prep" > "$OUT/prep.log" 2>&1
 rm -rf "$OUT/prep"
-ACE=${ACE:-$(cd "$HERE/../.." && pwd)}
 M=ornith15-9b
 docker build -q -t youtu-upstream "$HERE" >/dev/null
 docker network inspect tfnet >/dev/null 2>&1 || docker network create --internal tfnet >/dev/null

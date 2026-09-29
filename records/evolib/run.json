@@ -5,7 +5,7 @@
   "status": "раннер готов, живая запись не снята; прогон на фейковой модели доходит до конца",
   "reproducibility": "синтетические тесты (--syn_test_data_file) апстрим не опубликовал — результаты статьи по коду не воспроизводимы опубликованными артефактами",
   "task": "livecodebench: LiveCodeBench v6, только hard (80 задач), первые N по порядку данных, без повторов",
-  "runner": "records/evolib/run.sh OUT (UPSTREAMS по умолчанию ~/Projects/upstreams; N=20, EMB_PORT=8092; окружение — bridge/setup_envs.sh evolib)",
+  "runner": "records/evolib/run.sh OUT (UPSTREAMS по умолчанию upstreams/ репозитория; N=20, EMB_PORT=8092; окружение — records/setup_envs.sh evolib)",
   "command": "cd /up/LiveCodeBench && python /up/EvoLib/EvoLib/eval_main.py --task livecodebench --model ornith15-9b --k_q_per_problem 3 --n_iterations 20 --endpoint http://evorec:8080/v1 --embedding_endpoint http://evorec:8080/v1 --syn_test_data_file /out/syn_tests.json --log_file /out/evolib.log",
   "readme_command": "python eval_main.py --task livecodebench --k_q_per_problem 3 --endpoint <chat_completions_endpoint> --embedding_endpoint <embeddings_endpoint> --syn_test_data_file <livecodebench_synthetic_tests.json> --log_file ./runs/livecode.log",
   "knobs": {

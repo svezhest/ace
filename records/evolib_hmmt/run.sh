@@ -10,8 +10,8 @@
 set -euo pipefail
 OUT=$(mkdir -p "$1" && cd "$1" && pwd)
 HERE=$(cd "$(dirname "$0")" && pwd)
-U=${UPSTREAMS:-$HOME/Projects/upstreams}
 ACE=${ACE:-$(cd "$HERE/../.." && pwd)}
+U=${UPSTREAMS:-$ACE/upstreams}
 N=${N:-12}
 EMB_PORT=${EMB_PORT:-8092}
 if [ -z "${MODEL_URL:-}" ]; then
@@ -20,7 +20,7 @@ if [ -z "${MODEL_URL:-}" ]; then
     { echo "шлюз без GATEWAY_OPENAI_DEFAULTS=1: у запросов апстрима не будет T=1" >&2; exit 1; }
 fi
 mkdir -p "$OUT/rec" "$OUT/out"
-(cd "$ACE" && HF_HUB_OFFLINE=1 exec .venv/bin/python -m tools.record.embeddings --port $EMB_PORT) &
+(cd "$ACE" && HF_HOME=$U/.hf HF_HUB_OFFLINE=1 exec .venv/bin/python -m tools.record.embeddings --port $EMB_PORT) &
 EMB=$!
 trap 'kill $EMB; docker rm -f evorec >/dev/null' EXIT
 for i in $(seq 120); do (exec 3<>/dev/tcp/127.0.0.1/$EMB_PORT) 2>/dev/null && break; sleep 1; done

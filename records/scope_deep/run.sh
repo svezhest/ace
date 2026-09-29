@@ -4,8 +4,8 @@
 # временном каталоге и в конце сам удаляет, так что снимок состояния — только его вывод)
 set -eu
 OUT=$(mkdir -p "$1" && cd "$1" && pwd)
-U=${UPSTREAMS:-$HOME/Projects/upstreams}
 ACE=${ACE:-$(cd "$(dirname "$0")/../.." && pwd)}
+U=${UPSTREAMS:-$ACE/upstreams}
 PORT=${PORT:-8094}
 (cd "$ACE" && exec .venv/bin/python -m tools.record.record "$OUT/rec.jsonl" --port $PORT \
     --upstream "${MODEL_URL:-http://localhost:8080}") &

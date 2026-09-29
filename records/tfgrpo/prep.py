@@ -11,7 +11,8 @@ import pathlib
 import sqlite3
 import sys
 
-REPO = pathlib.Path(os.environ.get("UPSTREAMS", "~/Projects/upstreams")).expanduser() / "youtu-agent"
+UP = os.environ.get("UPSTREAMS") or pathlib.Path(__file__).resolve().parents[2] / "upstreams"
+REPO = pathlib.Path(UP) / "youtu-agent"
 sys.path.insert(0, str(REPO))
 
 

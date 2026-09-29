@@ -4,7 +4,7 @@
   "commit_note": "закреп = онлайн HEAD на 27.09.2026",
   "status": "раннер готов, живая запись не снята; два прогона на фейковой модели доходят до конца, наборы канонических запросов совпадают (70 = 70)",
   "mode": "онлайн из README (--mode online): initial test на всём test, затем по окнам online_eval_frequency — тест окна текущим playbook, потом обучение на нём же (_online_train_and_test)",
-  "runner": "records/ace_online/run.sh OUT (UPSTREAMS по умолчанию ~/Projects/upstreams, PORT=8095, MODEL_URL=http://localhost:8080)",
+  "runner": "records/ace_online/run.sh OUT (UPSTREAMS по умолчанию upstreams/ репозитория, PORT=8095, MODEL_URL=http://localhost:8080)",
   "command": "python -m eval.finance.run --task_name finer --mode online --save_path <OUT>/out --api_provider openai --generator_model ornith15-9b --reflector_model ornith15-9b --curator_model ornith15-9b --test_workers 1 --online_eval_frequency 5 --save_steps 1",
   "readme_command": "uv run python -m eval.finance.run --task_name finer --mode online --save_path results",
   "knobs": {

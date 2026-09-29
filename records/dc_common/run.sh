@@ -10,8 +10,8 @@ set -euo pipefail
 OUT=$(mkdir -p "$1" && cd "$1" && pwd)
 shift
 HERE=$(cd "$(dirname "$0")" && pwd)
-U=${UPSTREAMS:-$HOME/Projects/upstreams}
 ACE=${ACE:-$(cd "$HERE/../.." && pwd)}
+U=${UPSTREAMS:-$ACE/upstreams}
 mkdir -p "$OUT/rec" "$OUT/results"
 docker network inspect dcnet >/dev/null 2>&1 || docker network create --internal dcnet >/dev/null
 docker run -d --rm --name dcrec --network bridge -v "$ACE/tools":/ace/tools:ro -v "$OUT/rec":/out -e PYTHONPATH=/ace \

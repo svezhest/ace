@@ -22,7 +22,7 @@
     }
   },
   "record": "старый прокси tools/record (коммит d0e3c06, до 3ab1e3a): seed = seed_for(канонический запрос, n), канонический запрос — всё тело без stream, stream_options, id; наверх — тело без stream. В этой записи в запросах только model, messages, temperature, max_completion_tokens, поэтому ключ и seed те же, что у нового прокси",
-  "runner": "records/scope_deep/run.sh (UPSTREAMS по умолчанию ~/Projects/upstreams)",
+  "runner": "records/scope_deep/run.sh (UPSTREAMS по умолчанию upstreams/ репозитория)",
   "command": "cd $UPSTREAMS/SCOPE && $UPSTREAMS/.venvs/light/bin/python examples/test_scope_deep.py --provider openai --model ornith15-9b --api-key x --base-url http://127.0.0.1:8094/v1",
   "knobs": {
     "--provider": {
