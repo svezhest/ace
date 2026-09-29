@@ -1,0 +1,77 @@
+{
+  "train_results": [
+    {
+      "window": 1,
+      "global_step": 5,
+      "train_result": {
+        "pre_train_accuracy": 0.65,
+        "post_train_accuracy": 0.95
+      },
+      "cumulative_test_accuracy": 0.65,
+      "playbook_num_tokens": 1648,
+      "playbook_length": 7322,
+      "playbook_stats": {
+        "total_bullets": 12,
+        "high_performing": 0,
+        "problematic": 3,
+        "unused": 8,
+        "by_section": {
+          "COMMON MISTAKES TO AVOID": {
+            "count": 4,
+            "helpful": 0,
+            "harmful": 0
+          },
+          "CONTEXT CLUES & INDICATORS": {
+            "count": 5,
+            "helpful": 1,
+            "harmful": 2
+          },
+          "OTHERS": {
+            "count": 3,
+            "helpful": 1,
+            "harmful": 4
+          }
+        }
+      }
+    },
+    {
+      "window": 2,
+      "global_step": 10,
+      "train_result": {
+        "pre_train_accuracy": 0.65,
+        "post_train_accuracy": 0.85
+      },
+      "cumulative_test_accuracy": 0.65,
+      "playbook_num_tokens": 2777,
+      "playbook_length": 12583,
+      "playbook_stats": {
+        "total_bullets": 19,
+        "high_performing": 0,
+        "problematic": 6,
+        "unused": 9,
+        "by_section": {
+          "COMMON MISTAKES TO AVOID": {
+            "count": 8,
+            "helpful": 1,
+            "harmful": 4
+          },
+          "PROBLEM-SOLVING HEURISTICS": {
+            "count": 1,
+            "helpful": 0,
+            "harmful": 2
+          },
+          "CONTEXT CLUES & INDICATORS": {
+            "count": 6,
+            "helpful": 4,
+            "harmful": 2
+          },
+          "OTHERS": {
+            "count": 4,
+            "helpful": 1,
+            "harmful": 4
+          }
+        }
+      }
+    }
+  ]
+}

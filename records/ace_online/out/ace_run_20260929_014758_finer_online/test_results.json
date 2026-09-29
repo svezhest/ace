@@ -1,0 +1,67 @@
+{
+  "test_accuracy": 0.65,
+  "test_results": {
+    "accuracy": 0.65,
+    "correct": 4,
+    "total": 10,
+    "window_results": [
+      {
+        "window": 1,
+        "start_idx": 0,
+        "end_idx": 5,
+        "window_accuracy": 0.65,
+        "window_correct": 2,
+        "window_total": 5
+      },
+      {
+        "window": 2,
+        "start_idx": 5,
+        "end_idx": 10,
+        "window_accuracy": 0.65,
+        "window_correct": 2,
+        "window_total": 5
+      }
+    ]
+  },
+  "test_error_log": {
+    "accuracy": 0.65,
+    "errors": [
+      {
+        "window": 1,
+        "global_index": 0,
+        "prediction": "ShareBasedCompensationArrangementBySharebasedPaymentAwardNumberOfSharesAvailableForGrant,ShareBasedCompensationArrangementBySharebasedPaymentAwardEquityInstrumentsOtherThanOptionsVestedInPeriodTotalFairValue,ShareBasedCompensationArrangementBySharebasedPaymentAwardAwardVestingPeriod1,ShareBasedCompensationArrangementBySharebasedPaymentAwardEquityInstrumentsOtherThanOptionsVestedInPeriodTotalFairValue",
+        "ground_truth": "ShareBasedCompensationArrangementByShareBasedPaymentAwardNumberOfSharesAvailableForGrant,EmployeeServiceShareBasedCompensationNonvestedAwardsTotalCompensationCostNotYetRecognized,EmployeeServiceShareBasedCompensationNonvestedAwardsTotalCompensationCostNotYetRecognizedPeriodForRecognition1,EmployeeServiceShareBasedCompensationNonvestedAwardsTotalCompensationCostNotYetRecognized"
+      },
+      {
+        "window": 1,
+        "global_index": 1,
+        "prediction": "ClassOfWarrantOrRightExercisePriceOfWarrantsOrRights1,SaleOfStockNumberOfSharesIssuedInTransaction,SaleOfStockPricePerShare,GainsLossesOnExtinguishmentOfDebt",
+        "ground_truth": "ClassOfWarrantOrRightExercisePriceOfWarrantsOrRights1,SaleOfStockNumberOfSharesIssuedInTransaction,ClassOfWarrantOrRightExercisePriceOfWarrantsOrRights1,GainsLossesOnExtinguishmentOfDebt"
+      },
+      {
+        "window": 1,
+        "global_index": 2,
+        "prediction": "ShareBasedCompensationArrangementByShareBasedPaymentAwardNumberOfSharesAvailableForGrant,ShareBasedCompensationArrangementByShareBasedPaymentAwardAwardVestingPeriod1,ShareBasedCompensationArrangementByShareBasedPaymentAwardAwardVestingPeriod1,ShareBasedCompensationArrangementByShareBasedPaymentAwardAwardVestingPeriod1",
+        "ground_truth": "ShareBasedCompensationArrangementByShareBasedPaymentAwardNumberOfSharesAvailableForGrant,SharebasedCompensationArrangementBySharebasedPaymentAwardExpirationPeriod,SharebasedCompensationArrangementBySharebasedPaymentAwardExpirationPeriod,SharebasedCompensationArrangementBySharebasedPaymentAwardExpirationPeriod"
+      },
+      {
+        "window": 2,
+        "global_index": 6,
+        "prediction": "DebtInstrumentFaceAmount,NumberOfOperatingSegments,NumberOfReportableSegments,IncomeLossFromEquityMethodInvestments",
+        "ground_truth": "DebtInstrumentCarryingAmount,NumberOfOperatingSegments,NumberOfReportableSegments,RevenueFromRelatedParties"
+      },
+      {
+        "window": 2,
+        "global_index": 7,
+        "prediction": "AmortizationOfIntangibleAssets,AmortizationOfIntangibleAssets,DeferredFinanceCostsGross,DeferredFinanceCostsGross",
+        "ground_truth": "AmortizationOfIntangibleAssets,AmortizationOfIntangibleAssets,DeferredFinanceCostsNet,DeferredFinanceCostsNet"
+      },
+      {
+        "window": 2,
+        "global_index": 8,
+        "prediction": "ShareBasedCompensationArrangementBySharebasedPaymentAwardAwardVestingPeriod1,ShareBasedCompensationArrangementBySharebasedPaymentAwardEquityInstrumentsOtherThanOptionsVestedInPeriodTotalFairValue,ShareBasedCompensationArrangementBySharebasedPaymentAwardEquityInstrumentsOtherThanOptionsVestedInPeriodTotalFairValue,SharePrice",
+        "ground_truth": "ShareBasedCompensationArrangementByShareBasedPaymentAwardAwardVestingPeriod1,ShareBasedCompensationArrangementByShareBasedPaymentAwardEquityInstrumentsOtherThanOptionsNonvestedNumber,ShareBasedCompensationArrangementByShareBasedPaymentAwardEquityInstrumentsOtherThanOptionsNonvestedNumber,ShareBasedCompensationArrangementByShareBasedPaymentAwardEquityInstrumentsOtherThanOptionsVestedInPeriodTotalFairValue"
+      }
+    ]
+  }
+}

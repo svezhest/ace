@@ -1,0 +1,17 @@
+## STRATEGIES & INSIGHTS
+
+## FORMULAS & CALCULATIONS
+
+## CODE SNIPPETS & TEMPLATES
+
+## COMMON MISTAKES TO AVOID
+
+[err-00001] helpful=0 harmful=0 :: MISTAKE: Treating 'TotalFairValue' tags as dollar amounts. In this taxonomy, 'TotalFairValue' tags (e.g., EquityInstrumentsOtherThanOptionsVestedInPeriodTotalFairValue) represent COUNTS OF SHARES, not dollar amounts. If the entity is a dollar amount (e.g., '$6.5 million of unrecognized compensation cost'), do NOT select a TotalFairValue tag. Always check the entity's data type first.
+## PROBLEM-SOLVING HEURISTICS
+
+## CONTEXT CLUES & INDICATORS
+
+[ctx-00002] helpful=0 harmful=0 :: CONTEXT CLUE: The phrase 'unrecognized compensation cost' (or 'compensation cost not yet recognized') is a direct textual match to the tag family EmployeeServiceShareBasedCompensationNonvestedAwardsTotalCompensationCostNotYetRecognized. When this exact phrase appears, prioritize the tag that literally contains 'TotalCompensationCostNotYetRecognized' over semantically similar alternatives like 'fair value of grants'.
+## OTHERS
+[misc-00003] helpful=0 harmful=0 :: DATA-TYPE-FIRST HEURISTIC: Before selecting any XBRL tag, determine the entity's data type: (1) dollar amount -> map to 'CompensationCost'/'Expense' tags; (2) share count -> map to 'TotalFairValue'/'NumberOfShares' tags; (3) time period -> map to 'PeriodForRecognition'/'VestingPeriod' tags. Never assume a dollar amount represents a 'fair value of grants' — verify the data type explicitly.
+[misc-00004] helpful=0 harmful=0 :: TIME-PERIOD DISAMBIGUATION: For entities describing how long compensation cost will be recognized (e.g., '2.32 years' weighted-average recognition period), prefer the tag ending in 'PeriodForRecognition' (e.g., ...TotalCompensationCostNotYetRecognizedPeriodForRecognition1) over 'VestingPeriod' tags. 'VestingPeriod' describes the vesting schedule of awards, while 'PeriodForRecognition' describes the expense-recognition timeline — they are distinct concepts even if numerically similar.

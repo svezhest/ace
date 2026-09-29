@@ -1,0 +1,467 @@
+
+============================================================
+ACE SYSTEM
+============================================================
+Task: finer
+Mode: ONLINE
+Generator Model: ornith15-9b
+============================================================
+
+Loaded 10 samples from ./eval/finance/data/finer_test10.jsonl
+Online mode: Training and testing on 10 examples
+Using empty playbook as initial playbook
+
+Using openai API for all models
+
+============================================================
+ACE SYSTEM - ONLINE MODE
+============================================================
+Task: finer
+Test samples (used for training and testing): 10
+============================================================
+
+
+============================================================
+INITIAL TEST (before training)
+============================================================
+
+
+========================================
+EVALUATING TEST SET - 10 samples, 1 workers
+========================================
+[GENERATOR] Starting call test_eval_0...
+[GENERATOR] Call test_eval_0 completed in 27.34s
+[LOG] generator call logged to generator_test_eval_0_20260929_014826_312.json
+[GENERATOR] Starting call test_eval_1...
+[GENERATOR] Call test_eval_1 completed in 15.36s
+[LOG] generator call logged to generator_test_eval_1_20260929_014841_678.json
+[GENERATOR] Starting call test_eval_2...
+[GENERATOR] Call test_eval_2 completed in 18.37s
+[LOG] generator call logged to generator_test_eval_2_20260929_014900_052.json
+[GENERATOR] Starting call test_eval_3...
+[GENERATOR] Call test_eval_3 completed in 23.13s
+[LOG] generator call logged to generator_test_eval_3_20260929_014923_182.json
+[GENERATOR] Starting call test_eval_4...
+[GENERATOR] Call test_eval_4 completed in 16.48s
+[LOG] generator call logged to generator_test_eval_4_20260929_014939_660.json
+[GENERATOR] Starting call test_eval_5...
+[GENERATOR] Call test_eval_5 completed in 18.25s
+[LOG] generator call logged to generator_test_eval_5_20260929_014957_910.json
+[GENERATOR] Starting call test_eval_6...
+[GENERATOR] Call test_eval_6 completed in 18.75s
+[LOG] generator call logged to generator_test_eval_6_20260929_015016_666.json
+[GENERATOR] Starting call test_eval_7...
+[GENERATOR] Call test_eval_7 completed in 17.40s
+[LOG] generator call logged to generator_test_eval_7_20260929_015034_068.json
+[GENERATOR] Starting call test_eval_8...
+[GENERATOR] Call test_eval_8 completed in 20.85s
+[LOG] generator call logged to generator_test_eval_8_20260929_015054_920.json
+[GENERATOR] Starting call test_eval_9...
+[GENERATOR] Call test_eval_9 completed in 19.74s
+[LOG] generator call logged to generator_test_eval_9_20260929_015114_662.json
+
+📊 Final Accuracy: 0.625 (3/10)
+Initial Test Accuracy: 0.625
+
+
+============================================================
+STARTING ONLINE TRAIN AND TEST
+============================================================
+
+Total samples: 10
+Window size: 5
+Number of windows: 2
+Curator frequency: every 1 steps
+
+============================================================
+WINDOW 1/2
+Samples 0 to 4
+============================================================
+
+--- Testing window 1 with current playbook ---
+
+========================================
+EVALUATING TEST SET - 5 samples, 1 workers
+========================================
+[GENERATOR] Starting call test_eval_0...
+[GENERATOR] Call test_eval_0 completed in 18.69s
+[LOG] generator call logged to generator_test_eval_0_20260929_015133_358.json
+[GENERATOR] Starting call test_eval_1...
+[GENERATOR] Call test_eval_1 completed in 8.66s
+[LOG] generator call logged to generator_test_eval_1_20260929_015142_016.json
+[GENERATOR] Starting call test_eval_2...
+[GENERATOR] Call test_eval_2 completed in 12.90s
+[LOG] generator call logged to generator_test_eval_2_20260929_015154_917.json
+[GENERATOR] Starting call test_eval_3...
+[GENERATOR] Call test_eval_3 completed in 27.32s
+[LOG] generator call logged to generator_test_eval_3_20260929_015222_234.json
+[GENERATOR] Starting call test_eval_4...
+[GENERATOR] Call test_eval_4 completed in 16.03s
+[LOG] generator call logged to generator_test_eval_4_20260929_015238_269.json
+
+📊 Final Accuracy: 0.650 (2/5)
+Window 1 test accuracy: 0.650
+Cumulative test accuracy so far: 0.650 (5 samples)
+
+--- Training on window 1 ---
+
+--- Window 1, Step 1/5 (Global step 1) ---
+Generating initial answer...
+[GENERATOR] Starting call online_train_s_1_gen_initial...
+[GENERATOR] Call online_train_s_1_gen_initial completed in 23.07s
+[LOG] generator call logged to generator_online_train_s_1_gen_initial_20260929_015301_344.json
+Correct: False
+Reflection round 1/3
+[REFLECTOR] Starting call online_train_s_1_round_0...
+[REFLECTOR] Call online_train_s_1_round_0 completed in 84.80s
+[LOG] reflector call logged to reflector_online_train_s_1_round_0_20260929_015426_149.json
+[GENERATOR] Starting call online_train_s_1_post_reflect_round_0...
+[GENERATOR] Call online_train_s_1_post_reflect_round_0 completed in 32.93s
+[LOG] generator call logged to generator_online_train_s_1_post_reflect_round_0_20260929_015459_082.json
+Corrected after reflection round 1!
+
+--- Running Curator at step 1 ---
+[CURATOR] Starting call online_train_s_1...
+[CURATOR] Call online_train_s_1 completed in 42.45s
+[LOG] curator call logged to curator_online_train_s_1_20260929_015541_539.json
+✅ Curator JSON schema validated successfully: 4 operations
+  Added bullet err-00001 to section common_mistakes_to_avoid
+  Added bullet ctx-00002 to section context_clues_and_indicators
+Warning: Section 'problem_solving_heuristics' not found, adding to OTHERS
+  Added bullet misc-00003 to section others
+Warning: Section 'problem_solving_heuristics' not found, adding to OTHERS
+  Added bullet misc-00004 to section others
+  - ADD: No reason given
+  - ADD: No reason given
+  - ADD: No reason given
+  - ADD: No reason given
+[GENERATOR] Starting call online_train_s_1_post_curate...
+[GENERATOR] Call online_train_s_1_post_curate completed in 27.83s
+[LOG] generator call logged to generator_online_train_s_1_post_curate_20260929_015609_370.json
+
+--- Window 1, Step 2/5 (Global step 2) ---
+Generating initial answer...
+[GENERATOR] Starting call online_train_s_2_gen_initial...
+[GENERATOR] Call online_train_s_2_gen_initial completed in 19.59s
+[LOG] generator call logged to generator_online_train_s_2_gen_initial_20260929_015628_966.json
+Correct: False
+Reflection round 1/3
+[REFLECTOR] Starting call online_train_s_2_round_0...
+[REFLECTOR] Call online_train_s_2_round_0 completed in 58.81s
+[LOG] reflector call logged to reflector_online_train_s_2_round_0_20260929_015727_779.json
+[GENERATOR] Starting call online_train_s_2_post_reflect_round_0...
+[GENERATOR] Call online_train_s_2_post_reflect_round_0 completed in 27.76s
+[LOG] generator call logged to generator_online_train_s_2_post_reflect_round_0_20260929_015755_538.json
+Reflection round 2/3
+[REFLECTOR] Starting call online_train_s_2_round_1...
+[REFLECTOR] Call online_train_s_2_round_1 completed in 60.45s
+[LOG] reflector call logged to reflector_online_train_s_2_round_1_20260929_015855_986.json
+[GENERATOR] Starting call online_train_s_2_post_reflect_round_1...
+[GENERATOR] Call online_train_s_2_post_reflect_round_1 completed in 32.10s
+[LOG] generator call logged to generator_online_train_s_2_post_reflect_round_1_20260929_015928_091.json
+Reflection round 3/3
+[REFLECTOR] Starting call online_train_s_2_round_2...
+[REFLECTOR] Call online_train_s_2_round_2 completed in 64.43s
+[LOG] reflector call logged to reflector_online_train_s_2_round_2_20260929_020032_519.json
+[GENERATOR] Starting call online_train_s_2_post_reflect_round_2...
+[GENERATOR] Call online_train_s_2_post_reflect_round_2 completed in 34.89s
+[LOG] generator call logged to generator_online_train_s_2_post_reflect_round_2_20260929_020107_406.json
+
+--- Running Curator at step 2 ---
+[CURATOR] Starting call online_train_s_2...
+[CURATOR] Call online_train_s_2 completed in 34.01s
+[LOG] curator call logged to curator_online_train_s_2_20260929_020141_421.json
+✅ Curator JSON schema validated successfully: 2 operations
+  Added bullet err-00005 to section common_mistakes_to_avoid
+  Added bullet ctx-00006 to section context_clues_and_indicators
+  - ADD: No reason given
+  - ADD: No reason given
+[GENERATOR] Starting call online_train_s_2_post_curate...
+[GENERATOR] Call online_train_s_2_post_curate completed in 20.71s
+[LOG] generator call logged to generator_online_train_s_2_post_curate_20260929_020202_137.json
+
+--- Window 1, Step 3/5 (Global step 3) ---
+Generating initial answer...
+[GENERATOR] Starting call online_train_s_3_gen_initial...
+[GENERATOR] Call online_train_s_3_gen_initial completed in 23.80s
+[LOG] generator call logged to generator_online_train_s_3_gen_initial_20260929_020225_941.json
+Correct: False
+Reflection round 1/3
+[REFLECTOR] Starting call online_train_s_3_round_0...
+[REFLECTOR] Call online_train_s_3_round_0 completed in 85.60s
+[LOG] reflector call logged to reflector_online_train_s_3_round_0_20260929_020351_548.json
+[GENERATOR] Starting call online_train_s_3_post_reflect_round_0...
+[GENERATOR] Call online_train_s_3_post_reflect_round_0 completed in 39.68s
+[LOG] generator call logged to generator_online_train_s_3_post_reflect_round_0_20260929_020431_235.json
+Reflection round 2/3
+[REFLECTOR] Starting call online_train_s_3_round_1...
+[REFLECTOR] Call online_train_s_3_round_1 completed in 46.43s
+[LOG] reflector call logged to reflector_online_train_s_3_round_1_20260929_020517_662.json
+[GENERATOR] Starting call online_train_s_3_post_reflect_round_1...
+[GENERATOR] Call online_train_s_3_post_reflect_round_1 completed in 37.74s
+[LOG] generator call logged to generator_online_train_s_3_post_reflect_round_1_20260929_020555_406.json
+Corrected after reflection round 2!
+
+--- Running Curator at step 3 ---
+[CURATOR] Starting call online_train_s_3...
+[CURATOR] Call online_train_s_3 completed in 34.08s
+[LOG] curator call logged to curator_online_train_s_3_20260929_020629_491.json
+✅ Curator JSON schema validated successfully: 2 operations
+  Added bullet misc-00007 to section others
+  Added bullet ctx-00008 to section context_clues_and_indicators
+  - ADD: No reason given
+  - ADD: No reason given
+[GENERATOR] Starting call online_train_s_3_post_curate...
+[GENERATOR] Call online_train_s_3_post_curate completed in 25.95s
+[LOG] generator call logged to generator_online_train_s_3_post_curate_20260929_020655_448.json
+
+--- Window 1, Step 4/5 (Global step 4) ---
+Generating initial answer...
+[GENERATOR] Starting call online_train_s_4_gen_initial...
+[GENERATOR] Call online_train_s_4_gen_initial completed in 15.94s
+[LOG] generator call logged to generator_online_train_s_4_gen_initial_20260929_020711_398.json
+Correct: True
+[REFLECTOR] Starting call online_train_s_4_reflect_on_correct...
+[REFLECTOR] Call online_train_s_4_reflect_on_correct completed in 28.46s
+[LOG] reflector call logged to reflector_online_train_s_4_reflect_on_correct_20260929_020739_860.json
+
+--- Running Curator at step 4 ---
+[CURATOR] Starting call online_train_s_4...
+[CURATOR] Call online_train_s_4 completed in 28.61s
+[LOG] curator call logged to curator_online_train_s_4_20260929_020808_468.json
+✅ Curator JSON schema validated successfully: 2 operations
+  Added bullet ctx-00009 to section context_clues_and_indicators
+  Added bullet err-00010 to section common_mistakes_to_avoid
+  - ADD: No reason given
+  - ADD: No reason given
+[GENERATOR] Starting call online_train_s_4_post_curate...
+[GENERATOR] Call online_train_s_4_post_curate completed in 23.69s
+[LOG] generator call logged to generator_online_train_s_4_post_curate_20260929_020832_159.json
+
+--- Window 1, Step 5/5 (Global step 5) ---
+Generating initial answer...
+[GENERATOR] Starting call online_train_s_5_gen_initial...
+[GENERATOR] Call online_train_s_5_gen_initial completed in 16.12s
+[LOG] generator call logged to generator_online_train_s_5_gen_initial_20260929_020848_284.json
+Correct: True
+[REFLECTOR] Starting call online_train_s_5_reflect_on_correct...
+[REFLECTOR] Call online_train_s_5_reflect_on_correct completed in 28.14s
+[LOG] reflector call logged to reflector_online_train_s_5_reflect_on_correct_20260929_020916_427.json
+
+--- Running Curator at step 5 ---
+[CURATOR] Starting call online_train_s_5...
+[CURATOR] Call online_train_s_5 completed in 34.98s
+[LOG] curator call logged to curator_online_train_s_5_20260929_020951_409.json
+✅ Curator JSON schema validated successfully: 2 operations
+  Added bullet ctx-00011 to section context_clues_and_indicators
+  Added bullet err-00012 to section common_mistakes_to_avoid
+  - ADD: No reason given
+  - ADD: No reason given
+[GENERATOR] Starting call online_train_s_5_post_curate...
+[GENERATOR] Call online_train_s_5_post_curate completed in 26.89s
+[LOG] generator call logged to generator_online_train_s_5_post_curate_20260929_021018_300.json
+
+Window 1 training complete:
+  Pre-train accuracy: 0.650
+  Post-train accuracy: 0.950
+
+============================================================
+WINDOW 2/2
+Samples 5 to 9
+============================================================
+
+--- Testing window 2 with current playbook ---
+
+========================================
+EVALUATING TEST SET - 5 samples, 1 workers
+========================================
+[GENERATOR] Starting call test_eval_0...
+[GENERATOR] Call test_eval_0 completed in 15.63s
+[LOG] generator call logged to generator_test_eval_0_20260929_021033_939.json
+[GENERATOR] Starting call test_eval_1...
+[GENERATOR] Call test_eval_1 completed in 17.70s
+[LOG] generator call logged to generator_test_eval_1_20260929_021051_644.json
+[GENERATOR] Starting call test_eval_2...
+[GENERATOR] Call test_eval_2 completed in 15.81s
+[LOG] generator call logged to generator_test_eval_2_20260929_021107_459.json
+[GENERATOR] Starting call test_eval_3...
+[GENERATOR] Call test_eval_3 completed in 29.31s
+[LOG] generator call logged to generator_test_eval_3_20260929_021136_770.json
+[GENERATOR] Starting call test_eval_4...
+[GENERATOR] Call test_eval_4 completed in 18.70s
+[LOG] generator call logged to generator_test_eval_4_20260929_021155_472.json
+
+📊 Final Accuracy: 0.650 (2/5)
+Window 2 test accuracy: 0.650
+Cumulative test accuracy so far: 0.650 (10 samples)
+
+--- Training on window 2 ---
+
+--- Window 2, Step 1/5 (Global step 6) ---
+Generating initial answer...
+[GENERATOR] Starting call online_train_s_6_gen_initial...
+[GENERATOR] Call online_train_s_6_gen_initial completed in 9.92s
+[LOG] generator call logged to generator_online_train_s_6_gen_initial_20260929_021205_396.json
+Correct: True
+[REFLECTOR] Starting call online_train_s_6_reflect_on_correct...
+[REFLECTOR] Call online_train_s_6_reflect_on_correct completed in 27.40s
+[LOG] reflector call logged to reflector_online_train_s_6_reflect_on_correct_20260929_021232_801.json
+
+--- Running Curator at step 6 ---
+[CURATOR] Starting call online_train_s_6...
+[CURATOR] Call online_train_s_6 completed in 24.22s
+[LOG] curator call logged to curator_online_train_s_6_20260929_021257_021.json
+✅ Curator JSON schema validated successfully: 1 operations
+  Added bullet ph-00013 to section problem-solving_heuristics
+  - ADD: No reason given
+[GENERATOR] Starting call online_train_s_6_post_curate...
+[GENERATOR] Call online_train_s_6_post_curate completed in 23.07s
+[LOG] generator call logged to generator_online_train_s_6_post_curate_20260929_021320_091.json
+
+--- Window 2, Step 2/5 (Global step 7) ---
+Generating initial answer...
+[GENERATOR] Starting call online_train_s_7_gen_initial...
+[GENERATOR] Call online_train_s_7_gen_initial completed in 16.47s
+[LOG] generator call logged to generator_online_train_s_7_gen_initial_20260929_021336_564.json
+Correct: False
+Reflection round 1/3
+[REFLECTOR] Starting call online_train_s_7_round_0...
+[REFLECTOR] Call online_train_s_7_round_0 completed in 42.44s
+[LOG] reflector call logged to reflector_online_train_s_7_round_0_20260929_021419_013.json
+[GENERATOR] Starting call online_train_s_7_post_reflect_round_0...
+[GENERATOR] Call online_train_s_7_post_reflect_round_0 completed in 45.76s
+[LOG] generator call logged to generator_online_train_s_7_post_reflect_round_0_20260929_021504_770.json
+Reflection round 2/3
+[REFLECTOR] Starting call online_train_s_7_round_1...
+[REFLECTOR] Call online_train_s_7_round_1 completed in 45.56s
+[LOG] reflector call logged to reflector_online_train_s_7_round_1_20260929_021550_334.json
+[GENERATOR] Starting call online_train_s_7_post_reflect_round_1...
+[GENERATOR] Call online_train_s_7_post_reflect_round_1 completed in 27.39s
+[LOG] generator call logged to generator_online_train_s_7_post_reflect_round_1_20260929_021617_727.json
+Corrected after reflection round 2!
+
+--- Running Curator at step 7 ---
+[CURATOR] Starting call online_train_s_7...
+[CURATOR] Call online_train_s_7 completed in 48.95s
+[LOG] curator call logged to curator_online_train_s_7_20260929_021706_675.json
+✅ Curator JSON schema validated successfully: 4 operations
+  Added bullet err-00014 to section common_mistakes_to_avoid
+  Added bullet err-00015 to section common_mistakes_to_avoid
+  Added bullet err-00016 to section common_mistakes_to_avoid
+  Added bullet ctx-00017 to section context_clues_and_indicators
+  - ADD: No reason given
+  - ADD: No reason given
+  - ADD: No reason given
+  - ADD: No reason given
+[GENERATOR] Starting call online_train_s_7_post_curate...
+[GENERATOR] Call online_train_s_7_post_curate completed in 26.61s
+[LOG] generator call logged to generator_online_train_s_7_post_curate_20260929_021733_283.json
+
+--- Window 2, Step 3/5 (Global step 8) ---
+Generating initial answer...
+[GENERATOR] Starting call online_train_s_8_gen_initial...
+[GENERATOR] Call online_train_s_8_gen_initial completed in 13.18s
+[LOG] generator call logged to generator_online_train_s_8_gen_initial_20260929_021746_465.json
+Correct: False
+Reflection round 1/3
+[REFLECTOR] Starting call online_train_s_8_round_0...
+[REFLECTOR] Call online_train_s_8_round_0 completed in 36.59s
+[LOG] reflector call logged to reflector_online_train_s_8_round_0_20260929_021823_056.json
+[GENERATOR] Starting call online_train_s_8_post_reflect_round_0...
+[GENERATOR] Call online_train_s_8_post_reflect_round_0 completed in 31.37s
+[LOG] generator call logged to generator_online_train_s_8_post_reflect_round_0_20260929_021854_426.json
+Corrected after reflection round 1!
+
+--- Running Curator at step 8 ---
+[CURATOR] Starting call online_train_s_8...
+[CURATOR] Call online_train_s_8 completed in 40.27s
+[LOG] curator call logged to curator_online_train_s_8_20260929_021934_694.json
+✅ Curator JSON schema validated successfully: 1 operations
+  Added bullet misc-00018 to section others
+  - ADD: No reason given
+[GENERATOR] Starting call online_train_s_8_post_curate...
+[GENERATOR] Call online_train_s_8_post_curate completed in 21.71s
+[LOG] generator call logged to generator_online_train_s_8_post_curate_20260929_021956_404.json
+
+--- Window 2, Step 4/5 (Global step 9) ---
+Generating initial answer...
+[GENERATOR] Starting call online_train_s_9_gen_initial...
+[GENERATOR] Call online_train_s_9_gen_initial completed in 24.55s
+[LOG] generator call logged to generator_online_train_s_9_gen_initial_20260929_022020_961.json
+Correct: False
+Reflection round 1/3
+[REFLECTOR] Starting call online_train_s_9_round_0...
+[REFLECTOR] Call online_train_s_9_round_0 completed in 56.35s
+[LOG] reflector call logged to reflector_online_train_s_9_round_0_20260929_022117_314.json
+[GENERATOR] Starting call online_train_s_9_post_reflect_round_0...
+[GENERATOR] Call online_train_s_9_post_reflect_round_0 completed in 45.24s
+[LOG] generator call logged to generator_online_train_s_9_post_reflect_round_0_20260929_022202_559.json
+Reflection round 2/3
+[REFLECTOR] Starting call online_train_s_9_round_1...
+[REFLECTOR] Call online_train_s_9_round_1 completed in 50.29s
+[LOG] reflector call logged to reflector_online_train_s_9_round_1_20260929_022252_850.json
+[GENERATOR] Starting call online_train_s_9_post_reflect_round_1...
+[GENERATOR] Call online_train_s_9_post_reflect_round_1 completed in 41.83s
+[LOG] generator call logged to generator_online_train_s_9_post_reflect_round_1_20260929_022334_685.json
+Reflection round 3/3
+[REFLECTOR] Starting call online_train_s_9_round_2...
+[REFLECTOR] Call online_train_s_9_round_2 completed in 93.99s
+[LOG] reflector call logged to reflector_online_train_s_9_round_2_20260929_022508_672.json
+[GENERATOR] Starting call online_train_s_9_post_reflect_round_2...
+[GENERATOR] Call online_train_s_9_post_reflect_round_2 completed in 53.51s
+[LOG] generator call logged to generator_online_train_s_9_post_reflect_round_2_20260929_022602_187.json
+
+--- Running Curator at step 9 ---
+[CURATOR] Starting call online_train_s_9...
+[CURATOR] Call online_train_s_9 completed in 47.32s
+[LOG] curator call logged to curator_online_train_s_9_20260929_022649_514.json
+✅ Curator JSON schema validated successfully: 1 operations
+  Added bullet err-00019 to section common_mistakes_to_avoid
+  - ADD: No reason given
+[GENERATOR] Starting call online_train_s_9_post_curate...
+[GENERATOR] Call online_train_s_9_post_curate completed in 53.54s
+[LOG] generator call logged to generator_online_train_s_9_post_curate_20260929_022743_054.json
+
+--- Window 2, Step 5/5 (Global step 10) ---
+Generating initial answer...
+[GENERATOR] Starting call online_train_s_10_gen_initial...
+[GENERATOR] Call online_train_s_10_gen_initial completed in 24.03s
+[LOG] generator call logged to generator_online_train_s_10_gen_initial_20260929_022807_094.json
+Correct: True
+[REFLECTOR] Starting call online_train_s_10_reflect_on_correct...
+[REFLECTOR] Call online_train_s_10_reflect_on_correct completed in 42.57s
+[LOG] reflector call logged to reflector_online_train_s_10_reflect_on_correct_20260929_022849_671.json
+
+--- Running Curator at step 10 ---
+[CURATOR] Starting call online_train_s_10...
+[CURATOR] Call online_train_s_10 completed in 23.55s
+[LOG] curator call logged to curator_online_train_s_10_20260929_022913_220.json
+✅ Curator JSON schema validated successfully: 0 operations
+[GENERATOR] Starting call online_train_s_10_post_curate...
+[GENERATOR] Call online_train_s_10_post_curate completed in 19.27s
+[LOG] generator call logged to generator_online_train_s_10_post_curate_20260929_022932_495.json
+
+Window 2 training complete:
+  Pre-train accuracy: 0.650
+  Post-train accuracy: 0.850
+
+============================================================
+ONLINE TRAIN AND TEST COMPLETE
+============================================================
+
+============================================================
+ONLINE TRAINING AND TESTING COMPLETE
+============================================================
+Final Test Accuracy: 0.650
+============================================================
+
+
+============================================================
+RUN COMPLETE
+============================================================
+Mode: ONLINE
+Initial Test Accuracy: 0.625
+Final Test Accuracy: 0.650
+Results saved to: /private/tmp/claude-501/-Users-user-Projects-itmo/a04e42db-becc-4c5f-a1a6-f26b7e31e71d/scratchpad/recq/runs/ace_online-0929-0147-1/out/ace_run_20260929_014758_finer_online
+============================================================
+
