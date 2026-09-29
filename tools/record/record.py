@@ -8,6 +8,9 @@
 оборвал соединение до ответа (таймаут, повтор), и "error", если шлюз недоступен или его ответ не дочитан (клиенту
 502) — такая запись негодна. Поле тела вне FIELDS и CLIENT — отказ 400: его нельзя молча потерять. Отказ и сбой
 самого прокси — строка {"path", "request": тело как пришло, "status", "error"} без n.
+Кэш (cache=прошлая запись того же апстрима): на ключ, который там есть с годным ответом 200, модель не зовётся —
+уходит записанный ответ, в строке записи "cached": true. Ответ модели — функция ключа, поэтому это тот же ответ,
+только без повторного счёта (так дописывается прерванный прогон).
 Воспроизведение отдаёт k-му такому же запросу k-й записанный ответ; запроса нет в записи — 400 с diff против
 ближайшего записанного. GET /_status — сколько отдано и сколько не востребовано."""
 import argparse
@@ -59,6 +62,11 @@ def seed_for(c: str, n: int) -> int:
     return int.from_bytes(h[:8], "big") >> 1
 
 
+def good(r: dict) -> bool:
+    """Строка записи с настоящим ответом модели."""
+    return r["status"] == 200 and not r.get("dropped") and "error" not in r
+
+
 def load(rec: Path) -> dict:
     """Запись -> {(путь, канонический запрос): [строки по номеру повтора]}. Ключ пересчитывается, поэтому читаются
     и записи старого прокси, у которого в запросе были и клиентские поля."""
@@ -74,9 +82,11 @@ def load(rec: Path) -> dict:
 class Recorder(ThreadingHTTPServer):
     daemon_threads = True
 
-    def __init__(self, addr, out: Path, upstream: str, emb_upstream: str | None = None, seed=True):
+    def __init__(self, addr, out: Path, upstream: str, emb_upstream: str | None = None, seed=True,
+                 cache: Path | None = None):
         assert seed, "seed подставляется всегда"      # аргумент оставлен для старых раннеров
         super().__init__(addr, Handler)
+        self.cache = load(cache) if cache else {}
         self.out = out
         self.upstream = upstream.rstrip("/")
         self.emb_upstream = (emb_upstream or upstream).rstrip("/")
@@ -101,19 +111,25 @@ class Recorder(ThreadingHTTPServer):
             stream = path == CHAT and bool(body.get("stream"))
             if stream:      # долгий ответ идёт кадрами сразу, иначе клиент бросает его по таймауту и шлёт заново
                 sent.update(stream=True, stream_options={"include_usage": True})
-            base = self.emb_upstream if path == EMBEDDINGS else self.upstream
-            req = urllib.request.Request(base + path, json.dumps(sent).encode(), method="POST", headers={
-                "Content-Type": "application/json", "Authorization": out.headers.get("Authorization") or "Bearer x"})
-            with ThreadPoolExecutor(1) as pool:
-                job = pool.submit(fetch, req, stream)
-                out.wait(lambda t: wait([job], t).done, bool(body.get("stream")))
             error = None
-            try:
-                status, resp = job.result()
-            except Exception as e:      # и сбой разбора ответа (assemble на странном кадре)
-                unreachable = isinstance(e, urllib.error.URLError)
-                error = f"upstream unreachable: {e}" if unreachable else f"upstream read failed: {e!r}"
-                status, resp = 502, {"error": {"message": error, "type": "record"}}
+            hit = self.cache.get((path, c), [])
+            cached = n < len(hit) and good(hit[n])
+            if cached:
+                status, resp = hit[n]["status"], hit[n]["response"]
+            else:
+                base = self.emb_upstream if path == EMBEDDINGS else self.upstream
+                req = urllib.request.Request(base + path, json.dumps(sent).encode(), method="POST", headers={
+                    "Content-Type": "application/json",
+                    "Authorization": out.headers.get("Authorization") or "Bearer x"})
+                with ThreadPoolExecutor(1) as pool:
+                    job = pool.submit(fetch, req, stream)
+                    out.wait(lambda t: wait([job], t).done, bool(body.get("stream")))
+                try:
+                    status, resp = job.result()
+                except Exception as e:      # и сбой разбора ответа (assemble на странном кадре)
+                    unreachable = isinstance(e, urllib.error.URLError)
+                    error = f"upstream unreachable: {e}" if unreachable else f"upstream read failed: {e!r}"
+                    status, resp = 502, {"error": {"message": error, "type": "record"}}
             # клиент не дождался ответа (таймаут, повтор): апстрим его не увидел, запись негодна
             dropped = out.dropped or out.gone()
             try:
@@ -122,6 +138,8 @@ class Recorder(ThreadingHTTPServer):
             except OSError:
                 dropped = True
             rec = {"path": path, "request": c, "n": n, "seed": seed, "status": status, "response": resp}
+            if cached:
+                rec["cached"] = True
             if dropped:
                 rec["dropped"] = True
             if error:
@@ -417,6 +435,7 @@ def main():
     ap.add_argument("--port", type=int)
     ap.add_argument("--upstream")
     ap.add_argument("--embeddings-upstream")
+    ap.add_argument("--cache", type=Path, help="прошлая запись: её годные ответы отдаются без модели")
     ap.add_argument("--seed", action="store_true", help="не нужен: seed подставляется всегда")
     a = ap.parse_args()
     if a.replay:
@@ -425,7 +444,7 @@ def main():
         if a.upstream is None:
             from ace import config      # не при импорте: контейнеры записи монтируют только tools/
             a.upstream = config.OPENAI_BASE_URL.removesuffix("/v1")
-        srv = Recorder(("127.0.0.1", a.port or 8090), a.rec, a.upstream, a.embeddings_upstream)
+        srv = Recorder(("127.0.0.1", a.port or 8090), a.rec, a.upstream, a.embeddings_upstream, cache=a.cache)
     print(f"listening on http://127.0.0.1:{srv.server_address[1]}/v1", flush=True)
     srv.serve_forever()
 

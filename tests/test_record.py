@@ -200,6 +200,23 @@ def test_record_appends_counts(fake, tmp_path):
     assert [x["n"] for x in lines(tmp_path / "rec.jsonl")] == [0, 1]
 
 
+def test_cache_serves_recorded_answers(fake, tmp_path):
+    old = recorder(fake, tmp_path / "old.jsonl")
+    want = answers(client(old), QUERIES[:3])
+    old.shutdown()
+    calls = len(fake.got)
+    new = start(Recorder(("127.0.0.1", 0), tmp_path / "new.jsonl", f"http://127.0.0.1:{fake.server_address[1]}",
+                         cache=tmp_path / "old.jsonl"))
+    got = answers(client(new), QUERIES[:4])
+    new.shutdown()
+    assert {k: got[k] for k in want} == want
+    assert len(fake.got) == calls + 1       # к модели — только ("chat", "b"), которого нет в кэше
+    rows = lines(tmp_path / "new.jsonl")
+    assert [r.get("cached", False) for r in rows] == [True, True, True, False]
+    assert [(r["seed"], r["response"]) for r in rows[:3]] == [(r["seed"], r["response"])
+                                                             for r in lines(tmp_path / "old.jsonl")]
+
+
 def test_sse_and_assemble_tool_calls():
     msg = {"role": "assistant", "content": None,
            "tool_calls": [{"id": "t", "type": "function", "function": {"name": "f", "arguments": "{}"}, "index": 0}]}

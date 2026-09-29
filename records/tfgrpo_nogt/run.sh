@@ -4,9 +4,11 @@
 # (configs/practice/math_live_nogt.yaml). Тогда в итоге rollout и в групповом преимуществе вместо эталона и награды —
 # [REDACTED], и извлекаются все группы, а не только частично верные (utu/practice/experience_updater.py).
 # prep.py, Dockerfile, sitecustomize.py и конфиги — из records/tfgrpo; контейнеры — свои (tfng-rec, tfng-run).
-# usage: run.sh OUT   (в OUT то же, что у records/tfgrpo)
+# usage: run.sh OUT [CACHE]   (CACHE — прошлая запись этого раннера: её ответы прокси отдаёт без модели,
+# tools/record/record.py; в OUT то же, что у records/tfgrpo)
 set -euo pipefail
 OUT=$(mkdir -p "$1" && cd "$1" && pwd)
+CACHE=${2:+$(cd "$(dirname "$2")" && pwd)/$(basename "$2")}
 HERE=$(cd "$(dirname "$0")" && pwd)
 T=$(cd "$HERE/../tfgrpo" && pwd)
 ACE=${ACE:-$(cd "$HERE/../.." && pwd)}
@@ -21,10 +23,12 @@ M=ornith15-9b
 docker build -q -t youtu-upstream "$T" >/dev/null
 docker network inspect tfnet >/dev/null 2>&1 || docker network create --internal tfnet >/dev/null
 docker run -d --rm --name tfng-rec --network bridge -v "$ACE/tools":/ace/tools:ro -v "$OUT/rec":/out -e PYTHONPATH=/ace \
+    ${CACHE:+-v "$CACHE":/cache.jsonl:ro} \
     -e PYTHONDONTWRITEBYTECODE=1 youtu-upstream python -c "
 from pathlib import Path
 from tools.record.record import Recorder
-Recorder(('0.0.0.0', 8080), Path('/out/rec.jsonl'), '${MODEL_URL:-http://host.docker.internal:8080}').serve_forever()" >/dev/null
+Recorder(('0.0.0.0', 8080), Path('/out/rec.jsonl'), '${MODEL_URL:-http://host.docker.internal:8080}',
+         cache=Path('/cache.jsonl') if Path('/cache.jsonl').is_file() else None).serve_forever()" >/dev/null
 docker network connect tfnet tfng-rec
 trap 'docker rm -f tfng-rec >/dev/null' EXIT
 docker run --rm --name tfng-run --network tfnet --cap-drop ALL --security-opt no-new-privileges --pids-limit 512 \

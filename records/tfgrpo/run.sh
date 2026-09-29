@@ -12,10 +12,12 @@
 # монотонные идут) — метка времени в workdir python_executor, который видит модель, одна и та же.
 # Данные готовит prep.py на хосте без сети: parquet DAPO-Math-17k лежит в $UPSTREAMS/.data, AIME24 — в кэше HF
 # $UPSTREAMS/.hf (records/setup_envs.sh youtu).
-# usage: run.sh OUT   (в OUT: rec.jsonl — запись, test.db — БД прогона, tf_live_agent.yaml — итоговый агент,
+# usage: run.sh OUT [CACHE]   (CACHE — прошлая запись этого раннера: её ответы прокси отдаёт без модели,
+# tools/record/record.py; в OUT: rec.jsonl — запись, test.db — БД прогона, tf_live_agent.yaml — итоговый агент,
 # train.log и test.log — вывод команд, utu_train/ и utu_test/ — их logs/)
 set -euo pipefail
 OUT=$(mkdir -p "$1" && cd "$1" && pwd)
+CACHE=${2:+$(cd "$(dirname "$2")" && pwd)/$(basename "$2")}
 HERE=$(cd "$(dirname "$0")" && pwd)
 ACE=${ACE:-$(cd "$HERE/../.." && pwd)}
 U=${UPSTREAMS:-$ACE/upstreams}
@@ -29,10 +31,12 @@ M=ornith15-9b
 docker build -q -t youtu-upstream "$HERE" >/dev/null
 docker network inspect tfnet >/dev/null 2>&1 || docker network create --internal tfnet >/dev/null
 docker run -d --rm --name tfrec --network bridge -v "$ACE/tools":/ace/tools:ro -v "$OUT/rec":/out -e PYTHONPATH=/ace \
+    ${CACHE:+-v "$CACHE":/cache.jsonl:ro} \
     -e PYTHONDONTWRITEBYTECODE=1 youtu-upstream python -c "
 from pathlib import Path
 from tools.record.record import Recorder
-Recorder(('0.0.0.0', 8080), Path('/out/rec.jsonl'), '${MODEL_URL:-http://host.docker.internal:8080}').serve_forever()" >/dev/null
+Recorder(('0.0.0.0', 8080), Path('/out/rec.jsonl'), '${MODEL_URL:-http://host.docker.internal:8080}',
+         cache=Path('/cache.jsonl') if Path('/cache.jsonl').is_file() else None).serve_forever()" >/dev/null
 docker network connect tfnet tfrec
 trap 'docker rm -f tfrec >/dev/null' EXIT
 docker run --rm --name tfrun --network tfnet --cap-drop ALL --security-opt no-new-privileges --pids-limit 512 \
