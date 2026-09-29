@@ -1,0 +1,58 @@
+{
+ "attempt": 1,
+ "limit_minutes": 480,
+ "command": [
+  "records/gepa_quickstart/run.sh",
+  "<work>/runs/gepa_quickstart-0929-0806-1"
+ ],
+ "started": "2026-09-29 08:06:40",
+ "upstream_head": "d771eb21b5dd3228bc3f567293d2ccfc423fc900",
+ "upstream_at_pinned_commit": true,
+ "upstream_dirty": "",
+ "ace_head": "7cf3d5a4e64bb42249a624480c6783bb75221df3",
+ "runner_dirty": "",
+ "worker": {
+  "pids": [
+   81569
+  ],
+  "port": 50051,
+  "env": {
+   "QWEN_KV_BITS": "0",
+   "QWEN_MODEL": "../../weights/ornith15-9b-mlx-8bit",
+   "QWEN_PROMPT_CACHE": "1"
+  }
+ },
+ "gateway": {
+  "pids": [
+   87436
+  ],
+  "env": {
+   "GATEWAY_JOURNAL": "~/Projects/llm/logs/journal.jsonl",
+   "GATEWAY_OPENAI_DEFAULTS": "1"
+  }
+ },
+ "gateway_openai_defaults": true,
+ "model_alive_before": true,
+ "finished": "2026-09-29 10:41:57",
+ "minutes": 155.3,
+ "exit": 0,
+ "calls": 177,
+ "statuses": {
+  "200": 177
+ },
+ "verdicts": {
+  "ok": 177
+ },
+ "infra": [],
+ "refused": null,
+ "rec_sha256": "b1be5c4cf2a1b301974c318606230adba07e74f1cf0a8239f9921684d883a46c",
+ "caffeinate": "caffeinate -i на всю очередь",
+ "files": {
+  "gepa.log": 27716,
+  "rec.jsonl": 976606
+ },
+ "host_paths": [
+  "gepa.log"
+ ],
+ "discarded_attempts": []
+}

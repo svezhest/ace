@@ -1,0 +1,56 @@
+{
+ "attempt": 1,
+ "limit_minutes": 150,
+ "command": [
+  "records/scope_optimizer/run.sh",
+  "<work>/runs/scope_optimizer-0929-1041-1"
+ ],
+ "started": "2026-09-29 10:41:57",
+ "upstream_head": "4dc0da5e7843dce84a851bd7a53e4e45932b27d0",
+ "upstream_at_pinned_commit": true,
+ "upstream_dirty": "",
+ "ace_head": "7cf3d5a4e64bb42249a624480c6783bb75221df3",
+ "runner_dirty": "",
+ "worker": {
+  "pids": [
+   81569
+  ],
+  "port": 50051,
+  "env": {
+   "QWEN_KV_BITS": "0",
+   "QWEN_MODEL": "../../weights/ornith15-9b-mlx-8bit",
+   "QWEN_PROMPT_CACHE": "1"
+  }
+ },
+ "gateway": {
+  "pids": [
+   87436
+  ],
+  "env": {
+   "GATEWAY_JOURNAL": "~/Projects/llm/logs/journal.jsonl",
+   "GATEWAY_OPENAI_DEFAULTS": "1"
+  }
+ },
+ "gateway_openai_defaults": true,
+ "model_alive_before": true,
+ "finished": "2026-09-29 11:15:59",
+ "minutes": 34.0,
+ "exit": 0,
+ "calls": 181,
+ "statuses": {
+  "200": 181
+ },
+ "verdicts": {
+  "ok": 181
+ },
+ "infra": [],
+ "refused": null,
+ "rec_sha256": "76207671e15ab6ec8595c910d2c185dcac8b9cb0ffa89e3dd4fd0b99261fbd42",
+ "caffeinate": "caffeinate -i на всю очередь",
+ "files": {
+  "rec.jsonl": 919123,
+  "stdout.txt": 74750
+ },
+ "host_paths": [],
+ "discarded_attempts": []
+}

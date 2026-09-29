@@ -1,0 +1,588 @@
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: Always validate that input is well-formed JSON before processing; never trust raw user input, and sa... (confidence: medium)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=False, scope=strategic, confidence=0.90, reason=This is a general best practice rule that applies across different tasks—validating input well-forme
+scope.optimizer: [Guideliner] ⭐ STRATEGIC RULE PROMOTED for json_agent (confidence: 0.90, domain: data_validation)
+scope.optimizer: [Guideliner] ✓ ACCEPTED error update [STRATEGIC] for json_agent (error analysis passed (confidence: 0.90)): Always validate that input is well-formed JSON before processing; never trust raw user input, and sa...
+fail2.1: strategic
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: When parsing user input, always ensure all JSON object keys are enclosed in double quotes; reject or... (confidence: high)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=True, scope=strategic, confidence=0.45, reason=The proposed update (validate JSON keys are properly quoted before parsing) is semantically nearly i
+scope.optimizer: [Guideliner] ✗ REJECTED error update for json_agent (duplicate): When parsing user input, always ensure all JSON object keys are enclosed in double quotes; reject or...
+fail3.1: no guideline
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: Before parsing any user input as JSON, validate it programmatically with json.loads and gracefully h... (confidence: high)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=True, scope=strategic, confidence=0.85, reason=The proposed update already duplicates the existing Data Validation strategic rule 'Always validate 
+scope.optimizer: [Guideliner] ✗ REJECTED error update for json_agent (duplicate): Before parsing any user input as JSON, validate it programmatically with json.loads and gracefully h...
+fail4.1: no guideline
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: Never generate or echo JSON as literal prose—output well-formed JSON consisting solely of valid keys... (confidence: high)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=False, scope=strategic, confidence=0.85, reason=The proposed update addresses a specific failure mode—outward validation of well-formed JSON output.
+scope.optimizer: [Guideliner] ⭐ STRATEGIC RULE PROMOTED for json_agent (confidence: 0.85, domain: data_validation)
+scope.optimizer: [Guideliner] ✓ ACCEPTED error update [STRATEGIC] for json_agent (error analysis passed (confidence: 0.85)): Never generate or echo JSON as literal prose—output well-formed JSON consisting solely of valid keys...
+fail5.1: strategic
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: When user input or parsed content contains leading whitespace, decorative markers, or non-JSON forma... (confidence: high)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=False, scope=strategic, confidence=0.75, reason=While it partially overlaps with the existing rule about validating well-formed JSON before processi
+scope.optimizer: [Guideliner] ✓ ACCEPTED error update [STRATEGIC] for json_agent (error analysis passed (confidence: 0.75)): When user input or parsed content contains leading whitespace, decorative markers, or non-JSON forma...
+fail6.1: strategic
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: When input contains trailing data after valid JSON (e.g., extra characters, delimiters, or comments)... (confidence: high)
+scope.optimizer: [Classifier] Failed to classify update: Expecting ',' delimiter: line 6 column 747 (char 858). Using defaults.
+scope.optimizer: [Guideliner] ✓ ACCEPTED error update [TACTICAL] for json_agent (error analysis passed (confidence: 0.90)): When input contains trailing data after valid JSON (e.g., extra characters, delimiters, or comments)...
+fail7.1: tactical
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: If the input contains text followed by JSON, concatenation artifacts (such as a stray closing bracke... (confidence: high)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=True, scope=strategic, confidence=0.55, reason=This update overlaps with the existing strategic rule about validating well-formed JSON before proce
+scope.optimizer: [Guideliner] ✗ REJECTED error update for json_agent (duplicate): If the input contains text followed by JSON, concatenation artifacts (such as a stray closing bracke...
+fail8.1: no guideline
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: When parsing user JSON, treat it as potentially malformed and defensively normalize it: strip traili... (confidence: medium)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=False, scope=strategic, confidence=0.78, reason=While existing data_validation rules cover validating well-formed JSON and sanitizing malformed mess
+scope.optimizer: [Guideliner] ✓ ACCEPTED error update [STRATEGIC] for json_agent (error analysis passed (confidence: 0.78)): When parsing user JSON, treat it as potentially malformed and defensively normalize it: strip traili...
+fail9.1: strategic
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: When echoing or returning JSON, output only the raw compact JSON object—never append extra tokens (b... (confidence: high)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=True, scope=strategic, confidence=0.88, reason=This rule is largely redundant with the existing strategic rule: 'Never generate or echo JSON as lit
+scope.optimizer: [Guideliner] ✗ REJECTED error update for json_agent (duplicate): When echoing or returning JSON, output only the raw compact JSON object—never append extra tokens (b...
+fail10.1: no guideline
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: Never embed raw arithmetic, formulas, or expression code inside JSON string values; if a computation... (confidence: high)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=False, scope=strategic, confidence=0.80, reason=The proposed update addresses a specific JSON construction problem—embedding raw arithmetic/expressi
+scope.optimizer: [Guideliner] ✓ ACCEPTED error update [STRATEGIC] for json_agent (error analysis passed (confidence: 0.80)): Never embed raw arithmetic, formulas, or expression code inside JSON string values; if a computation...
+fail11.1: strategic
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] No update generated for json_agent
+fail12.1: no guideline
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: Never treat numeric literals such as numbers with leading zeroes as string values; convert or reject... (confidence: high)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=False, scope=strategic, confidence=0.65, reason=The proposed update addresses a specific JSON type-handling concern (leading-zero numbers producing 
+scope.optimizer: [Guideliner] ✓ ACCEPTED error update [STRATEGIC] for json_agent (error analysis passed (confidence: 0.65)): Never treat numeric literals such as numbers with leading zeroes as string values; convert or reject...
+fail13.1: strategic
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: Never use or emit invalid JSON values such as raw hex literals (e.g., 0x...); always provide numbers... (confidence: high)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=False, scope=strategic, confidence=0.95, reason=The rule establishes a persistent best practice: defining what constitutes valid JSON values (reject
+scope.optimizer: [Guideliner] ⭐ STRATEGIC RULE PROMOTED for json_agent (confidence: 0.95, domain: data_validation)
+scope.optimizer: [Guideliner] ✓ ACCEPTED error update [STRATEGIC] for json_agent (error analysis passed (confidence: 0.95)): Never use or emit invalid JSON values such as raw hex literals (e.g., 0x...); always provide numbers...
+fail14.1: strategic
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: Never trust raw user input: before parsing, decode escape sequences as text and verify it is valid J... (confidence: medium)
+scope.optimizer: [Classifier] Failed to classify update: Invalid \escape: line 6 column 483 (char 593). Using defaults.
+scope.optimizer: [Guideliner] ✓ ACCEPTED error update [TACTICAL] for json_agent (error analysis passed (confidence: 0.60)): Never trust raw user input: before parsing, decode escape sequences as text and verify it is valid J...
+fail15.1: tactical
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] No update generated for json_agent
+fail16.1: no guideline
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: Always escape backslashes in string values by doubling them (e.g., write "\\" not "\"\\") so that a ... (confidence: high)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=True, scope=strategic, confidence=0.85, reason=This rule is already covered by existing strategic data validation rules. The existing guidelines al
+scope.optimizer: [Guideliner] ✗ REJECTED error update for json_agent (duplicate): Always escape backslashes in string values by doubling them (e.g., write "\\" not "\"\\") so that a ...
+fail17.1: no guideline
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: When parsing user input, detect and report structural JSON errors — specifically, missing colon key/... (confidence: high)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=False, scope=strategic, confidence=0.70, reason=The proposed update targets successful JSON parsing—detecting a missing colon delimiter before proce
+scope.optimizer: [Guideliner] ✓ ACCEPTED error update [STRATEGIC] for json_agent (error analysis passed (confidence: 0.70)): When parsing user input, detect and report structural JSON errors — specifically, missing colon key/...
+fail19.1: strategic
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: Never include a doubled colon (::) when emitting a JSON key; use exactly one ':' separator to separa... (confidence: high)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=True, scope=strategic, confidence=0.80, reason=The proposed rule about using exactly one colon separator is already semantically covered by the exi
+scope.optimizer: [Guideliner] ✗ REJECTED error update for json_agent (duplicate): Never include a doubled colon (::) when emitting a JSON key; use exactly one ':' separator to separa...
+fail20.1: no guideline
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: When sanitizing or rewriting user input into JSON, represent separators (colons, commas) literally a... (confidence: medium)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=True, scope=strategic, confidence=0.95, reason=This proposed update is almost entirely redundant with an existing strategic rule. The existing rule
+scope.optimizer: [Guideliner] ✗ REJECTED error update for json_agent (duplicate): When sanitizing or rewriting user input into JSON, represent separators (colons, commas) literally a...
+fail21.1: no guideline
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: When parsing user input with json.loads fails with a JSONDecodeError, re-emit the response as an exp... (confidence: medium)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=False, scope=strategic, confidence=0.78, reason=The proposed update establishes a persistent best practice for handling JSON.parse errors: explicitl
+scope.optimizer: [Guideliner] ✓ ACCEPTED error update [STRATEGIC] for json_agent (error analysis passed (confidence: 0.78)): When parsing user input with json.loads fails with a JSONDecodeError, re-emit the response as an exp...
+fail22.1: strategic
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: When the input is not valid JSON, never attempt to interpret 'true'/'false'/'unknown' words or fragm... (confidence: medium)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=False, scope=strategic, confidence=0.85, reason=The proposed update is strategic because it addresses a general best practice (handling malformed/no
+scope.optimizer: [Guideliner] ⭐ STRATEGIC RULE PROMOTED for json_agent (confidence: 0.85, domain: data_validation)
+scope.optimizer: [Guideliner] ✓ ACCEPTED error update [STRATEGIC] for json_agent (error analysis passed (confidence: 0.85)): When the input is not valid JSON, never attempt to interpret 'true'/'false'/'unknown' words or fragm...
+fail23.1: strategic
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: Always start your response with a '[' to ensure the output is parsed as a JSON array from the first ... (confidence: high)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=True, scope=strategic, confidence=0.55, reason=Already substantially covered by existing strategic rules, which require outputting valid JSON and n
+scope.optimizer: [Guideliner] ✗ REJECTED error update for json_agent (duplicate): Always start your response with a '[' to ensure the output is parsed as a JSON array from the first ...
+fail24.1: no guideline
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: When echoes of your own model output are provided as input, parse them as opaque plain-text lines ra... (confidence: high)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=True, scope=strategic, confidence=0.85, reason=This update is largely covered by existing strategic rules. The instruction to never generate/echo J
+scope.optimizer: [Guideliner] ✗ REJECTED error update for json_agent (duplicate): When echoes of your own model output are provided as input, parse them as opaque plain-text lines ra...
+fail25.1: no guideline
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: Always reject any input containing literal tab (U+0009) or other raw ASCII control characters (0x00-... (confidence: high)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=False, scope=strategic, confidence=0.78, reason=Not a duplicate because it adds a specific, previously-uncalled-out constraint about rejecting raw A
+scope.optimizer: [Guideliner] ✓ ACCEPTED error update [STRATEGIC] for json_agent (error analysis passed (confidence: 0.78)): Always reject any input containing literal tab (U+0009) or other raw ASCII control characters (0x00-...
+fail26.1: strategic
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: When user input contains literal line breaks or unescaped control characters, serialize the entire i... (confidence: medium)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=False, scope=strategic, confidence=0.85, reason=The proposed update addresses a specific, actionable concern: escaping raw control characters in use
+scope.optimizer: [Guideliner] ⭐ STRATEGIC RULE PROMOTED for json_agent (confidence: 0.85, domain: error_handling)
+scope.optimizer: [Guideliner] ✓ ACCEPTED error update [STRATEGIC] for json_agent (error analysis passed (confidence: 0.85)): When user input contains literal line breaks or unescaped control characters, serialize the entire i...
+fail27.1: strategic
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: When user input contains line breaks mismatched with escape sequences (e.g. a backslash followed by ... (confidence: medium)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=True, scope=strategic, confidence=0.80, reason=The proposed update's core mechanism (emitting a sanitized fallback object when input can't be prope
+scope.optimizer: [Guideliner] ✗ REJECTED error update for json_agent (duplicate): When user input contains line breaks mismatched with escape sequences (e.g. a backslash followed by ...
+fail28.1: no guideline
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: If user input is a single bare token (e.g., a hex-like string '0e') with no commas, quotes, braces, ... (confidence: high)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=False, scope=strategic, confidence=0.75, reason=This rule is NOT a duplicate. While it overlaps with existing data validation rules about avoiding r
+scope.optimizer: [Guideliner] ✓ ACCEPTED error update [STRATEGIC] for json_agent (error analysis passed (confidence: 0.75)): If user input is a single bare token (e.g., a hex-like string '0e') with no commas, quotes, braces, ...
+fail29.1: strategic
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: When parsing user input, do not discard leading content such as corruption or spurious characters (e... (confidence: medium)
+scope.optimizer: [Classifier] Failed to classify update: Expecting ',' delimiter: line 6 column 1740 (char 1851). Using defaults.
+scope.optimizer: [Guideliner] ✓ ACCEPTED error update [TACTICAL] for json_agent (error analysis passed (confidence: 0.60)): When parsing user input, do not discard leading content such as corruption or spurious characters (e...
+fail30.1: tactical
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: When exposed user input contains stray plus characters (e.g., '0e+-1') that cannot be valid JSON or ... (confidence: medium)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=True, scope=strategic, confidence=0.62, reason=The proposed update specifically targets '0e+-1' input, but the existing strategic rules already cov
+scope.optimizer: [Guideliner] ✗ REJECTED error update for json_agent (duplicate): When exposed user input contains stray plus characters (e.g., '0e+-1') that cannot be valid JSON or ...
+fail31.1: no guideline
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: When input fragments reliably map to a specific structured response (e.g., a singular boolean condit... (confidence: medium)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=False, scope=strategic, confidence=0.82, reason=The update is cross-task and persistent (not tied to any specific task/dataset/API), so it's strateg
+scope.optimizer: [Guideliner] ✓ ACCEPTED error update [STRATEGIC] for json_agent (error analysis passed (confidence: 0.82)): When input fragments reliably map to a specific structured response (e.g., a singular boolean condit...
+fail32.1: strategic
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: When the input is a JSON object, emit the parsed result as a compact single-line object with no newl... (confidence: medium)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=False, scope=strategic, confidence=0.55, reason=The update concerns handling malformed JSON input by validating strict object membership and emittin
+scope.optimizer: [Guideliner] ✓ ACCEPTED error update [STRATEGIC] for json_agent (error analysis passed (confidence: 0.55)): When the input is a JSON object, emit the parsed result as a compact single-line object with no newl...
+fail33.1: strategic
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: Always parse input character-by-character (greedy) so that once a delimiter is located it is consume... (confidence: low)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=False, scope=strategic, confidence=0.55, reason=This rule prescribes a specific parser algorithm (character-by-character greedy parsing with delimit
+scope.optimizer: [Guideliner] ✓ ACCEPTED error update [STRATEGIC] for json_agent (error analysis passed (confidence: 0.55)): Always parse input character-by-character (greedy) so that once a delimiter is located it is consume...
+fail2.2: strategic
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: When the input is a single line it may still contain unquoted or non-standard keys (e.g., {unquoted_... (confidence: high)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=True, scope=strategic, confidence=0.65, reason=The proposed update aligns with, and is largely redundant to, existing strategic Data Validation and
+scope.optimizer: [Guideliner] ✗ REJECTED error update for json_agent (duplicate): When the input is a single line it may still contain unquoted or non-standard keys (e.g., {unquoted_...
+fail3.2: no guideline
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: When the raw input is a short list containing only a single trailing value (e.g. an unclosed list en... (confidence: high)
+scope.optimizer: [Classifier] Failed to classify update: Expecting ',' delimiter: line 1 column 360 (char 359). Using defaults.
+scope.optimizer: [Guideliner] ✓ ACCEPTED error update [TACTICAL] for json_agent (error analysis passed (confidence: 0.90)): When the raw input is a short list containing only a single trailing value (e.g. an unclosed list en...
+fail4.2: tactical
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: When reconstructing or echoing traces that may themselves contain JSON artifacts (e.g., log fragment... (confidence: medium)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=False, scope=strategic, confidence=0.75, reason=This rule extends input validation specifically to nested/log fields that may contain malformed JSON
+scope.optimizer: [Guideliner] ✓ ACCEPTED error update [STRATEGIC] for json_agent (error analysis passed (confidence: 0.75)): When reconstructing or echoing traces that may themselves contain JSON artifacts (e.g., log fragment...
+fail5.2: strategic
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: When user input begins with non-JSON tokens, empty arrays, or whitespace-only content, always respon... (confidence: high)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=False, scope=strategic, confidence=0.80, reason=This rule enforces fallback-on-malformed-input for non-JSON tokens, empty arrays, and whitespace-onl
+scope.optimizer: [Guideliner] ✓ ACCEPTED error update [STRATEGIC] for json_agent (error analysis passed (confidence: 0.80)): When user input begins with non-JSON tokens, empty arrays, or whitespace-only content, always respon...
+fail6.2: strategic
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: When input contains unescaped newlines or structural issues (e.g., raw line breaks that split or ext... (confidence: medium)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=False, scope=strategic, confidence=0.45, reason=This is a strategic rule because it establishes a general best practice about handling unescaped new
+scope.optimizer: [Guideliner] ✓ ACCEPTED error update [STRATEGIC] for json_agent (error analysis passed (confidence: 0.45)): When input contains unescaped newlines or structural issues (e.g., raw line breaks that split or ext...
+fail7.2: strategic
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: When parsing user input as JSON, if a JSONDecodeError occurs, re-transmit the raw input (trimmed and... (confidence: medium)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=False, scope=strategic, confidence=0.45, reason=The proposed rule focuses on how to visually demarcate raw error input from model output so that str
+scope.optimizer: [Guideliner] ✓ ACCEPTED error update [STRATEGIC] for json_agent (error analysis passed (confidence: 0.45)): When parsing user input as JSON, if a JSONDecodeError occurs, re-transmit the raw input (trimmed and...
+fail8.2: strategic
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: When generating JSON objects or arrays, format separators so no trailing comma, comma, or comma arti... (confidence: high)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=True, scope=strategic, confidence=0.75, reason=The proposed update is largely REDUNDANT. The existing strategic rule 'Never generate or echo JSON a
+scope.optimizer: [Guideliner] ✗ REJECTED error update for json_agent (duplicate): When generating JSON objects or arrays, format separators so no trailing comma, comma, or comma arti...
+fail9.2: no guideline
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: When the input contains extra or trailing content, stop parsing after the complete JSON object and d... (confidence: medium)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=True, scope=strategic, confidence=0.75, reason=The proposed update is essentially covered by existing strategic rules. The current rules already ma
+scope.optimizer: [Guideliner] ✗ REJECTED error update for json_agent (duplicate): When the input contains extra or trailing content, stop parsing after the complete JSON object and d...
+fail10.2: no guideline
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: When an emitted value contains multiple tokens or operators (e.g., '1 + 2'), wrap the entire express... (confidence: high)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=False, scope=strategic, confidence=0.75, reason=The update addresses emitting multiple tokens or operators as arithmetic expressions (e.g., '1 + 2')
+scope.optimizer: [Guideliner] ✓ ACCEPTED error update [STRATEGIC] for json_agent (error analysis passed (confidence: 0.75)): When an emitted value contains multiple tokens or operators (e.g., '1 + 2'), wrap the entire express...
+fail11.2: strategic
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: Always parse user input in one atomic operation and if JSONDecodeError is raised at any stage, immed... (confidence: medium)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=True, scope=strategic, confidence=0.75, reason=The proposed update is largely covered by existing strategic rules: the 'always validate well-formed
+scope.optimizer: [Guideliner] ✗ REJECTED error update for json_agent (duplicate): Always parse user input in one atomic operation and if JSONDecodeError is raised at any stage, immed...
+fail12.2: no guideline
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: When representing whole numbers, always emit plain decimal digits without a leading zero (e.g., use ... (confidence: high)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=False, scope=strategic, confidence=0.85, reason=This is a new strategic rule focusing on canonical number emission (leading-zero normalization like 
+scope.optimizer: [Guideliner] ⭐ STRATEGIC RULE PROMOTED for json_agent (confidence: 0.85, domain: data_validation)
+scope.optimizer: [Guideliner] ✓ ACCEPTED error update [STRATEGIC] for json_agent (error analysis passed (confidence: 0.85)): When representing whole numbers, always emit plain decimal digits without a leading zero (e.g., use ...
+fail13.2: strategic
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: When a value is contained within a JSON object, always emit it using proper JSON syntax (json.dumps ... (confidence: high)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=True, scope=strategic, confidence=0.90, reason=The proposed update is already fully covered by existing strategic data validation rules. The key pr
+scope.optimizer: [Guideliner] ✗ REJECTED error update for json_agent (duplicate): When a value is contained within a JSON object, always emit it using proper JSON syntax (json.dumps ...
+fail14.2: no guideline
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: If raw bytes (e.g., \x15, 0x15) appear as literal escape sequences in input, decode the surrounding ... (confidence: medium)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=False, scope=strategic, confidence=0.82, reason=This rule is strategic/general (not task-specific) as it describes a cross-task best practice for ha
+scope.optimizer: [Guideliner] ✓ ACCEPTED error update [STRATEGIC] for json_agent (error analysis passed (confidence: 0.82)): If raw bytes (e.g., \x15, 0x15) appear as literal escape sequences in input, decode the surrounding ...
+fail15.2: strategic
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: Trailing whitespace after JSON content (e.g., a single space following the closing brace) causes JSO... (confidence: high)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=False, scope=strategic, confidence=0.85, reason=The update provides a specific, reusable technique for a class of recurring errors: handling unescap
+scope.optimizer: [Guideliner] ⭐ STRATEGIC RULE PROMOTED for json_agent (confidence: 0.85, domain: error_handling)
+scope.optimizer: [Guideliner] ✓ ACCEPTED error update [STRATEGIC] for json_agent (error analysis passed (confidence: 0.85)): Trailing whitespace after JSON content (e.g., a single space following the closing brace) causes JSO...
+fail16.2: strategic
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: Before parsing any input, check for octal-style backslash sequences (e.g., \017) or other invalid es... (confidence: medium)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=False, scope=strategic, confidence=0.72, reason=This rule addresses handling of malformed octal/invalid escape sequences before JSON parsing. It's n
+scope.optimizer: [Guideliner] ✓ ACCEPTED error update [STRATEGIC] for json_agent (error analysis passed (confidence: 0.72)): Before parsing any input, check for octal-style backslash sequences (e.g., \017) or other invalid es...
+fail17.2: strategic
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: Before parsing, attempt to auto-correct malformed JSON: if the input looks like valid JSON missing o... (confidence: medium)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=False, scope=strategic, confidence=0.72, reason=The update contains one sub-rule (trimming leading/trailing whitespace before parsing) that is expli
+scope.optimizer: [Guideliner] ✓ ACCEPTED error update [STRATEGIC] for json_agent (error analysis passed (confidence: 0.72)): Before parsing, attempt to auto-correct malformed JSON: if the input looks like valid JSON missing o...
+fail19.2: strategic
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: When receiving any input, validate it character-by-character from position 1 before parsing to ensur... (confidence: medium)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=False, scope=strategic, confidence=0.78, reason=The update's mechanism (character-by-character validation from position 1) is not explicitly covered
+scope.optimizer: [Guideliner] ✓ ACCEPTED error update [STRATEGIC] for json_agent (error analysis passed (confidence: 0.78)): When receiving any input, validate it character-by-character from position 1 before parsing to ensur...
+fail20.2: strategic
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: When input JSON declares strict requirements (or carries audit/error words such as 'Comma instead of... (confidence: medium)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=False, scope=strategic, confidence=0.65, reason=The proposed update is not an exact duplicate—the existing rules address several related issues (ech
+scope.optimizer: [Guideliner] ✓ ACCEPTED error update [STRATEGIC] for json_agent (error analysis passed (confidence: 0.65)): When input JSON declares strict requirements (or carries audit/error words such as 'Comma instead of...
+fail21.2: strategic
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: Before parsing, join any input containing newlines, embedded quotes, or unescaped control characters... (confidence: medium)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=True, scope=strategic, confidence=0.90, reason=The proposed rule (joining newlines/control characters and strict JSON-encoding the full value as a 
+scope.optimizer: [Guideliner] ✗ REJECTED error update for json_agent (duplicate): Before parsing, join any input containing newlines, embedded quotes, or unescaped control characters...
+fail22.2: no guideline
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: When input contains stray characters or fragments after the first token (e.g., a bare word like 'Bad... (confidence: medium)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=True, scope=strategic, confidence=0.85, reason=The proposed update about reparsing substrings when stray characters appear after the first token an
+scope.optimizer: [Guideliner] ✗ REJECTED error update for json_agent (duplicate): When input contains stray characters or fragments after the first token (e.g., a bare word like 'Bad...
+fail23.2: no guideline
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: When input is a non-JSON string such as 'single quote' (e.g., a query, command, or instruction rathe... (confidence: medium)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=False, scope=strategic, confidence=0.70, reason=This rule is strategic because it establishes a general best practice (gracefully rejecting non-JSON
+scope.optimizer: [Guideliner] ✓ ACCEPTED error update [STRATEGIC] for json_agent (error analysis passed (confidence: 0.70)): When input is a non-JSON string such as 'single quote' (e.g., a query, command, or instruction rathe...
+fail24.2: strategic
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: When echo pitfalls cause the model to output prose or stray tab/space characters between tokens (e.g... (confidence: medium)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=False, scope=strategic, confidence=0.62, reason=Not a duplicate: while existing strategic rules cover stripping whitespace from inputs (checked char
+scope.optimizer: [Guideliner] ✓ ACCEPTED error update [STRATEGIC] for json_agent (error analysis passed (confidence: 0.62)): When echo pitfalls cause the model to output prose or stray tab/space characters between tokens (e.g...
+fail25.2: strategic
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: When sanitizing string values, always replace literal tab, newline, and carriage-return characters w... (confidence: high)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=False, scope=strategic, confidence=0.72, reason=The proposed update focuses specifically on escaping control characters (tab, newline, carriage-retu
+scope.optimizer: [Guideliner] ✓ ACCEPTED error update [STRATEGIC] for json_agent (error analysis passed (confidence: 0.72)): When sanitizing string values, always replace literal tab, newline, and carriage-return characters w...
+fail26.2: strategic
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: When user input contains literal newlines (LF/U+000A, CR, or CRLF, e.g. name/value/number labels fol... (confidence: medium)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=False, scope=strategic, confidence=0.70, reason=Not a duplicate: existing strategic rules cover trimming line breaks before parsing and escaping con
+scope.optimizer: [Guideliner] ✓ ACCEPTED error update [STRATEGIC] for json_agent (error analysis passed (confidence: 0.70)): When user input contains literal newlines (LF/U+000A, CR, or CRLF, e.g. name/value/number labels fol...
+fail27.2: strategic
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: Never emit unescaped control characters in string values: replace line breaks, tabs, and other contr... (confidence: high)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=False, scope=strategic, confidence=0.85, reason=While the proposed update overlaps with the existing Data Validation rule (escaping non-ASCII charac
+scope.optimizer: [Guideliner] ⭐ STRATEGIC RULE PROMOTED for json_agent (confidence: 0.85, domain: error_handling)
+scope.optimizer: [Guideliner] ✓ ACCEPTED error update [STRATEGIC] for json_agent (error analysis passed (confidence: 0.85)): Never emit unescaped control characters in string values: replace line breaks, tabs, and other contr...
+fail28.2: strategic
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] No update generated for json_agent
+fail29.2: no guideline
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: When input appears to be a truncated, incomplete, or partial JSON value (e.g., a leading digit follo... (confidence: high)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=False, scope=strategic, confidence=0.94, reason=This rule addresses a partially-covered edge case. The existing Data Validation rules cover malforme
+scope.optimizer: [Guideliner] ⭐ STRATEGIC RULE PROMOTED for json_agent (confidence: 0.94, domain: error_handling)
+scope.optimizer: [Guideliner] ✓ ACCEPTED error update [STRATEGIC] for json_agent (error analysis passed (confidence: 0.94)): When input appears to be a truncated, incomplete, or partial JSON value (e.g., a leading digit follo...
+fail30.2: strategic
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: When numeric input contains an erroneous exponent-like '+-1' appended to digits (e.g., '[0e+-1]'), n... (confidence: medium)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=False, scope=strategic, confidence=0.80, reason=This rule addresses a specific malformed input pattern (erroneous exponent-like '+-1' appended to di
+scope.optimizer: [Guideliner] ✓ ACCEPTED error update [STRATEGIC] for json_agent (error analysis passed (confidence: 0.80)): When numeric input contains an erroneous exponent-like '+-1' appended to digits (e.g., '[0e+-1]'), n...
+fail31.2: strategic
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: When input is a sprite-style two-token string like 'XML' or 'Binary' (e.g., 'XML ', 'Binary'), never... (confidence: medium)
+scope.optimizer: [Classifier] Failed to classify update: Expecting ',' delimiter: line 6 column 464 (char 575). Using defaults.
+scope.optimizer: [Guideliner] ✓ ACCEPTED error update [TACTICAL] for json_agent (error analysis passed (confidence: 0.60)): When input is a sprite-style two-token string like 'XML' or 'Binary' (e.g., 'XML ', 'Binary'), never...
+fail32.2: tactical
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: When user input is a standalone fragment like a bare quoted string (e.g., "mismatch") with no object... (confidence: medium)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=True, scope=strategic, confidence=0.85, reason=The proposed update is fully covered by existing strategic rules. The core instruction—treating malf
+scope.optimizer: [Guideliner] ✗ REJECTED error update for json_agent (duplicate): When user input is a standalone fragment like a bare quoted string (e.g., "mismatch") with no object...
+fail33.2: no guideline
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: When user input is a bare number (e.g., only digits with no closing delimiter), it begins a JSON val... (confidence: high)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=False, scope=strategic, confidence=0.82, reason=Not a duplicate: existing tactical rules address *complete-malformed* inputs (truncated/partial JSON
+scope.optimizer: [Guideliner] ✓ ACCEPTED error update [STRATEGIC] for json_agent (error analysis passed (confidence: 0.82)): When user input is a bare number (e.g., only digits with no closing delimiter), it begins a JSON val...
+fail2.3: strategic
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: When parsing input, assume top-level keys may arrive as unquoted identifiers (e.g., {unquoted_key: .... (confidence: medium)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=False, scope=strategic, confidence=0.65, reason=This rule addresses unquoted top-level keys arriving as bare IDENT-like tokens during JSON parsing, 
+scope.optimizer: [Guideliner] ✓ ACCEPTED error update [STRATEGIC] for json_agent (error analysis passed (confidence: 0.65)): When parsing input, assume top-level keys may arrive as unquoted identifiers (e.g., {unquoted_key: ....
+fail3.3: strategic
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: When the submitted model output itself contains injection or pollution artifacts such as user-style ... (confidence: high)
+scope.optimizer: [Classifier] Domain '' not in allowed list. Mapping to 'general'.
+scope.optimizer: [Classifier] Result for json_agent: duplicate=True, scope=strategic, confidence=0.97, reason=The proposed update is substantially covered by existing strategic Error Handling and Data Validatio
+scope.optimizer: [Guideliner] ✗ REJECTED error update for json_agent (duplicate): When the submitted model output itself contains injection or pollution artifacts such as user-style ...
+fail4.3: no guideline
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: When user input is a raw JSON syntax artifact such as a doubled/duplicated separator (e.g., '[,]' or... (confidence: high)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=True, scope=strategic, confidence=0.00, reason=This update is already fully covered by multiple existing strategic rules. The proposed rule instruc
+scope.optimizer: [Guideliner] ✗ REJECTED error update for json_agent (duplicate): When user input is a raw JSON syntax artifact such as a doubled/duplicated separator (e.g., '[,]' or...
+fail5.3: no guideline
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] No update generated for json_agent
+fail6.3: no guideline
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: When input contains a complete JSON value followed by additional non-whitespace characters or commen... (confidence: high)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=False, scope=strategic, confidence=0.85, reason=Not a duplicate because the Proposed Update addresses a specific gap: trailing non-whitespace conten
+scope.optimizer: [Guideliner] ⭐ STRATEGIC RULE PROMOTED for json_agent (confidence: 0.85, domain: data_validation)
+scope.optimizer: [Guideliner] ✓ ACCEPTED error update [STRATEGIC] for json_agent (error analysis passed (confidence: 0.85)): When input contains a complete JSON value followed by additional non-whitespace characters or commen...
+fail7.3: strategic
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: When the valid JSON value is followed by extraneous characters that cause 'Extra data' JSONDecodeErr... (confidence: medium)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=True, scope=strategic, confidence=0.90, reason=This update is fully covered by the existing strategic rule: 'When input contains a complete JSON va
+scope.optimizer: [Guideliner] ✗ REJECTED error update for json_agent (duplicate): When the valid JSON value is followed by extraneous characters that cause 'Extra data' JSONDecodeErr...
+fail8.3: no guideline
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: Never emit a trailing comma before a closing brace or bracket (e.g., write {"a": true} not {"a": tru... (confidence: high)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=False, scope=strategic, confidence=0.70, reason=The proposed update concerns trailing commas before closing braces/brackets producing invalid JSON, 
+scope.optimizer: [Guideliner] ✓ ACCEPTED error update [STRATEGIC] for json_agent (error analysis passed (confidence: 0.70)): Never emit a trailing comma before a closing brace or bracket (e.g., write {"a": true} not {"a": tru...
+fail9.3: strategic
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: When input contains a complete, valid JSON value followed by additional non-whitespace characters (t... (confidence: high)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=True, scope=strategic, confidence=0.72, reason=The proposed update directly duplicates the existing strategic rule: 'When input contains a complete
+scope.optimizer: [Guideliner] ✗ REJECTED error update for json_agent (duplicate): When input contains a complete, valid JSON value followed by additional non-whitespace characters (t...
+fail10.3: no guideline
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: When input contains a valid-looking key like '"Illegal expression"' but the value 1 + 2 is not a pro... (confidence: medium)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=True, scope=strategic, confidence=0.90, reason=This rule already falls under the established Data Validation domain rule that mandates emitting a s
+scope.optimizer: [Guideliner] ✗ REJECTED error update for json_agent (duplicate): When input contains a valid-looking key like '"Illegal expression"' but the value 1 + 2 is not a pro...
+fail11.3: no guideline
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: When input is missing a top-level JSON value (e.g., malformed junk like alert code fragments) or doe... (confidence: high)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=True, scope=strategic, confidence=0.82, reason=This proposed rule is already fully covered by existing strategic rules. The existing Data Validatio
+scope.optimizer: [Guideliner] ✗ REJECTED error update for json_agent (duplicate): When input is missing a top-level JSON value (e.g., malformed junk like alert code fragments) or doe...
+fail12.3: no guideline
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: When parsing a JSON object, if a value is intended to be a number but is written with a leading zero... (confidence: high)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=True, scope=strategic, confidence=0.95, reason=The proposed update is already comprehensively covered by existing strategic rules. Rule set covers:
+scope.optimizer: [Guideliner] ✗ REJECTED error update for json_agent (duplicate): When parsing a JSON object, if a value is intended to be a number but is written with a leading zero...
+fail13.3: no guideline
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: When reconstructing output values, emit each number as an explicit valid JSON scalar—serialize integ... (confidence: high)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=False, scope=strategic, confidence=0.90, reason=The update specifies serializing integers as plain decimal digit strings and prohibits hex/ternary l
+scope.optimizer: [Guideliner] ⭐ STRATEGIC RULE PROMOTED for json_agent (confidence: 0.90, domain: data_validation)
+scope.optimizer: [Guideliner] ✓ ACCEPTED error update [STRATEGIC] for json_agent (error analysis passed (confidence: 0.90)): When reconstructing output values, emit each number as an explicit valid JSON scalar—serialize integ...
+fail14.3: strategic
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: When encountering an input that parses as just a few characters followed by syntax errors such as a ... (confidence: medium)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=False, scope=strategic, confidence=0.78, reason=This rule handles a specific JSON parsing failure mode—an input that parses as a few characters foll
+scope.optimizer: [Guideliner] ✓ ACCEPTED error update [STRATEGIC] for json_agent (error analysis passed (confidence: 0.78)): When encountering an input that parses as just a few characters followed by syntax errors such as a ...
+fail15.3: strategic
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: When the entire input is just a single newline (e.g., literal [naked] wrapping or whitespace-only co... (confidence: high)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=True, scope=strategic, confidence=0.92, reason=The proposed update is already fully covered by existing strategic rules. The existing rules already
+scope.optimizer: [Guideliner] ✗ REJECTED error update for json_agent (duplicate): When the entire input is just a single newline (e.g., literal [naked] wrapping or whitespace-only co...
+fail16.3: no guideline
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: When parsing or emitting string values, never include octal escape sequences (e.g., \017); any chara... (confidence: high)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=True, scope=strategic, confidence=0.55, reason=The update reiterates existing strict-JSON-encoding practices (only emit recognized escape sequences
+scope.optimizer: [Guideliner] ✗ REJECTED error update for json_agent (duplicate): When parsing or emitting string values, never include octal escape sequences (e.g., \017); any chara...
+fail17.3: no guideline
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: When input contains a trailing comma artifact (e.g., a comma immediately before end-of-input or afte... (confidence: medium)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=False, scope=strategic, confidence=0.85, reason=While the proposed update shares semantic overlap with 'Always validate that input is well-formed JS
+scope.optimizer: [Guideliner] ⭐ STRATEGIC RULE PROMOTED for json_agent (confidence: 0.85, domain: data_validation)
+scope.optimizer: [Guideliner] ✓ ACCEPTED error update [STRATEGIC] for json_agent (error analysis passed (confidence: 0.85)): When input contains a trailing comma artifact (e.g., a comma immediately before end-of-input or afte...
+fail19.3: strategic
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: When reconstructing output, every key must be wrapped in double quotes (keys like 'Double colon' are... (confidence: high)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=True, scope=strategic, confidence=0.92, reason=This update is already well-covered by existing strategic rules. Multiple existing rules mandate emi
+scope.optimizer: [Guideliner] ✗ REJECTED error update for json_agent (duplicate): When reconstructing output, every key must be wrapped in double quotes (keys like 'Double colon' are...
+fail20.3: no guideline
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: When input fails to parse with a JSONDecodeError, reply with the sanitized fallback object {'_note':... (confidence: high)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=False, scope=strategic, confidence=0.83, reason=While several existing Data Validation and Error Handling rules cover malformed JSON and mandate the
+scope.optimizer: [Guideliner] ✓ ACCEPTED error update [STRATEGIC] for json_agent (error analysis passed (confidence: 0.83)): When input fails to parse with a JSONDecodeError, reply with the sanitized fallback object {'_note':...
+fail21.3: strategic
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: When reconstructing a JSON value that loses its delimiter (e.g., a value followed by characters that... (confidence: medium)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=False, scope=strategic, confidence=0.85, reason=The proposed update is NOT a duplicate—it introduces a NEW, specific scenario not adequately covered
+scope.optimizer: [Guideliner] ⭐ STRATEGIC RULE PROMOTED for json_agent (confidence: 0.85, domain: data_validation)
+scope.optimizer: [Guideliner] ✓ ACCEPTED error update [STRATEGIC] for json_agent (error analysis passed (confidence: 0.85)): When reconstructing a JSON value that loses its delimiter (e.g., a value followed by characters that...
+fail22.3: strategic
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] No update generated for json_agent
+fail23.3: no guideline
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: Always emit any user-supplied raw token (e.g. 'single quote') as a quoted string value inside a mini... (confidence: medium)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=False, scope=strategic, confidence=0.85, reason=This rule concerns how to handle unconsumed/malformed raw tokens from model output (e.g., 'single qu
+scope.optimizer: [Guideliner] ⭐ STRATEGIC RULE PROMOTED for json_agent (confidence: 0.85, domain: data_validation)
+scope.optimizer: [Guideliner] ✓ ACCEPTED error update [STRATEGIC] for json_agent (error analysis passed (confidence: 0.85)): Always emit any user-supplied raw token (e.g. 'single quote') as a quoted string value inside a mini...
+fail24.3: strategic
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: When reconstructing user-supplied string values (e.g., 'tab\tcharacter\t\tin\tstring'), always emit ... (confidence: high)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=True, scope=strategic, confidence=0.85, reason=The proposed update is essentially covering the same general JSON-validation principle already embed
+scope.optimizer: [Guideliner] ✗ REJECTED error update for json_agent (duplicate): When reconstructing user-supplied string values (e.g., 'tab\tcharacter\t\tin\tstring'), always emit ...
+fail25.3: no guideline
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: Always humanize and naturally break up long consecutive sequences of identical characters, subdividi... (confidence: medium)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=False, scope=strategic, confidence=0.30, reason=The rule is not a duplicate: it targets a distinctly different failure mode—a model mechanically rep
+scope.optimizer: [Guideliner] ✓ ACCEPTED error update [STRATEGIC] for json_agent (error analysis passed (confidence: 0.30)): Always humanize and naturally break up long consecutive sequences of identical characters, subdividi...
+fail26.3: strategic
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: Always pre-validate all incoming content as strict JSON: strip leading/trailing whitespace and rejec... (confidence: high)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=True, scope=strategic, confidence=0.95, reason=The proposed update to pre-validate incoming content as strict JSON by stripping whitespace, rejecti
+scope.optimizer: [Guideliner] ✗ REJECTED error update for json_agent (duplicate): Always pre-validate all incoming content as strict JSON: strip leading/trailing whitespace and rejec...
+fail27.3: no guideline
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: If the model emits a value as a literal sequence with an unescaped backslash—e.g. "line\"break" or "... (confidence: medium)
+scope.optimizer: [Classifier] Failed to classify update: Invalid control character at: line 6 column 305 (char 414). Using defaults.
+scope.optimizer: [Guideliner] ✓ ACCEPTED error update [TACTICAL] for json_agent (error analysis passed (confidence: 0.60)): If the model emits a value as a literal sequence with an unescaped backslash—e.g. "line\"break" or "...
+fail28.3: tactical
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: When the input is a single non-whitespace token such as a lone number (e.g. '0e'), treat it as a fra... (confidence: medium)
+scope.optimizer: [Classifier] Failed to classify update: Expecting ',' delimiter: line 6 column 310 (char 420). Using defaults.
+scope.optimizer: [Guideliner] ✓ ACCEPTED error update [TACTICAL] for json_agent (error analysis passed (confidence: 0.60)): When the input is a single non-whitespace token such as a lone number (e.g. '0e'), treat it as a fra...
+fail29.3: tactical
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: When input is a single non-whitespace byte that fails JSON parsing (e.g. a lone digit like '0'), tre... (confidence: medium)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=True, scope=strategic, confidence=0.85, reason=This update is fully covered by existing strategic rules. The core concept—a lone/malformed byte fai
+scope.optimizer: [Guideliner] ✗ REJECTED error update for json_agent (duplicate): When input is a single non-whitespace byte that fails JSON parsing (e.g. a lone digit like '0'), tre...
+fail30.3: no guideline
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: When the raw model output itself is not valid JSON (e.g. a stray token like '-1' emitted directly ra... (confidence: high)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=False, scope=strategic, confidence=0.85, reason=The proposed rule is cross-task and covers a class of edge cases not explicitly matched by existing 
+scope.optimizer: [Guideliner] ⭐ STRATEGIC RULE PROMOTED for json_agent (confidence: 0.85, domain: error_handling)
+scope.optimizer: [Guideliner] ✓ ACCEPTED error update [STRATEGIC] for json_agent (error analysis passed (confidence: 0.85)): When the raw model output itself is not valid JSON (e.g. a stray token like '-1' emitted directly ra...
+fail31.3: strategic
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: When reconstructing a value, complete the enclosing brace so the output is a well-formed object (e.g... (confidence: high)
+scope.optimizer: [Classifier] Failed to classify update: Expecting ',' delimiter: line 6 column 170 (char 280). Using defaults.
+scope.optimizer: [Guideliner] ✓ ACCEPTED error update [TACTICAL] for json_agent (error analysis passed (confidence: 0.90)): When reconstructing a value, complete the enclosing brace so the output is a well-formed object (e.g...
+fail32.3: tactical
+scope.optimizer: [Guideliner] Analyzing step for json_agent (error=True)
+scope.optimizer: [Guideliner] Generated error update for json_agent: When the reconstructed JSON still fails strict parsing (e.g., a comma counted inside a numeric strin... (confidence: medium)
+scope.optimizer: [Classifier] Result for json_agent: duplicate=False, scope=strategic333, confidence=0.75, reason=This is a strategic rule generalizing the fallback-or-guess behavior across delimiter-content edge c
+scope.optimizer: [Guideliner] ✓ ACCEPTED error update [STRATEGIC333] for json_agent (error analysis passed (confidence: 0.75)): When the reconstructed JSON still fails strict parsing (e.g., a comma counted inside a numeric strin...
+fail33.3: strategic333
+
+OPTIMIZER TRIGGERED: 0
+
+STRATEGIC MEMORY
+{
+  "json_agent": {
+    "data_validation": [
+      {
+        "rule": "Never use or emit invalid JSON values such as raw hex literals (e.g., 0x...); always provide numbers as plain decimal digits and escape any non-ASCII characters in strings to guarantee strictly valid JSON. When unsure whether a value is valid JSON, output a sanitized fallback object with that value ignored.",
+        "rationale": "It stops the agent from inserting non-JSON tokens like 0x14 that break JSON parsing, and gives a safe fallback for malformed input.",
+        "confidence": 0.95,
+        "added_timestamp": "2026-09-29T10:45:31.381748",
+        "source_task_id": "fail14.1"
+      },
+      {
+        "rule": "Always validate that input is well-formed JSON before processing; never trust raw user input, and sanitize by trimming whitespace and ignoring empty or malformed messages.",
+        "rationale": "This stops the agent from treating partially-formed or truncated JSON payloads as valid input, which is what triggered the JSONDecodeError.",
+        "confidence": 0.9,
+        "added_timestamp": "2026-09-29T10:42:17.028757",
+        "source_task_id": "fail2.1"
+      },
+      {
+        "rule": "When reconstructing output values, emit each number as an explicit valid JSON scalar—serialize integers as plain decimal digit strings (e.g., 20) and never emit a hex/ternary literal such as '0x14', which is not valid JSON.",
+        "rationale": "The model emitted the literal 0x14 as an object value; explicitly prohibiting non-decimal numeral literals (hex, binary, octal, etc.) prevents JSONDecodeError generated by such invalid tokens.",
+        "confidence": 0.9,
+        "added_timestamp": "2026-09-29T11:07:02.380114",
+        "source_task_id": "fail14.3"
+      },
+      {
+        "rule": "Never generate or echo JSON as literal prose—output well-formed JSON consisting solely of valid keys and values, and never repeat an intended comma or separator as a standalone field value like a doubled/comma artifact.",
+        "rationale": "The agent mistakenly treated 'double extra comma' as a value and produced an unparseable sequence ('double extra comma',,) that violates JSON syntax at a separator position.",
+        "confidence": 0.85,
+        "added_timestamp": "2026-09-29T10:43:06.026372",
+        "source_task_id": "fail5.1"
+      },
+      {
+        "rule": "When the input is not valid JSON, never attempt to interpret 'true'/'false'/'unknown' words or fragments as booleans—treat any non-parseable input as malformed and respond with a sanitized fallback object, and always serialize output values explicitly (numbers and booleans) to reject anything that fails strict JSON parsing.",
+        "rationale": "The agent tried to coerce a malformed string ('Bad value') into a boolean 'truth', which produced invalid JSON; instructing it to always fall back to a sanitizing object for any input it cannot parse as strict JSON prevents this.",
+        "confidence": 0.85,
+        "added_timestamp": "2026-09-29T10:47:53.173956",
+        "source_task_id": "fail23.1"
+      },
+      {
+        "rule": "When representing whole numbers, always emit plain decimal digits without a leading zero (e.g., use '13', never '013'); support only valid JSON scalar types (string, number, object, array, true, false, null) and never try to provide an invalid numeral within quotes as a number.",
+        "rationale": "This directly prevents retrying a leading-zero '013' (an invalid JSON number) by instructing the agent to canonicalize whole numbers and emit strictly valid scalars instead of treating an invalid numeral as intentional.",
+        "confidence": 0.85,
+        "added_timestamp": "2026-09-29T10:55:39.548854",
+        "source_task_id": "fail13.2"
+      },
+      {
+        "rule": "When input contains a complete JSON value followed by additional non-whitespace characters or comments, treat the entire input as malformed and respond with the sanitized fallback object rather than trimming and attempting to parse only the leading value.",
+        "rationale": "The JSONDecodeError 'Extra data' occurs because input has a valid value plus trailing non-whitespace content that strict JSON parsers reject.",
+        "confidence": 0.85,
+        "added_timestamp": "2026-09-29T11:04:29.727594",
+        "source_task_id": "fail7.3"
+      },
+      {
+        "rule": "When input contains a trailing comma artifact (e.g., a comma immediately before end-of-input or after a value) or a missing ':' delimiter, reconstruct that fragment with a sanitized minimal placeholder—strip trailing commas and emit an empty object {'_note': 'malformed '}—and re-validate the sanitized result before claiming it is valid JSON.",
+        "rationale": "This teaches the agent to locally repair common delimiter/comma artifacts rather than trusting or blindly echoing split fragments, directly targeting the 'Expecting : delimiter' JSONDecodeError.",
+        "confidence": 0.85,
+        "added_timestamp": "2026-09-29T11:10:35.775120",
+        "source_task_id": "fail19.3"
+      },
+      {
+        "rule": "When reconstructing a JSON value that loses its delimiter (e.g., a value followed by characters that failed to close the array/object, producing Expecting ',' delimiter), flag it as malformed and emit the sanitized fallback object {'_note': 'malformed '} instead of guessing the missing comma.",
+        "rationale": "The report shows the model correctly paired with a delimiter like a comma rather than ':'—the fix is to instruct it to treat such delimiter-busting continuation as malformed and return the fallback instead of attempting recovery.",
+        "confidence": 0.85,
+        "added_timestamp": "2026-09-29T11:11:48.464265",
+        "source_task_id": "fail22.3"
+      },
+      {
+        "rule": "Always emit any user-supplied raw token (e.g. 'single quote') as a quoted string value inside a minimum placeholder object ({\"_note\": \"malformed \"}) with the token properly JSON-escaped to avoid emitting invalid standalone scalar content that fails strict JSON parsing.",
+        "rationale": "The 'single quote' model output was emitted as a bare, unquoted literal that the parser rejected as JSON; wrapping unconsumed(fragment) tokens in an escaped JSON string value prevents this error.",
+        "confidence": 0.85,
+        "added_timestamp": "2026-09-29T11:12:19.408351",
+        "source_task_id": "fail24.3"
+      }
+    ],
+    "error_handling": [
+      {
+        "rule": "When input appears to be a truncated, incomplete, or partial JSON value (e.g., a leading digit followed by too few characters to form a complete token), treat the entire input as malformed—do not attempt to complete or guess missing delimiters; instead respond with the sanitized fallback object.",
+        "rationale": "The error 'Expecting ',' delimiter: line 1 column 3 (char 2)' for input like '0e+' indicates the model tried to process a fragment it mistook for valid JSON rather than reporting malformed input with a fallback.",
+        "confidence": 0.94,
+        "added_timestamp": "2026-09-29T11:01:18.943239",
+        "source_task_id": "fail30.2"
+      },
+      {
+        "rule": "When user input contains literal line breaks or unescaped control characters, serialize the entire input as a single JSON string escaped via a strict JSON encoder so no raw control characters leak into emitted output.",
+        "rationale": "The error stems from unescaped control characters in the output, so forcibly escaping them prevents InvalidControlCharacter DecodeErrors, and this addresses JSON string escaping rather than covering the Apache/Thrift control-character whitelist budget, which is irrelevant here.",
+        "confidence": 0.85,
+        "added_timestamp": "2026-09-29T10:49:07.226587",
+        "source_task_id": "fail27.1"
+      },
+      {
+        "rule": "Trailing whitespace after JSON content (e.g., a single space following the closing brace) causes JSONDecodeError at the 2nd character—chop all leading and trailing whitespace from the entire input before attempting to parse it, and skip parsing if nothing meaningful remains.",
+        "rationale": "The input '[\naked]' expands to '[\\naked] ' and the 'Expecting value at line 1 col 2' error occurs because JSON parsers reject trailing whitespace; stripping it lets the parser detect the malformed '[ ]' content instead of failing at the space.",
+        "confidence": 0.85,
+        "added_timestamp": "2026-09-29T10:56:42.495427",
+        "source_task_id": "fail16.2"
+      },
+      {
+        "rule": "Never emit unescaped control characters in string values: replace line breaks, tabs, and other control characters with their proper JSON escape sequences (e.g., \\n for newlines, \\t for tabs) to avoid JSONDecodeError with 'Invalid \\escape'.",
+        "rationale": "The model output a literal newline inside a string, producing an invalid backslash-escape that the JSON parser rejected; forcing explicit escaping of control characters prevents this parser error.",
+        "confidence": 0.85,
+        "added_timestamp": "2026-09-29T11:00:45.102293",
+        "source_task_id": "fail28.2"
+      },
+      {
+        "rule": "When the raw model output itself is not valid JSON (e.g. a stray token like '-1' emitted directly rather than wrapped in a fallback object), detect this before emission and re-emit a sanitized fallback object {'_note': 'malformed '} instead of outputting the bare token.",
+        "rationale": "This prevents the agent from leaking invalid JSON scalars directly as its response, closing the gap the current rules don't cover—assuming reconstruction always happens inside a fallback object and catching cases where the output is a bare invalid token rather than a full object.",
+        "confidence": 0.85,
+        "added_timestamp": "2026-09-29T11:15:06.541124",
+        "source_task_id": "fail31.3"
+      }
+    ]
+  }
+}
