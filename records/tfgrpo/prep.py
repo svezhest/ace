@@ -43,10 +43,12 @@ from utu.utils import EnvUtils  # noqa: E402
 db = sqlite3.connect(EnvUtils.get_env("UTU_DB_URL").removeprefix("sqlite:///"))
 # исключение (автор, 29.09): задача DAPO №7 (S={1..98}, 10 чисел и взаимная простота) — модель пишет на ней
 # переборы, поток python_executor по таймауту не умирает (issue #256), rollout раз за разом упирается в 3600 с;
-# 10 ч прогона ушли на неё. Срез --rollout_data_truncate 16 берёт вместо неё следующую, №16
-q = db.execute("select question from data where dataset = 'DAPO-Math-17k' and \"index\" = 7").fetchone()[0]
-assert q.startswith("设 S=\\{1,2,\\cdots,98\\}"), q[:40]
-db.execute("delete from data where dataset = 'DAPO-Math-17k' and \"index\" = 7")
-db.commit()
+# 10 ч прогона ушли на неё. Срез --rollout_data_truncate 16 берёт вместо неё следующую, №16.
+# TFGRPO_ALL_TASKS=1 — данные апстрима как есть
+if os.environ.get("TFGRPO_ALL_TASKS") != "1":
+    q = db.execute("select question from data where dataset = 'DAPO-Math-17k' and \"index\" = 7").fetchone()[0]
+    assert q.startswith("设 S=\\{1,2,\\cdots,98\\}"), q[:40]
+    db.execute("delete from data where dataset = 'DAPO-Math-17k' and \"index\" = 7")
+    db.commit()
 rows = db.execute("select question, answer, source from data where dataset = ? order by \"index\"", ("AIME24",))
 upload(list(rows)[:4], "AIME24-live")

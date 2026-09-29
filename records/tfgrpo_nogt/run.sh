@@ -4,11 +4,15 @@
 # (configs/practice/math_live_nogt.yaml). Тогда в итоге rollout и в групповом преимуществе вместо эталона и награды —
 # [REDACTED], и извлекаются все группы, а не только частично верные (utu/practice/experience_updater.py).
 # prep.py, Dockerfile, sitecustomize.py и конфиги — из records/tfgrpo; контейнеры — свои (tfng-rec, tfng-run).
-# usage: run.sh OUT [CACHE]   (CACHE — прошлая запись этого раннера: её ответы прокси отдаёт без модели,
-# tools/record/record.py; в OUT то же, что у records/tfgrpo)
+# usage: [TFGRPO_ALL_TASKS=1] run.sh OUT [CACHE]   (CACHE — прошлая запись этого раннера, можно .gz: её ответы прокси
+# отдаёт без модели, tools/record/record.py; TFGRPO_ALL_TASKS=1 — без исключения задачи в prep.py; в OUT то же, что у records/tfgrpo)
 set -euo pipefail
 OUT=$(mkdir -p "$1" && cd "$1" && pwd)
 CACHE=${2:+$(cd "$(dirname "$2")" && pwd)/$(basename "$2")}
+if [[ $CACHE == *.gz ]]; then
+    gunzip -c "$CACHE" > "$OUT/cache.jsonl"
+    CACHE=$OUT/cache.jsonl
+fi
 HERE=$(cd "$(dirname "$0")" && pwd)
 T=$(cd "$HERE/../tfgrpo" && pwd)
 ACE=${ACE:-$(cd "$HERE/../.." && pwd)}
@@ -72,3 +76,4 @@ mv logs /out/utu_train
 step test.log "grep -qF \"> Cleaning up...\" logs/utu.log* 2>/dev/null" python scripts/run_eval.py --config_name math/math_live_test
 mv logs /out/utu_test' 2>&1 | tee "$OUT/run.log"
 mv "$OUT/rec/rec.jsonl" "$OUT/rec.jsonl" && rmdir "$OUT/rec"
+rm -f "$OUT/cache.jsonl"
