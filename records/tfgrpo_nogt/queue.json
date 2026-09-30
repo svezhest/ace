@@ -1,0 +1,41 @@
+{
+ "attempt": 1,
+ "limit_minutes": 720,
+ "command": [
+  "records/tfgrpo_nogt/run.sh",
+  "<work>/runs/tfgrpo_nogt-0929-2320-1",
+  "<work>/cache/tfgrpo_nogt.jsonl"
+ ],
+ "started": "2026-09-29 23:20",
+ "finished": "2026-09-30 09:36",
+ "minutes": 615.8,
+ "upstream_head": "c2caa539f4c95ae1c39ed24dc8a99cb3651e1d5d",
+ "ace_head": "3772dfc",
+ "exit": 127,
+ "calls": 807,
+ "statuses": {
+  "200": 807
+ },
+ "verdicts": {
+  "ok": 807
+ },
+ "infra": [],
+ "refused": null,
+ "salvaged": "апстрим отработал целиком (train.log и test.log: результат есть), упал хвост раннера: run.sh правился (c259c46) во время прогона, bash дочитал изменённый файл со старого смещения — '.yaml: command not found' после docker run. Два хвостовых шага (mv rec/rec.jsonl, rm cache) сделаны вручную, проверки очереди (статусы, dropped, error) пройдены, опубликовано из <work>/_failed/tfgrpo_nogt-0929-2320-1",
+ "cache": "records/tfgrpo_nogt/cache.jsonl.gz (то же содержимое, sha256_jsonl в run.json)",
+ "rec_sha256": "a6b3201d0d042c3eb5f1d778b4336798c568c9f482e579fdac52402cc5b61020",
+ "files": {
+  "prep.log": 1059,
+  "rec.jsonl": 40811659,
+  "run.log": 170,
+  "test.db": 11010048,
+  "test.log": 2525,
+  "tf_live_agent.yaml": 3116,
+  "train.log": 1491,
+  "utu_test/utu.log": 361375,
+  "utu_train/utu.log": 1247408
+ },
+ "host_paths": [
+  "prep.log"
+ ]
+}

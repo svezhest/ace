@@ -1,0 +1,8 @@
+2026-09-29 23:20:36,652[utu.tracing.setup] - WARNING - setup.py:85 - PHOENIX_ENDPOINT or PHOENIX_PROJECT_NAME is not set! Skipping OpenTelemetry tracing.
+Generating train split: 0 examples [00:00, ? examples/s]Generating train split: 1048576 examples [00:02, 361986.70 examples/s]Generating train split: 1791700 examples [00:03, 635695.53 examples/s]Generating train split: 1791700 examples [00:03, 557523.87 examples/s]
+DAPO-Math-17k 17398
+Using the latest cached version of the dataset since HuggingFaceH4/aime_2024 couldn't be found on the Hugging Face Hub (offline mode is enabled).
+Found the latest cached dataset configuration 'default' at /Users/user/Projects/ace/upstreams/.hf/datasets/HuggingFaceH4___aime_2024/default/0.0.0/2fe88a2f1091d5048c0f36abc874fb997b3dd99a (last modified on Tue Sep 29 04:58:47 2026).
+AIME24 30
+Uploaded 4 datapoints from /private/tmp/claude-501/-Users-user-Projects-itmo/a04e42db-becc-4c5f-a1a6-f26b7e31e71d/scratchpad/recq/runs/tfgrpo_nogt-0929-2320-1/prep/AIME24-live.jsonl to dataset 'AIME24-live'.
+Upload complete.

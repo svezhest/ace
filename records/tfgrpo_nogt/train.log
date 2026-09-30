@@ -1,0 +1,9 @@
+2026-01-01 00:00:00,000[utu.tracing.setup] - WARNING - setup.py:85 - PHOENIX_ENDPOINT or PHOENIX_PROJECT_NAME is not set! Skipping OpenTelemetry tracing.
+Preprocessing batch:   0%|          | 0/12 [00:00<?, ?it/s]Preprocessing batch: 100%|██████████| 12/12 [00:00<?, ?it/s]
+Rolling out batch:   0%|          | 0/12 [00:00<?, ?it/s]Rolling out batch: 100%|██████████| 12/12 [00:00<?, ?it/s]
+2026-01-01 00:00:00,000[utu.practice.experience_updater] - WARNING - experience_updater.py:254 - Warning: failed in group update experience, Expecting value: line 1 column 1 (char 0)
+2026-01-01 00:00:00,000[utu.practice.experience_updater] - WARNING - experience_updater.py:254 - Warning: failed in group update experience, Expecting value: line 1 column 1 (char 0)
+2026-01-01 00:00:00,000[utu.practice.experience_updater] - WARNING - experience_updater.py:254 - Warning: failed in group update experience, Invalid control character at: line 6 column 363 (char 412)
+2026-01-01 00:00:00,000[utu.context.base_context_manager] - WARNING - base_context_manager.py:37 - Max turns 50 encountered! Injecting stop message.
+2026-01-01 00:00:00,000[utu.context.base_context_manager] - WARNING - base_context_manager.py:37 - Max turns 50 encountered! Injecting stop message.
+2026-01-01 00:00:00,000[utu.practice.experience_updater] - WARNING - experience_updater.py:254 - Warning: failed in group update experience, Expecting ',' delimiter: line 8 column 3 (char 409)

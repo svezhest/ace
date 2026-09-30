@@ -1,0 +1,57 @@
+# @package _global_
+defaults:
+  - _self_
+
+type: simple
+model:
+  model_provider:
+    type: chat.completions
+    model: ornith15-9b
+  model_settings:
+    temperature: 0.3
+    top_p: 0.95
+    include_usage: true
+    extra_args:
+      timeout: 3000
+  model_params: {}
+agent:
+  name: math_agent
+  instructions: "Solve the following problem step by step. You now have the ability\
+    \ to selectively write executable Python code to enhance your reasoning process,\
+    \ e.g., calulating numbers and verifying math computations. Never directly just\
+    \ printing your textual reasoning in Python. The Python code will be executed\
+    \ by an external sandbox, and the output (returned as a dict with the message\
+    \ in the \"message\" field) can be returned to aid your reasoning and help you\
+    \ arrive at the final answer. The Python code should be complete scripts, including\
+    \ necessary imports. \nEach code snippet is wrapped with \n```python\ncode snippet\n\
+    ```.\n\nThe last part of your final response should be in the following format:\n\
+    <answer>\n\\\\boxed{{'The final answer goes here.'}}\n</answer>\n\nWhen solving\
+    \ problems, you MUST first carefully read and understand the helpful instructions\
+    \ and experiences:\n[G0]. Commit to the reduction/hybrid method: first identify\
+    \ and state the governing general method for the problem class, then establish\
+    \ a clean model (transition rule, residue partition by gcd) and derive its immediate\
+    \ consequences, rather than repeatedly abandoning the model for ad-hoc case-work.\n\
+    [G1]. Bound before you conclude: Use structural/global bounds to narrow the search,\
+    \ then check only the hardest remaining cases, using extremal divisors and monotonicity\
+    \ pairing (c vs m/c) when the divisor structure is symmetric.\n[G2]. Establish\
+    \ existence via the transition rule: Prove infinite validity by showing strict\
+    \ growth and reachability of an absorbing state, and report this existence argument\
+    \ instead of a full explicit construction.\n[G3]. Brute force as existence/minimality\
+    \ checkpoint: Commit to search only when it carries both a witness (existence)\
+    \ and a proof all smaller candidates fail (minimality), then close with a clean\
+    \ structural principle so the result generalizes rather than reading as an observed\
+    \ datum.\n[G4]. Declare ambiguity transparently and report the derived correct\
+    \ reading: enumerate feasible answers for all plausible readings in one pass and\
+    \ let the reader decide, and always verify the target reading is feasible up front\
+    \ before building a solution around it.\n[G5]. Prove preconditions before applying\
+    \ them: verify geometric conditions (e.g., a right angle) explicitly before using\
+    \ them to simplify a computation, since a shortcut that fails its precondition\
+    \ injects a silent error into the final answer."
+toolkits:
+  python_executor:
+    mode: builtin
+    env_mode: local
+    name: python_executor
+    config: {}
+    mcp_transport: stdio
+    mcp_client_session_timeout_seconds: 20
