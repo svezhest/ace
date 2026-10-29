@@ -34,6 +34,8 @@ VIEWS = {"app": os.path.expanduser("~/Projects/nrhsi/appworld/view"),
          "alf": os.path.expanduser("~/Projects/nrhsi/alfworld/view")}
 SET = f"{HERE}/set.tsv"
 RESULTS = f"{HERE}/results.jsonl"
+OUT = HERE                # --out: results.jsonl и logs/ этого прогона
+VER = "v2"               # v1: «try to refute»; v2: нейтрально; v3: v2 + два синтетических примера, why перед verdict
 BASH_LIMIT = 10
 FINAL_TURNS = 3          # ходов только с verdict после лимита
 HARD_AT = 52000          # оценка prompt -> только verdict
@@ -55,9 +57,43 @@ The claim is supported if its main statement survives these checks, refuted if t
 RUNS_LINE
 BSD_LINE
 PYTHON_LINE
-- verdict(verdict, why, evidence): the result. verdict is "supported", "refuted" or "unclear"; why says what was checked and what was found; evidence lists the lines that decide it ("path:line", "path:start-end", or a short quote with its path).
+VERDICT_LINE
 
+EXAMPLES
 bash can be called BASH_LIMIT times; after that only verdict remains. Call verdict once, when the check is done."""
+
+VERDICT_V2 = """- verdict(verdict, why, evidence): the result. verdict is "supported", "refuted" or "unclear"; why says what was checked and what was found; evidence lists the lines that decide it ("path:line", "path:start-end", or a short quote with its path)."""
+VERDICT_V3 = """- verdict(why, evidence, verdict): the result. why says what was checked and what was found; evidence lists the lines that decide it ("path:line", "path:start-end", or a short quote with its path); verdict is "supported" (the claim's main statement is true), "refuted" (it is false) or "unclear" (the files do not decide it)."""
+
+EXAMPLES_V3 = """
+# Two examples of checks (synthetic, not about this repository)
+Claim: "The model most of the time answers 'No' instead of 'Yes' when the messages near the question mention 'Zephyr'."
+    bash: python3 - <<'EOF'
+    import glob, re
+    near, far = {"Yes": 0, "No": 0}, {"Yes": 0, "No": 0}
+    for f in glob.glob("logs/run_*.jsonl"):
+        t = open(f).read()
+        for m in re.finditer(r"\\b(Yes|No)\\b", t):
+            d = near if "Zephyr" in t[max(0, m.start() - 500):m.end() + 500] else far
+            d[m.group(1)] += 1
+    print("near Zephyr:", near, "elsewhere:", far)
+    EOF
+    >> near Zephyr: {'Yes': 4, 'No': 31} elsewhere: {'Yes': 52, 'No': 47}
+    verdict(why="Near 'Zephyr' the answer is No in 31 of 35 cases, elsewhere in about half; the claim holds.", evidence=["count over logs/run_*.jsonl: near Zephyr Yes 4, No 31; elsewhere Yes 52, No 47"], verdict="supported")
+
+Claim: "After the hook check_budget interrupts the agent, the agent ignores the prompt's instruction to end each reply with a summary line."
+    bash: grep -n "check_budget" src/*.py
+    >> src/hooks.py:12:def check_budget(ctx, nb):   (it returns a message "Budget check: ...")
+    bash: runs grep "Budget check:"
+    >> logs/run_3.jsonl:41 user: ...  logs/run_7.jsonl:18 user: ...
+    bash: grep -n -i "summary line" src/*.md
+    >> src/prompt.md:30: End each reply with a summary line.
+    bash: runs show 3 41-44
+    >> (the hook's message, then the agent's replies) -- replies 42 and 44 end with a summary line
+    bash: runs show 7 18-21
+    >> (the same) -- replies 19 and 21 end with a summary line
+    verdict(why="In both runs where check_budget fired (run_3:41, run_7:18), the next replies end with the summary line that src/prompt.md:30 asks for; the claim is false.", evidence=["logs/run_3.jsonl:42", "logs/run_7.jsonl:19", "src/prompt.md:30"], verdict="refuted")
+"""
 
 FIRST_T = """Claim (KIND):
 OBS
@@ -101,7 +137,7 @@ def init_fsr():
 
 def build_system():
     progs = sorted(fsr.ALLOWED)
-    return (SYSTEM_T.replace("PROGRAMS", ", ".join(progs)).replace("OUT_CHARS", str(fsr.OUT_CHARS))
+    return (SYSTEM_T.replace("VERDICT_LINE", VERDICT_V3 if VER == "v3" else VERDICT_V2).replace("EXAMPLES\n", EXAMPLES_V3.lstrip("\n") + "\n" if VER == "v3" else "").replace("PROGRAMS", ", ".join(progs)).replace("OUT_CHARS", str(fsr.OUT_CHARS))
             .replace("RUNS_LINE", fsr.RUNS_LINE).replace("BSD_LINE", fsr.BSD_LINE)
             .replace("PYTHON_LINE", fsr.PYTHON_LINE).replace("BASH_LIMIT", str(BASH_LIMIT)))
 
@@ -137,8 +173,8 @@ def session(rid, row, system):
         vname, lock = fsr.claim_view(f"v_{rid}")
         root = fsr.build_view(vname, tids)
         prof = fsr.sandbox_profile(root)
-    os.makedirs(f"{HERE}/logs", exist_ok=True)
-    logp = f"{HERE}/logs/{rid}.jsonl"
+    os.makedirs(f"{OUT}/logs", exist_ok=True)
+    logp = f"{OUT}/logs/{rid}.jsonl"
     log = open(logp, "w", encoding="utf-8", errors="backslashreplace")
 
     def w(rec):
@@ -292,7 +328,7 @@ def session(rid, row, system):
         fsr.release_view(lock)
     out = {"id": rid, "verdict": (result or {}).get("verdict", "none"), "end": end, **st,
            "why": (result or {}).get("why"), "evidence": (result or {}).get("evidence"), "log": logp}
-    with _res_lock, open(RESULTS, "a") as f:
+    with _res_lock, open(f"{OUT}/results.jsonl", "a") as f:
         f.write(json.dumps(out, ensure_ascii=False) + "\n")
     print(json.dumps({k: out[k] for k in ("id", "verdict", "end", "turns", "bash_calls", "max_prompt", "model_sec")}),
           flush=True)
@@ -345,7 +381,22 @@ def main():
     r.add_argument("--ids", required=True)
     r.add_argument("--par", type=int, default=2)
     r.add_argument("--total", type=int, default=4)
+    for x in (d, r):
+        x.add_argument("--ver", default="v2", choices=["v2", "v3"])
+        x.add_argument("--bash-limit", type=int, default=10)
+        x.add_argument("--out", default=HERE)
     a = ap.parse_args()
+    global VER, BASH_LIMIT, OUT, TOOLS, FINAL_TOOLS
+    VER, BASH_LIMIT, OUT = a.ver, a.bash_limit, os.path.abspath(a.out)
+    os.makedirs(OUT, exist_ok=True)
+    if VER == "v3":                          # why и evidence до verdict; что значит каждая метка
+        fn = TOOLS[1]["function"]
+        p = fn["parameters"]["properties"]
+        p["verdict"]["description"] = ("supported: the claim's main statement is true; refuted: it is false; "
+                                       "unclear: the files do not decide it")
+        fn["parameters"]["properties"] = {k: p[k] for k in ("why", "evidence", "verdict")}
+        fn["parameters"]["required"] = ["why", "evidence", "verdict"]
+        FINAL_TOOLS = [TOOLS[1]]
     if a.cmd == "dry":
         init_fsr()
         row = load_set()[a.id]
