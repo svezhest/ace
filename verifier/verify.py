@@ -66,33 +66,42 @@ VERDICT_V2 = """- verdict(verdict, why, evidence): the result. verdict is "suppo
 VERDICT_V3 = """- verdict(why, evidence, verdict): the result. why says what was checked and what was found; evidence lists the lines that decide it ("path:line", "path:start-end", or a short quote with its path); verdict is "supported" (the claim's main statement is true), "refuted" (it is false) or "unclear" (the files do not decide it)."""
 
 EXAMPLES_V3 = """
-# Two examples of checks (synthetic, not about this repository)
-Claim: "The model most of the time answers 'No' instead of 'Yes' when the messages near the question mention 'Zephyr'."
+# Examples
+Claim: "The model most of the time answers 'No' instead of 'Yes' when the messages before the question mention 'Zephyr'."
     bash: python3 - <<'EOF'
-    import glob, re
+    import glob, json
     near, far = {"Yes": 0, "No": 0}, {"Yes": 0, "No": 0}
     for f in glob.glob("logs/run_*.jsonl"):
-        t = open(f).read()
-        for m in re.finditer(r"\\b(Yes|No)\\b", t):
-            d = near if "Zephyr" in t[max(0, m.start() - 500):m.end() + 500] else far
-            d[m.group(1)] += 1
-    print("near Zephyr:", near, "elsewhere:", far)
+        msgs = [json.loads(l) for l in open(f)]
+        for i, m in enumerate(msgs):
+            words = (m.get("content") or "").split()
+            if m["role"] != "assistant" or not words or words[0].strip(".,!") not in near:
+                continue
+            before = " ".join(x.get("content") or "" for x in msgs[max(0, i - 2):i])
+            (near if "Zephyr" in before else far)[words[0].strip(".,!")] += 1
+    print("after Zephyr:", near, "otherwise:", far)
     EOF
-    >> near Zephyr: {'Yes': 4, 'No': 31} elsewhere: {'Yes': 52, 'No': 47}
-    verdict(why="Near 'Zephyr' the answer is No in 31 of 35 cases, elsewhere in about half; the claim holds.", evidence=["count over logs/run_*.jsonl: near Zephyr Yes 4, No 31; elsewhere Yes 52, No 47"], verdict="supported")
+    >> after Zephyr: {'Yes': 4, 'No': 31} otherwise: {'Yes': 52, 'No': 47}
+    verdict(why="When one of the two messages before the answer mentions 'Zephyr', the answer is No in 31 of 35 cases, otherwise in 47 of 99; the claim holds.", evidence=["count over the assistant answers in logs/run_*.jsonl: after Zephyr Yes 4, No 31; otherwise Yes 52, No 47"], verdict="supported")
 
 Claim: "After the hook check_budget interrupts the agent, the agent ignores the prompt's instruction to end each reply with a summary line."
-    bash: grep -n "check_budget" src/*.py
-    >> src/hooks.py:12:def check_budget(ctx, nb):   (it returns a message "Budget check: ...")
+    bash: grep -n "check_budget\\|Budget check" src/*.py
+    >> src/hooks.py:12:def check_budget(ctx, nb):
+    >> src/hooks.py:15:        return {"message": f"Budget check: {ctx['remaining_steps']} steps left."}
     bash: runs grep "Budget check:"
-    >> logs/run_3.jsonl:41 user: ...  logs/run_7.jsonl:18 user: ...
-    bash: grep -n -i "summary line" src/*.md
-    >> src/prompt.md:30: End each reply with a summary line.
-    bash: runs show 3 41-44
-    >> (the hook's message, then the agent's replies) -- replies 42 and 44 end with a summary line
-    bash: runs show 7 18-21
-    >> (the same) -- replies 19 and 21 end with a summary line
-    verdict(why="In both runs where check_budget fired (run_3:41, run_7:18), the next replies end with the summary line that src/prompt.md:30 asks for; the claim is false.", evidence=["logs/run_3.jsonl:42", "logs/run_7.jsonl:19", "src/prompt.md:30"], verdict="refuted")
+    >> logs/run_3.jsonl:41 user: {"role": "user", "content": "Budget check: 9 steps left."}
+    >> logs/run_7.jsonl:18 user: {"role": "user", "content": "Budget check: 32 steps left."}
+    bash: grep -n -i "summary" src/*.md
+    >> src/prompt.md:30:End each reply with a line that starts with "Summary:".
+    bash: runs show 3 42-43
+    >> --- 42 assistant (83 chars)
+    >> {"role": "assistant", "content": "I open drawer 2.\\nSummary: looking for the key."}
+    >> --- 43 tool (65 chars)
+    >> {"role": "tool", "content": "The drawer 2 is open. It is empty."}
+    bash: runs show 7 19
+    >> --- 19 assistant (90 chars)
+    >> {"role": "assistant", "content": "I go to the desk.\\nSummary: the key is not in drawers."}
+    verdict(why="In both runs where check_budget fired (run_3:41, run_7:18), the next reply ends with the Summary line that src/prompt.md:30 asks for; the claim is false.", evidence=["logs/run_3.jsonl:42", "logs/run_7.jsonl:19", "src/prompt.md:30"], verdict="refuted")
 """
 
 FIRST_T = """Claim (KIND):
