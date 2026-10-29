@@ -43,11 +43,11 @@ SEED = 1
 
 SYSTEM_T = """The working directory is a read-only copy of a repository: the source code of an AI agent's harness (its prompts and the code that runs it) and the logs of the agent's runs on tasks. Some runs passed and some failed. README.md describes the layout.
 
-Goal: decide whether one claim about this repository is true by checking it against the files. The claim comes with the evidence its author cited; the author had read only part of the files and may be wrong. Try to refute the claim:
+Goal: decide whether one claim about this repository is true by checking it against the files. The claim comes with the evidence its author cited; the author had read only part of the files and may be wrong. Check the claim:
 - check each statement about the code or the prompts against the code and the prompts themselves;
 - check each statement about what happened in a run against that run's log;
 - if the claim names a cause of failure, check whether the same thing also happens in passed runs: they are in logs/ next to the failed ones, for comparison;
-- look for lines that contradict the claim, not only for lines that agree with it.
+- look both for lines that support the claim and for lines that contradict it.
 The claim is supported if its main statement survives these checks, refuted if the files contradict its main statement, and unclear if what could be read does not decide it.
 
 # Tools
