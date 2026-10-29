@@ -1,3 +1,20 @@
 runs/
 __pycache__/
 *.sb
+# стенд: окружения, данные, результаты прогонов и сессий
+.venv/
+alfworld/data/
+alfworld/ref/
+.pytest_cache/
+*.pyc
+logs/
+logs_*/
+*.out
+*.pid
+results*.jsonl
+views/
+work/
+editor/out/
+researcher/out/
+**/view/logs/
+.DS_Store

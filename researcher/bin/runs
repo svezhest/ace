@@ -1,0 +1,362 @@
+#!/Library/Developer/CommandLineTools/usr/bin/python3
+"""runs — навигация по логам вида: logs/run_N.jsonl (одна строка = одно сообщение) и logs/results.jsonl.
+Сообщение печатается сырой строкой jsonl как есть, номер сообщения = номер строки файла. О бенчмарке ничего не
+знает, только читает. Запускается в песочнице fsr (PATH = researcher/bin:...); интерпретатор — CLT python 3.9
+(/usr/bin/python3 — обёртка xcode-select, в песочнице не работает)."""
+import json
+import os
+import re
+import shlex
+import sys
+
+sys.dont_write_bytecode = True
+OUT = int(os.environ.get("RUNS_OUT_CHARS") or 8000)   # = fsr OUT_CHARS: больше — fsr обрежет вывод вслепую
+PART = 4000                                           # столько символов одного сообщения за раз
+CTX = 150                                             # grep: символов вокруг совпадения
+SNIP_MAX = 600
+PER_MSG = 3                                           # grep: сниппетов на сообщение, дальше — счёт
+RESERVE = 300                                         # место под метку продолжения
+FORMAT = os.environ.get("RUNS_FORMAT") or "raw"       # raw: строка jsonl как есть; text: поля сообщения текстом
+
+HELP = """runs — the run logs, message by message (a message = one line of logs/run_N.jsonl, printed FMT)
+
+  runs                          list runs: result, reason, size
+  runs show N 40-45             messages 40-45 (= lines 40-45 of logs/run_N.jsonl)
+  runs show N --tail 6          the last 6 messages
+  runs grep -i "error" N M      matches in runs N and M, with message numbers
+
+runs show N [A | A-B | A-] [--tail K] [--role R[,R]] [--chars A-B]
+  Each message: a header '--- 12 assistant (1830 chars)' and the message under it (FMT).
+  A message longer than 4000 characters is shown 4000 at a time: runs show N 12 --chars 4001- shows the next part.
+  A long output stops at a message boundary and ends with the command that continues it.
+runs grep [-i] [-c] PATTERN [N ...]
+  PATTERN is a regular expression (Python syntax) searched in the messages (FMT) of all runs, or of runs N ...
+  Each match: logs/run_N.jsonl:LINE role: ...150 characters on each side...
+  -i  ignore case;  -c  count matches in each run.
+"""
+
+
+class Err(Exception):
+    pass
+
+
+def find_logs():
+    d = os.getcwd()
+    while True:
+        for c in (os.path.join(d, "logs"), d):
+            if os.path.isfile(os.path.join(c, "results.jsonl")):
+                return c
+        up = os.path.dirname(d)
+        if up == d:
+            raise Err("no logs/results.jsonl found; run runs from the working directory")
+        d = up
+
+
+def run_files(logs):
+    out = {}
+    for f in os.listdir(logs):
+        m = re.fullmatch(r"run_(\d+)\.jsonl", f)
+        if m:
+            out[int(m.group(1))] = os.path.join(logs, f)
+    return dict(sorted(out.items()))
+
+
+def read_lines(path):
+    with open(path, encoding="utf-8", errors="replace", newline="") as f:
+        t = f.read()
+    lines = t.split("\n")
+    if lines and lines[-1] == "":
+        lines.pop()
+    return lines
+
+
+def role_of(line):
+    try:
+        o = json.loads(line)
+    except ValueError:
+        return "(not JSON)"
+    r = o.get("role") if isinstance(o, dict) else None
+    return r if isinstance(r, str) else "?"
+
+
+def as_text(line):
+    """FORMAT=text: поля сообщения текстом, без раскодирования действий. content — как есть (строка без экранов);
+    у вызова — имя и строка arguments ровно теми символами, что написала модель; прочие поля — key: value."""
+    try:
+        o = json.loads(line)
+    except ValueError:
+        return line
+    if not isinstance(o, dict):
+        return line
+    out = []
+    c = o.get("content")
+    out.append(c if isinstance(c, str) else "(no content)" if c is None else json.dumps(c, ensure_ascii=False))
+    for tc in o.get("tool_calls") or []:
+        f = tc.get("function") if isinstance(tc, dict) else None
+        if isinstance(f, dict):
+            a = f.get("arguments")
+            out.append(f"tool call: {f.get('name')} {a if isinstance(a, str) else json.dumps(a, ensure_ascii=False)}")
+        else:
+            out.append(f"tool call: {json.dumps(tc, ensure_ascii=False)}")
+    for k, v in o.items():
+        if k not in ("role", "content", "tool_calls"):
+            out.append(f"{k}: {v if isinstance(v, str) else json.dumps(v, ensure_ascii=False)}")
+    return "\n".join(out)
+
+
+def view(line):
+    return as_text(line) if FORMAT == "text" else line
+
+
+def run_no(tok):
+    m = re.fullmatch(r"(?:(?:\./)?(?:logs/)?run_)?(\d+)(?:\.jsonl)?", tok)
+    if not m:
+        raise Err(f"'{tok}' is not a run number")
+    return int(m.group(1))
+
+
+def get_run(logs, n):
+    p = os.path.join(logs, f"run_{n}.jsonl")
+    if not os.path.isfile(p):
+        raise Err(f"there is no logs/run_{n}.jsonl here (runs lists the runs)")
+    return read_lines(p)
+
+
+# ---------------------------------------------------------------- runs
+
+def cmd_list(logs):
+    files = run_files(logs)
+    rows, seen = [], set()
+    for l in read_lines(os.path.join(logs, "results.jsonl")):
+        if not l.strip():
+            continue
+        try:
+            r = json.loads(l)
+        except ValueError:
+            continue
+        n = r.get("run") if isinstance(r, dict) else None
+        if not isinstance(n, int):
+            continue
+        seen.add(n)
+        rows.append((n, json.dumps(r.get("ok")), str(r.get("reason", ""))))
+    rows += [(n, "?", "(not in results.jsonl)") for n in files if n not in seen]
+    table = [("run", "ok", "reason", "messages", "chars")]
+    for n, ok, reason in rows:
+        if n in files:
+            ls = read_lines(files[n])
+            table.append((str(n), ok, reason, str(len(ls)), str(sum(len(x) for x in ls))))
+        else:
+            table.append((str(n), ok, reason, "-", "-"))
+    w = [max(len(r[i]) for r in table) for i in range(5)]
+    out = []
+    for r in table:
+        out.append(f"{r[0]:>{w[0]}}  {r[1]:<{w[1]}}  {r[2]:<{w[2]}}  {r[3]:>{w[3]}}  {r[4]:>{w[4]}}")
+    return "\n".join(out) + "\n"
+
+
+# ---------------------------------------------------------------- runs show
+
+def parse_range(tok, total):
+    m = re.fullmatch(r"(\d+)(?:(-)(\d*))?", tok)
+    a = int(m.group(1))
+    b = a if not m.group(2) else int(m.group(3)) if m.group(3) else total
+    return a, b
+
+
+def cmd_show(logs, args):
+    if not args:
+        raise Err("usage: runs show N [A-B] [--tail K] [--role R[,R]] [--chars A-B]")
+    n = run_no(args[0])
+    lines = get_run(logs, n)
+    total = len(lines)
+    rng = tail = roles = chars = None
+    i = 1
+    while i < len(args):
+        x = args[i]
+        if x in ("--tail", "--role", "--chars") and i + 1 >= len(args):
+            raise Err(f"{x} needs a value")
+        if x == "--tail":
+            if not args[i + 1].isdigit() or int(args[i + 1]) < 1:
+                raise Err("--tail needs a number of messages, e.g. --tail 6")
+            tail = int(args[i + 1])
+            i += 2
+        elif x == "--role":
+            roles = {r.strip() for r in args[i + 1].split(",") if r.strip()}
+            i += 2
+        elif x == "--chars":
+            m = re.fullmatch(r"(\d+)-(\d*)", args[i + 1])
+            if not m or int(m.group(1)) < 1:
+                raise Err("--chars needs a range like 4001- or 4001-8000")
+            chars = (int(m.group(1)), int(m.group(2)) if m.group(2) else None)
+            i += 2
+        elif re.fullmatch(r"\d+(-\d*)?", x) and rng is None:
+            rng = parse_range(x, total)
+            i += 1
+        elif re.fullmatch(r"\d+(-\d*)?", x):
+            raise Err(f"unexpected '{x}': one range per command, written like 18-21 (runs --help)")
+        else:
+            raise Err(f"unexpected '{x}' (runs --help)")
+    if total == 0:
+        return f"logs/run_{n}.jsonl is empty\n"
+    a, b = rng or (1, total)
+    if a < 1 or a > total:
+        raise Err(f"logs/run_{n}.jsonl has {total} messages (lines 1-{total})")
+    if b < a:
+        a, b = b, a
+    b = min(b, total)
+    sel = [k for k in range(a, b + 1) if roles is None or role_of(lines[k - 1]) in roles]
+    if tail:
+        sel = sel[-tail:]
+    if not sel:
+        return f"no messages with role {','.join(sorted(roles))} in messages {a}-{b} of logs/run_{n}.jsonl\n"
+    if chars and len(sel) != 1:
+        raise Err("--chars works on one message: runs show N 12 --chars 4001-")
+    role_flag = f" --role {','.join(sorted(roles))}" if roles else ""
+    blocks = []
+    for k in sel:
+        raw = lines[k - 1]
+        line = view(raw)
+        L = len(line)
+        c1, c2 = chars if chars else (1, None)
+        if c1 > max(L, 1):
+            raise Err(f"message {k} has {L} chars")
+        c2 = min(c2 or L, c1 + PART - 1, L)
+        body = line[c1 - 1:c2]
+        blk = f"--- {k} {role_of(raw)} ({L} chars)\n{body}\n"
+        if c1 > 1 or c2 < L:
+            blk += f"[shown {c1}-{c2} of {L} chars" + (f"; more: runs show {n} {k} --chars {c2 + 1}-]" if c2 < L else "]")
+            blk += "\n"
+        blocks.append((k, blk))
+    out, used, last = [], 0, None
+    for k, blk in blocks:
+        if out and used + len(blk) > OUT - RESERVE:
+            break
+        out.append(blk)
+        used += len(blk)
+        last = k
+    if last != sel[-1]:
+        of = f"{a}-{b}" if rng else f"{sel[0]}-{sel[-1]}" if tail else str(total)
+        nxt = f"runs show {n} {last + 1}-{b if b != total else ''}{role_flag}"
+        out.append(f"[messages {sel[0]}-{last} of {of} shown; next: {nxt}]\n")
+    return "".join(out)
+
+
+# ---------------------------------------------------------------- runs grep
+
+def snippets(line, rx):
+    """-> (сниппеты, совпадений всего). Совпадение внутри окна предыдущего сниппета нового не даёт."""
+    out, n, win_end = [], 0, -1
+    for m in rx.finditer(line):
+        if m.end() == m.start():
+            continue
+        n += 1
+        if m.start() < win_end:
+            continue
+        s, e = max(0, m.start() - CTX), min(len(line), m.end() + CTX)
+        e = min(e, s + SNIP_MAX)
+        win_end = e
+        out.append(("…" if s else "") + line[s:e] + ("…" if e < len(line) else ""))
+    return out, n
+
+
+def cmd_grep(logs, args):
+    icase = count = False
+    skip = 0
+    pat = None
+    nums = []
+    i = 0
+    while i < len(args):
+        x = args[i]
+        if pat is None and re.fullmatch(r"-[ic]+", x):
+            icase |= "i" in x
+            count |= "c" in x
+        elif x == "--skip" and i + 1 < len(args) and args[i + 1].isdigit():
+            skip = int(args[i + 1])
+            i += 1
+        elif x == "--" and pat is None and i + 1 < len(args):
+            pat = args[i + 1]
+            i += 1
+        elif pat is None:
+            pat = x
+        else:
+            nums.append(run_no(x))
+        i += 1
+    if pat is None or pat == "":
+        raise Err('usage: runs grep [-i] [-c] PATTERN [N ...]   e.g. runs grep -i "error" 12 33')
+    flags = re.I if icase else 0
+    try:
+        rx = re.compile(pat, flags)
+    except re.error:
+        rx = re.compile(re.escape(pat), flags)
+    files = run_files(logs)
+    for k in nums:
+        if k not in files:
+            raise Err(f"there is no logs/run_{k}.jsonl here (runs lists the runs)")
+    todo = list(dict.fromkeys(nums)) or list(files)
+    if count:
+        out = []
+        for k in todo:
+            msgs = tot = 0
+            for line in map(view, read_lines(files[k])):
+                c = sum(1 for m in rx.finditer(line) if m.end() > m.start())
+                msgs += bool(c)
+                tot += c
+            out.append(f"logs/run_{k}.jsonl: {tot} matches in {msgs} messages")
+        return "\n".join(out) + "\n"
+    hits = []
+    for k in todo:
+        for j, raw in enumerate(read_lines(files[k]), 1):
+            line = view(raw)
+            sn, n = snippets(line, rx)
+            if not sn:
+                continue
+            role = role_of(raw)
+            if FORMAT == "text":
+                sn = [x.replace("\n", " ⏎ ") for x in sn]
+            for s_i, s in enumerate(sn[:PER_MSG]):
+                more = ""
+                if s_i == PER_MSG - 1 and len(sn) > PER_MSG:
+                    more = f"  [+{len(sn) - PER_MSG} more places in this message: runs show {k} {j}]"
+                hits.append(f"logs/run_{k}.jsonl:{j} {role}: {s}{more}")
+    if not hits:
+        return f"no matches for {shlex.quote(pat)} in {'runs ' + ' '.join(map(str, todo)) if nums else 'any run'}\n"
+    out, used = [], 0
+    for h in hits[skip:]:
+        if out and used + len(h) + 1 > OUT - RESERVE:
+            break
+        out.append(h)
+        used += len(h) + 1
+    shown_to = skip + len(out)
+    txt = "\n".join(out) + "\n"
+    if skip >= len(hits):
+        return f"all {len(hits)} matches were shown before --skip {skip}\n"
+    if shown_to < len(hits):
+        cmd = " ".join(["runs grep"] + [f for f, on in (("-i", icase),) if on] + [shlex.quote(pat)]
+                       + [str(k) for k in nums] + ["--skip", str(shown_to)])
+        txt += f"[matches {skip + 1}-{shown_to} of {len(hits)} shown; next: {cmd}]\n"
+    return txt
+
+
+def main(argv):
+    if argv and argv[0] in ("-h", "--help", "help"):
+        sys.stdout.write(HELP.replace("FMT", "raw" if FORMAT != "text" else "as text: its content, then each tool call with its arguments as written, then other fields"))
+        return 0
+    try:
+        logs = find_logs()
+        if not argv:
+            out = cmd_list(logs)
+        elif argv[0] == "show":
+            out = cmd_show(logs, argv[1:])
+        elif argv[0] == "grep":
+            out = cmd_grep(logs, argv[1:])
+        else:
+            raise Err(f"unknown command '{argv[0]}' (runs --help)")
+    except Err as e:
+        sys.stderr.write(f"runs: {e}\n")
+        return 2
+    sys.stdout.write(out)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
