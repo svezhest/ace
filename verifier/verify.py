@@ -35,7 +35,6 @@ VIEWS = {"app": os.path.expanduser("~/Projects/nrhsi/appworld/view"),
 SET = f"{HERE}/set.tsv"
 RESULTS = f"{HERE}/results.jsonl"
 OUT = HERE                # --out: results.jsonl и logs/ этого прогона
-VER = "v2"               # v1: «try to refute»; v2: нейтрально; v3: v2 + два синтетических примера, why перед verdict
 BASH_LIMIT = 10
 FINAL_TURNS = 3          # ходов только с verdict после лимита
 HARD_AT = 52000          # оценка prompt -> только verdict
@@ -52,20 +51,10 @@ Goal: decide whether one claim about this repository is true by checking it agai
 - look both for lines that support the claim and for lines that contradict it.
 The claim is supported if its main statement survives these checks, refuted if the files contradict its main statement, and unclear if what could be read does not decide it.
 
-# Tools
-- bash(command): a read-only shell in the working directory. Programs: PROGRAMS. Pipes, ';', '&&', '||', $(...), for/while loops and if work. Nothing can be written (no files, no /tmp). Output longer than OUT_CHARS characters is truncated, so read big files in parts (sed -n '40,90p' FILE, head, tail), search with grep -n, and read the logs with runs.
-RUNS_LINE
-BSD_LINE
-PYTHON_LINE
-VERDICT_LINE
-
 EXAMPLES
 bash can be called BASH_LIMIT times; after that only verdict remains. Call verdict once, when the check is done."""
 
-VERDICT_V2 = """- verdict(verdict, why, evidence): the result. verdict is "supported", "refuted" or "unclear"; why says what was checked and what was found; evidence lists the lines that decide it ("path:line", "path:start-end", or a short quote with its path)."""
-VERDICT_V3 = """- verdict(why, evidence, verdict): the result. why says what was checked and what was found; evidence lists the lines that decide it ("path:line", "path:start-end", or a short quote with its path); verdict is "supported" (the claim's main statement is true), "refuted" (it is false) or "unclear" (the files do not decide it)."""
-
-EXAMPLES_V3 = """
+EXAMPLES = """
 # Examples
 Claim: "The model most of the time answers 'No' instead of 'Yes' when the messages before the question mention 'Zephyr'."
     bash: python3 - <<'EOF'
@@ -104,6 +93,21 @@ Claim: "After the hook check_budget interrupts the agent, the agent ignores the 
     verdict(why="In both runs where check_budget fired (run_3:41, run_7:18), the next reply ends with the Summary line that src/prompt.md:30 asks for; the claim is false.", evidence=["logs/run_3.jsonl:42", "logs/run_7.jsonl:19", "src/prompt.md:30"], verdict="refuted")
 """
 
+def bash_desc():
+    """Всё о bash, runs, BSD и python — в описании инструмента (стандартная форма, как в opencode и dsh)."""
+    head = ("Run a read-only shell command in the working directory. Programs: " + ", ".join(sorted(fsr.ALLOWED)) +
+            ". Pipes, ';', '&&', '||', $(...), for/while loops and if work. Nothing can be written (no files, no /tmp). "
+            "Output longer than " + str(fsr.OUT_CHARS) + " characters is truncated, so read big files in parts "
+            "(sed -n '40,90p' FILE, head, tail), search with grep -n, and read the logs with runs.")
+    runs = fsr.RUNS_LINE.replace("- runs (a program in bash)", "runs (a program in this shell)")
+    return "\n".join([head, runs, fsr.BSD_LINE[2:], fsr.PYTHON_LINE[2:]])
+
+
+VERDICT_DESC = ("The result of the check; call it once, at the end. why says what was checked and what was found; "
+                   "evidence lists the lines that decide it ('path:line', 'path:start-end', or a short quote with its "
+                   "path); verdict is supported (the claim's main statement is true), refuted (it is false) or unclear "
+                   "(the files do not decide it).")
+
 FIRST_T = """Claim (KIND):
 OBS
 
@@ -117,19 +121,19 @@ CTX_FINAL_MSG = "The context is nearly full; bash is no longer available. Give t
 
 TOOLS = [
     {"type": "function", "function": {
-        "name": "bash", "description": "Run a read-only shell command in the working directory. Pipes, ';', '&&', "
-        "'||', $(...), for/while loops and if work; nothing can be written. Long output is truncated: use grep -n, "
-        "sed -n 'a,bp', head, tail, runs.",
+        "name": "bash", "description": None,          # bash_desc() — после политики fsr (список программ)
         "parameters": {"type": "object", "properties": {"command": {"type": "string", "description": "The command line"}},
                        "required": ["command"]}}},
     {"type": "function", "function": {
-        "name": "verdict", "description": "The result of the check. Call it once, at the end.",
+        "name": "verdict", "description": VERDICT_DESC,
         "parameters": {"type": "object", "properties": {
-            "verdict": {"type": "string", "enum": ["supported", "refuted", "unclear"]},
             "why": {"type": "string", "description": "What was checked and what was found"},
             "evidence": {"type": "array", "items": {"type": "string"},
-                         "description": "The lines that decide it: 'path:line', 'path:start-end' or a short quote with its path"}},
-            "required": ["verdict", "why", "evidence"]}}},
+                         "description": "The lines that decide it: 'path:line', 'path:start-end' or a short quote with its path"},
+            "verdict": {"type": "string", "enum": ["supported", "refuted", "unclear"],
+                        "description": "supported: the claim's main statement is true; refuted: it is false; "
+                                       "unclear: the files do not decide it"}},
+            "required": ["why", "evidence", "verdict"]}}},
 ]
 FINAL_TOOLS = [TOOLS[1]]
 
@@ -142,13 +146,11 @@ def init_fsr():
     fsr.apply_policy("final")
     fsr.HERE = HERE
     assert "python3" in fsr.ALLOWED and "runs" in fsr.ALLOWED and fsr.RUNS_MODE == "bash"
+    TOOLS[0]["function"]["description"] = bash_desc()
 
 
 def build_system():
-    progs = sorted(fsr.ALLOWED)
-    return (SYSTEM_T.replace("VERDICT_LINE", VERDICT_V3 if VER == "v3" else VERDICT_V2).replace("EXAMPLES\n", EXAMPLES_V3.lstrip("\n") + "\n" if VER == "v3" else "").replace("PROGRAMS", ", ".join(progs)).replace("OUT_CHARS", str(fsr.OUT_CHARS))
-            .replace("RUNS_LINE", fsr.RUNS_LINE).replace("BSD_LINE", fsr.BSD_LINE)
-            .replace("PYTHON_LINE", fsr.PYTHON_LINE).replace("BASH_LIMIT", str(BASH_LIMIT)))
+    return SYSTEM_T.replace("EXAMPLES\n", EXAMPLES.lstrip("\n") + "\n").replace("BASH_LIMIT", str(BASH_LIMIT))
 
 
 def load_set():
@@ -391,23 +393,14 @@ def main():
     r.add_argument("--par", type=int, default=2)
     r.add_argument("--total", type=int, default=4)
     for x in (d, r):
-        x.add_argument("--ver", default="v2", choices=["v2", "v3"])
         x.add_argument("--bash-limit", type=int, default=10)
         x.add_argument("--out", default=HERE)
     a = ap.parse_args()
-    global VER, BASH_LIMIT, OUT, TOOLS, FINAL_TOOLS
-    VER, BASH_LIMIT, OUT = a.ver, a.bash_limit, os.path.abspath(a.out)
+    global BASH_LIMIT, OUT
+    BASH_LIMIT, OUT = a.bash_limit, os.path.abspath(a.out)
     os.makedirs(OUT, exist_ok=True)
-    if VER == "v3":                          # why и evidence до verdict; что значит каждая метка
-        fn = TOOLS[1]["function"]
-        p = fn["parameters"]["properties"]
-        p["verdict"]["description"] = ("supported: the claim's main statement is true; refuted: it is false; "
-                                       "unclear: the files do not decide it")
-        fn["parameters"]["properties"] = {k: p[k] for k in ("why", "evidence", "verdict")}
-        fn["parameters"]["required"] = ["why", "evidence", "verdict"]
-        FINAL_TOOLS = [TOOLS[1]]
+    init_fsr()
     if a.cmd == "dry":
-        init_fsr()
         row = load_set()[a.id]
         _, x = claim_of(row)
         print(build_system())
