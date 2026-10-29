@@ -13,7 +13,7 @@
 | Путь | Что |
 |---|---|
 | `editor.py` | редактор и шаг вариантов (`--arm obs|fix`), промпты, инструмент `edit`, цикл сессии |
-| `fsr_base.py` | снимок `researcher/fsr.py` (sha256 `98001ec5a8b25030`): песочница bash, белый список, обрезка вывода, транспорт. Снимок — чтобы правки fsr.py другим агентом не меняли механику посреди фазы |
+| `smoke/alf.py`, `smoke/app.py` | смоук для модели: копируется в `work/<tag>/tests/smoke.py`, `python3 tests/smoke.py` — прогон `src/harness.py` на заглушке среды и модели (не бенчмарк), что харнесс добавил в разговор и после какого ответа, или traceback. Механика bash — `researcher/fsr.py` (снимок `fsr_base.py` убран 30.10, версии — в git, ветка `dev` ace) |
 | `check.py` | механика правок: компиляция, `import harness, hooks` в venv бенчмарка, тесты бенчмарка на заглушке модели, для AppWorld — слоты `{{ }}` и роли промпта |
 | `tests/test_alf.py`, `tests/test_app.py` | копии `tests/test_harness.py` бенчмарков с `SRC`/`ROOT` из окружения (остальное байт в байт) |
 | `tests/mock_editor.py` | заглушка модели для `edit`/`propose`/финала (без LLM) |

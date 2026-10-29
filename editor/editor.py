@@ -4,8 +4,9 @@
   obs — наблюдения исследователя (kind, observation, evidence) как есть -> редактор;
   fix — промежуточный шаг (та же 9B, чтение src/, без трасс) превращает наблюдения в варианты исправлений
         словами (propose) -> редактор получает только варианты.
-Механика bash (песочница, белый список, обрезка вывода) и транспорт — из fsr_base.py (снимок researcher/fsr.py).
-Рабочий каталог сессии: work/<tag>/ = README.md вида без раздела logs/ + копия src/ (edit пишет только сюда).
+Механика bash (песочница, белый список, обрезка вывода, python3, «/» = корень копии) и транспорт — researcher/fsr.py.
+Рабочий каталог сессии: work/<tag>/ = README.md вида без раздела logs/ + копия src/ (edit пишет только сюда)
++ tests/smoke.py (smoke/<bench>.py): прогон src/harness.py на заглушке среды и модели, запуск python3 tests/smoke.py.
 
 python editor.py --bench alf --input a7k5ef --arm obs --seed 1 --tag b1_alf_a7k5ef_obs
 python editor.py --bench alf --input a7k5ef --arm fix --seed 1 --tag b1_alf_a7k5ef_fix
@@ -24,8 +25,14 @@ import traceback
 
 sys.dont_write_bytecode = True
 HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, HERE)
-import fsr_base as F  # noqa: E402
+sys.path.insert(0, os.path.expanduser("~/Projects/nrhsi/researcher"))
+import fsr as F  # noqa: E402
+
+# 30.10: механика bash — fsr исследователя (политика final: python3, heredoc), «/» = корень копии.
+F.apply_policy("final", {"RUNS_TOOL": False})
+SMOKE_README = ("- `tests/smoke.py` — a smoke test: runs src/harness.py with a stub environment and a stub model (not the "
+                "benchmark) and prints what the harness adds to the conversation after which model reply, or the error. "
+                "Run it with `python3 tests/smoke.py`.\n")
 
 VIEWS = {"alf": os.path.expanduser("~/Projects/nrhsi/alfworld/view"),
          "app": os.path.expanduser("~/Projects/nrhsi/appworld/view")}
@@ -43,11 +50,12 @@ SHOW_MAX = 80
 # ---------------------------------------------------------------- промпты
 
 BASH_TOOL_LINES = """- bash(command): a read-only shell in the working directory. Programs: PROGRAMS. Pipes, ';', '&&', '||', $(...), for/while loops and if work. Nothing can be written with it. Output longer than OUT_CHARS characters is truncated, so read big files in parts (sed -n '40,90p' FILE, head, tail) and search with grep -n.
-- The shell is bash 3.2 with macOS/BSD utilities: GNU-only options are missing (use grep -E, not grep -P; no find -printf)."""
+- The shell is bash 3.2 with macOS/BSD utilities: GNU-only options are missing (use grep -E, not grep -P; no find -printf).
+PYTHON_LINE"""
 
 REPO_LINE = ("You are working in a copy of a repository that holds the harness of an AI agent: the prompts and "
              "the code that run the agent on tasks. README.md describes the layout; the harness is in src/. This directory is everything there is to "
-             "read: the agent's runs and the benchmark are not here, and code cannot be run (there is no Python).")
+             "read: the agent's runs and the benchmark are not here.")
 
 EDIT_TOOL_LINE = ("- edit(path, old_string, new_string): replace old_string with new_string in the file at path, a "
                   "file in src/ (src/bridge.py is not part of the harness, see README.md). old_string must be copied "
@@ -84,7 +92,7 @@ Your goal: change src/ so that the agent fails fewer tasks. ARM_GOAL The same ha
 
 # How to work
 - Read the part of src/ a change touches before you edit it, and keep intact what the rest of the harness relies on: README.md and the comments at the top of the code describe how the parts fit together.
-- Since code cannot be run, check each change by reading the changed lines together with the code that calls or uses them.
+- Check each change: run python3 tests/smoke.py, and read the changed lines together with the code that calls or uses them.
 - bash can be called BASH_LIMIT times; after that only edit and finish remain, for a few turns, and the session ends.
 - Call finish when you are done."""
 
@@ -109,6 +117,7 @@ def fill(t, arm=None):
     if arm:
         ctx, goal = ARM_EDITOR[arm]
         t = t.replace("ARM_CONTEXT", ctx).replace("ARM_GOAL", goal)
+    t = t.replace("PYTHON_LINE", F.PYTHON_LINE)
     return (t.replace("PROGRAMS", ", ".join(sorted(F.ALLOWED))).replace("OUT_CHARS", str(F.OUT_CHARS))
             .replace("BASH_LIMIT", str(BASH_LIMIT)))
 
@@ -197,16 +206,21 @@ def readme_without_logs(text):
     return "".join(out).rstrip("\n") + "\n"
 
 
-def build_work(bench, tag):
+def build_work(bench, tag, smoke=True):
     v = f"{HERE}/work/{tag}"
     if os.path.lexists(v):
         shutil.rmtree(v)
     os.makedirs(v)
     with open(f"{VIEWS[bench]}/README.md") as f:
         readme = readme_without_logs(f.read())
+    if smoke:
+        readme += SMOKE_README
     with open(f"{v}/README.md", "w") as f:
         f.write(readme)
     shutil.copytree(f"{VIEWS[bench]}/src", f"{v}/src", ignore=shutil.ignore_patterns("__pycache__"))
+    if smoke:
+        os.makedirs(f"{v}/tests")
+        shutil.copy(f"{HERE}/smoke/{bench}.py", f"{v}/tests/smoke.py")
     for p in glob.glob(f"{v}/src/*"):
         assert os.stat(p).st_nlink == 1, p          # копия, не жёсткая ссылка
     return os.path.realpath(v)
@@ -557,7 +571,7 @@ def main():
         if a.dry:
             print(psys, "\n-----\n", pfirst, "\n=====")
         else:
-            proot = build_work(a.bench, a.tag + "_p")
+            proot = build_work(a.bench, a.tag + "_p", smoke=False)
             pprof = make_profile(proot, a.tag + "_p")
             pend, pst, props = run_session("proposer", psys, pfirst, proot, pprof, a.seed * 1000 + 7,
                                            f"{HERE}/logs/{a.tag}_p.jsonl", n_obs=len(reports))

@@ -93,6 +93,7 @@ REPEAT_MSG = "Don't repeat yourself."
 FINAL_MSG_TEXT = ("Limit reached, stop exploring. Write your findings now: one report call per finding, "
                   "then finish.")
 BIN = os.path.join(HERE, "bin")                  # runs и python3 -> PY_LINK; в PATH песочницы первым
+SITE = os.path.join(HERE, "site")                # sitecustomize.py: «/» = корень вида и для python3
 PY_LINK = "/Library/Developer/CommandLineTools/usr/bin/python3"   # /usr/bin/python3 — обёртка xcode-select:
                                                                   # в песочнице не работает
 
@@ -571,7 +572,7 @@ def _py_profile():
     if "runs" in ALLOWED:
         reads.append(os.path.join(BIN, "runs"))
     meta = ["/"] + sorted({a for p in (BIN, py["link"], py["launcher"]) for a in _ancestors(os.path.dirname(p))})
-    return (f'(allow file-read* {lit(reads)} (subpath "{py["framework"]}"))\n'
+    return (f'(allow file-read* {lit(reads)} (subpath "{py["framework"]}") (subpath "{SITE}"))\n'
             f"(allow file-read-metadata {lit(meta)})\n")
 
 
@@ -997,6 +998,56 @@ def _collect(p, deadline):
     return bytes(bufs[p.stdout]), bytes(bufs[p.stderr]), capped, timed
 
 
+# «/» = корень вида (как смонтированный образ): функции bash поверх программ белого списка переводят аргументы-пути.
+NO_WRAP = {"cd", "read", "break", "continue", ":", "[[", "[", "test", "echo", "printf", "true", "false", "basename",
+           "dirname", "expr", "seq", "tr", "runs"}
+PATTERN_FIRST = {"grep", "sed", "awk", "jq"}                    # первый операнд — шаблон или программа, не путь
+VALUE_OPTS = {                                                  # опции со значением в следующем слове: значение не путь
+    "cut": "-d -f -c -b", "sort": "-t -k -T -S", "paste": "-d", "column": "-s -c", "awk": "-F -v",
+    "xargs": "-d -I -E -n -P -L -s", "grep": "-A -B -C -m -d -D --include --exclude --exclude-dir --context",
+    "find": "-name -iname -regex -iregex -type -maxdepth -mindepth -size -perm -user -group -mtime -mmin",
+    "python3": "-c -m -W -X", "jq": "--arg --argjson --indent", "od": "-A -j -N -t", "xxd": "-c -g -l -s -o",
+    "nl": "-b -d -f -h -i -l -n -s -v -w", "uniq": "-f -s", "head": "-n -c", "tail": "-n -c"}
+PATH_OPTS = {"find": "-path -ipath -newer"}                     # значение — путь (шаблон пути): переводится без glob
+
+
+def root_prelude(root):
+    """«/» = корень каталога, как в смонтированном образе: аргумент «/путь» вне каталога -> «каталог/путь» (кроме /dev),
+    «..» из корня -> корень; cd за пределы -> корень (относительный путь) или «No such file» (абсолютный).
+    Песочница та же: функции только переписывают аргументы."""
+    fns = [f'{p}(){{ __m {int(p in PATTERN_FIRST)} "{VALUE_OPTS.get(p, "")}" "{PATH_OPTS.get(p, "")}" "$@"; '
+           f'command {p} "${{__A[@]}}"; }}' for p in sorted(set(ALLOWED) - NO_WRAP)]
+    return ("__R='" + root.replace("'", "'\\''") + "'\n"
+            "__p(){ if [[ $1 == / || $1 == /. ]]; then __A+=(\"$__R\")\n"
+            "  elif [[ $PWD == \"$__R\" && ( $1 == .. || $1 == ../* ) ]]; then local g=$1; "
+            "while [[ $g == .. || $g == ../* ]]; do g=${g#..}; g=${g#/}; done; __A+=(\"$__R/$g\")\n"
+            "  elif [[ $1 == /* && $1 != \"$__R\" && $1 != \"$__R\"/* && $1 != /dev/* ]]; then\n"
+            "    if [[ $2 == 0 && $1 == *[*?[]* ]]; then local g=( $__R$1 ); if [[ -e ${g[0]} ]]; then __A+=(\"${g[@]}\"); "
+            "else __A+=(\"$__R$1\"); fi; else __A+=(\"$__R$1\"); fi\n"
+            "  else __A+=(\"$1\"); fi; }\n"
+            "__m(){ local s=$1 v=\" $2 \" w=\" $3 \" a o=0 k=0; shift 3; __A=(); for a in \"$@\"; do\n"
+            "  if [[ $k == 1 ]]; then k=0; __A+=(\"$a\"); continue; fi\n"
+            "  if [[ $k == 2 ]]; then k=0; __p \"$a\" 1; continue; fi\n"
+            "  if [[ $a == -?* ]]; then __A+=(\"$a\")\n"
+            "    if [[ $v == *\" $a \"* ]]; then k=1; elif [[ $w == *\" $a \"* ]]; then k=2; fi\n"
+            "    if [[ $s == 1 && ( $a == -e || $a == --regexp ) ]]; then o=1; k=1; elif [[ $s == 1 && ( $a == -f || $a == --file ) ]]; then o=1; fi\n"
+            "    continue; fi\n"
+            "  if [[ $s == 1 && $o == 0 ]]; then o=1; __A+=(\"$a\"); continue; fi\n"
+            "  __p \"$a\" 0; done; }\n"
+            "cd(){ local t; if [[ $# == 0 ]]; then builtin cd \"$__R\"; return; fi; __m 0 \"\" \"\" \"$@\"; "
+            "t=$(builtin cd \"${__A[@]}\" 2>/dev/null && builtin pwd -P 2>/dev/null); "
+            "if [[ $t == \"$__R\" || $t == \"$__R\"/* ]]; then builtin cd \"${__A[@]}\"; "
+            "elif [[ ${__A[0]} == /* ]]; then builtin cd \"${__A[@]}\"; "
+            "elif (builtin cd \"${__A[@]}\" 2>/dev/null); then builtin cd \"$__R\"; else builtin cd \"${__A[@]}\"; fi; }\n"
+            + "\n".join(fns) + "\n")
+
+
+def root_paths(text, root):
+    text = re.sub(r'  File "' + re.escape(SITE) + r'/sitecustomize\.py", line \d+, in \w+\n[^\n]*\n', "", text)
+    text = re.sub(r"/bin/bash: line \d+: ", "bash: ", text)       # номер строки — с учётом пролога
+    return text.replace(BIN, "/usr/local/bin").replace(root + "/", "/").replace(root, "/")
+
+
 def run_bash(cmd, root, prof, info=None):
     """-> (ok, text). v3: своя группа процессов (по таймауту/потолку убивается вся, сирот нет), stdin=/dev/null,
     вывод читается потоком с потолком MAX_CAPTURE. info <- pid, rc, capped, timed_out, parsed, notes."""
@@ -1019,6 +1070,8 @@ def run_bash(cmd, root, prof, info=None):
     env = {"PATH": "/usr/bin:/bin", "LANG": "en_US.UTF-8", "HOME": root}
     if PYTHON or RUNS_TOOL:
         env.update(PATH=f"{BIN}:/usr/bin:/bin", PYTHONDONTWRITEBYTECODE="1", RUNS_OUT_CHARS=str(OUT_CHARS), RUNS_FORMAT=RUNS_FORMAT)
+    run = root_prelude(root) + run
+    env.update(NRHSI_ROOT=root, PYTHONPATH=SITE, NRHSI_SYS=BIN)
     p = subprocess.Popen(["sandbox-exec", "-f", prof, "/bin/bash", "--noprofile", "--norc", "-c", run],
                          cwd=root, stdin=subprocess.DEVNULL if body is None else subprocess.PIPE,
                          stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True, env=env)
@@ -1043,7 +1096,7 @@ def run_bash(cmd, root, prof, info=None):
     if timed:
         return False, f"Error: command timed out after {CMD_TIMEOUT}s; narrow it (search fewer files, use head)."
     out = out.decode("utf-8", "replace")
-    er = er.decode("utf-8", "replace").replace(root + "/", "").replace(root, ".")
+    out, er = root_paths(out, root), root_paths(er.decode("utf-8", "replace"), root)
     er = XARGS_PIPE_RE.sub("", er)                      # ... | xargs ... | head: xargs жалуется на закрытый пайп
     text = out + (("\n[stderr]\n" + er) if er.strip() else "")
     if rc and not text.strip():
