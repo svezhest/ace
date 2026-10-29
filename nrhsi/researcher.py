@@ -67,6 +67,7 @@ REPORT_TOOL = {"type": "function", "function": {
                                     "paths are checked to exist"}},
         "required": ["kind", "observation", "evidence"]}}}
 REPORT_EXAMPLE = 'report(kind="pattern", observation="...", evidence=["logs/run_N.jsonl: <short quote>", "src/FILE:12-30"])'
+agent.EXAMPLES["report"] = REPORT_EXAMPLE
 PATH_HEAD = re.compile(r"^\s*(?:\./)?([^\s:]+)(?::|\s*$)")
 
 

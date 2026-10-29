@@ -6,7 +6,8 @@
 
 Изоляция — профиль sandbox-exec: deny default; исполнять можно только bash и программы из ALLOWED, читать —
 только каталог сессии и сами эти программы; записи и сети нет. python3 в песочнице может то же, что bash,
-поэтому граница — профиль, а не разбор команд. «/» = корень каталога сессии, как смонтированный образ: аргументы
+поэтому граница — профиль. Разбор команды до запуска и подсказки к выводу (shell.py) — то, что видит модель:
+понятный отказ вместо «Operation not permitted», заметки к пустому выводу и ошибкам, обрезка с указанием, как дочитать. «/» = корень каталога сессии, как смонтированный образ: аргументы
 «/…» и пути python3 переводятся в каталог, в выводе путь каталога -> «/» (песочница та же, это только пути).
 """
 import json
@@ -20,6 +21,8 @@ import time
 import traceback
 import urllib.error
 import urllib.request
+
+import shell
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 BIN = os.path.join(HERE, "bin")                       # runs и python3 (ссылка на CLT python: /usr/bin/python3 —
@@ -43,9 +46,12 @@ TEMP = 0.6
 ALLOWED = ["[", "awk", "basename", "cat", "column", "comm", "cut", "diff", "dirname", "echo", "expr", "false", "find",
            "grep", "head", "jq", "ls", "nl", "od", "paste", "printf", "rev", "sed", "seq", "sort", "tail", "test",
            "tr", "true", "uniq", "wc", "xargs", "xxd", "python3", "runs"]
-BUILTINS = [":", "[[", "break", "cd", "continue", "read"]          # встроенные bash: в промпте, в профиле не нужны
+BUILTINS = [":", "[[", "break", "cd", "continue", "pwd", "read"]          # встроенные bash: в промпте, в профиле не нужны
+shell.ALLOWED = set(ALLOWED + BUILTINS)
+shell.OUT_CHARS, shell.MAX_CAPTURE = OUT_CHARS, MAX_CAPTURE
 
 REPEAT_MSG = "Don't repeat yourself."
+EXAMPLES = {}            # инструмент роли -> пример вызова для отказа «это инструмент, не команда» (задаёт роль)
 NO_CALL_MSG = "Your reply contained no tool call. Continue with the tools; call finish when you are done."
 
 BASH_TOOL = {"type": "function", "function": {
@@ -111,26 +117,6 @@ def sandbox_profile(root):
     return path
 
 
-HEREDOC_RE = re.compile(r"\s*python3(?:[ \t]+-)?[ \t]*<<(-?)[ \t]*(['\"]?)([A-Za-z_]\w*)\2([^\n]*)\n")
-
-
-def split_heredoc(cmd):
-    """python3 - <<'EOF' ... EOF -> ("python3 -", тело в stdin): here-doc bash пишет во временный файл, а писать нельзя."""
-    m = HEREDOC_RE.match(cmd)
-    if not m:
-        return cmd, None
-    tabs, word, body = m.group(1) == "-", m.group(3), []
-    lines = cmd[m.end():].split("\n")
-    for i, ln in enumerate(lines):
-        x = ln.lstrip("\t") if tabs else ln
-        if x.rstrip() == word:
-            if "\n".join(lines[i + 1:]).strip():
-                return cmd, None
-            break
-        body.append(x)
-    return "python3 -" + m.group(4), "\n".join(body) + "\n"
-
-
 NO_WRAP = {"cd", "read", "break", "continue", ":", "[[", "[", "test", "echo", "printf", "true", "false", "basename",
            "dirname", "expr", "seq", "tr", "runs"}
 PATTERN_FIRST = {"grep", "sed", "awk", "jq"}                    # первый операнд — шаблон или программа, не путь
@@ -181,8 +167,19 @@ def root_paths(text, root):
 
 
 def run_bash(cmd, root, prof):
-    """-> вывод для модели. Своя группа процессов: по таймауту или потолку вывода убивается вся."""
-    cmd, body = split_heredoc(cmd)
+    """-> (вывод для модели, исполнена ли). Сначала разбор (shell.check_command): отказ — без запуска.
+    Своя группа процессов: по таймауту или потолку вывода убивается вся."""
+    body = None
+    hd = shell.split_heredoc(cmd)
+    if hd:
+        cmd, body = hd
+    parsed, pipeamp = [], []
+    err = shell.check_command(cmd, parsed, pipeamp)
+    if err:
+        return f"Error: {err}", False
+    raw = cmd
+    for j in reversed(pipeamp):
+        cmd = cmd[:j] + " 2>&1 |" + cmd[j + 2:]
     env = {"PATH": f"{BIN}:/usr/bin:/bin", "LANG": "en_US.UTF-8", "HOME": root, "PYTHONDONTWRITEBYTECODE": "1",
            "RUNS_OUT_CHARS": str(OUT_CHARS), "NRHSI_ROOT": root, "PYTHONPATH": SITE, "NRHSI_SYS": BIN}
     p = subprocess.Popen(["sandbox-exec", "-f", prof, "/bin/bash", "--noprofile", "--norc", "-c",
@@ -219,16 +216,25 @@ def run_bash(cmd, root, prof):
         pass
     rc = p.wait()
     if timed:
-        return f"Error: command timed out after {CMD_TIMEOUT}s; narrow it (search fewer files, use head)."
+        return f"Error: command timed out after {CMD_TIMEOUT}s; narrow it (search fewer files, use head).", False
     out = root_paths(bufs[p.stdout][:MAX_CAPTURE].decode("utf-8", "replace"), root)
     err = root_paths(bufs[p.stderr][:20_000].decode("utf-8", "replace"), root)
+    err = shell.XARGS_PIPE_RE.sub("", err)              # ... | xargs ... | head: xargs жалуется на закрытый пайп
     text = out + (("\n[stderr]\n" + err) if err.strip() else "")
-    if not text.strip():
-        text = f"(no output, exit code {rc})" if rc else "(no output)"
-    if len(text) > OUT_CHARS:
-        text = (text[:OUT_CHARS] + f"\n\n[output truncated: showing the first {OUT_CHARS} of {len(text)} characters. "
-                "Read on with sed -n 'a,bp' or narrow it with grep -n.]")
-    return text
+    if rc and not text.strip():
+        text = f"(no output, exit code {rc})"
+    elif not text:
+        text = "(no output)"
+    notes = []
+    note = shell._stdin_note(parsed, raw, empty=not out.strip())
+    if note:
+        notes.append(note)
+    if err.strip():
+        notes += shell._layout_notes(raw, err, root) + shell._bsd_notes(err)
+    text, _ = shell.clip(text, raw, root, capped, parsed)
+    if notes:
+        text += "\n" + "\n".join(f"[note: {n}]" for n in notes)
+    return text, True
 
 
 def _feed(f, data):
@@ -274,6 +280,7 @@ def session(system, first_user, role_tools, handle, root, log_path, bash_limit, 
     Пишет log_path (jsonl: meta, turn..., end) и возвращает причину конца."""
     root = os.path.realpath(root)
     tools = [BASH_TOOL] + role_tools + [FINISH_TOOL]
+    shell.TOOLS = {t["function"]["name"]: EXAMPLES.get(t["function"]["name"], "") for t in tools[1:]}
     final_tools = role_tools + [FINISH_TOOL]
     prof = sandbox_profile(root)
     messages = [{"role": "system", "content": system}, {"role": "user", "content": first_user}]
@@ -341,7 +348,7 @@ def session(system, first_user, role_tools, handle, root, log_path, bash_limit, 
                         out, ok = REPEAT_MSG, False
                     else:
                         seen.add(key)
-                        out, ok = run_bash(cmd, root, prof), True
+                        out, ok = run_bash(cmd, root, prof)
                 elif name in [t["function"]["name"] for t in role_tools]:
                     try:
                         out, ok = handle(name, args)
