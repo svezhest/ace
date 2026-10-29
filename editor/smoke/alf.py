@@ -173,6 +173,8 @@ def report(msgs, marks, ep):
         if not texts:
             continue
         when = f"after reply {a + 1}" if a == b else f"after each of replies {a + 1}-{b + 1} ({b - a + 1} times)"
+        if b == len(marks) - 1:
+            when += " (the last reply: run() returned, the model never reads this)"
         for t in texts:
             lines.append(f"  {when}: {t}")
     if not any(t for _, _, t in groups):

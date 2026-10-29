@@ -16,5 +16,5 @@ views/
 work/
 editor/out/
 researcher/out/
-**/view/logs/
+**/view*/logs/
 .DS_Store
