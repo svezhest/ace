@@ -1,16 +1,70 @@
-# ace
+# NRHSI — самоулучшение харнесса LLM-агента силами самой модели
 
-A bench of in-context learning methods (ACE, Dynamic Cheatsheet, SCOPE, TF-GRPO, EvoLib, GEPA, MCE). Fidelity to the
-upstream implementations is checked with live records: the upstream runs as is, a proxy logs its requests to the
-model, and the port of the method replays the same log.
+Харнесс — всё, что окружает модель, кроме весов: промпты, код цикла агента, хуки. Здесь малая модель
+(Ornith-1.5-9B) сама улучшает свой харнесс, без более сильного учителя: читает свои проваленные прогоны,
+правит код и промпты, новый вариант замеряется на свежих задачах.
 
-| where | what |
+Малая модель часто предлагает плохие правки. Жадный поиск (как в Self-Harness: принятая правка сразу становится
+основой, решение по 2 попыткам) такие правки закрепляет. Здесь вместо этого дерево: хороший вариант остаётся
+точкой роста, плохой ребёнок его не сдвигает — берётся следующая правка из пула того же узла.
+
+Метод в базовом виде: всё собрано в цикл, но целиком на модели ещё не запускалось. Своего замера прироста нет.
+
+## Цикл
+
+```
+узел (src/) ── замер: M свежих случайных задач ──> доля ok + логи прогонов
+   │
+   └─ исследователь ×S: K проваленных прогонов + src/ -> report (наблюдения)
+        └─ редактор: report -> edit(path, old, new) по копии src/ -> кандидат в пул узла
+                                                                     │
+следующий узел = замер кандидата из пула узла с лучшей долей ok  <───┘
+```
+
+Исследователь и редактор — одна и та же модель в роли coding-агента: bash только на чтение, свои инструменты
+(`report` / `edit`), `finish`.
+
+## Файлы
+
+| где | что |
 |---|---|
-| `records/<record>/` | upstream record runner (`run.sh`, `run.json`) and the record itself (`rec.jsonl`, upstream output) |
-| `upstreams/` | upstream repositories, git submodules at the pinned commits |
-| `records/setup_envs.sh` | upstream environments for the records: venvs, data, caches (`upstreams/.venvs`, `.data`, `.hf`, `.hf-evolib`, `.tiktoken`) and docker images |
-| `tools/record/` | record and replay proxy (`record.py`), embeddings server (`embeddings.py`) |
-| `tests/test_record.py` | proxy tests |
+| `nrhsi/tree.py` | цикл метода: замер, исследование, правки, пул, выбор узла |
+| `nrhsi/researcher.py` | исследователь: промпт, каталог сессии (README + src + логи), `report` |
+| `nrhsi/editor.py` | редактор: промпт, `edit` по копии `src/` (только `src/`, кроме `bridge.py`) |
+| `nrhsi/agent.py` | общий цикл агента: песочница, лимит вызовов, повторы, финал |
+| `nrhsi/bin/runs` | навигация по логам для модели: список прогонов, сообщения по номерам, grep |
+| `bench/run.py` | замер: прогоны `src/` на случайных задачах, `logs/run_N.jsonl` + `results.jsonl` |
+| `bench/*/src/` | стартовый харнесс бенчмарка как есть (ALFWorld — как в Harness-R1, AppWorld — ReAct-агент апстрима) |
+| `bench/*/src/bridge.py` | связь с бенчмарком; модель его видит, но не правит |
+| `bench/*/view_readme.md` | README каталога, который видит модель |
 
-Setup: `git clone --recursive`, then `records/setup_envs.sh` (or `records/setup_envs.sh gepa light ...` for some
-environments only). `UPSTREAMS` points the runners and the setup to another upstreams directory with the same layout.
+## Запуск
+
+Нужны macOS (`sandbox-exec`, python3 из Command Line Tools), модель за OpenAI-совместимым API (`NRHSI_URL`),
+ALFWorld (venv с `alfworld`, `textworld`, данные в `ALFWORLD_DATA`) и/или AppWorld (`APPWORLD_PY` — python его
+venv, `APPWORLD_DATA`).
+
+```
+python bench/run.py alfworld --src bench/alfworld/src --out runs/base --n 40 --seed 1      # один замер
+python nrhsi/researcher.py --node runs/base --readme bench/alfworld/view_readme.md --out runs/r1
+python nrhsi/editor.py --src runs/base/src --readme bench/alfworld/view_readme.md --reports runs/r1/reports.json --out runs/e1
+NRHSI_BENCH_PY=<python бенчмарка> python nrhsi/tree.py alfworld --out runs/tree1 --m 40 --k 5 --s 3 --children 10
+```
+
+## Что довести
+
+**Калибровка** — довести компонент, чтобы хорошо работал. **Абляция** — сравнить варианты в диссертации.
+
+| компонент | состояние | что дальше |
+|---|---|---|
+| исследователь: механика | откалибрована: лимит 40 вызовов, финал по краю окна, 3 повтора подряд -> финал, `runs`, python | — |
+| исследователь: качество находок | на прогонах с циклами до лимита шагов модель видит циклы, но не называет; принимает демо-диалог из промпта за события эпизода | **калибровка** (идёт): проговаривать увиденное перед командой, дневник report, реестр гипотез, таксономия TRAIL, проверка report в свежем контексте |
+| исследователь: K, S | K = 5, S = 3 без обоснования | **калибровка** |
+| исследователь: режим чтения, подача трасс, фидбек (`--hint-level`) | fs-инструменты, K случайных провалов, только ok/reason | **абляция** |
+| редактор | механика работает; годных правок мало, правки кода хуков часто ломают харнесс | **калибровка**; вход редактора (наблюдения / варианты исправлений) и число правок в узле — **абляция** |
+| проверка правок | нет: кандидат идёт в замер как есть | довести: тесты и смоук до замера |
+| замер | M = 40 без обоснования, T = 0 | **калибровка**; ранняя остановка детей (10/20/40) не перенесена |
+| поиск | лучший узел с непустым пулом | жадно / дерево / beam — **абляция** |
+| слияние узлов разных веток | нет | сделать; условия слияния не решены |
+| изоляция | исследователь и редактор — `sandbox-exec`: только чтение каталога, без записи и сети | правленый `src/` (хуки) исполняется без песочницы — довести |
+| сравнения | нет | Self-Harness, Harness-R1, PRISM, GEPA, ACE на тех же моделях; затем модель больше |

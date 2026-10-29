@@ -1,11 +1,3 @@
-.env
-.venv/
+runs/
 __pycache__/
-.DS_Store
-results/
-logs/
-/upstreams/.venvs/
-/upstreams/.data/
-/upstreams/.hf/
-/upstreams/.hf-evolib/
-/upstreams/.tiktoken/
+*.sb
