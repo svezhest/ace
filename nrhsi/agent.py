@@ -6,7 +6,8 @@
 
 Изоляция — профиль sandbox-exec: deny default; исполнять можно только bash и программы из ALLOWED, читать —
 только каталог сессии и сами эти программы; записи и сети нет. python3 в песочнице может то же, что bash,
-поэтому граница — профиль, а не разбор команд.
+поэтому граница — профиль, а не разбор команд. «/» = корень каталога сессии, как смонтированный образ: аргументы
+«/…» и пути python3 переводятся в каталог, в выводе путь каталога -> «/» (песочница та же, это только пути).
 """
 import json
 import os
@@ -23,6 +24,7 @@ import urllib.request
 HERE = os.path.dirname(os.path.abspath(__file__))
 BIN = os.path.join(HERE, "bin")                       # runs и python3 (ссылка на CLT python: /usr/bin/python3 —
 PY_LINK = os.path.join(BIN, "python3")                # обёртка xcode-select, в песочнице не работает)
+SITE = os.path.join(HERE, "site")                     # sitecustomize.py: «/» = корень каталога и для python3
 URL = os.environ.get("NRHSI_URL", "http://127.0.0.1:8089/v1/chat/completions")
 MODEL = os.environ.get("NRHSI_MODEL", "ornith15-9b")
 
@@ -100,7 +102,7 @@ def sandbox_profile(root):
 (allow file-write-data (literal "/dev/null"))
 (allow file-read* (subpath "{root}"))
 (allow file-read-metadata (literal "{os.path.dirname(root)}"))
-(allow file-read* {lit(reads)} (subpath "{fw}"))
+(allow file-read* {lit(reads)} (subpath "{fw}") (subpath "{SITE}"))
 (allow file-read-metadata {lit(meta)})
 """
     path = f"{root}.sb"                                                  # рядом с каталогом, не внутри
@@ -129,12 +131,62 @@ def split_heredoc(cmd):
     return "python3 -" + m.group(4), "\n".join(body) + "\n"
 
 
+NO_WRAP = {"cd", "read", "break", "continue", ":", "[[", "[", "test", "echo", "printf", "true", "false", "basename",
+           "dirname", "expr", "seq", "tr", "runs"}
+PATTERN_FIRST = {"grep", "sed", "awk", "jq"}                    # первый операнд — шаблон или программа, не путь
+VALUE_OPTS = {                                                  # опции со значением в следующем слове: значение не путь
+    "cut": "-d -f -c -b", "sort": "-t -k -T -S", "paste": "-d", "column": "-s -c", "awk": "-F -v",
+    "xargs": "-d -I -E -n -P -L -s", "grep": "-A -B -C -m -d -D --include --exclude --exclude-dir --context",
+    "find": "-name -iname -regex -iregex -type -maxdepth -mindepth -size -perm -user -group -mtime -mmin",
+    "python3": "-c -m -W -X", "jq": "--arg --argjson --indent", "od": "-A -j -N -t", "xxd": "-c -g -l -s -o",
+    "nl": "-b -d -f -h -i -l -n -s -v -w", "uniq": "-f -s", "head": "-n -c", "tail": "-n -c"}
+PATH_OPTS = {"find": "-path -ipath -newer"}                     # значение — путь (шаблон пути): переводится без glob
+
+
+def root_prelude(root):
+    """«/» = корень каталога, как в смонтированном образе: аргумент «/путь» вне каталога -> «каталог/путь» (кроме /dev),
+    «..» из корня -> корень; cd за пределы -> корень (относительный путь) или «No such file» (абсолютный).
+    Песочница та же: функции только переписывают аргументы."""
+    fns = [f'{p}(){{ __m {int(p in PATTERN_FIRST)} "{VALUE_OPTS.get(p, "")}" "{PATH_OPTS.get(p, "")}" "$@"; '
+           f'command {p} "${{__A[@]}}"; }}' for p in sorted(set(ALLOWED) - NO_WRAP)]
+    return ("__R='" + root.replace("'", "'\\''") + "'\n"
+            "__p(){ if [[ $1 == / || $1 == /. ]]; then __A+=(\"$__R\")\n"
+            "  elif [[ $PWD == \"$__R\" && ( $1 == .. || $1 == ../* ) ]]; then local g=$1; "
+            "while [[ $g == .. || $g == ../* ]]; do g=${g#..}; g=${g#/}; done; __A+=(\"$__R/$g\")\n"
+            "  elif [[ $1 == /* && $1 != \"$__R\" && $1 != \"$__R\"/* && $1 != /dev/* ]]; then\n"
+            "    if [[ $2 == 0 && $1 == *[*?[]* ]]; then local g=( $__R$1 ); if [[ -e ${g[0]} ]]; then __A+=(\"${g[@]}\"); "
+            "else __A+=(\"$__R$1\"); fi; else __A+=(\"$__R$1\"); fi\n"
+            "  else __A+=(\"$1\"); fi; }\n"
+            "__m(){ local s=$1 v=\" $2 \" w=\" $3 \" a o=0 k=0; shift 3; __A=(); for a in \"$@\"; do\n"
+            "  if [[ $k == 1 ]]; then k=0; __A+=(\"$a\"); continue; fi\n"
+            "  if [[ $k == 2 ]]; then k=0; __p \"$a\" 1; continue; fi\n"
+            "  if [[ $a == -?* ]]; then __A+=(\"$a\")\n"
+            "    if [[ $v == *\" $a \"* ]]; then k=1; elif [[ $w == *\" $a \"* ]]; then k=2; fi\n"
+            "    if [[ $s == 1 && ( $a == -e || $a == --regexp ) ]]; then o=1; k=1; elif [[ $s == 1 && ( $a == -f || $a == --file ) ]]; then o=1; fi\n"
+            "    continue; fi\n"
+            "  if [[ $s == 1 && $o == 0 ]]; then o=1; __A+=(\"$a\"); continue; fi\n"
+            "  __p \"$a\" 0; done; }\n"
+            "cd(){ local t; if [[ $# == 0 ]]; then builtin cd \"$__R\"; return; fi; __m 0 \"\" \"\" \"$@\"; "
+            "t=$(builtin cd \"${__A[@]}\" 2>/dev/null && builtin pwd -P 2>/dev/null); "
+            "if [[ $t == \"$__R\" || $t == \"$__R\"/* ]]; then builtin cd \"${__A[@]}\"; "
+            "elif [[ ${__A[0]} == /* ]]; then builtin cd \"${__A[@]}\"; "
+            "elif (builtin cd \"${__A[@]}\" 2>/dev/null); then builtin cd \"$__R\"; else builtin cd \"${__A[@]}\"; fi; }\n"
+            + "\n".join(fns) + "\n")
+
+
+def root_paths(text, root):
+    text = re.sub(r'  File "' + re.escape(SITE) + r'/sitecustomize\.py", line \d+, in \w+\n[^\n]*\n', "", text)
+    text = re.sub(r"/bin/bash: line \d+: ", "bash: ", text)       # номер строки — с учётом пролога
+    return text.replace(BIN, "/usr/local/bin").replace(root + "/", "/").replace(root, "/")
+
+
 def run_bash(cmd, root, prof):
     """-> вывод для модели. Своя группа процессов: по таймауту или потолку вывода убивается вся."""
     cmd, body = split_heredoc(cmd)
     env = {"PATH": f"{BIN}:/usr/bin:/bin", "LANG": "en_US.UTF-8", "HOME": root, "PYTHONDONTWRITEBYTECODE": "1",
-           "RUNS_OUT_CHARS": str(OUT_CHARS)}
-    p = subprocess.Popen(["sandbox-exec", "-f", prof, "/bin/bash", "--noprofile", "--norc", "-c", cmd], cwd=root,
+           "RUNS_OUT_CHARS": str(OUT_CHARS), "NRHSI_ROOT": root, "PYTHONPATH": SITE, "NRHSI_SYS": BIN}
+    p = subprocess.Popen(["sandbox-exec", "-f", prof, "/bin/bash", "--noprofile", "--norc", "-c",
+                          root_prelude(root) + cmd], cwd=root,
                          stdin=subprocess.DEVNULL if body is None else subprocess.PIPE, stdout=subprocess.PIPE,
                          stderr=subprocess.PIPE, start_new_session=True, env=env)
     if body is not None:
@@ -168,8 +220,8 @@ def run_bash(cmd, root, prof):
     rc = p.wait()
     if timed:
         return f"Error: command timed out after {CMD_TIMEOUT}s; narrow it (search fewer files, use head)."
-    out = bufs[p.stdout][:MAX_CAPTURE].decode("utf-8", "replace")
-    err = bufs[p.stderr][:20_000].decode("utf-8", "replace").replace(root + "/", "").replace(root, ".")
+    out = root_paths(bufs[p.stdout][:MAX_CAPTURE].decode("utf-8", "replace"), root)
+    err = root_paths(bufs[p.stderr][:20_000].decode("utf-8", "replace"), root)
     text = out + (("\n[stderr]\n" + err) if err.strip() else "")
     if not text.strip():
         text = f"(no output, exit code {rc})" if rc else "(no output)"
