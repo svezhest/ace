@@ -21,8 +21,6 @@ class StubStop(Exception):
 # ---------------------------------------------------------------- stub environment and model
 
 class AlfEpisode:
-    """A room with five places; the goal is to put mug 1 in cabinet 1. The episode ends as in src/bridge.py:
-    on success, or when the same raw action is sent 3 times in a row."""
     PLACES = ["cabinet 1", "countertop 1", "drawer 1", "fridge 1", "shelf 1"]
     GOAL = "put mug 1 in/on cabinet 1"
 
@@ -167,8 +165,6 @@ def report(msgs, marks, ep):
         if not texts:
             continue
         when = f"after reply {a + 1}" if a == b else f"after each of replies {a + 1}-{b + 1} ({b - a + 1} times)"
-        if b == len(marks) - 1:
-            when += " (the last reply: run() returned, the model never reads this)"
         for t in texts:
             lines.append(f"  {when}: {t}")
     if not any(t for _, _, t in groups):

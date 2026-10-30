@@ -66,9 +66,9 @@ ALLOWED = {"ls", "cat", "head", "tail", "grep", "wc", "find", "sed", "sort", "un
            "awk", "tr", "basename", "dirname", "printf", "nl", "paste", "comm", "diff", "seq", "cd", "test", "[",
            "[[", ":", "read", "true", "false", "break", "continue", "expr", "rev", "column",
            "xargs", "xxd", "od",
-           "jq"}
+           "jq", "pwd", "which", "command"}
 WRITE_PROGS = {"tee", "cp", "mv", "rm", "rmdir", "mkdir", "touch", "ln", "dd", "install", "truncate", "chmod", "chown"}
-BUILTINS = {"cd", "read", "break", "continue", ":", "[["}
+BUILTINS = {"cd", "read", "break", "continue", ":", "[[", "pwd", "command"}
 KEYWORDS = {"if", "then", "else", "elif", "fi", "while", "until", "do", "done", "!", "{", "}"}
 MAX_DEPTH = 100
 MAX_CMD = 8000
@@ -889,6 +889,8 @@ def _check_words(w, m, via_xargs=False):
         return f"'{p}' writes files: {READONLY_MSG}"
     if p not in ALLOWED:
         return f"'{p}' is not allowed. Allowed programs: {', '.join(sorted(ALLOWED))}"
+    if p == "command" and not (len(w) > 2 and w[1] in ("-v", "-V")):
+        return "command works here only as command -v NAME (where a program is)"
     if via_xargs and (p in BUILTINS or p == "xargs"):
         return (f"xargs can only run a program from the list, not '{p}'; "
                 "use a loop instead: ... | while read f; do ...; done")
@@ -1000,7 +1002,7 @@ def _collect(p, deadline):
 
 # «/» = корень вида (как смонтированный образ): функции bash поверх программ белого списка переводят аргументы-пути.
 NO_WRAP = {"cd", "read", "break", "continue", ":", "[[", "[", "test", "echo", "printf", "true", "false", "basename",
-           "dirname", "expr", "seq", "tr", "runs"}
+           "dirname", "expr", "seq", "tr", "runs", "pwd", "which", "command"}
 PATTERN_FIRST = {"grep", "sed", "awk", "jq"}                    # первый операнд — шаблон или программа, не путь
 VALUE_OPTS = {                                                  # опции со значением в следующем слове: значение не путь
     "cut": "-d -f -c -b", "sort": "-t -k -T -S", "paste": "-d", "column": "-s -c", "awk": "-F -v",
@@ -1039,6 +1041,7 @@ def root_prelude(root):
             "if [[ $t == \"$__R\" || $t == \"$__R\"/* ]]; then builtin cd \"${__A[@]}\"; "
             "elif [[ ${__A[0]} == /* ]]; then builtin cd \"${__A[@]}\"; "
             "elif (builtin cd \"${__A[@]}\" 2>/dev/null); then builtin cd \"$__R\"; else builtin cd \"${__A[@]}\"; fi; }\n"
+            "command(){ if [[ $1 == -v || $1 == -V ]]; then shift; /usr/bin/which \"$@\"; else builtin command \"$@\"; fi; }\n"
             + "\n".join(fns) + "\n")
 
 

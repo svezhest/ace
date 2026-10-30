@@ -21,7 +21,6 @@ class StubStop(Exception):
 # ---------------------------------------------------------------- stub environment and model
 
 class AppEpisode:
-    """A stub REPL: the same code gives the same output; complete_task marks the task complete."""
     SLOTS = {"instruction": "Find the stub value and report it.", "main_user.first_name": "Sam",
              "main_user.last_name": "Stub", "main_user.email": "sam@stub.example",
              "main_user.phone_number": "5550100", "app_descriptions": '{"supervisor": "stub app"}'}
@@ -130,8 +129,6 @@ def report(msgs, marks, ep):
         if not texts:
             continue
         when = f"after reply {a + 1}" if a == b else f"after each of replies {a + 1}-{b + 1} ({b - a + 1} times)"
-        if b == len(marks) - 1:
-            when += " (the last reply: run() returned, the model never reads this)"
         for t in texts:
             lines.append(f"  {when}: {t}")
     if not any(t for _, _, t in groups):
