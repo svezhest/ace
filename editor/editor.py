@@ -484,7 +484,7 @@ def run_session(role, system, first_user, root, prof, seed, log_path, n_obs=0):
             st["length_stops"] += r["finish_reason"] == "length"
             calls = r["calls"]
             rec = {"type": "turn", "i": st["turns"], "sec": round(dt, 1), "usage": u, "final": bool(final_left),
-                   "finish_reason": r["finish_reason"], "content": r["content"],
+                   "finish_reason": r["finish_reason"], "content": r["content"], "reasoning": r.get("reasoning"),
                    "tool_calls": [{"name": c["function"]["name"], "arguments": c["function"]["arguments"]}
                                   for c in calls], "results": []}
             amsg = {"role": "assistant", "content": r["content"] or ""}
@@ -559,12 +559,14 @@ def main():
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--tag", required=True)
     ap.add_argument("--dry", action="store_true")
+    ap.add_argument("--think", action="store_true", help="рассуждение модели (шлюз с thinking); в историю не идёт, в лог — да")
     a = ap.parse_args()
+    F.THINKING = a.think
     reports = load_reports(a.input)
     src_before = tree_hash(f"{VIEWS[a.bench]}/src")
     os.makedirs(f"{HERE}/logs", exist_ok=True)
     os.makedirs(f"{HERE}/out", exist_ok=True)
-    summary = {"tag": a.tag, "bench": a.bench, "input": a.input, "arm": a.arm, "seed": a.seed,
+    summary = {"tag": a.tag, "bench": a.bench, "input": a.input, "arm": a.arm, "seed": a.seed, "think": a.think,
                "n_reports": len(reports), "view_src_hash": src_before}
     if a.arm == "fix":
         psys, pfirst = fill(PROPOSER_T), first_user_proposer(reports)
