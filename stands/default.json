@@ -1,0 +1,54 @@
+{
+  "name": "default",
+  "doc": "Один шлюз без thinking. Исполнитель в бенчмарках — как в апстриме (T=0); агенты метода (исследователь, редактор) — T=0.6.",
+  "model": "ornith15-9b",
+  "served_model": "ornith15-9b-mlx-8bit",
+  "worker": {
+    "port": 50051,
+    "count": 1,
+    "env": {
+      "QWEN_MODEL": "../../weights/ornith15-9b-mlx-8bit",
+      "QWEN_KV_BITS": "0",
+      "QWEN_MAX_CONTEXT": "65536",
+      "QWEN_PRESENCE_PENALTY": "0",
+      "QWEN_PROMPT_CACHE": "1",
+      "QWEN_PROMPT_CACHE_GB": "4",
+      "QWEN_PROMPT_CACHE_REPLY": "0",
+      "QWEN_BATCH_RESERVE_TOKENS": "1024",
+      "QWEN_PROMPT_CACHE_DISK": "/Users/user/.cache/qwen-pcdisk",
+      "QWEN_MAX_BATCH": "16",
+      "QWEN_BATCH_INVARIANT": "1"
+    }
+  },
+  "gateways": {
+    "main": {
+      "port": 8090,
+      "cmd": "./target/release/qwen-gateway",
+      "env": {
+        "GATEWAY_ADDR": "127.0.0.1:8090",
+        "GATEWAY_THINKING": "off",
+        "GATEWAY_SERVED_MODEL_NAMES": "ornith15-9b,ornith-ai/Ornith-1.5-9B-MLX-8bit"
+      },
+      "thinking": false
+    }
+  },
+  "executor": {
+    "gateway": "main",
+    "alfworld": {
+      "temperature": 0.0,
+      "max_tokens": 4096
+    },
+    "appworld": {
+      "temperature": 0.0,
+      "seed": 100,
+      "max_tokens": null
+    }
+  },
+  "agent": {
+    "gateway": "main",
+    "temperature": 0.6,
+    "max_tokens": 4096,
+    "thinking": false,
+    "think_budget": null
+  }
+}

@@ -5,12 +5,11 @@ import os
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # researcher/: каталог fsr.py
 LAYOUT = os.path.expanduser("~/Projects/nrhsi/alfworld/view")   # --view
-URL = "http://127.0.0.1:8090/v1/chat/completions"      # 30.10: один шлюз, без прокси (GATEWAY_THINKING=off)
-THINK_URL = "http://127.0.0.1:8081/v1/chat/completions"   # 29.10: шлюз с thinking; 30.10 остановлен — для прогонов с thinking поднять снова
-MODEL = "ornith15-9b"
+# модель и генерация — только из профиля стенда (stands/<имя>.json, apply_stand в policy.py); до него None
+URL = MODEL = TEMP = THINKING = THINK_BUDGET = STAND = None
 
 CTX = 65536
-MAX_GEN = 4096
+MAX_GEN = None           # max_tokens — из профиля стенда
 WARN_AT = 44000          # оценка prompt-токенов: предупреждение (None — нет)
 HARD_AT = 54000          # последний ход: только report/finish
 CLEAR_AT = 30000         # при такой оценке старые выводы инструментов заменяются заглушкой (или сжатие)
@@ -53,8 +52,6 @@ ALLOWED_BASE = frozenset(ALLOWED)
 
 # 29.10 (политика final): python, runs, повторы, одно сообщение финала. По умолчанию выключено — поведение прежнее.
 PYTHON = False           # python3 в белом списке: python3 -c '...' и python3 - <<'EOF' ... EOF (тело — в stdin)
-THINKING = False         # 29.10: enable_thinking через THINK_URL; рассуждение — в лог (reasoning), в историю не идёт
-THINK_BUDGET = None      # thinking_budget шлюза (токенов рассуждения на ход); None — без ограничения
 DIARY = False            # 29.10 (R3'): дневник report — записывать каждое наблюдение сразу, пример в промпте
 HYPOTHESES = False       # 29.10 (R1): реестр гипотез hypothesis/verdict (бесплатные), список — после каждого вывода
 TAXONOMY = None          # 29.10: "trail" — таксономия ошибок агентов TRAIL (2505.08638, прил. A.11) в «How to work»

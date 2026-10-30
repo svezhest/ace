@@ -39,7 +39,6 @@ VIEWS = {"alf": os.path.expanduser("~/Projects/nrhsi/alfworld/view"),
          "app": os.path.expanduser("~/Projects/nrhsi/appworld/view")}
 RLOGS = os.path.expanduser("~/Projects/nrhsi/researcher/logs")
 
-TEMP = 0.6
 BASH_LIMIT = 25          # вызовов bash; потом — финальные ходы
 STEP_BUDGET = 60         # всех вызовов инструментов
 FINAL_TURNS = 3
@@ -482,8 +481,8 @@ def run_session(role, system, first_user, root, prof, seed, log_path, n_obs=0):
         names = [t["function"]["name"] for t in (final_tools if final_left else tools)]
         return f"Error: unknown tool '{name}'. Tools: {', '.join(names)}.", False
 
-    w({"type": "meta", "role": role, "system": system, "first_user": first_user, "seed": seed, "temperature": TEMP,
-       "provenance": F.provenance(TEMP),
+    w({"type": "meta", "role": role, "system": system, "first_user": first_user, "seed": seed, "temperature": F.TEMP,
+       "stand": F.STAND,
        "root": root, "tools": [t["function"]["name"] for t in tools],
        "limits": {"bash_limit": BASH_LIMIT, "step_budget": STEP_BUDGET, "final_turns": FINAL_TURNS,
                   "hard_at": HARD_AT, "out_chars": F.OUT_CHARS, "max_gen": F.MAX_GEN}})
@@ -499,7 +498,7 @@ def run_session(role, system, first_user, root, prof, seed, log_path, n_obs=0):
             t0 = time.time()
             r = perr = err = None
             for attempt in range(F.API_RETRIES + 1):
-                resp, err = F.chat(messages, TEMP, seed + st["turns"], final_tools if final_left else tools)
+                resp, err = F.chat(messages, F.TEMP, seed + st["turns"], final_tools if final_left else tools)
                 if err:
                     break
                 r, perr = F.parse_response(resp)
@@ -600,18 +599,17 @@ def main():
     ap.add_argument("--dry", action="store_true")
     ap.add_argument("--view", help="вид узла (src/ и README.md), по умолчанию — корневой вид бенчмарка")
     ap.add_argument("--predict", action="store_true", help="плечо: перед smoke записать ожидаемый вывод, после — сверить")
-    ap.add_argument("--think", action="store_true", help="рассуждение модели (шлюз с thinking); в историю не идёт, в лог — да")
-    ap.add_argument("--think-budget", type=int, default=2048, help="потолок токенов рассуждения на ход (thinking_budget шлюза)")
+    ap.add_argument("--stand", default="default", help="профиль стенда (stands/<имя>.json): модель и генерация")
     a = ap.parse_args()
     if a.view:
         VIEWS[a.bench] = os.path.realpath(os.path.expanduser(a.view))
-    F.THINKING = a.think
-    F.THINK_BUDGET = a.think_budget
+    if not a.dry:
+        F.apply_stand(a.stand)
     reports = load_reports(a.input)
     src_before = tree_hash(f"{VIEWS[a.bench]}/src")
     os.makedirs(f"{HERE}/logs", exist_ok=True)
     os.makedirs(f"{HERE}/out", exist_ok=True)
-    summary = {"tag": a.tag, "bench": a.bench, "input": a.input, "arm": a.arm, "seed": a.seed, "view": VIEWS[a.bench], "predict": a.predict, "think": a.think, "think_budget": a.think_budget if a.think else None, "provenance": F.provenance(TEMP),
+    summary = {"tag": a.tag, "bench": a.bench, "input": a.input, "arm": a.arm, "seed": a.seed, "view": VIEWS[a.bench], "predict": a.predict, "stand": F.STAND,
                "n_reports": len(reports), "view_src_hash": src_before}
     if a.arm == "fix":
         psys, pfirst = fill(PROPOSER_T), first_user_proposer(reports)

@@ -52,7 +52,7 @@ def session(mode, k, seed, temp, tag, resume=None, max_turns=None, runs=None):
     try:
         w({"type": "meta", "version": 3, "mechanics": "v3b-view", "policy": C.POLICY, "layout": C.LAYOUT,
            "tools": [x["function"]["name"] for x in P.TOOLS], "notes_tool": C.NOTES, "compact": C.COMPACT,
-           "compact_req": P.COMPACT_REQ if C.COMPACT else None, "read_counter": 1, "variant": C.VARIANT, "mode": mode, "k": k, "seed": seed, "temperature": temp, "provenance": M.provenance(temp),
+           "compact_req": P.COMPACT_REQ if C.COMPACT else None, "read_counter": 1, "variant": C.VARIANT, "mode": mode, "k": k, "seed": seed, "temperature": temp, "stand": C.STAND,
            "runs": tids, "selection": sel, "view": vname, "system": P.SYSTEM, "first_user": P.FIRST_USER, "limits": {
                "ctx": C.CTX, "max_gen": C.MAX_GEN, "warn_at": C.WARN_AT, "hard_at": C.HARD_AT, "clear_at": C.CLEAR_AT,
                "keep_results": C.KEEP_RESULTS, "step_budget": C.STEP_BUDGET, "remind_every": C.REMIND_EVERY,
@@ -587,7 +587,7 @@ def main():
     ap.add_argument("--runs", help="проваленные run через запятую (иначе --k случайных с --seed)")
     ap.add_argument("--k", type=int, default=3)
     ap.add_argument("--seed", type=int, default=1)
-    ap.add_argument("--temp", type=float, default=0.6)
+    ap.add_argument("--stand", default="default", help="профиль стенда (stands/<имя>.json): модель и генерация")
     ap.add_argument("--policy", default="compact", choices=sorted(C.POLICIES))   # A2: выбрана compact (JOURNAL.md §4)
     ap.add_argument("--set", action="append", default=[], help="KEY=JSON поверх политики")
     ap.add_argument("--tag", default="t")
@@ -601,4 +601,5 @@ def main():
         print(P.SYSTEM)
         print(json.dumps(P.TOOLS, indent=1))
         return
-    session("rand", a.k, a.seed, a.temp, a.tag, runs=runs)
+    PO.apply_stand(a.stand)
+    session("rand", a.k, a.seed, C.TEMP, a.tag, runs=runs)

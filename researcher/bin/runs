@@ -25,8 +25,10 @@ HELP = """runs — the run logs, message by message (a message = one line of log
   runs show N --tail 6          the last 6 messages
   runs grep -i "error" N M      matches in runs N and M, with message numbers
 
-runs show N [A | A-B | A-] [--tail K] [--role R[,R]] [--chars A-B]
+runs show N [A | A-B | A-] [--tail K] [--role R[,R]] [--event E[,E]] [--chars A-B]
   Each message: a header '--- 12 assistant (1830 chars)' and the message under it (FMT).
+  If the log is a stream of events, the header names the event ('--- 12 model assistant', '--- 13 bridge execute');
+  --event bridge,model shows only those events.
   A message longer than 4000 characters is shown 4000 at a time: runs show N 12 --chars 4001- shows the next part.
   A long output stops at a message boundary and ends with the command that continues it.
 runs grep [-i] [-c] PATTERN [N ...]
@@ -75,8 +77,20 @@ def role_of(line):
         o = json.loads(line)
     except ValueError:
         return "(not JSON)"
+    if isinstance(o, dict) and isinstance(o.get("event"), str):          # лог-поток событий: «event call/role»
+        m = o.get("message")
+        sub = o.get("call") if o["event"] == "bridge" else m.get("role") if isinstance(m, dict) else None
+        return o["event"] + (f" {sub}" if isinstance(sub, str) else "")
     r = o.get("role") if isinstance(o, dict) else None
     return r if isinstance(r, str) else "?"
+
+
+def event_of(line):
+    try:
+        o = json.loads(line)
+    except ValueError:
+        return None
+    return o.get("event") if isinstance(o, dict) else None
 
 
 def as_text(line):
@@ -169,11 +183,11 @@ def cmd_show(logs, args):
     n = run_no(args[0])
     lines = get_run(logs, n)
     total = len(lines)
-    rng = tail = roles = chars = None
+    rng = tail = roles = events = chars = None
     i = 1
     while i < len(args):
         x = args[i]
-        if x in ("--tail", "--role", "--chars") and i + 1 >= len(args):
+        if x in ("--tail", "--role", "--event", "--chars") and i + 1 >= len(args):
             raise Err(f"{x} needs a value")
         if x == "--tail":
             if not args[i + 1].isdigit() or int(args[i + 1]) < 1:
@@ -182,6 +196,9 @@ def cmd_show(logs, args):
             i += 2
         elif x == "--role":
             roles = {r.strip() for r in args[i + 1].split(",") if r.strip()}
+            i += 2
+        elif x == "--event":
+            events = {r.strip() for r in args[i + 1].split(",") if r.strip()}
             i += 2
         elif x == "--chars":
             m = re.fullmatch(r"(\d+)-(\d*)", args[i + 1])
@@ -204,14 +221,17 @@ def cmd_show(logs, args):
     if b < a:
         a, b = b, a
     b = min(b, total)
-    sel = [k for k in range(a, b + 1) if roles is None or role_of(lines[k - 1]) in roles]
+    sel = [k for k in range(a, b + 1) if (roles is None or role_of(lines[k - 1]).split()[-1] in roles)
+           and (events is None or event_of(lines[k - 1]) in events)]
     if tail:
         sel = sel[-tail:]
     if not sel:
-        return f"no messages with role {','.join(sorted(roles))} in messages {a}-{b} of logs/run_{n}.jsonl\n"
+        what = " and ".join(x for x in (f"role {','.join(sorted(roles))}" if roles else "",
+                                         f"event {','.join(sorted(events))}" if events else "") if x)
+        return f"no messages with {what} in messages {a}-{b} of logs/run_{n}.jsonl\n"
     if chars and len(sel) != 1:
         raise Err("--chars works on one message: runs show N 12 --chars 4001-")
-    role_flag = f" --role {','.join(sorted(roles))}" if roles else ""
+    role_flag = (f" --role {','.join(sorted(roles))}" if roles else "") + (f" --event {','.join(sorted(events))}" if events else "")
     blocks = []
     for k in sel:
         raw = lines[k - 1]

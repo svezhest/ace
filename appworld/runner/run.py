@@ -26,37 +26,16 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
+sys.path.insert(0, str(ROOT.parent))   # stand.py — профиль стенда
+import stand as STAND                  # noqa: E402
 APPWORLD = Path.home() / "Projects" / "appworld"           # AppWorld root (data) and its venv
 APPWORLD_PY = APPWORLD / ".venv" / "bin" / "python"
-WORKER_KEYS = ("QWEN_MAX_CONTEXT", "QWEN_PRESENCE_PENALTY", "QWEN_MAX_BATCH", "QWEN_BATCH_INVARIANT",
-               "QWEN_PROMPT_CACHE", "QWEN_KV_BITS", "QWEN_MODEL")
-
-
 def src_hash(src):
     h = hashlib.sha256()
     for p in sorted(Path(src).glob("*")):
         if p.is_file():
             h.update(p.name.encode() + b"\0" + p.read_bytes() + b"\0")
     return h.hexdigest()[:16]
-
-
-def process_env(pattern, keep):
-    """Whitelisted env of live processes matching `pattern` (pgrep -f)."""
-    try:
-        pids = subprocess.run(["pgrep", "-f", pattern], capture_output=True, text=True).stdout.split()
-        out = {}
-        for pid in pids:
-            env = subprocess.run(["ps", "eww", "-p", pid], capture_output=True, text=True).stdout.split()
-            out[pid] = {k: v for k, _, v in (t.partition("=") for t in env) if keep(k)}
-        return out
-    except Exception as e:
-        return {"error": repr(e)}
-
-
-def listener(url):
-    port = url.split("//", 1)[1].split("/", 1)[0].rsplit(":", 1)[1]
-    r = subprocess.run(["lsof", "-nP", f"-iTCP:{port}", "-sTCP:LISTEN", "-Fpc"], capture_output=True, text=True)
-    return r.stdout.split()
 
 
 def free_port():
@@ -134,7 +113,9 @@ def play(job):
         if job["fake"] is not None:
             llm = Fake(job["fake"], bridge.STEP_LIMIT)
         else:
-            llm = Client(job["url"], job["model"], bridge.STEP_LIMIT, job["wall_limit"])
+            g = job["gen"]
+            llm = Client(g["url"], g["model"], bridge.STEP_LIMIT, job["wall_limit"], seed=g["seed"],
+                         temperature=g["temperature"], max_tokens=g["max_tokens"])
         try:
             messages = harness.run(ep, llm)
         except EpisodeEnd as e:
@@ -175,8 +156,7 @@ def main():
     ap.add_argument("--tasks", nargs="*", help="explicit task ids (must be in train or val)")
     ap.add_argument("--workers", type=int, default=2)
     ap.add_argument("--hint-level", type=int, default=0, help="0: ok/reason only; 1: + checks passed; 2: + failed checks")
-    ap.add_argument("--url", default="http://127.0.0.1:8090/v1", help="the gateway itself, no proxy in between")
-    ap.add_argument("--model", default="ornith15-9b")
+    ap.add_argument("--stand", default="default", help="profile in stands/: model, gateway, generation parameters")
     ap.add_argument("--wall-limit", type=int, default=3600, help="seconds per episode")
     ap.add_argument("--fake", help="JSON script for the stub model (no LLM calls)")
     ap.add_argument("--tag", required=True)
@@ -192,16 +172,9 @@ def main():
     tasks = a.tasks or random.Random(a.seed).sample(splits[a.split], a.n)
     if not set(tasks) <= allowed:
         sys.exit(f"tasks outside train/val: {sorted(set(tasks) - allowed)}")
-    stand = {"url": a.url, "model": a.model, "temperature": 0, "seed": 100, "max_tokens": None, "thinking": False,
-             "listener": listener(a.url) if a.fake is None else None,
-             "worker_env": process_env("python worker.py", lambda k: k in WORKER_KEYS),
-             "gateway_env": process_env("qwen-gateway", lambda k: k.startswith("GATEWAY_"))}
-    if a.fake is None:
-        penalties = {v.get("QWEN_PRESENCE_PENALTY") for v in stand["worker_env"].values() if isinstance(v, dict)}
-        if penalties != {"0"}:
-            sys.exit(f"worker presence penalty is not 0: {stand['worker_env']}")
-        if not any(x.startswith("cqwen-gate") for x in stand["listener"]):
-            sys.exit(f"{a.url} is not served by the gateway itself: {stand['listener']}")
+    P = STAND.load(a.stand)
+    g = STAND.gen(P, "executor", "appworld")
+    stand = {"stand": STAND.meta(P, STAND.check(P, ["executor"]) if a.fake is None else None), "gen": g}
 
     out.mkdir(parents=True)
     shutil.copytree(src, out / "src", ignore=shutil.ignore_patterns("__pycache__"))
@@ -218,7 +191,7 @@ def main():
 
     jobs = [{"run": i + 1, "task": t, "experiment": f"run_{i + 1}", "appworld_root": str(aw_root),
              "env_log": str(out / "env" / f"run_{i + 1}.log"), "src": str(out / "src"),
-             "fake": json.loads(a.fake) if a.fake else None, "url": a.url, "model": a.model,
+             "fake": json.loads(a.fake) if a.fake else None, "gen": g,
              "hint_level": a.hint_level, "wall_limit": a.wall_limit}
             for i, t in enumerate(tasks)]
     results, t0 = [], time.time()

@@ -15,7 +15,6 @@ import multiprocessing as mp
 import os
 import random
 import shutil
-import subprocess
 import sys
 import time
 import traceback
@@ -23,30 +22,15 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
+sys.path.insert(0, str(ROOT.parent))   # stand.py — профиль стенда
+import stand as STAND                  # noqa: E402
 DATA = ROOT / "data" / "alfworld"
-WORKER_KEYS = ("QWEN_MAX_CONTEXT", "QWEN_PRESENCE_PENALTY", "QWEN_MAX_BATCH", "QWEN_BATCH_INVARIANT",
-               "QWEN_PROMPT_CACHE", "QWEN_KV_BITS", "QWEN_MODEL")
-
-
 def src_hash(src):
     h = hashlib.sha256()
     for p in sorted(Path(src).glob("*")):
         if p.is_file():
             h.update(p.name.encode() + b"\0" + p.read_bytes() + b"\0")
     return h.hexdigest()[:16]
-
-
-def worker_env():
-    """Sampling-relevant env of the live model worker (only whitelisted keys)."""
-    try:
-        pids = subprocess.run(["pgrep", "-f", "python worker.py"], capture_output=True, text=True).stdout.split()
-        out = {}
-        for pid in pids:
-            env = subprocess.run(["ps", "eww", "-p", pid], capture_output=True, text=True).stdout.split()
-            out[pid] = {k: v for k, _, v in (t.partition("=") for t in env) if k in WORKER_KEYS}
-        return out
-    except Exception as e:
-        return {"error": repr(e)}
 
 
 def play(job):
@@ -61,7 +45,9 @@ def play(job):
     if job["fake"] is not None:
         llm = Fake(job["fake"], bridge.STEP_LIMIT)
     else:
-        llm = Client(job["url"], job["model"], bridge.STEP_LIMIT, job["wall_limit"])
+        g = job["gen"]
+        llm = Client(g["url"], g["model"], bridge.STEP_LIMIT, job["wall_limit"], max_tokens=g["max_tokens"],
+                     temperature=g["temperature"])
     t0, reason, detail, messages = time.time(), None, "", None
     try:
         messages = harness.run(ep, llm)
@@ -104,8 +90,7 @@ def main():
     ap.add_argument("--games", nargs="*", help="explicit game files (relative to data root)")
     ap.add_argument("--workers", type=int, default=4)
     ap.add_argument("--hint-level", type=int, default=0, help="0: ok/reason only; 1: + expert steps; 2: + plan")
-    ap.add_argument("--url", default="http://127.0.0.1:8090/v1")
-    ap.add_argument("--model", default="ornith15-9b")
+    ap.add_argument("--stand", default="default", help="profile in stands/: model, gateway, generation parameters")
     ap.add_argument("--wall-limit", type=int, default=3600, help="seconds per episode")
     ap.add_argument("--fake", help="JSON script for the stub model (no LLM calls)")
     ap.add_argument("--tag", required=True)
@@ -120,12 +105,9 @@ def main():
     src = view / "src"
     splits = json.loads((ROOT / "splits.json").read_text())
     games = a.games or random.Random(a.seed).sample(splits[a.split], a.n)
-    stand = {"worker_env": worker_env(), "url": a.url, "model": a.model, "temperature": 0.0, "max_tokens": 4096,
-             "thinking": False}
-    if a.fake is None:
-        penalties = {v.get("QWEN_PRESENCE_PENALTY") for v in stand["worker_env"].values() if isinstance(v, dict)}
-        if penalties != {"0"}:
-            sys.exit(f"worker presence penalty is not 0: {stand['worker_env']}")
+    P = STAND.load(a.stand)
+    gp = STAND.gen(P, "executor", "alfworld")
+    stand = {"stand": STAND.meta(P, STAND.check(P, ["executor"]) if a.fake is None else None), "gen": gp}
 
     out.mkdir(parents=True)
     shutil.copytree(src, out / "src", ignore=shutil.ignore_patterns("__pycache__"))
@@ -137,7 +119,7 @@ def main():
     print(json.dumps(info), flush=True)
 
     jobs = [{"run": i + 1, "game": g, "src": str(out / "src"), "fake": json.loads(a.fake) if a.fake else None,
-             "url": a.url, "model": a.model, "hint_level": a.hint_level, "wall_limit": a.wall_limit}
+             "gen": gp, "hint_level": a.hint_level, "wall_limit": a.wall_limit}
             for i, g in enumerate(games)]
     results, t0 = [], time.time()
     with cf.ProcessPoolExecutor(a.workers, mp_context=mp.get_context("spawn"), max_tasks_per_child=1) as pool:

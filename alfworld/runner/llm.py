@@ -96,8 +96,8 @@ def clean(msg):
 class Client:
     """llm(messages, tools) -> assistant message. One instance per episode."""
 
-    def __init__(self, url, model, step_limit, wall_limit_s=3600, max_tokens=4096, http_timeout=900):
-        self.url, self.model = url.rstrip("/") + "/chat/completions", model
+    def __init__(self, url, model, step_limit, wall_limit_s=3600, max_tokens=4096, http_timeout=900, temperature=0.0):
+        self.url, self.model, self.temperature = url.rstrip("/") + "/chat/completions", model, temperature
         self.step_limit, self.max_tokens, self.http_timeout = step_limit, max_tokens, http_timeout
         self.deadline = time.time() + wall_limit_s
         self.conversation = None  # live reference to the harness's message list
@@ -110,7 +110,7 @@ class Client:
             raise EpisodeEnd("step limit")
         if time.time() > self.deadline:
             raise EpisodeEnd("timeout")
-        body = {"model": self.model, "messages": messages, "max_tokens": self.max_tokens, "temperature": 0.0}
+        body = {"model": self.model, "messages": messages, "max_tokens": self.max_tokens, "temperature": self.temperature}
         if tools:
             body["tools"] = tools
         self.requests.append(copy.deepcopy(messages))

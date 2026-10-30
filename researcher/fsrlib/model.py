@@ -1,6 +1,5 @@
 """Вызов модели и разбор ответа API."""
 import json
-import subprocess
 import urllib.error
 import urllib.request
 
@@ -9,29 +8,11 @@ from . import cfg as C
 
 # ---------------------------------------------------------------- модель
 
-WORKER_KEYS = ("QWEN_MODEL", "QWEN_PRESENCE_PENALTY", "QWEN_MAX_CONTEXT", "QWEN_KV_BITS", "QWEN_MAX_BATCH",
-               "QWEN_BATCH_INVARIANT", "QWEN_PROMPT_CACHE")
-
-
-def provenance(temp):
-    """С какой моделью и параметрами генерации идёт сессия: пишется в мету лога вместе с результатом."""
-    try:
-        pids = subprocess.run(["pgrep", "-f", "python worker.py"], capture_output=True, text=True).stdout.split()
-        worker = {}
-        for pid in pids:
-            env = subprocess.run(["ps", "eww", "-p", pid], capture_output=True, text=True).stdout.split()
-            worker[pid] = {k: v for k, _, v in (t.partition("=") for t in env) if k in WORKER_KEYS}
-    except Exception as e:  # noqa: BLE001
-        worker = {"error": repr(e)}
-    return {"model": C.MODEL, "url": C.THINK_URL if C.THINKING else C.URL, "temperature": temp,
-            "max_tokens": C.MAX_GEN, "thinking": C.THINKING, "think_budget": C.THINK_BUDGET, "worker": worker}
-
-
 def chat(messages, temp, seed, tools=None, tool_choice=None):
+    assert C.URL, "no stand profile applied (policy.apply_stand)"
     body = {"model": C.MODEL, "messages": messages, "temperature": temp, "seed": seed, "max_tokens": C.MAX_GEN}
     url = C.URL
     if C.THINKING:
-        url = C.THINK_URL
         body["enable_thinking"] = True
         if C.THINK_BUDGET:
             body["thinking_budget"] = C.THINK_BUDGET

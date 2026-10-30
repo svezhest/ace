@@ -13,6 +13,7 @@ def resp(*calls, content=""):
 def run(script, role, bench="alf", n_obs=3):
     it = iter(script)
     E.F.chat = lambda *a, **k: (next(it), None)
+    E.F.MAX_GEN, E.F.TEMP, E.F.URL = 4096, 0.6, "mock:"   # заглушка модели: профиль стенда не нужен
     root = E.build_work(bench, "mock_" + role)
     prof = E.make_profile(root, "mock_" + role)
     end, st, items = E.run_session(role, "sys", "first", root, prof, 1, f"{HERE}/logs/mock_{role}.jsonl", n_obs)

@@ -1,0 +1,63 @@
+{
+  "name": "thinking",
+  "doc": "Как default, плюс второй шлюз с thinking для агентов метода (исполнитель — по-прежнему main, без thinking). Поднять перед прогоном: cd ~/Projects/llm && GATEWAY_ADDR=127.0.0.1:8081 GATEWAY_SERVED_MODEL_NAMES=ornith15-9b,ornith-ai/Ornith-1.5-9B-MLX-8bit ./target/release/qwen-gateway",
+  "model": "ornith15-9b",
+  "served_model": "ornith15-9b-mlx-8bit",
+  "worker": {
+    "port": 50051,
+    "count": 1,
+    "env": {
+      "QWEN_MODEL": "../../weights/ornith15-9b-mlx-8bit",
+      "QWEN_KV_BITS": "0",
+      "QWEN_MAX_CONTEXT": "65536",
+      "QWEN_PRESENCE_PENALTY": "0",
+      "QWEN_PROMPT_CACHE": "1",
+      "QWEN_PROMPT_CACHE_GB": "4",
+      "QWEN_PROMPT_CACHE_REPLY": "0",
+      "QWEN_BATCH_RESERVE_TOKENS": "1024",
+      "QWEN_PROMPT_CACHE_DISK": "/Users/user/.cache/qwen-pcdisk",
+      "QWEN_MAX_BATCH": "16",
+      "QWEN_BATCH_INVARIANT": "1"
+    }
+  },
+  "gateways": {
+    "main": {
+      "port": 8090,
+      "cmd": "./target/release/qwen-gateway",
+      "env": {
+        "GATEWAY_ADDR": "127.0.0.1:8090",
+        "GATEWAY_THINKING": "off",
+        "GATEWAY_SERVED_MODEL_NAMES": "ornith15-9b,ornith-ai/Ornith-1.5-9B-MLX-8bit"
+      },
+      "thinking": false
+    },
+    "think": {
+      "port": 8081,
+      "cmd": "./target/release/qwen-gateway",
+      "env": {
+        "GATEWAY_ADDR": "127.0.0.1:8081",
+        "GATEWAY_SERVED_MODEL_NAMES": "ornith15-9b,ornith-ai/Ornith-1.5-9B-MLX-8bit"
+      },
+      "thinking": true
+    }
+  },
+  "executor": {
+    "gateway": "main",
+    "alfworld": {
+      "temperature": 0.0,
+      "max_tokens": 4096
+    },
+    "appworld": {
+      "temperature": 0.0,
+      "seed": 100,
+      "max_tokens": null
+    }
+  },
+  "agent": {
+    "gateway": "think",
+    "temperature": 0.6,
+    "max_tokens": 4096,
+    "thinking": true,
+    "think_budget": 2048
+  }
+}
