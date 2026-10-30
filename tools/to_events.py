@@ -3,7 +3,8 @@
   python3 tools/to_events.py --bench appworld --view appworld/view --out appworld/view_ev
 
 События (поле "event"):
-  bridge   — вызов моста: fill (подстановки в шаблон промпта), reset, execute / step (что ушло в среду)
+  bridge   — вызов моста: fill (подстановки в шаблон промпта), reset, execute / step (что ушло в среду);
+             end — как эпизод кончился на уровне моста (finished, step limit, ...), без оценки
   prompt   — сообщение, которое харнесс собрал из src/starting_prompt.md (после подстановок моста)
   env      — сообщение с результатом моста, как его получила модель
   model    — ответ модели
@@ -14,6 +15,12 @@ import json
 import re
 import shutil
 from pathlib import Path
+
+# reason из results.jsonl -> конец эпизода на уровне моста. Оценка (success / wrong result) сюда не идёт:
+# мост знает только, что эпизод закончен (AppWorld: complete_task; ALFWorld: среда сама закрыла эпизод).
+END = {"success": "finished", "wrong result": "finished", "step limit": "step limit",
+       "repeated action": "repeated action", "harness error": "error", "runner error": "error",
+       "harness stopped early": "stopped"}
 
 SLOT = re.compile(r"\{\{\s*([\w.]+)\s*\}\}")
 
@@ -104,7 +111,8 @@ README_LOGS = {
     "old": "  - `run_N.jsonl` — one episode's conversation, one message per line, as sent to and received from the model.",
     "new": ("  - `run_N.jsonl` — one episode as a stream of events, one per line. `event` says who produced it: "
             "`bridge` — a call to the benchmark (`fill`: the values put into the prompt's slots; `reset`, `step`, "
-            "`execute`: what was sent to the environment); `prompt` — a message the harness built from "
+            "`execute`: what was sent to the environment; `end`: how the episode ended — `finished`, `step limit`, "
+            "`repeated action`, `error`); `prompt` — a message the harness built from "
             "`src/starting_prompt.md`; `env` — a message with the benchmark's result, as the model received it; "
             "`model` — the model's reply; `harness` — other messages from the harness (`from`: its file in `src/`). "
             "The `message` fields in order are the conversation as the model saw it."),
@@ -126,9 +134,11 @@ def main():
     (out / "README.md").write_text(readme.replace(README_LOGS["old"], README_LOGS["new"]))
     shutil.copy(view / "logs" / "results.jsonl", out / "logs" / "results.jsonl")
     conv = appworld if a.bench == "appworld" else alfworld
+    reasons = {r["run"]: r["reason"] for r in map(json.loads, (view / "logs" / "results.jsonl").read_text().splitlines())}
     for f in sorted((view / "logs").glob("run_*.jsonl")):
         msgs = [json.loads(x) for x in f.read_text().splitlines() if x.strip()]
         ev = conv(msgs, out / "src")
+        ev.append({"event": "bridge", "call": "end", "reason": END[reasons[int(f.stem.split("_")[1])]]})
         assert [e["message"] for e in ev if "message" in e] == msgs, f    # разговор не изменился
         (out / "logs" / f.name).write_text("".join(json.dumps(e, ensure_ascii=False) + "\n" for e in ev))
     print(f"{out}: {len(list((out / 'logs').glob('run_*.jsonl')))} runs")
