@@ -1,5 +1,6 @@
 """Учёт чтения трасс: какие logs/run_N.jsonl команда открыла. Только лог, модель не видит."""
 import glob
+import json
 import os
 import re
 
@@ -220,3 +221,52 @@ def fsr_xargs_prog(w):
 def _is_trace_read(inner_files):
     """Run прочитан как трасса: открыт файл шага или каталог шагов/run (grep -r внутри run)."""
     return any(STEP_FILE_RE.match(f.lstrip("?")) for f in inner_files)
+
+
+# ---------------------------------------------------------------- что модель увидела (по выводу, а не по команде)
+
+SEEN_CHUNK = 60                  # знаков: кусок текста сообщения; он же окно поиска в выводе
+_SEEN = {}                       # root -> {кусок: run}
+
+
+def _unique_chunks(root):
+    """Куски текста сообщений (как есть и в JSON-записи), которые встречаются только в одном run.
+    Общее у всех run (промпт, демо) не считается."""
+    if root in _SEEN:
+        return _SEEN[root]
+    owner = {}
+    for f in glob.glob(os.path.join(root, "logs", "run_*.jsonl")):
+        r = re.search(r"run_(\d+)\.jsonl$", f).group(1)
+        with open(f, encoding="utf-8", errors="replace") as fh:
+            for line in fh:
+                try:
+                    m = json.loads(line)
+                except ValueError:
+                    continue
+                parts = [m.get("content") or ""] + [str((c.get("function") or {}).get("arguments") or "")
+                                                     for c in m.get("tool_calls") or []]
+                for t in parts:
+                    for form in (t, json.dumps(t, ensure_ascii=False)[1:-1]):
+                        for k in range(0, len(form) - SEEN_CHUNK + 1, SEEN_CHUNK):
+                            owner.setdefault(form[k:k + SEEN_CHUNK], set()).add(r)
+    _SEEN[root] = {c: next(iter(rs)) for c, rs in owner.items() if len(rs) == 1}
+    return _SEEN[root]
+
+
+def seen_runs(text, root):
+    """run -> куски его собственного текста, которые есть в выводе, полученном моделью (любым способом чтения)."""
+    chunks = _unique_chunks(root)
+    out = {}
+    for i in range(len(text) - SEEN_CHUNK + 1):
+        r = chunks.get(text[i:i + SEEN_CHUNK])
+        if r:
+            out.setdefault(r, set()).add(text[i:i + SEEN_CHUNK])
+    return out
+
+
+def seen_share(seen, root):
+    """run -> доля (%) его собственного текста, которую модель получила (по накопленным кускам)."""
+    total = {}
+    for r in _unique_chunks(root).values():
+        total[r] = total.get(r, 0) + 1
+    return {r: round(100 * len(cs) / total[r], 1) for r, cs in sorted(seen.items(), key=lambda x: int(x[0]))}

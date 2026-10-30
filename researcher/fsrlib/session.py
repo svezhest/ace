@@ -43,7 +43,7 @@ def session(mode, k, seed, temp, tag, resume=None, max_turns=None, runs=None):
           "bad_call": 0, "repeats": 0, "denied": 0, "truncated": 0, "gen_tokens": 0, "max_prompt": 0,
           "model_sec": 0.0, "length_stops": 0, "clears": 0, "cleared_results": 0, "reminders": 0,
           "final_turns": 0, "first_report_call": None, "api_retries": 0, "harness_errors": 0,
-          "traces_read": [], "n_traces_read": 0, "traces_read_exact": [], "runs_opened": [], "traces_scanned_only": [], "step_files_read": 0,
+          "traces_read": [], "n_traces_read": 0, "traces_seen": {}, "traces_read_exact": [], "runs_opened": [], "traces_scanned_only": [], "step_files_read": 0,
           "read_unresolved_calls": 0, "notes": 0, "compactions": 0,
           "bash_calls": 0, "bash_over_limit": 0, "final_rejected": 0, "final_fix_used": 0, "finish_deferred": 0,
           "repeat_run_max": 0, "loop_final": 0}
@@ -119,7 +119,8 @@ def _loop(st, reports, w, root, prof, temp, seed, resume=None, max_turns=None, s
                 "tool_msgs": tool_msgs, "tool_meta": tool_meta, "cleared": sorted(cleared),
                 "last_prompt": last_prompt, "pending": pending, "warned_ctx": warned_ctx,
                 "warned_steps": warned_steps, "since_report": since_report, "st": st, "reports": reports,
-                "reads_acc": {r: sorted(v) for r, v in reads_acc.items()}, "scanned_acc": sorted(scanned_acc)}
+                "reads_acc": {r: sorted(v) for r, v in reads_acc.items()}, "scanned_acc": sorted(scanned_acc),
+                "seen_acc": {r: sorted(v) for r, v in seen_acc.items()}}
         path = f"{C.SNAPSHOT_DIR}/{snap['name']}.json"
         with open(path, "w") as f:
             json.dump(snap, f, ensure_ascii=False)
@@ -245,6 +246,7 @@ def _loop(st, reports, w, root, prof, temp, seed, resume=None, max_turns=None, s
 
     reads_acc = {r: set(v) for r, v in (resume or {}).get("reads_acc", {}).items()}
     scanned_acc = set((resume or {}).get("scanned_acc", []))
+    seen_acc = {r: set(v) for r, v in (resume or {}).get("seen_acc", {}).items()}
 
     def note_reads(cmd, info, res):
         """Учёт открытых файлов трасс (trace_reads) -> res['reads'] и счётчики st; модели не показывается."""
@@ -326,6 +328,12 @@ def _loop(st, reports, w, root, prof, temp, seed, resume=None, max_turns=None, s
                 st["denied"] += 1
             else:
                 note_reads(cmd, info, res)
+                seen = T.seen_runs(out, root)
+                if seen:
+                    res["seen"] = sorted(seen, key=int)
+                    for r, cs in seen.items():
+                        seen_acc.setdefault(r, set()).update(cs)
+                    st["traces_seen"] = T.seen_share(seen_acc, root)
             st["truncated"] += tr
             # v3: в лог — начало вывода и длина (вывод может быть до MAX_CAPTURE байт)
             res.update(ok=ok, full_chars=len(full), truncated=tr, capped=info["capped"],
