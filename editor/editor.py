@@ -16,6 +16,7 @@ import argparse
 import glob
 import hashlib
 import json
+import re
 import os
 import shutil
 import subprocess
@@ -120,6 +121,14 @@ def fill(t, arm=None):
     t = t.replace("PYTHON_LINE", F.PYTHON_LINE)
     return (t.replace("PROGRAMS", ", ".join(sorted(F.ALLOWED))).replace("OUT_CHARS", str(F.OUT_CHARS))
             .replace("BASH_LIMIT", str(BASH_LIMIT)))
+
+
+CHECK_LINE = ("- Check each change: run python3 tests/smoke.py, and read the changed lines together with the code that "
+              "calls or uses them.")
+PREDICT_LINE = ("- Check each change: before you run python3 tests/smoke.py, write down what you expect it to print "
+                "after your change (which messages, after which replies, how the run ends); after it runs, compare "
+                "the output with what you wrote, line by line, and say where they differ before you go on. Read the "
+                "changed lines together with the code that calls or uses them.")
 
 
 BASH_SCHEMA = {"type": "function", "function": {
@@ -329,7 +338,36 @@ def do_edit(args, root, st):
     what = (f"Applied: {rel} created." if not exists else
             f"Applied: {rel}, the new text is at lines {a_line + 1}-{max(a_line + 1, b_line)}." if new else
             f"Applied: text removed from {rel} at line {a_line + 1}.")
-    return f"{what} Lines {lo + 1}-{hi} now read:\n{shown}" if lines else f"{what} The file is now empty.", rec
+    note = lint_note(text if exists else "", newtext, rel)
+    rec["lint"] = note.strip() or None
+    return (f"{what} Lines {lo + 1}-{hi} now read:\n{shown}" if lines else f"{what} The file is now empty.") + note, rec
+
+
+def lint(text, rel):
+    """pyflakes по тексту файла -> [(строка, сообщение)]."""
+    import io
+    sys.path.insert(0, f"{HERE}/lint")
+    from pyflakes import api, reporter
+    out = io.StringIO()
+    api.check(text, rel, reporter.Reporter(out, out))
+    res = []
+    for ln in out.getvalue().splitlines():
+        m = re.match(rf"{re.escape(rel)}:(\d+):(?:\d+:?)?\s*(.*)", ln)
+        if m:
+            res.append((int(m.group(1)), m.group(2)))
+    return res
+
+
+def lint_note(old, new, rel):
+    """Предупреждения pyflakes, которых не было до правки (сравнение по тексту сообщения)."""
+    if not rel.endswith(".py"):
+        return ""
+    before = {msg for _, msg in lint(old, rel)} if old else set()
+    fresh = [(n, msg) for n, msg in lint(new, rel) if msg not in before]
+    if not fresh:
+        return ""
+    return ("\npyflakes on " + rel + " after this change:\n" +
+            "".join(f"  line {n}: {msg}\n" for n, msg in fresh[:10]))
 
 
 # ---------------------------------------------------------------- цикл
@@ -559,14 +597,20 @@ def main():
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--tag", required=True)
     ap.add_argument("--dry", action="store_true")
+    ap.add_argument("--view", help="вид узла (src/ и README.md), по умолчанию — корневой вид бенчмарка")
+    ap.add_argument("--predict", action="store_true", help="плечо: перед smoke записать ожидаемый вывод, после — сверить")
     ap.add_argument("--think", action="store_true", help="рассуждение модели (шлюз с thinking); в историю не идёт, в лог — да")
+    ap.add_argument("--think-budget", type=int, default=2048, help="потолок токенов рассуждения на ход (thinking_budget шлюза)")
     a = ap.parse_args()
+    if a.view:
+        VIEWS[a.bench] = os.path.realpath(os.path.expanduser(a.view))
     F.THINKING = a.think
+    F.THINK_BUDGET = a.think_budget
     reports = load_reports(a.input)
     src_before = tree_hash(f"{VIEWS[a.bench]}/src")
     os.makedirs(f"{HERE}/logs", exist_ok=True)
     os.makedirs(f"{HERE}/out", exist_ok=True)
-    summary = {"tag": a.tag, "bench": a.bench, "input": a.input, "arm": a.arm, "seed": a.seed, "think": a.think,
+    summary = {"tag": a.tag, "bench": a.bench, "input": a.input, "arm": a.arm, "seed": a.seed, "view": VIEWS[a.bench], "predict": a.predict, "think": a.think, "think_budget": a.think_budget if a.think else None,
                "n_reports": len(reports), "view_src_hash": src_before}
     if a.arm == "fix":
         psys, pfirst = fill(PROPOSER_T), first_user_proposer(reports)
@@ -589,6 +633,9 @@ def main():
     else:
         first = first_user_editor_obs(reports)
     esys = fill(EDITOR_T, a.arm)
+    if a.predict:
+        esys = esys.replace(CHECK_LINE, PREDICT_LINE)
+        assert PREDICT_LINE in esys
     if a.dry:
         print(esys, "\n-----\n", first)
         return
