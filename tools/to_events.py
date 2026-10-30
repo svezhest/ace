@@ -18,9 +18,12 @@ from pathlib import Path
 
 # reason из results.jsonl -> конец эпизода на уровне моста. Оценка (success / wrong result) сюда не идёт:
 # мост знает только, что эпизод закончен (AppWorld: complete_task; ALFWorld: среда сама закрыла эпизод).
-END = {"success": "finished", "wrong result": "finished", "step limit": "step limit",
-       "repeated action": "repeated action", "harness error": "error", "runner error": "error",
-       "harness stopped early": "stopped"}
+# Ошибка -> reason "error" и detail (repeated action — правило самого бенчмарка, AgentBench ALFWorld).
+END = {"success": {"reason": "finished"}, "wrong result": {"reason": "finished"},
+       "step limit": {"reason": "step limit"}, "harness stopped early": {"reason": "stopped"},
+       "repeated action": {"reason": "error", "detail": "repeated action"},
+       "harness error": {"reason": "error", "detail": "harness error"},
+       "runner error": {"reason": "error", "detail": "runner error"}}
 
 SLOT = re.compile(r"\{\{\s*([\w.]+)\s*\}\}")
 
@@ -112,7 +115,7 @@ README_LOGS = {
     "new": ("  - `run_N.jsonl` — one episode as a stream of events, one per line. `event` says who produced it: "
             "`bridge` — a call to the benchmark (`fill`: the values put into the prompt's slots; `reset`, `step`, "
             "`execute`: what was sent to the environment; `end`: how the episode ended — `finished`, `step limit`, "
-            "`repeated action`, `error`); `prompt` — a message the harness built from "
+            "`error` with `detail`); `prompt` — a message the harness built from "
             "`src/starting_prompt.md`; `env` — a message with the benchmark's result, as the model received it; "
             "`model` — the model's reply; `harness` — other messages from the harness (`from`: its file in `src/`). "
             "The `message` fields in order are the conversation as the model saw it."),
@@ -138,7 +141,7 @@ def main():
     for f in sorted((view / "logs").glob("run_*.jsonl")):
         msgs = [json.loads(x) for x in f.read_text().splitlines() if x.strip()]
         ev = conv(msgs, out / "src")
-        ev.append({"event": "bridge", "call": "end", "reason": END[reasons[int(f.stem.split("_")[1])]]})
+        ev.append({"event": "bridge", "call": "end", **END[reasons[int(f.stem.split("_")[1])]]})
         assert [e["message"] for e in ev if "message" in e] == msgs, f    # разговор не изменился
         (out / "logs" / f.name).write_text("".join(json.dumps(e, ensure_ascii=False) + "\n" for e in ev))
     print(f"{out}: {len(list((out / 'logs').glob('run_*.jsonl')))} runs")
