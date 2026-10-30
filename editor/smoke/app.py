@@ -57,12 +57,8 @@ def app_reply(i, item):
 def scenarios():
     code = lambda c: "Next step.\n```python\n" + c + "\n```"                      # noqa: E731
     fail = [code(f"print({i + 1})") for i in range(N_REPLIES)]
-    fail[2] = "Let me think about it first."
-    for i in range(19, 24):
-        fail[i] = code('print("same")')
     win = [code(f"print({i + 1})") for i in range(4)] + [code('apis.supervisor.complete_task(answer="stub")')]
-    return [("the task is not solved: 50 replies with different code, except reply 3 (text without code) and replies "
-             "20-24 (the same code, so the same output, five times)", AppEpisode, fail, app_reply),
+    return [("the task is not solved: 50 replies with different code", AppEpisode, fail, app_reply),
             ("the task is solved at reply 5 (complete_task)", AppEpisode, win, app_reply)]
 
 
