@@ -105,6 +105,7 @@ def test_turn_limit_of_the_task():
 def test_game_step_limit():
     ep, rec, llm, msgs = play(["look", "inventory"] * 30)
     assert ep.turns == bridge.STEP_LIMIT and rec.env_steps() == bridge.STEP_LIMIT and ep.finished
+    assert ep.end == {"reason": "step limit", "status": "completed", "detail": "the game's limit of 50 actions"}
 
 
 def test_noop_hooks_do_not_change_conversation():
@@ -202,3 +203,13 @@ def test_runner_files(tmp_path):
 def test_hint_levels(level):
     h = expert_hint(GAME, level)
     assert h.startswith("an expert solves" if level == 1 else "expert plan: ")
+
+
+def test_upstream_files_unchanged():
+    import hashlib
+    import re
+    text = (ROOT / "bench" / "UPSTREAM.md").read_text()
+    want = dict((p, h) for h, p in re.findall(r"^([0-9a-f]{64})  (\S+)$", text, flags=re.M))
+    assert len(want) == 6
+    for p, h in want.items():
+        assert hashlib.sha256((ROOT / "bench" / "agentbench_alfworld" / p).read_bytes()).hexdigest() == h, p
