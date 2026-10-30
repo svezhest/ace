@@ -103,45 +103,52 @@ def play(job):
     sys.path[:0] = [job["src"], str(HERE)]
     import bridge
     import harness
+    from events import Recorder, events, honest
     from fake import Fake
     from llm import Client, EpisodeEnd
 
-    t0, reason, detail, messages, evaluation, completed = time.time(), None, "", None, None, False
+    t0, reason, detail, messages, evaluation, ep = time.time(), None, "", None, None, None
+    if job["fake"] is not None:
+        llm = Fake(job["fake"])
+    else:
+        g = job["gen"]
+        llm = Client(g["url"], g["model"], job["wall_limit"], seed=g["seed"], temperature=g["temperature"],
+                     max_tokens=g["max_tokens"])
     bench = Benchmark(job["task"], job["experiment"], job["appworld_root"], job["env_log"])
     try:
         ep = bridge.Episode(bench.url)
-        if job["fake"] is not None:
-            llm = Fake(job["fake"], bridge.STEP_LIMIT)
-        else:
-            g = job["gen"]
-            llm = Client(g["url"], g["model"], bridge.STEP_LIMIT, job["wall_limit"], seed=g["seed"],
-                         temperature=g["temperature"], max_tokens=g["max_tokens"])
+        rec = Recorder(ep, llm)
         try:
             messages = harness.run(ep, llm)
         except EpisodeEnd as e:
             reason, detail = e.reason, e.detail
         except Exception:
             reason, detail = "harness error", traceback.format_exc(limit=5)
-        completed = post(bench.url + "/completed")
         evaluation = bench.finish()
     finally:
         bench.close()
     if not isinstance(messages, list):
         messages = llm.conversation or []
-    if evaluation["success"]:
+    end = ep.end if ep is not None else None
+    is_honest = honest(rec.codes(), llm.outputs)
+    if not is_honest:
+        reason, detail = "harness error", "code run by the benchmark is not from a model reply"
+    elif evaluation["success"]:
         reason = "success"
-    elif completed:
+    elif end and end["reason"] == "finished":
         reason = "wrong result"
     elif reason is None:
-        reason = "step limit" if len(llm.calls) >= bridge.STEP_LIMIT else "harness stopped early"
+        reason = end["reason"] if end else "harness stopped early"
     as_json = [json.dumps(m, sort_keys=True) for m in messages]
     append_only = all([json.dumps(m, sort_keys=True) for m in r] == as_json[:len(r)] for r in llm.requests)
     prompt_tokens = [c["prompt_tokens"] or 0 for c in llm.calls]
     ok = reason == "success"
+    n_first = len(llm.requests[0]) if llm.requests else len(messages)
     return {"run": job["run"], "ok": ok, "reason": reason, "hint": hint(evaluation, job["hint_level"]),
-            "messages": messages,
+            "events": events(messages, rec, end, job["src"], n_first),
             "meta": {"run": job["run"], "task": job["task"], "ok": ok, "reason": reason, "detail": detail,
-                     "completed": completed, "sec": round(time.time() - t0, 1), "model_calls": len(llm.calls),
+                     "end": end, "honest": is_honest, "sec": round(time.time() - t0, 1),
+                     "model_calls": len(llm.calls), "steps": ep.steps if ep else 0,
                      "max_prompt_tokens": max(prompt_tokens, default=0),
                      "completion_tokens": sum(c["completion_tokens"] or 0 for c in llm.calls),
                      "append_only": append_only, "evaluation": evaluation, "calls": llm.calls}}
@@ -202,12 +209,12 @@ def main():
                 r = f.result()
             except Exception:
                 j = futs[f]
-                r = {"run": j["run"], "ok": False, "reason": "runner error", "hint": None, "messages": [],
+                r = {"run": j["run"], "ok": False, "reason": "runner error", "hint": None, "events": [],
                      "meta": {"run": j["run"], "task": j["task"], "detail": traceback.format_exc()}}
             results.append(r)
             with open(out / "logs" / f"run_{r['run']}.jsonl", "w") as fh:
-                for m in r["messages"]:
-                    fh.write(json.dumps(m, ensure_ascii=False) + "\n")
+                for e in r["events"]:
+                    fh.write(json.dumps(e, ensure_ascii=False) + "\n")
             with open(out / "meta.jsonl", "a") as fh:
                 fh.write(json.dumps(r["meta"], ensure_ascii=False) + "\n")
             m = r["meta"]

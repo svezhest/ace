@@ -1,4 +1,4 @@
-"""Smoke test: runs src/harness.py with a stub environment and a stub model (not the benchmark).
+"""Smoke test: runs src/harness.py with a stub of the bridge and benchmark and a stub model (not the benchmark).
 
     python3 tests/smoke.py
 
@@ -10,7 +10,8 @@ import os
 import sys
 import traceback
 
-N_REPLIES = 50          # model replies per episode (STEP_LIMIT in src/bridge.py)
+N_REPLIES = 50          # steps per episode (STEP_LIMIT in src/bridge.py)
+MAX_CALLS = 200         # the stub model stops here if the episode has not ended
 SHOW = 160
 
 
@@ -18,15 +19,16 @@ class StubStop(Exception):
     pass
 
 
-# ---------------------------------------------------------------- stub environment and model
+# ---------------------------------------------------------------- stub benchmark and model
 
 class AppEpisode:
+    """Stub of src/bridge.py's Episode and the benchmark behind it (fill, execute, steps, finished, end)."""
     SLOTS = {"instruction": "Find the stub value and report it.", "main_user.first_name": "Sam",
              "main_user.last_name": "Stub", "main_user.email": "sam@stub.example",
              "main_user.phone_number": "5550100", "app_descriptions": '{"supervisor": "stub app"}'}
 
     def __init__(self):
-        self._done = False
+        self.steps, self.finished, self.end = 0, False, None
         self.results = []
 
     def fill(self, text):
@@ -34,19 +36,19 @@ class AppEpisode:
         return re.sub(r"\{\{\s*([\w.]+)\s*\}\}", lambda m: self.SLOTS.get(m.group(1), m.group(0)), text)
 
     def execute(self, code):
+        assert not self.finished, "the episode is over"
+        self.steps += 1
         if "complete_task" in code:
-            self._done = True
+            self.finished, self.end = True, {"reason": "finished"}
             out = "Execution successful."
         elif not code.strip():
-            out = ""
+            out = "No code available to execute."
         else:
             out = "stub output: " + str(abs(hash(code)) % 10 ** 6)
+        if not self.finished and self.steps >= N_REPLIES:
+            self.finished, self.end = True, {"reason": "step limit"}
         self.results.append(out)
         return out
-
-    @property
-    def done(self):
-        return self._done
 
 
 def app_reply(i, item):
@@ -75,7 +77,7 @@ def play(harness, Ep, script, mk):
 
     def llm(messages, tools=None):
         convo["m"] = messages
-        if len(marks) >= N_REPLIES:
+        if len(marks) >= MAX_CALLS:
             raise StubStop()
         marks.append(len(messages))
         i = len(marks) - 1
@@ -86,7 +88,7 @@ def play(harness, Ep, script, mk):
         msgs = harness.run(ep, llm)
         end = f"run() returned after {len(marks)} model replies"
     except StubStop:
-        msgs, end = convo.get("m") or [], f"stopped at the step limit: {N_REPLIES} model replies"
+        msgs, end = convo.get("m") or [], f"stopped: {MAX_CALLS} model replies and the episode has not ended"
     except BaseException:                            # noqa: BLE001
         msgs, end = convo.get("m") or [], f"crashed after {len(marks)} model replies"
         e = sys.exc_info()
@@ -138,7 +140,7 @@ def report(msgs, marks, ep):
 
 def main():
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src"))
-    print("smoke: src/harness.py with a stub environment and a stub model, not the benchmark. It shows what the "
+    print("smoke: src/harness.py with a stub of the bridge and benchmark and a stub model, not the benchmark. It shows what the "
           "harness adds to the conversation and when; model replies and environment results are left out.")
     try:
         import harness
@@ -149,7 +151,8 @@ def main():
     for n, (desc, Ep, script, mk) in enumerate(scenarios(), 1):
         ep, msgs, marks, end, err = play(harness, Ep, script, mk)
         print(f"\n== scenario {n}: {desc}")
-        print(f"  {end}; episode done: {bool(ep.done)}" + (f" ({ep.end_reason})" if getattr(ep, "end_reason", None) else ""))
+        print(f"  {end}; steps run: {ep.steps}; episode ended by the benchmark: {bool(ep.finished)}"
+              + (f" ({ep.end})" if ep.end else ""))
         if err:
             print("  " + "\n  ".join(err.rstrip().splitlines()[-8:]))
         for line in report(msgs, marks, ep):

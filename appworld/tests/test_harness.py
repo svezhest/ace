@@ -1,5 +1,5 @@
-"""Stub-model tests for view/src (harness + bridge), runner/llm.py and runner/run.py. No LLM calls.
-The benchmark process (runner/env_server.py in AppWorld's venv) is real.
+"""Stub-model tests for view_v3/src (harness + bridge), runner/llm.py and runner/run.py. No LLM calls.
+The benchmark process (runner/env_server.py in AppWorld's venv: AppWorld's own agent loop) is real.
 
   cd ~/Projects/nrhsi/appworld && .venv/bin/python -m pytest -q tests
 """
@@ -15,13 +15,14 @@ import pytest
 import requests
 
 ROOT = Path(__file__).resolve().parents[1]
-SRC = ROOT / "view_b2" / "src"
+SRC = ROOT / "view_v3" / "src"
 sys.dont_write_bytecode = True
 sys.path[:0] = [str(SRC), str(ROOT / "runner")]
 
 import bridge  # noqa: E402
 import harness  # noqa: E402
 import llm as llm_mod  # noqa: E402
+from events import Recorder, events, honest  # noqa: E402
 from fake import Fake  # noqa: E402
 from llm import EpisodeEnd  # noqa: E402
 from run import APPWORLD, Benchmark, hint  # noqa: E402
@@ -34,8 +35,8 @@ PRINT_SET = "Let me look.\n\n```python\nprint({'rock', 'jazz', 'pop', 'indie', '
 COMPLETE = "Done.\n\n```python\napis.supervisor.complete_task()\n```"
 
 
-def play(script, task=TASK, hooks=None, tmp=None):
-    """-> (messages, llm, completed, evaluation)."""
+def play(script, task=TASK, hooks=None, tmp=None, full=False):
+    """-> (messages, llm, completed, evaluation) [+ (episode, recorder) if full]."""
     old = harness.hooks
     harness.hooks = hooks if hooks is not None else types.SimpleNamespace()
     root = Path(tmp)
@@ -44,16 +45,19 @@ def play(script, task=TASK, hooks=None, tmp=None):
     llm = Fake(script)
     try:
         ep = bridge.Episode(bench.url)
+        rec = Recorder(ep, llm)
         try:
             msgs = harness.run(ep, llm)
         except EpisodeEnd:
             msgs = llm.conversation
-        completed = ep.done
+        completed = bool(ep.end) and ep.end["reason"] == "finished"
         evaluation = bench.finish()
     finally:
         bench.close()
         harness.hooks = old
         (root / "data").unlink()
+    if full:
+        return msgs, llm, completed, evaluation, ep, rec
     return msgs, llm, completed, evaluation
 
 
@@ -116,8 +120,9 @@ def test_reproducible_across_processes(tmp_path):
 
 
 def test_step_limit(tmp):
-    msgs, llm, completed, ev = play(["```python\nprint(1)\n```"], tmp=tmp)
-    assert not completed and len(llm.calls) == bridge.STEP_LIMIT == harness.MAX_STEPS
+    msgs, llm, completed, ev, ep, rec = play(["```python\nprint(1)\n```"], tmp=tmp, full=True)
+    assert not completed and len(llm.calls) == ep.steps == bridge.STEP_LIMIT and ep.end == {"reason": "step limit"}
+    assert msgs[-1]["content"] == "Output:\n```\n1\n```\n\n"  # the last step's output, as before
 
 
 def test_noop_hooks_do_not_change_conversation(tmp_path):
@@ -141,13 +146,14 @@ def test_hook_effects_reach_conversation(tmp):
         return {"skills": [{"text": "tip one"}]}
 
     def make_pre_hint(ctx, nb):
-        return {"message": "pre hint"} if ctx["step"] == 0 else None
+        if ctx["step"] == 0 and not nb.get("hinted"):
+            nb["hinted"] = True
+            return {"message": "pre hint"}
+        return None
 
     def on_before_action(ctx, nb):
         if "print(1)" in ctx["code"]:
             return {"kind": "block_and_prompt", "message": "blocked"}
-        if "print(2)" in ctx["code"]:
-            return {"kind": "rewrite_action", "action": "print(3)"}
         return None
 
     def broken(ctx, nb):
@@ -155,15 +161,15 @@ def test_hook_effects_reach_conversation(tmp):
 
     hooks = types.SimpleNamespace(on_init=on_init, make_pre_hint=make_pre_hint,
                                   on_before_action=on_before_action, on_post_step=broken)
-    msgs, llm, completed, ev = play(["```python\nprint(1)\n```", "```python\nprint(2)\n```", COMPLETE],
-                                    hooks=hooks, tmp=tmp)
+    msgs, llm, completed, ev, ep, rec = play(["```python\nprint(1)\n```", "```python\nprint(2)\n```", COMPLETE],
+                                            hooks=hooks, tmp=tmp, full=True)
     n = len(llm.requests[0]) - 1  # pre hint is the last message of the first request
     assert "Task: " in seen["task_msg"]
     assert msgs[n - 1]["content"].endswith("Some tips that may help for this task:\n- tip one\n\n")
     assert msgs[n] == {"role": "user", "content": "pre hint"}
     assert msgs[n + 2] == {"role": "user", "content": "blocked"}
-    assert msgs[n + 4]["content"] == "Output:\n```\n3\n```\n\n"
-    assert completed
+    assert msgs[n + 4]["content"] == "Output:\n```\n2\n```\n\n"
+    assert completed and ep.steps == 2 and len(llm.calls) == 3  # the blocked code was not run: no step
 
 
 def test_transport_body_and_endings(monkeypatch):
@@ -182,7 +188,7 @@ def test_transport_body_and_endings(monkeypatch):
     replies = []
     monkeypatch.setattr(llm_mod.requests, "post", lambda url, json, **kw: sent.append(json) or replies.pop(0))
     monkeypatch.setattr(llm_mod.time, "sleep", lambda s: None)
-    c = llm_mod.Client("http://x/v1", "m", step_limit=2)
+    c = llm_mod.Client("http://x/v1", "m")
     replies.append(R(200, ok))
     assert c([{"role": "user", "content": "q"}]) == {"role": "assistant", "content": "hi", "reasoning_content": "r"}
     assert sent[0] == {"model": "m", "messages": [{"role": "user", "content": "q"}], "temperature": 0.0, "seed": 100}
@@ -197,9 +203,6 @@ def test_transport_body_and_endings(monkeypatch):
         raise requests.ReadTimeout()
     monkeypatch.setattr(llm_mod.requests, "post", timeout)
     with pytest.raises(EpisodeEnd, match="timeout"):
-        c([])
-    c.calls = [{}] * 2
-    with pytest.raises(EpisodeEnd, match="step limit"):
         c([])
 
 
@@ -223,13 +226,32 @@ def test_runner_files(tmp_path):
         rows = [json.loads(l) for l in (view / "logs" / "results.jsonl").read_text().splitlines()]
         assert rows == [{"run": 1, "ok": False, "reason": "wrong result"}, {"run": 2, "ok": False, "reason": "wrong result"}]
         for n in (1, 2):
-            msgs = [json.loads(l) for l in (view / "logs" / f"run_{n}.jsonl").read_text().splitlines()]
+            ev = [json.loads(l) for l in (view / "logs" / f"run_{n}.jsonl").read_text().splitlines()]
+            msgs = [e["message"] for e in ev if "message" in e]
             assert msgs[0]["role"] == "user" and msgs[-1]["content"].startswith("Output:")
             assert all(set(m) == {"role", "content"} for m in msgs)
+            assert ev[0]["event"] == "bridge" and ev[0]["call"] == "fill" and "instruction" in ev[0]["slots"]
+            assert ev[-1] == {"event": "bridge", "call": "end", "reason": "finished"}
         meta = [json.loads(l) for l in (ROOT / "runs" / tag / "meta.jsonl").read_text().splitlines()]
-        assert all(m["append_only"] and m["completed"] for m in meta)
+        assert all(m["append_only"] and m["honest"] and m["end"] == {"reason": "finished"} for m in meta)
         assert not list((view / "src").glob("__pycache__"))
         bad = subprocess.run(cmd[:-2] + ["--tasks", "x_1", "--tag", tag + "b"], capture_output=True, text=True)
         assert bad.returncode != 0 and "outside train/val" in bad.stderr
     finally:
         shutil.rmtree(ROOT / "runs" / tag, ignore_errors=True)
+
+
+def test_honest_check():
+    a = {"role": "assistant", "content": "x\n```python\nprint(1)\nprint(2)\n```"}
+    assert honest(["print(1)\nprint(2)", ""], [a, {"role": "assistant", "content": "no code"}])
+    assert not honest(["print(3)"], [a])
+
+
+def test_events_of_an_episode(tmp):
+    msgs, llm, completed, ev, ep, rec = play(["no code", PRINT_SET, COMPLETE], tmp=tmp, full=True)
+    e = events(msgs, rec, ep.end, SRC, len(llm.requests[0]))
+    kinds = [x["event"] for x in e]
+    n = len(llm.requests[0])
+    assert e[0]["call"] == "fill" and kinds[1:1 + n] == ["prompt"] * n  # demo turns are the prompt's
+    assert [x["event"] for x in e[1 + n:]] == ["model", "bridge", "env"] * 3 + ["bridge"]
+    assert [x["step"] for x in e if x.get("call") == "execute"] == [1, 2, 3]

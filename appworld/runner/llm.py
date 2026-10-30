@@ -5,8 +5,8 @@ body = model, messages, temperature 0, seed 100; no max_tokens, no tools. Transp
 (connection, 429, 5xx) are retried 3 times 15 s apart; a 4xx ends the episode (upstream BREAKING_ERROR),
 as "context exhausted" when it is about the context window. A reply wrapped in <think>...</think> is split
 into reasoning_content + content (upstream maybe_insert_reasoning_content).
-Also enforces the episode budget (model calls, wall clock, per-call time) so that harness edits cannot
-exceed it.
+Also enforces the episode's wall clock and per-call time, so that harness edits cannot exceed them
+(steps are counted by the benchmark's loop).
 """
 import copy
 import re
@@ -50,20 +50,19 @@ def clean(msg):
 class Client:
     """llm(messages) -> assistant message. One instance per episode."""
 
-    def __init__(self, url, model, step_limit, wall_limit_s=3600, call_timeout_s=600, seed=100, temperature=0.0,
+    def __init__(self, url, model, wall_limit_s=3600, call_timeout_s=600, seed=100, temperature=0.0,
                  max_tokens=None):
         self.url, self.model, self.seed = url.rstrip("/") + "/chat/completions", model, seed
         self.temperature, self.max_tokens = temperature, max_tokens
-        self.step_limit, self.call_timeout = step_limit, call_timeout_s
+        self.call_timeout = call_timeout_s
         self.deadline = time.time() + wall_limit_s
         self.conversation = None  # live reference to the harness's message list
         self.requests = []        # copies of what was sent, for the append-only check
         self.calls = []           # per call: seconds, prompt/completion tokens, finish reason
+        self.outputs = []         # the replies as returned, for the check that the benchmark ran only their code
 
     def __call__(self, messages):
         self.conversation = messages
-        if len(self.calls) >= self.step_limit:
-            raise EpisodeEnd("step limit")
         if time.time() > self.deadline:
             raise EpisodeEnd("timeout")
         body = {"model": self.model, "messages": messages, "temperature": self.temperature, "seed": self.seed}
@@ -90,7 +89,9 @@ class Client:
                                        "prompt_tokens": usage.get("prompt_tokens"),
                                        "completion_tokens": usage.get("completion_tokens"),
                                        "finish_reason": data["choices"][0].get("finish_reason")})
-                    return clean(data["choices"][0]["message"])
+                    msg = clean(data["choices"][0]["message"])
+                    self.outputs.append(copy.deepcopy(msg))
+                    return msg
                 if is_context_error(r.text):
                     raise EpisodeEnd("context exhausted", r.text[:300])
                 if 400 <= r.status_code < 500 and r.status_code != 429:

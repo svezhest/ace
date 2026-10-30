@@ -16,12 +16,13 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+SRC = str(ROOT / "view_v3" / "src")  # the src/ replayed
 
 
 def replay(args):
     exp_dir, task = args
     sys.dont_write_bytecode = True
-    sys.path[:0] = [str(ROOT / "view" / "src"), str(ROOT / "runner")]
+    sys.path[:0] = [SRC, str(ROOT / "runner")]
     import bridge
     import harness
     from fake import Fake
@@ -39,7 +40,7 @@ def replay(args):
         (Path(tmp) / "data").symlink_to(APPWORLD / "data")
         bench = Benchmark(task, "replay", tmp, Path(tmp) / "env.log")
         try:
-            llm = Fake(replies or [""], step_limit=len(replies))
+            llm = Fake(replies or [""], max_calls=len(replies))
             try:
                 harness.run(bridge.Episode(bench.url), llm)
             except EpisodeEnd:

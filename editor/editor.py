@@ -31,7 +31,7 @@ import fsr as F  # noqa: E402
 
 # 30.10: механика bash — fsr исследователя (политика final: python3, heredoc), «/» = корень копии.
 F.apply_policy("final", {"RUNS_TOOL": False})
-SMOKE_README = ("- `tests/smoke.py` — a smoke test: runs src/harness.py with a stub environment and a stub model (not the "
+SMOKE_README = ("- `tests/smoke.py` — a smoke test: runs src/harness.py with a stub benchmark and a stub model (not the "
                 "benchmark) and prints what the harness adds to the conversation after which model reply, or the error. "
                 "Run it with `python3 tests/smoke.py`.\n")
 
