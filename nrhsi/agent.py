@@ -45,8 +45,8 @@ TEMP = 0.6
 
 ALLOWED = ["[", "awk", "basename", "cat", "column", "comm", "cut", "diff", "dirname", "echo", "expr", "false", "find",
            "grep", "head", "jq", "ls", "nl", "od", "paste", "printf", "rev", "sed", "seq", "sort", "tail", "test",
-           "tr", "true", "uniq", "wc", "xargs", "xxd", "python3", "runs"]
-BUILTINS = [":", "[[", "break", "cd", "continue", "pwd", "read"]          # встроенные bash: в промпте, в профиле не нужны
+           "tr", "true", "uniq", "wc", "which", "xargs", "xxd", "python3", "runs"]
+BUILTINS = [":", "[[", "break", "cd", "command", "continue", "pwd", "read"]          # встроенные bash: в промпте, в профиле не нужны
 shell.ALLOWED = set(ALLOWED + BUILTINS)
 shell.OUT_CHARS, shell.MAX_CAPTURE = OUT_CHARS, MAX_CAPTURE
 
@@ -118,7 +118,7 @@ def sandbox_profile(root):
 
 
 NO_WRAP = {"cd", "read", "break", "continue", ":", "[[", "[", "test", "echo", "printf", "true", "false", "basename",
-           "dirname", "expr", "seq", "tr", "runs"}
+           "dirname", "expr", "seq", "tr", "runs", "pwd", "which", "command"}
 PATTERN_FIRST = {"grep", "sed", "awk", "jq"}                    # первый операнд — шаблон или программа, не путь
 VALUE_OPTS = {                                                  # опции со значением в следующем слове: значение не путь
     "cut": "-d -f -c -b", "sort": "-t -k -T -S", "paste": "-d", "column": "-s -c", "awk": "-F -v",
@@ -157,6 +157,7 @@ def root_prelude(root):
             "if [[ $t == \"$__R\" || $t == \"$__R\"/* ]]; then builtin cd \"${__A[@]}\"; "
             "elif [[ ${__A[0]} == /* ]]; then builtin cd \"${__A[@]}\"; "
             "elif (builtin cd \"${__A[@]}\" 2>/dev/null); then builtin cd \"$__R\"; else builtin cd \"${__A[@]}\"; fi; }\n"
+            "command(){ if [[ $1 == -v || $1 == -V ]]; then shift; /usr/bin/which \"$@\"; else builtin command \"$@\"; fi; }\n"
             + "\n".join(fns) + "\n")
 
 

@@ -13,7 +13,7 @@ import shlex
 ALLOWED = set()          # задаёт agent.py: программы + встроенные bash
 PYTHON = True            # python3 в белом списке: heredoc python3 - <<'EOF'
 WRITE_PROGS = {"tee", "cp", "mv", "rm", "rmdir", "mkdir", "touch", "ln", "dd", "install", "truncate", "chmod", "chown"}
-BUILTINS = {"cd", "read", "break", "continue", ":", "[[", "pwd"}
+BUILTINS = {"cd", "read", "break", "continue", ":", "[[", "pwd", "command"}
 KEYWORDS = {"if", "then", "else", "elif", "fi", "while", "until", "do", "done", "!", "{", "}"}
 MAX_DEPTH = 100
 MAX_CMD = 8000
@@ -322,6 +322,8 @@ def _check_words(w, m, via_xargs=False):
         return f"'{p}' writes files: {READONLY_MSG}"
     if p not in ALLOWED:
         return f"'{p}' is not allowed. Allowed programs: {', '.join(sorted(ALLOWED))}"
+    if p == "command" and not (len(w) > 2 and w[1] in ("-v", "-V")):
+        return "command works here only as command -v NAME (where a program is)"
     if via_xargs and (p in BUILTINS or p == "xargs"):
         return (f"xargs can only run a program from the list, not '{p}'; "
                 "use a loop instead: ... | while read f; do ...; done")
