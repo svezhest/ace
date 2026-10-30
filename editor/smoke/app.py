@@ -156,7 +156,7 @@ def main():
     for n, (desc, Ep, script, mk) in enumerate(scenarios(), 1):
         ep, msgs, marks, end, err = play(harness, Ep, script, mk)
         print(f"\n== scenario {n}: {desc}")
-        print(f"  {end}; episode done: {bool(ep.done)}")
+        print(f"  {end}; episode done: {bool(ep.done)}" + (f" ({ep.end_reason})" if getattr(ep, "end_reason", None) else ""))
         if err:
             print("  " + "\n  ".join(err.rstrip().splitlines()[-8:]))
         for line in report(msgs, marks, ep):

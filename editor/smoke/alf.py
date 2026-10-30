@@ -102,7 +102,9 @@ def scenarios():
     return [("the task is not solved: 50 replies with different actions, except reply 3 (text without a tool call), "
              "reply 4 (a tool call with broken arguments) and replies 20-21 (the same action twice)",
              AlfEpisode, fail, alf_reply),
-            ("the task is solved at reply 4", AlfEpisode, win, alf_reply)]
+            ("the task is solved at reply 4", AlfEpisode, win, alf_reply),
+            ("reply 1 is look, then from reply 2 on the same action that is not among the available actions, again "
+             "and again", AlfEpisode, ["look"] + ["pick up the mug"] * (N_REPLIES - 1), alf_reply)]
 
 
 # ---------------------------------------------------------------- run
@@ -195,7 +197,7 @@ def main():
     for n, (desc, Ep, script, mk) in enumerate(scenarios(), 1):
         ep, msgs, marks, end, err = play(harness, Ep, script, mk)
         print(f"\n== scenario {n}: {desc}")
-        print(f"  {end}; episode done: {bool(ep.done)}")
+        print(f"  {end}; episode done: {bool(ep.done)}" + (f" ({ep.end_reason})" if getattr(ep, "end_reason", None) else ""))
         if err:
             print("  " + "\n  ".join(err.rstrip().splitlines()[-8:]))
         for line in report(msgs, marks, ep):
