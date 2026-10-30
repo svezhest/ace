@@ -4,19 +4,6 @@ Builds the conversation from the prompt in src/ (its {{ ... }} slots filled by t
 bridge.py), asks the model for the next step, runs the first ```python block of the reply in the
 task's REPL and shows the output, until the task is marked complete or the step limit is reached.
 Runs the hooks from hooks.py.
-
-Hooks (all optional; define any of them in hooks.py as `def name(ctx, nb)`):
-  on_init(ctx, nb)          -> {"skills": [{"text": TEXT}]} or None     tips added to the task message
-  make_pre_hint(ctx, nb)    -> {"message": TEXT} or None                 user message before the model's turn
-  on_before_action(ctx, nb) -> {"kind": "block_and_prompt", "message": TEXT}           code not executed
-                               {"kind": "rewrite_action", "action": CODE, "message": TEXT}
-                               {"kind": "force_action", "action": CODE, "message": TEXT}
-                               or None
-  on_post_step(ctx, nb)     -> {"kind": "inject_hint", "message": TEXT}                 user message
-                               {"kind": "force_action", "action": CODE, "message": TEXT} next code
-                               or None
-ctx is a read-only copy of what the agent has seen (see make_ctx); nb is a dict kept for the episode.
-A hook that raises is ignored.
 """
 import copy
 import re
@@ -84,7 +71,7 @@ def make_ctx(messages, step, history, reply="", code="", remaining=None):
         "messages": copy.deepcopy(messages),
         "observation": history["last_observations"][-1] if history["last_observations"] else "",
         "output": reply,
-        "action": {"raw": reply, "code": code},
+        "code": code,
         "step": step,
         "max_step": MAX_STEPS,
         "remaining_steps": MAX_STEPS - step if remaining is None else remaining,
