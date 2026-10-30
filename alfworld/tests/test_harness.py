@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-SRC = ROOT / "view" / "src"
+SRC = ROOT / "view_b2" / "src"
 sys.dont_write_bytecode = True
 sys.path[:0] = [str(SRC), str(ROOT / "runner")]
 os.environ.setdefault("ALFWORLD_DATA", str(ROOT / "data" / "alfworld"))
@@ -47,7 +47,11 @@ def play(script, hooks=None, game=GAME):
 
 
 def test_hooks_file_is_empty():
-    assert (SRC / "hooks.py").read_text().strip() == ""
+    ns = {}
+    exec((SRC / "hooks.py").read_text(), ns)
+    names = sorted(k for k, v in ns.items() if callable(v))
+    assert names == ["make_pre_hint", "on_before_action", "on_init", "on_post_step"]
+    assert all(ns[n]({}, {}) is None for n in names)
 
 
 def test_success_with_expert_actions():
@@ -116,7 +120,7 @@ def test_hook_effects_reach_conversation():
         return {"message": "pre hint"} if ctx["step"] == 0 else None
 
     def on_before_action(ctx, nb):
-        if ctx["action"]["final_action"] == "inventory":
+        if ctx["output"] == "inventory":
             return {"kind": "block_and_prompt", "message": "blocked"}
         return None
 

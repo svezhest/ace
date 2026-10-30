@@ -15,7 +15,7 @@ import pytest
 import requests
 
 ROOT = Path(__file__).resolve().parents[1]
-SRC = ROOT / "view" / "src"
+SRC = ROOT / "view_b2" / "src"
 sys.dont_write_bytecode = True
 sys.path[:0] = [str(SRC), str(ROOT / "runner")]
 
@@ -63,7 +63,11 @@ def tmp(tmp_path):
 
 
 def test_start_state():
-    assert (SRC / "hooks.py").read_text() == ""
+    ns = {}
+    exec((SRC / "hooks.py").read_text(), ns)
+    names = sorted(k for k, v in ns.items() if callable(v))
+    assert names == ["make_pre_hint", "on_before_action", "on_init", "on_post_step"]
+    assert all(ns[n]({}, {}) is None for n in names)
     assert (SRC / "starting_prompt.md").read_bytes() == UPSTREAM_PROMPT.read_bytes()
 
 
@@ -140,9 +144,9 @@ def test_hook_effects_reach_conversation(tmp):
         return {"message": "pre hint"} if ctx["step"] == 0 else None
 
     def on_before_action(ctx, nb):
-        if "print(1)" in ctx["action"]["code"]:
+        if "print(1)" in ctx["code"]:
             return {"kind": "block_and_prompt", "message": "blocked"}
-        if "print(2)" in ctx["action"]["code"]:
+        if "print(2)" in ctx["code"]:
             return {"kind": "rewrite_action", "action": "print(3)"}
         return None
 
