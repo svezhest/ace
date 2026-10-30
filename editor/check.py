@@ -15,6 +15,7 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 BENCH = {"alf": os.path.expanduser("~/Projects/nrhsi/alfworld"), "app": os.path.expanduser("~/Projects/nrhsi/appworld")}
+TESTS_TIMEOUT = 600  # с; тесты бенчмарка на заглушке идут ~25 с (ALF), ~50 с (App)
 START_STATE = {"test_hooks_file_is_empty", "test_start_state", "test_replay_equals_upstream_requests"}
 
 
@@ -41,8 +42,13 @@ def check(tag):
     env.update(BENCH_ROOT=BENCH[b], EDITOR_SRC=src)
     if b == "alf":
         env.setdefault("ALFWORLD_DATA", f"{BENCH[b]}/data/alfworld")
-    r = subprocess.run([py, "-m", "pytest", "-q", "-rA", "-p", "no:cacheprovider", f"{HERE}/tests/test_{b}.py"],
-                       capture_output=True, text=True, env=env, cwd=BENCH[b])
+    try:
+        r = subprocess.run([py, "-m", "pytest", "-q", "-rA", "-p", "no:cacheprovider", f"{HERE}/tests/test_{b}.py"],
+                           capture_output=True, text=True, env=env, cwd=BENCH[b], timeout=TESTS_TIMEOUT)
+    except subprocess.TimeoutExpired as e:   # правка подвесила тест (бесконечный цикл): это результат проверки
+        out = e.stdout.decode() if isinstance(e.stdout, bytes) else (e.stdout or "")
+        r = subprocess.CompletedProcess(e.cmd, -1, out, "")
+        res["tests_timeout"] = TESTS_TIMEOUT
     tests = {}
     for m in re.finditer(r"^(PASSED|FAILED|ERROR|SKIPPED)\s+\S*::(\w+)(\[[^\]]*\])?", r.stdout, re.M):
         tests[m.group(2) + (m.group(3) or "")] = m.group(1)
@@ -51,7 +57,7 @@ def check(tag):
     res["tests_failed"] = sorted(bad)
     res["tests_failed_start_state"] = sorted(k for k, v in tests.items() if v in ("FAILED", "ERROR")
                                              and k.split("[")[0] in START_STATE)
-    if bad:
+    if bad or res.get("tests_timeout"):
         res["pytest_tail"] = r.stdout[-6000:]
     orig = f"{BENCH[b]}/view/src/starting_prompt.md"
     if b == "app" and os.path.exists(f"{src}/starting_prompt.md"):
@@ -69,7 +75,7 @@ def check(tag):
 if __name__ == "__main__":
     for t in sys.argv[1:]:
         r = check(t)
-        print(json.dumps({k: r[k] for k in ("tag", "compile_errors", "import_ok", "tests_failed",
+        print(json.dumps({k: r.get(k) for k in ("tag", "compile_errors", "import_ok", "tests_failed", "tests_timeout",
                                              "tests_failed_start_state", "prompt_slots_missing", "prompt_roles")
                           if k in r}, ensure_ascii=False))
         print("  tests:", len(r["tests"]), "pass", sum(v == "PASSED" for v in r["tests"].values()))
