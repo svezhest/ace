@@ -28,7 +28,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 BIN = os.path.join(HERE, "bin")                       # runs и python3 (ссылка на CLT python: /usr/bin/python3 —
 PY_LINK = os.path.join(BIN, "python3")                # обёртка xcode-select, в песочнице не работает)
 SITE = os.path.join(HERE, "site")                     # sitecustomize.py: «/» = корень каталога и для python3
-URL = os.environ.get("NRHSI_URL", "http://127.0.0.1:8089/v1/chat/completions")
+URL = os.environ.get("NRHSI_URL", "http://127.0.0.1:8090/v1/chat/completions")
 MODEL = os.environ.get("NRHSI_MODEL", "ornith15-9b")
 
 CTX = 65536              # окно воркера
