@@ -6,7 +6,9 @@ TaskWorker.interact do behind HTTP. Fixtures, and nothing else:
   - task parameters as in Harness-R1's configs/tasks/alfworld.yaml (max_step 50, the take_action tool);
   - a split file with the one game of this episode (the task reads data/alfworld/<split>.json);
   - $ALFWORLD_DATA/logic from the alfworld package, as `alfworld-download` puts it there;
-  - the task's own log line about repeated actions is kept as the detail of the end.
+  - the task's own log line about repeated actions is kept as the detail of the end;
+  - the game's own limit of actions (alfworld config, max_nb_steps_per_episode): when the game ends the
+    episode at that many actions, the end is the step limit, not "finished".
 """
 import asyncio
 import json
@@ -89,6 +91,9 @@ class Episode:
         lg.setLevel(logging.INFO)
         lg.propagate = False
         lg.handlers = [self.log]
+        cfg = self.task.config
+        self.game_limit = cfg[cfg["general"]["training_method"]]["training"]["max_nb_steps_per_episode"]
+        self.env_steps = 0
         self.session = Session(0)
         self.final = None  # TaskOutput at the end
         self.loop = asyncio.new_event_loop()
@@ -107,8 +112,9 @@ class Episode:
 
     def _pull(self, agent_output):
         env = asyncio.run_coroutine_threadsafe(self.session.controller.agent_pull(agent_output), self.loop).result()
-        return {"messages": _chat(env.history[env.history_ptr:]), "status": env.status.value,
-                "finish": env.status != SampleStatus.RUNNING}
+        msgs = _chat(env.history[env.history_ptr:])
+        self.env_steps += sum(m.get("role") == "tool" for m in msgs)
+        return {"messages": msgs, "status": env.status.value, "finish": env.status != SampleStatus.RUNNING}
 
     def start(self):
         asyncio.run_coroutine_threadsafe(self._sample(), self.loop)
@@ -125,6 +131,8 @@ class Episode:
             return {"reason": "step limit", "status": status}
         if status in (SampleStatus.TASK_ERROR.value, SampleStatus.CANCELLED.value):
             return {"reason": "error", "status": status, "detail": str(self.final.result)[-500:]}
+        if self.env_steps >= self.game_limit:
+            return {"reason": "step limit", "status": status, "detail": f"the game's limit of {self.game_limit} actions"}
         return {"reason": "finished", "status": status}
 
     def won(self):

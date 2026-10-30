@@ -104,6 +104,7 @@ def test_turn_limit_of_the_task():
 def test_game_step_limit():
     ep, rec, llm, msgs = play(["look", "inventory"] * 30)
     assert ep.turns == bridge.STEP_LIMIT and rec.env_steps() == bridge.STEP_LIMIT and ep.finished
+    assert ep.end == {"reason": "step limit", "status": "completed", "detail": "the game's limit of 50 actions"}
 
 
 def test_noop_hooks_do_not_change_conversation():

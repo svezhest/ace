@@ -85,8 +85,8 @@ def play(job):
             reason = "harness stopped early"
         elif ep.end.get("detail") == "repeated action":
             reason = "repeated action"
-        elif ep.end["reason"] == "step limit" or rec.env_steps() >= bridge.STEP_LIMIT:
-            reason = "step limit"  # the task's turn limit, or the game's own limit of steps
+        elif ep.end["reason"] == "step limit":
+            reason = "step limit"  # the task's turn limit, or the game's own limit of actions
         else:
             reason = ep.end["reason"]
     rec.bench.close()
