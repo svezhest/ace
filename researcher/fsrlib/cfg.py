@@ -5,8 +5,8 @@ import os
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # researcher/: каталог fsr.py
 LAYOUT = os.path.expanduser("~/Projects/nrhsi/alfworld/view")   # --view
-URL = "http://127.0.0.1:8089/v1/chat/completions"
-THINK_URL = "http://127.0.0.1:8081/v1/chat/completions"   # 29.10: второй шлюз без GATEWAY_THINKING=off
+URL = "http://127.0.0.1:8090/v1/chat/completions"      # 30.10: один шлюз, без прокси (GATEWAY_THINKING=off)
+THINK_URL = "http://127.0.0.1:8081/v1/chat/completions"   # 29.10: шлюз с thinking; 30.10 остановлен — для прогонов с thinking поднять снова
 MODEL = "ornith15-9b"
 
 CTX = 65536

@@ -52,7 +52,7 @@ def session(mode, k, seed, temp, tag, resume=None, max_turns=None, runs=None):
     try:
         w({"type": "meta", "version": 3, "mechanics": "v3b-view", "policy": C.POLICY, "layout": C.LAYOUT,
            "tools": [x["function"]["name"] for x in P.TOOLS], "notes_tool": C.NOTES, "compact": C.COMPACT,
-           "compact_req": P.COMPACT_REQ if C.COMPACT else None, "read_counter": 1, "variant": C.VARIANT, "mode": mode, "k": k, "seed": seed, "temperature": temp,
+           "compact_req": P.COMPACT_REQ if C.COMPACT else None, "read_counter": 1, "variant": C.VARIANT, "mode": mode, "k": k, "seed": seed, "temperature": temp, "provenance": M.provenance(temp),
            "runs": tids, "selection": sel, "view": vname, "system": P.SYSTEM, "first_user": P.FIRST_USER, "limits": {
                "ctx": C.CTX, "max_gen": C.MAX_GEN, "warn_at": C.WARN_AT, "hard_at": C.HARD_AT, "clear_at": C.CLEAR_AT,
                "keep_results": C.KEEP_RESULTS, "step_budget": C.STEP_BUDGET, "remind_every": C.REMIND_EVERY,

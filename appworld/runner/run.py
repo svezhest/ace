@@ -192,7 +192,8 @@ def main():
     tasks = a.tasks or random.Random(a.seed).sample(splits[a.split], a.n)
     if not set(tasks) <= allowed:
         sys.exit(f"tasks outside train/val: {sorted(set(tasks) - allowed)}")
-    stand = {"url": a.url, "model": a.model, "listener": listener(a.url) if a.fake is None else None,
+    stand = {"url": a.url, "model": a.model, "temperature": 0, "seed": 100, "max_tokens": None, "thinking": False,
+             "listener": listener(a.url) if a.fake is None else None,
              "worker_env": process_env("python worker.py", lambda k: k in WORKER_KEYS),
              "gateway_env": process_env("qwen-gateway", lambda k: k.startswith("GATEWAY_"))}
     if a.fake is None:

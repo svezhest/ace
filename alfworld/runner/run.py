@@ -104,7 +104,7 @@ def main():
     ap.add_argument("--games", nargs="*", help="explicit game files (relative to data root)")
     ap.add_argument("--workers", type=int, default=4)
     ap.add_argument("--hint-level", type=int, default=0, help="0: ok/reason only; 1: + expert steps; 2: + plan")
-    ap.add_argument("--url", default="http://127.0.0.1:8089/v1")
+    ap.add_argument("--url", default="http://127.0.0.1:8090/v1")
     ap.add_argument("--model", default="ornith15-9b")
     ap.add_argument("--wall-limit", type=int, default=3600, help="seconds per episode")
     ap.add_argument("--fake", help="JSON script for the stub model (no LLM calls)")
@@ -120,7 +120,8 @@ def main():
     src = view / "src"
     splits = json.loads((ROOT / "splits.json").read_text())
     games = a.games or random.Random(a.seed).sample(splits[a.split], a.n)
-    stand = {"worker_env": worker_env(), "url": a.url, "model": a.model}
+    stand = {"worker_env": worker_env(), "url": a.url, "model": a.model, "temperature": 0.0, "max_tokens": 4096,
+             "thinking": False}
     if a.fake is None:
         penalties = {v.get("QWEN_PRESENCE_PENALTY") for v in stand["worker_env"].values() if isinstance(v, dict)}
         if penalties != {"0"}:

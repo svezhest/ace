@@ -483,6 +483,7 @@ def run_session(role, system, first_user, root, prof, seed, log_path, n_obs=0):
         return f"Error: unknown tool '{name}'. Tools: {', '.join(names)}.", False
 
     w({"type": "meta", "role": role, "system": system, "first_user": first_user, "seed": seed, "temperature": TEMP,
+       "provenance": F.provenance(TEMP),
        "root": root, "tools": [t["function"]["name"] for t in tools],
        "limits": {"bash_limit": BASH_LIMIT, "step_budget": STEP_BUDGET, "final_turns": FINAL_TURNS,
                   "hard_at": HARD_AT, "out_chars": F.OUT_CHARS, "max_gen": F.MAX_GEN}})
@@ -610,7 +611,7 @@ def main():
     src_before = tree_hash(f"{VIEWS[a.bench]}/src")
     os.makedirs(f"{HERE}/logs", exist_ok=True)
     os.makedirs(f"{HERE}/out", exist_ok=True)
-    summary = {"tag": a.tag, "bench": a.bench, "input": a.input, "arm": a.arm, "seed": a.seed, "view": VIEWS[a.bench], "predict": a.predict, "think": a.think, "think_budget": a.think_budget if a.think else None,
+    summary = {"tag": a.tag, "bench": a.bench, "input": a.input, "arm": a.arm, "seed": a.seed, "view": VIEWS[a.bench], "predict": a.predict, "think": a.think, "think_budget": a.think_budget if a.think else None, "provenance": F.provenance(TEMP),
                "n_reports": len(reports), "view_src_hash": src_before}
     if a.arm == "fix":
         psys, pfirst = fill(PROPOSER_T), first_user_proposer(reports)
