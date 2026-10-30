@@ -1,4 +1,4 @@
-"""Smoke test: runs src/harness.py with a stub environment and a stub model (not the benchmark).
+"""Smoke test: runs src/harness.py and src/bridge.py with a stub task and a stub model (not the benchmark).
 
     python3 tests/smoke.py
 
@@ -10,7 +10,8 @@ import os
 import sys
 import traceback
 
-N_REPLIES = 50          # model replies per episode (STEP_LIMIT in src/bridge.py)
+N_REPLIES = 50          # turns per episode (STEP_LIMIT in src/bridge.py)
+MAX_CALLS = 200         # the stub model stops here if the task has not ended the episode
 SHOW = 160
 
 
@@ -18,18 +19,17 @@ class StubStop(Exception):
     pass
 
 
-# ---------------------------------------------------------------- stub environment and model
+# ---------------------------------------------------------------- stub task and model
 
-class AlfEpisode:
+class AlfTask:
+    """Stub of the task behind src/bridge.py: what the AgentBench task returns (messages, status, finish)."""
     PLACES = ["cabinet 1", "countertop 1", "drawer 1", "fridge 1", "shelf 1"]
     GOAL = "put mug 1 in/on cabinet 1"
 
     def __init__(self):
         self.observation, self.admissible = "", []
-        self.done = self.won = False
-        self.end_reason = None
-        self._sent, self.at, self.holding = [], None, False
-        self.results = []
+        self._sent, self.at, self.holding, self.turns = [], None, False, 0
+        self.status, self.results = "running", []
 
     def _acts(self):
         a = [f"go to {p}" for p in self.PLACES if p != self.at] + ["inventory", "look"]
@@ -42,39 +42,63 @@ class AlfEpisode:
     def _text(self):
         return self.observation + " AVAILABLE ACTIONS: " + "\n".join(self.admissible) + "\n"
 
-    def reset(self):
+    def _out(self, messages):
+        return {"messages": messages, "status": self.status, "finish": self.status != "running"}
+
+    def start(self):
         self.observation = ("You are in the middle of a room. Looking quickly around you, you see a cabinet 1, a "
                             "countertop 1, a drawer 1, a fridge 1, and a shelf 1.\n\nYour task is to: put a mug in "
                             "cabinet 1.")
         self.admissible = self._acts()
-        return "Here is your task. " + self._text()
+        return self._out([{"role": "system", "content": "(the task's system prompt)"},
+                          {"role": "user", "content": "Here is your task. " + self._text()}])
 
-    def match(self, raw):
-        r = str(raw).strip().lower()
-        return r if r in self.admissible else self.admissible[0]
+    def interact(self, reply):
+        import json
+        self.turns += 1
+        calls = reply.get("tool_calls") or []
+        out = []
+        if not calls:
+            out.append({"role": "user", "content": "No executable tool calls found. Please call a tool instead"})
+        else:
+            try:
+                raw = list(json.loads(calls[0]["function"]["arguments"]).values())[0]
+            except Exception:  # noqa: BLE001
+                raw = None
+            if raw is None:
+                out.append({"role": "user", "content": "No valid tool calls found. Please call a tool instead."})
+            else:
+                r = str(raw).strip().lower()
+                self._step(r if r in self.admissible else self.admissible[0])
+                text = self._text()
+                self.results.append(text)
+                out.append({"role": "tool", "tool_call_id": calls[0]["id"], "content": text})
+                self._sent.append(raw)
+                if len(self._sent) > 3 and len(set(self._sent[-3:])) == 1:
+                    self.status = "agent invalid action"
+        if self.status == "running" and self.turns >= N_REPLIES:
+            self.status = "task limit reached"
+        return self._out(out)
 
-    def step(self, action, raw):
+    def _step(self, action):
         if action.startswith("go to "):
             self.at = action[6:]
             self.observation = f"On the {self.at}, you see " + ("a mug 1." if self.at == "countertop 1" and not self.holding else "nothing.")
         elif action.startswith("take mug"):
             self.holding, self.observation = True, "You pick up the mug 1 from the countertop 1."
         elif action == self.GOAL:
-            self.holding, self.won = False, True
+            self.holding, self.status = False, "completed"
             self.observation = "You put the mug 1 in/on the cabinet 1."
         elif action == "inventory":
             self.observation = "You are carrying: a mug 1." if self.holding else "You are not carrying anything."
         else:
             self.observation = f"You are facing the {self.at or 'middle of the room'}."
         self.admissible = self._acts()
-        self._sent.append(raw)
-        if len(self._sent) > 3 and len(set(self._sent[-3:])) == 1:
-            self.done, self.won, self.end_reason = True, False, "repeated action"
-        elif self.won:
-            self.done, self.end_reason = True, "success"
-        out = self._text()
-        self.results.append(out)
-        return out
+
+    def end_of(self, status):
+        if status == "agent invalid action":
+            return {"reason": "error", "status": status, "detail": "repeated action"}
+        return {"reason": "step limit" if status == "task limit reached" else "finished", "status": status}
 
 
 def alf_reply(i, item):
@@ -92,9 +116,9 @@ def alf_reply(i, item):
 def scenarios():
     cycle = ["go to drawer 1", "go to fridge 1", "look", "go to shelf 1", "inventory", "go to countertop 1"]
     fail = [cycle[i % len(cycle)] for i in range(N_REPLIES)]
-    win = ["go to countertop 1", "take mug 1 from countertop 1", "go to cabinet 1", AlfEpisode.GOAL]
-    return [("the task is not solved: 50 replies with ordinary actions", AlfEpisode, fail, alf_reply),
-            ("the task is solved at reply 4", AlfEpisode, win, alf_reply)]
+    win = ["go to countertop 1", "take mug 1 from countertop 1", "go to cabinet 1", AlfTask.GOAL]
+    return [("the task is not solved: 50 replies with ordinary actions", AlfTask, fail, alf_reply),
+            ("the task is solved at reply 4", AlfTask, win, alf_reply)]
 
 
 # ---------------------------------------------------------------- run
@@ -105,13 +129,15 @@ def short(t):
 
 
 def play(harness, Ep, script, mk):
-    ep = Ep()
+    import bridge
+    task = Ep()
+    ep = bridge.Episode(task)
     marks = []                                       # len(messages) at each model call
     convo = {}
 
     def llm(messages, tools=None):
         convo["m"] = messages
-        if len(marks) >= N_REPLIES:
+        if len(marks) >= MAX_CALLS:
             raise StubStop()
         marks.append(len(messages))
         i = len(marks) - 1
@@ -122,17 +148,17 @@ def play(harness, Ep, script, mk):
         msgs = harness.run(ep, llm)
         end = f"run() returned after {len(marks)} model replies"
     except StubStop:
-        msgs, end = convo.get("m") or [], f"stopped at the step limit: {N_REPLIES} model replies"
+        msgs, end = convo.get("m") or [], f"stopped: {MAX_CALLS} model replies and the task has not ended the episode"
     except BaseException:                            # noqa: BLE001
         msgs, end = convo.get("m") or [], f"crashed after {len(marks)} model replies"
         e = sys.exc_info()
         tb = [f for f in traceback.extract_tb(e[2]) if f.filename != __file__]   # only the harness frames
         err = "Traceback (most recent call last):\n" + "".join(traceback.format_list(tb)) + \
             "".join(traceback.format_exception_only(e[0], e[1]))
-    return ep, msgs, marks, end, err
+    return ep, task, msgs, marks, end, err
 
 
-def report(msgs, marks, ep):
+def report(msgs, marks, task):
     """What the harness added (besides model replies and environment results), grouped by reply."""
     lines = []
     head = marks[0] if marks else len(msgs)
@@ -145,7 +171,7 @@ def report(msgs, marks, ep):
             lines.append(f"    system: {short(m.get('content'))}")
     if head:
         lines.append(f"    last: {m.get('role')}: {short(msgs[head - 1].get('content'))}")
-    results = set(ep.results)
+    results = set(task.results)
     groups = []                                       # [(first, last, texts)]
     bounds = marks + [len(msgs)]
     for k in range(len(marks)):
@@ -174,7 +200,7 @@ def report(msgs, marks, ep):
 
 def main():
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src"))
-    print("smoke: src/harness.py with a stub environment and a stub model, not the benchmark. It shows what the "
+    print("smoke: src/harness.py and src/bridge.py with a stub task and a stub model, not the benchmark. It shows what the "
           "harness adds to the conversation and when; model replies and environment results are left out.")
     try:
         import harness
@@ -183,12 +209,13 @@ def main():
         print(traceback.format_exc(limit=-3))
         return
     for n, (desc, Ep, script, mk) in enumerate(scenarios(), 1):
-        ep, msgs, marks, end, err = play(harness, Ep, script, mk)
+        ep, task, msgs, marks, end, err = play(harness, Ep, script, mk)
         print(f"\n== scenario {n}: {desc}")
-        print(f"  {end}; episode done: {bool(ep.done)}" + (f" ({ep.end_reason})" if getattr(ep, "end_reason", None) else ""))
+        print(f"  {end}; turns handed to the task: {ep.turns}; episode ended by the task: {bool(ep.finished)}"
+              + (f" ({ep.end})" if ep.end else ""))
         if err:
             print("  " + "\n  ".join(err.rstrip().splitlines()[-8:]))
-        for line in report(msgs, marks, ep):
+        for line in report(msgs, marks, task):
             print(line)
 
 

@@ -3,7 +3,7 @@
 Mirrors the Harness-R1 rollout client (AgentBench HTTPAgent.inference_openai): T=0, max_tokens 4096,
 tools passed as-is, 3 attempts on transport errors, context overflow ends the episode,
 tool calls written as text in `content` are rescued into `tool_calls` (serving compatibility shim).
-Also enforces the episode budget (turns, wall clock) so that harness edits cannot exceed it.
+Also enforces the episode's wall clock, so that harness edits cannot exceed it (turns are counted by the task).
 """
 import copy
 import json
@@ -96,18 +96,17 @@ def clean(msg):
 class Client:
     """llm(messages, tools) -> assistant message. One instance per episode."""
 
-    def __init__(self, url, model, step_limit, wall_limit_s=3600, max_tokens=4096, http_timeout=900, temperature=0.0):
+    def __init__(self, url, model, wall_limit_s=3600, max_tokens=4096, http_timeout=900, temperature=0.0):
         self.url, self.model, self.temperature = url.rstrip("/") + "/chat/completions", model, temperature
-        self.step_limit, self.max_tokens, self.http_timeout = step_limit, max_tokens, http_timeout
+        self.max_tokens, self.http_timeout = max_tokens, http_timeout
         self.deadline = time.time() + wall_limit_s
         self.conversation = None  # live reference to the harness's message list
         self.requests = []        # copies of what was sent, for the append-only check
         self.calls = []           # per call: seconds, prompt/completion tokens, finish reason
+        self.outputs = []         # the replies returned, for the check that the task got only these
 
     def __call__(self, messages, tools):
         self.conversation = messages
-        if len(self.calls) >= self.step_limit:
-            raise EpisodeEnd("step limit")
         if time.time() > self.deadline:
             raise EpisodeEnd("timeout")
         body = {"model": self.model, "messages": messages, "max_tokens": self.max_tokens, "temperature": self.temperature}
@@ -131,6 +130,7 @@ class Client:
                                        "prompt_tokens": usage.get("prompt_tokens"),
                                        "completion_tokens": usage.get("completion_tokens"),
                                        "finish_reason": data["choices"][0].get("finish_reason")})
+                    self.outputs.append(copy.deepcopy(msg))
                     return msg
                 if is_context_error(r.text):
                     raise EpisodeEnd("context exhausted", r.text[:300])

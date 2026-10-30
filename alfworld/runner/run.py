@@ -33,22 +33,39 @@ def src_hash(src):
     return h.hexdigest()[:16]
 
 
+def expert_hint(game_file, level):
+    """Benchmark feedback for results.jsonl beyond ok/reason (ablation axis; 0 = none).
+    1: how many steps an expert planner needs from the start (difficulty, no solution).
+    2: the expert plan itself (reference solution)."""
+    import textworld
+    from alfworld.agents.environment.alfred_tw_env import AlfredDemangler, AlfredInfos
+    env = textworld.start(str(DATA / game_file), request_infos=textworld.EnvInfos(policy_commands=True),
+                          wrappers=[AlfredDemangler(shuffle=False), AlfredInfos])
+    plan = list(env.reset()["policy_commands"] or [])
+    env.close()
+    if level == 1:
+        return f"an expert solves this task in {len(plan)} steps"
+    return "expert plan: " + "; ".join(plan)
+
+
 def play(job):
     sys.dont_write_bytecode = True
-    sys.path[:0] = [job["src"], str(HERE)]
+    sys.path[:0] = [job["src"], str(HERE), str(ROOT / "bench")]
     import bridge
+    import fixture
     import harness
+    from events import Recorder, events, honest
     from fake import Fake
     from llm import Client, EpisodeEnd
 
-    ep = bridge.Episode(job["game"], str(DATA))
+    t0, reason, detail, messages = time.time(), None, "", None
+    rec = Recorder(fixture.Episode(job["game"], str(DATA)))
+    ep = bridge.Episode(rec)
     if job["fake"] is not None:
-        llm = Fake(job["fake"], bridge.STEP_LIMIT)
+        llm = Fake(job["fake"])
     else:
         g = job["gen"]
-        llm = Client(g["url"], g["model"], bridge.STEP_LIMIT, job["wall_limit"], max_tokens=g["max_tokens"],
-                     temperature=g["temperature"])
-    t0, reason, detail, messages = time.time(), None, "", None
+        llm = Client(g["url"], g["model"], job["wall_limit"], max_tokens=g["max_tokens"], temperature=g["temperature"])
     try:
         messages = harness.run(ep, llm)
     except EpisodeEnd as e:
@@ -57,25 +74,33 @@ def play(job):
         reason, detail = "harness error", traceback.format_exc(limit=5)
     if not isinstance(messages, list):
         messages = llm.conversation or []
-    if ep.won:
+    is_honest = honest(rec.sent(), llm.outputs)
+    won = rec.bench.won()
+    if not is_honest:
+        reason, detail = "harness error", "a message handed to the task is not a model reply"
+    elif won:
         reason = "success"
     elif reason is None:
-        if ep.end_reason == "repeated action":
-            reason = "repeated action"
-        elif len(llm.calls) >= bridge.STEP_LIMIT:
-            reason = "step limit"
-        else:
+        if ep.end is None:
             reason = "harness stopped early"
-    hint = ep.hint(job["hint_level"]) if job["hint_level"] > 0 else None
-    ep.close()
+        elif ep.end.get("detail") == "repeated action":
+            reason = "repeated action"
+        elif ep.end["reason"] == "step limit" or rec.env_steps() >= bridge.STEP_LIMIT:
+            reason = "step limit"  # the task's turn limit, or the game's own limit of steps
+        else:
+            reason = ep.end["reason"]
+    rec.bench.close()
+    hint = expert_hint(job["game"], job["hint_level"]) if job["hint_level"] > 0 else None
     as_json = [json.dumps(m, sort_keys=True) for m in messages]
     append_only = all([json.dumps(m, sort_keys=True) for m in r] == as_json[:len(r)] for r in llm.requests)
     prompt_tokens = [c["prompt_tokens"] or 0 for c in llm.calls]
-    return {"run": job["run"], "ok": reason == "success", "reason": reason, "hint": hint,
-            "messages": messages,
-            "meta": {"run": job["run"], "game": job["game"], "ok": reason == "success", "reason": reason,
-                     "detail": detail, "sec": round(time.time() - t0, 1), "model_calls": len(llm.calls),
-                     "env_steps": len(ep._sent), "max_prompt_tokens": max(prompt_tokens, default=0),
+    ok = reason == "success"
+    return {"run": job["run"], "ok": ok, "reason": reason, "hint": hint,
+            "events": events(messages, rec, ep.end, job["src"]),
+            "meta": {"run": job["run"], "game": job["game"], "ok": ok, "reason": reason,
+                     "detail": detail, "end": ep.end, "honest": is_honest, "sec": round(time.time() - t0, 1),
+                     "model_calls": len(llm.calls), "turns": ep.turns, "env_steps": rec.env_steps(),
+                     "max_prompt_tokens": max(prompt_tokens, default=0),
                      "completion_tokens": sum(c["completion_tokens"] or 0 for c in llm.calls),
                      "append_only": append_only, "calls": llm.calls}}
 
@@ -129,12 +154,12 @@ def main():
                 r = f.result()
             except Exception:
                 j = futs[f]
-                r = {"run": j["run"], "ok": False, "reason": "runner error", "hint": None, "messages": [],
+                r = {"run": j["run"], "ok": False, "reason": "runner error", "hint": None, "events": [],
                      "meta": {"run": j["run"], "game": j["game"], "detail": traceback.format_exc()}}
             results.append(r)
             with open(out / "logs" / f"run_{r['run']}.jsonl", "w") as fh:
-                for m in r["messages"]:
-                    fh.write(json.dumps(m, ensure_ascii=False) + "\n")
+                for e in r["events"]:
+                    fh.write(json.dumps(e, ensure_ascii=False) + "\n")
             with open(out / "meta.jsonl", "a") as fh:
                 fh.write(json.dumps(r["meta"], ensure_ascii=False) + "\n")
             m = r["meta"]

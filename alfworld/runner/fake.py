@@ -19,22 +19,30 @@ def tool_reply(action, i):
 
 class Fake:
     """script: list of items; str -> take_action(str); {"text": ...} -> plain text reply;
-    {"args": ...} -> raw arguments string; "@first" -> first available action. Then repeats the last item."""
+    {"args": ...} -> raw arguments string; {"role": "assistant", ...} -> this message as it is (replay of a log);
+    "@first" -> first available action. Then repeats the last item."""
 
-    def __init__(self, script, step_limit=50):
-        self.script, self.step_limit = script, step_limit
-        self.calls, self.requests, self.conversation = [], [], None
+    def __init__(self, script, max_calls=1000):
+        self.script, self.max_calls = script, max_calls
+        self.calls, self.requests, self.outputs, self.conversation = [], [], [], None
 
     def __call__(self, messages, tools):
+        out = self._reply(messages)
+        self.outputs.append(copy.deepcopy(out))
+        return out
+
+    def _reply(self, messages):
         from llm import EpisodeEnd
         self.conversation = messages
-        if len(self.calls) >= self.step_limit:
-            raise EpisodeEnd("step limit")
+        if len(self.calls) >= self.max_calls:
+            raise EpisodeEnd("model error", "stub: no more calls")
         self.requests.append(copy.deepcopy(messages))
         i = len(self.calls)
         item = self.script[min(i, len(self.script) - 1)]
         self.calls.append({"sec": 0, "prompt_tokens": sum(len(m.get("content") or "") for m in messages) // 4,
                            "completion_tokens": 1, "finish_reason": "stop"})
+        if isinstance(item, dict) and item.get("role") == "assistant":
+            return copy.deepcopy(item)
         if item == "@first":
             return tool_reply(last_actions(messages)[0], i)
         if isinstance(item, dict) and "text" in item:
