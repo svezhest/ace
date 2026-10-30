@@ -36,11 +36,15 @@ script = [
     resp(("bash", {"command": "grep -n MAX_STEPS src/harness.py"})),                     # повтор после правки разрешён
     resp(("edit", {"path": "src/new_tips.md", "old_string": "", "new_string": "tip\n"})),
     resp(("edit", {"path": H, "old_string": "MAX_STEPS = 50\n", "new_string": "MAX_STEPS = 50  # limit\n"})),
+    resp(("edit", {"path": "src/extra.py", "old_string": "", "new_string": "def f():\n    return undefined_name\n"})),
+    resp(("finish", {})),                                                                 # pyflakes: undefined name
     resp(("finish", {})),
 ]
 root, end, st, items, log = run(script, "editor")
+fin = [r["shown"] for t in log if t.get("type") == "turn" for r in t["results"] if r["name"] == "finish"]
+assert len(fin) == 2 and "Not finished yet" in fin[0] and "undefined name" in fin[0] and fin[1] == "Finished.", fin
 assert end == "finish", end
-assert st["edits_applied"] == 3 and st["edits_attempted"] == 11, st
+assert st["edits_applied"] == 4 and st["edits_attempted"] == 12, st
 assert st["edit_fail"] == {"not_found": 1, "multiple": 1, "bridge": 1, "path": 2, "syntax": 1, "same": 1, "empty_old": 1}, st["edit_fail"]
 assert open(f"{root}/src/hooks.py").read().startswith("def on_init")
 assert "# limit" in open(f"{root}/src/harness.py").read()

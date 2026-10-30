@@ -38,6 +38,7 @@ SMOKE_README = ("- `tests/smoke.py` — a smoke test: runs src/harness.py with a
 VIEWS = {"alf": os.path.expanduser("~/Projects/nrhsi/alfworld/view"),
          "app": os.path.expanduser("~/Projects/nrhsi/appworld/view")}
 RLOGS = os.path.expanduser("~/Projects/nrhsi/researcher/logs")
+BENCH = None   # --bench (main)
 
 BASH_LIMIT = 25          # вызовов bash; потом — финальные ходы
 STEP_BUDGET = 60         # всех вызовов инструментов
@@ -215,6 +216,8 @@ def readme_without_logs(text):
 
 
 def build_work(bench, tag, smoke=True):
+    global BENCH
+    BENCH = bench
     v = f"{HERE}/work/{tag}"
     if os.path.lexists(v):
         shutil.rmtree(v)
@@ -369,6 +372,19 @@ def lint_note(old, new, rel):
             "".join(f"  line {n}: {msg}\n" for n, msg in fresh[:10]))
 
 
+def lint_changed(root):
+    """Предупреждения pyflakes по изменённым .py копии root/src относительно исходного src вида (только новые)."""
+    base, notes = f"{VIEWS[BENCH]}/src", ""
+    for p in sorted(glob.glob(f"{root}/src/*.py")):
+        rel = os.path.relpath(p, root)
+        orig = f"{base}/{os.path.basename(p)}"
+        old = open(orig).read() if os.path.exists(orig) else ""
+        new = open(p).read()
+        if new != old:
+            notes += lint_note(old, new, rel)
+    return notes.strip()
+
+
 # ---------------------------------------------------------------- цикл
 
 def run_session(role, system, first_user, root, prof, seed, log_path, n_obs=0):
@@ -406,7 +422,8 @@ def run_session(role, system, first_user, root, prof, seed, log_path, n_obs=0):
                 "call finish." if role == "editor" else
                 "Record the proposals you have settled on with propose now (several propose calls in one reply are "
                 "fine), then call finish.")
-        note_user(f"{head} bash is no longer available. {tail}")
+        lint_ = lint_changed(root) if role == "editor" else ""
+        note_user(f"{head} bash is no longer available. {tail}" + (f"\n\n{lint_}" if lint_ else ""))
 
     def do_call(name, raw, res):
         try:
@@ -475,6 +492,10 @@ def run_session(role, system, first_user, root, prof, seed, log_path, n_obs=0):
                           "final": bool(final_left)})
             return f"Proposal {st['proposals']} recorded.", False
         if name == "finish":
+            lint_ = lint_changed(root) if role == "editor" and not st.get("lint_at_finish") else ""
+            if lint_:   # один раз: те же предупреждения, что после edit, но по итогу всех правок
+                st["lint_at_finish"] = True
+                return (f"Not finished yet. {lint_}\nFix them with edit, or call finish again to end as is."), False
             return "Finished.", True
         st["bad_call"] += 1
         res["format_fail"] = "unknown_tool"
