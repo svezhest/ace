@@ -243,6 +243,7 @@ def _unique_chunks(root):
                     m = json.loads(line)
                 except ValueError:
                     continue
+                m = m.get("message") or {} if "event" in m else m
                 parts = [m.get("content") or ""] + [str((c.get("function") or {}).get("arguments") or "")
                                                      for c in m.get("tool_calls") or []]
                 for t in parts:
