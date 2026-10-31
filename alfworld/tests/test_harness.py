@@ -212,3 +212,16 @@ def test_upstream_files_unchanged():
     assert len(want) == 6
     for p, h in want.items():
         assert hashlib.sha256((ROOT / "bench" / "agentbench_alfworld" / p).read_bytes()).hexdigest() == h, p
+
+
+def test_close_cancels_an_unfinished_task():
+    """The harness stops first (here: the stub model runs out): the task is cancelled, its thread ends."""
+    import threading
+    rec = Recorder(fixture.Episode(GAME, os.environ["ALFWORLD_DATA"]))
+    ep = bridge.Episode(rec)
+    llm = Fake(["look", "inventory"], max_calls=3)
+    with pytest.raises(EpisodeEnd):
+        harness.run(ep, llm)
+    rec.bench.close()
+    assert not ep.finished and rec.bench.final.status == "cancelled"
+    assert not [t for t in threading.enumerate() if not t.daemon and t is not threading.main_thread()]

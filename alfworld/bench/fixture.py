@@ -26,7 +26,8 @@ UP = HERE / "agentbench_alfworld"
 sys.path.insert(0, str(HERE))
 
 from agentrl.worker.task import Session  # noqa: E402
-from agentrl.worker.typings import AgentOutput, RewardHistoryItem, SampleStatus, TaskOutput  # noqa: E402
+from agentrl.worker.typings import (AgentOutput, AgentOutputStatus, RewardHistoryItem, SampleStatus,  # noqa: E402
+                                    TaskOutput)
 
 MAX_STEP = 50  # Harness-R1 configs/tasks/alfworld.yaml
 TOOLS = [{"type": "function", "function": {  # configs/tasks/alfworld.yaml (AgentBench and Harness-R1)
@@ -96,6 +97,7 @@ class Episode:
         self.env_steps = 0
         self.session = Session(0)
         self.final = None  # TaskOutput at the end
+        self.started = False
         self.loop = asyncio.new_event_loop()
         threading.Thread(target=self.loop.run_forever, daemon=True).start()
 
@@ -117,6 +119,7 @@ class Episode:
         return {"messages": msgs, "status": env.status.value, "finish": env.status != SampleStatus.RUNNING}
 
     def start(self):
+        self.started = True
         asyncio.run_coroutine_threadsafe(self._sample(), self.loop)
         return self._pull(None)
 
@@ -141,4 +144,12 @@ class Episode:
         return isinstance(r, dict) and r.get("result") == 1
 
     def close(self):
+        """The harness may stop before the task ends the episode (an error, the context, the wall clock): then
+        the task is cancelled as TaskWorker cancels a session (AgentOutput CANCELLED -> AgentCancelledException
+        in the task), so that its thread ends; otherwise it would wait for the agent forever."""
+        if self.final is None and self.started:
+            try:
+                self._pull(AgentOutput(status=AgentOutputStatus.CANCELLED))
+            except Exception:  # noqa: BLE001
+                pass
         self.loop.call_soon_threadsafe(self.loop.stop)
