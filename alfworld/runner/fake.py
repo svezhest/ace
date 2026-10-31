@@ -1,7 +1,6 @@
 """Stub models for tests: same interface as llm.Client (callable + .calls/.conversation/.requests)."""
 import copy
 import json
-import re
 
 
 def last_actions(messages):
