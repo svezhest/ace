@@ -14,8 +14,13 @@ from . import trace as T
 from . import evidence as E
 from . import model as M
 from . import session as L
+from . import state as R
+from . import context as CX
+from . import tools as TO
+from . import turn as TU
+from . import phase as PH
 
-PARTS = (C, P, V, S, K, N, T, E, M, L, sys.modules[__name__])
+PARTS = (C, P, V, S, K, N, T, E, M, L, R, CX, TO, TU, PH, sys.modules[__name__])
 _NO = object()
 
 

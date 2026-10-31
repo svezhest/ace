@@ -6,7 +6,8 @@ python fsr.py --view ~/Projects/nrhsi/alfworld/view --runs 4,8,12 --policy base 
 Вид сессии: views/<name>_<tag>/ = README.md, src/, logs/ (K проваленных + все пройденные, results.jsonl только по ним).
 Лог сессии — logs/<name>_<tag>.jsonl.
 
-Код — в fsrlib/: cfg (настройки), prompt, views, sandbox, check, notes, trace, evidence, model, session, policy.
+Код — в fsrlib/: cfg (настройки), prompt, views, sandbox, check, notes, trace, evidence, model, session (сессия и
+cikl
 Здесь — общий интерфейс: fsr.ИМЯ = имя из модуля-владельца, и чтение, и присваивание (F.THINKING = True,
 fsr.chat = заглушка) идут туда, откуда его читают функции.
 """
