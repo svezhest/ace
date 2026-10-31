@@ -157,7 +157,7 @@ def play(job):
                      "append_only": append_only, "evaluation": evaluation, "calls": llm.calls}}
 
 
-def main():
+def parse_args():
     ap = argparse.ArgumentParser()
     ap.add_argument("--view", default=str(ROOT / "view"))
     ap.add_argument("--split", default="train", choices=["train", "val"])
@@ -171,21 +171,28 @@ def main():
     ap.add_argument("--fake", help="JSON script for the stub model (no LLM calls)")
     ap.add_argument("--tag", required=True)
     ap.add_argument("--no-publish", action="store_true", help="do not replace <view>/logs")
-    a = ap.parse_args()
+    return ap.parse_args()
 
-    view, out = Path(a.view).resolve(), ROOT / "runs" / a.tag
-    if out.exists():
-        sys.exit(f"{out} exists")
-    src = view / "src"
+
+def pick_tasks(a):
+    """--tasks as given or a seeded sample of --split; only train/val tasks."""
     splits = json.loads((ROOT / "splits.json").read_text())
     allowed = set(splits["train"]) | set(splits["val"])
     tasks = a.tasks or random.Random(a.seed).sample(splits[a.split], a.n)
     if not set(tasks) <= allowed:
         sys.exit(f"tasks outside train/val: {sorted(set(tasks) - allowed)}")
+    return tasks
+
+
+def stand_of(a):
+    """-> (generation parameters of the executor, the stand's record for run.json)."""
     P = STAND.load(a.stand)
     g = STAND.gen(P, "executor", "appworld")
-    stand = {"stand": STAND.meta(P, STAND.check(P, ["executor"]) if a.fake is None else None), "gen": g}
+    return g, {"stand": STAND.meta(P, STAND.check(P, ["executor"]) if a.fake is None else None), "gen": g}
 
+
+def prepare(a, src, out, tasks, stand):
+    """runs/<tag>/: src snapshot, logs/, env/, AppWorld root with the data, run.json -> (run info, AppWorld root)."""
     out.mkdir(parents=True)
     shutil.copytree(src, out / "src", ignore=shutil.ignore_patterns("__pycache__"))
     (out / "logs").mkdir()
@@ -198,14 +205,21 @@ def main():
             "started": time.strftime("%Y-%m-%d %H:%M:%S"), **stand}
     (out / "run.json").write_text(json.dumps(info, indent=1))
     print(json.dumps(info), flush=True)
+    return info, aw_root
 
-    jobs = [{"run": i + 1, "task": t, "experiment": f"run_{i + 1}", "appworld_root": str(aw_root),
+
+def make_jobs(a, tasks, out, aw_root, g):
+    return [{"run": i + 1, "task": t, "experiment": f"run_{i + 1}", "appworld_root": str(aw_root),
              "env_log": str(out / "env" / f"run_{i + 1}.log"), "src": str(out / "src"),
              "fake": json.loads(a.fake) if a.fake else None, "gen": g,
              "hint_level": a.hint_level, "wall_limit": a.wall_limit}
             for i, t in enumerate(tasks)]
+
+
+def play_all(jobs, workers, out):
+    """Episodes in worker processes; each result is saved as it comes -> (results, start time)."""
     results, t0 = [], time.time()
-    with cf.ProcessPoolExecutor(a.workers, mp_context=mp.get_context("spawn"), max_tasks_per_child=1) as pool:
+    with cf.ProcessPoolExecutor(workers, mp_context=mp.get_context("spawn"), max_tasks_per_child=1) as pool:
         futs = {pool.submit(play, j): j for j in jobs}
         for f in cf.as_completed(futs):
             try:
@@ -215,32 +229,58 @@ def main():
                 r = {"run": j["run"], "ok": False, "reason": "runner error", "hint": None, "events": [],
                      "meta": {"run": j["run"], "task": j["task"], "detail": traceback.format_exc()}}
             results.append(r)
-            with open(out / "logs" / f"run_{r['run']}.jsonl", "w") as fh:
-                for e in r["events"]:
-                    fh.write(json.dumps(e, ensure_ascii=False) + "\n")
-            with open(out / "meta.jsonl", "a") as fh:
-                fh.write(json.dumps(r["meta"], ensure_ascii=False) + "\n")
-            m = r["meta"]
-            print(f"[{time.time() - t0:7.0f}s] run {r['run']:3d} {m.get('task')} ok={r['ok']!s:5} {r['reason']:<18} "
-                  f"calls={m.get('model_calls')} ctx={m.get('max_prompt_tokens')} sec={m.get('sec')}", flush=True)
+            save_episode(out, r, t0)
+    return results, t0
 
+
+def save_episode(out, r, t0):
+    """logs/run_N.jsonl, a line of meta.jsonl, a progress line."""
+    with open(out / "logs" / f"run_{r['run']}.jsonl", "w") as fh:
+        for e in r["events"]:
+            fh.write(json.dumps(e, ensure_ascii=False) + "\n")
+    with open(out / "meta.jsonl", "a") as fh:
+        fh.write(json.dumps(r["meta"], ensure_ascii=False) + "\n")
+    m = r["meta"]
+    print(f"[{time.time() - t0:7.0f}s] run {r['run']:3d} {m.get('task')} ok={r['ok']!s:5} {r['reason']:<18} "
+          f"calls={m.get('model_calls')} ctx={m.get('max_prompt_tokens')} sec={m.get('sec')}", flush=True)
+
+
+def write_results(out, results, hint_level, t0):
+    """logs/results.jsonl in run order and summary.json."""
     results.sort(key=lambda r: r["run"])
     with open(out / "logs" / "results.jsonl", "w") as fh:
         for r in results:
             row = {"run": r["run"], "ok": r["ok"], "reason": r["reason"]}
-            if a.hint_level > 0:
+            if hint_level > 0:
                 row["hint"] = r["hint"]
             fh.write(json.dumps(row, ensure_ascii=False) + "\n")
     summary = {"ok": sum(r["ok"] for r in results), "n": len(results), "wall_sec": round(time.time() - t0, 1)}
     (out / "summary.json").write_text(json.dumps(summary))
     print(json.dumps(summary), flush=True)
 
+
+def publish(view, src, out, info):
+    """<view>/logs := this run's logs, if <view>/src is still the code that was run."""
+    if src_hash(src) != info["src_hash"]:
+        sys.exit("src/ changed during the run; logs not published to the view")
+    logs = view / "logs"
+    shutil.rmtree(logs, ignore_errors=True)
+    shutil.copytree(out / "logs", logs)
+
+
+def main():
+    a = parse_args()
+    view, out = Path(a.view).resolve(), ROOT / "runs" / a.tag
+    if out.exists():
+        sys.exit(f"{out} exists")
+    src = view / "src"
+    tasks = pick_tasks(a)
+    g, stand = stand_of(a)
+    info, aw_root = prepare(a, src, out, tasks, stand)
+    results, t0 = play_all(make_jobs(a, tasks, out, aw_root, g), a.workers, out)
+    write_results(out, results, a.hint_level, t0)
     if not a.no_publish:
-        if src_hash(src) != info["src_hash"]:
-            sys.exit("src/ changed during the run; logs not published to the view")
-        logs = view / "logs"
-        shutil.rmtree(logs, ignore_errors=True)
-        shutil.copytree(out / "logs", logs)
+        publish(view, src, out, info)
 
 
 if __name__ == "__main__":
