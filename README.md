@@ -24,32 +24,44 @@
 Исследователь и редактор — одна и та же модель в роли coding-агента: bash только на чтение, свои инструменты
 (`report` / `edit`), `finish`.
 
-## Файлы
+## Раскладка
+
+Код метода — в `nrhsi/`, остальные каталоги — стенд: бенчмарки, запуск ролей, данные прогонов и сессий
+(`logs/`, `views/`, `work/`, `out/`, `runs/` — вне git).
 
 | где | что |
 |---|---|
-| `nrhsi/tree.py` | цикл метода: замер, исследование, правки, пул, выбор узла |
-| `nrhsi/researcher.py` | исследователь: промпт, каталог сессии (README + src + логи), `report` |
-| `nrhsi/editor.py` | редактор: промпт, `edit` по копии `src/` (только `src/`, кроме `bridge.py`) |
-| `nrhsi/agent.py` | общий цикл агента: песочница, лимит вызовов, повторы, финал (код — `nrhsi/agentlib/`) |
-| `nrhsi/bin/runs` | навигация по логам для модели: список прогонов, сообщения по номерам, grep |
-| `bench/run.py` | замер: прогоны `src/` на случайных задачах, `logs/run_N.jsonl` + `results.jsonl` |
-| `bench/*/src/` | стартовый харнесс бенчмарка как есть (ALFWorld — как в Harness-R1, AppWorld — ReAct-агент апстрима) |
-| `bench/*/src/bridge.py` | связь с бенчмарком; модель его видит, но не правит |
-| `bench/*/view_readme.md` | README каталога, который видит модель |
+| `nrhsi/tree.py` | цикл метода: замер (раннер бенча), исследование, правки, пул, выбор узла; `python -m nrhsi.tree` |
+| `nrhsi/researcher/` | исследователь: промпт и политики (`cfg`, `prompt`, `policy`), вид сессии (`views`), песочница и разбор команды (`sandbox`, `check`, `notes`), учёт чтения и ссылок report (`trace`, `evidence`), цикл (`state`, `context`, `tools`, `turn`, `phase`, `nudge`, `session`), транспорт (`model`); `python -m nrhsi.researcher` |
+| `nrhsi/editor/` | редактор: промпты и инструменты (`prompt`, `schema`), вход (`inputs`), копия `src/` и diff (`work`), `edit`, pyflakes (`lint`), ворота finish (`gate`), цикл (`state`, `tools`, `turn`, `phase`, `session`, `cli`); `smoke/<бенч>.py` — `tests/smoke.py` копии; bash и транспорт — исследователя; `python -m nrhsi.editor` |
+| `nrhsi/facade.py` | общий интерфейс пакета роли: `пакет.ИМЯ` читает и пишет имя в модуле-владельце (заглушки, `--set`) |
+| `nrhsi/bin/` | программы песочницы: `runs` (логи прогонов по сообщениям), `python3` (ссылка на python CLT) |
+| `nrhsi/site/` | `sitecustomize.py`: «/» = корень каталога сессии и для python3 в песочнице |
+| `start/` | стартовый харнесс: `template/` (цикл агента, пустые хуки) + `<бенч>.patch` + `<бенч>/` (промпты, `bridge.py`) + `<бенч>.README.md` (README для модели); сборка — `tools/make_start.py` |
+| `tools/` | `make_start.py` — сборка стартового `src/` или вида узла (`--view`); `to_events.py` — перевод старых логов-бесед в логи событий |
+| `alfworld/`, `appworld/` | бенчмарк: `runner/` (замер `src/` на задачах: модель, бюджет, логи событий, `run.py --out`), `tests/test_harness.py` (харнесс и раннер на заглушке модели; `HARNESS_SRC` — проверить правленую копию), `tools/` (сплиты, повтор логов, сверка с апстримом), `splits.json`, `bench/` (ALFWorld: задача AgentBench как есть + `fixture.py`), `view_v3/` (текущий вид: README.md + src/ = старт, logs/ — вне git), `views_e3/` (виды узлов экспериментов), `JOURNAL.md` |
+| `researcher/` | стенд исследователя: `fsr.py` (запуск: сессии в `researcher/logs`, `researcher/views`, вид по умолчанию `alfworld/view_v3`), `analyze.py`, `show_run.py` (разбор сессий и прогонов), `JOURNAL.md` |
+| `editor/` | стенд редактора: `editor.py` (запуск: `editor/logs`, `out`, `work`, report из `researcher/logs`, pyflakes из `editor/lint/`), `check.py` (харнесс копии: компиляция, импорт, тесты бенча), `show.py`, `table.py`, `launch.sh`, `queue.sh`, `tests/mock_editor.py` (редактор на заглушке модели), `JOURNAL.md` |
+| `stand.py`, `stands/` | профиль стенда — единственный источник модели и генерации; сверка живого стенда с профилем перед прогоном |
+| `docs/` | журналы ночей и аудитов (NIGHT-*, AUDIT-1031, IDEAS-1031), BACKLOG, TRACE-VIEWS |
 
 ## Запуск
 
-Нужны macOS (`sandbox-exec`, python3 из Command Line Tools), модель за OpenAI-совместимым API (`NRHSI_URL`),
-ALFWorld (venv с `alfworld`, `textworld`, данные в `ALFWORLD_DATA`) и/или AppWorld (`APPWORLD_PY` — python его
-venv, `APPWORLD_DATA`).
+Нужны macOS (`sandbox-exec`, python3 из Command Line Tools), модель за OpenAI-совместимым API (адрес и генерация —
+из `stands/<имя>.json`, `--stand`), ALFWorld (`alfworld/.venv`, игры в `ALFWORLD_DATA`, по умолчанию
+`alfworld/data/alfworld`) и/или AppWorld (`appworld/.venv`; репозиторий AppWorld с данными и
+venv — `APPWORLD_DIR`, по умолчанию `~/Projects/appworld`).
 
 ```
-python bench/run.py alfworld --src bench/alfworld/src --out runs/base --n 40 --seed 1      # один замер
-python nrhsi/researcher.py --node runs/base --readme bench/alfworld/view_readme.md --out runs/r1
-python nrhsi/editor.py --src runs/base/src --readme bench/alfworld/view_readme.md --reports runs/r1/reports.json --out runs/e1
-NRHSI_BENCH_PY=<python бенчмарка> python nrhsi/tree.py alfworld --out runs/tree1 --m 40 --k 5 --s 3 --children 10
+cd alfworld && .venv/bin/python runner/run.py --view view_v3 --n 40 --seed 1 --tag base   # замер -> runs/base, логи в view_v3/logs
+cd researcher && python3 fsr.py --view ../alfworld/view_v3 --k 5 --seed 1 --policy final --tag r1
+cd editor && python3 editor.py --bench alf --input r1 --arm obs --seed 1 --tag e1           # -> out/e1.diff, work/e1/src
+python3 -m nrhsi.tree alfworld --out runs/tree1 --m 40 --k 5 --s 3 --children 10 --lint editor/lint
 ```
+
+Без стенда: `python3 -m nrhsi.researcher --home DIR --view VIEW ...`, `python3 -m nrhsi.editor --home DIR --rlogs
+DIR/logs --view VIEW ...` (те же аргументы, что у `fsr.py` и `editor.py`). Тесты бенчей:
+`cd alfworld && .venv/bin/python -m pytest -q tests` (и так же в `appworld`).
 
 ## Что довести
 
@@ -57,12 +69,12 @@ NRHSI_BENCH_PY=<python бенчмарка> python nrhsi/tree.py alfworld --out r
 
 | компонент | состояние | что дальше |
 |---|---|---|
-| исследователь: механика | откалибрована: лимит 40 вызовов, финал по краю окна, 3 повтора подряд -> финал, `runs`, python; команда разбирается до запуска (`researcher/fsrlib/check.py`, `notes.py`): понятный отказ (запись, heredoc, `find -exec`, «not allowed: X»), заметки к пустому выводу и ошибкам, обрезка с указанием, как дочитать | — |
+| исследователь: механика | откалибрована: лимит 40 вызовов, финал по краю окна, 3 повтора подряд -> финал, `runs`, python; команда разбирается до запуска (`nrhsi/researcher/check.py`, `notes.py`): понятный отказ (запись, heredoc, `find -exec`, «not allowed: X»), заметки к пустому выводу и ошибкам, обрезка с указанием, как дочитать | — |
 | исследователь: качество находок | на прогонах с циклами до лимита шагов модель видит циклы, но не называет; принимает демо-диалог из промпта за события эпизода | **калибровка** (идёт): проговаривать увиденное перед командой, дневник report, реестр гипотез, таксономия TRAIL, проверка report в свежем контексте |
 | исследователь: K, S | K = 5, S = 3 без обоснования | **калибровка** |
 | исследователь: режим чтения, подача трасс, фидбек (`--hint-level`) | fs-инструменты, K случайных провалов, только ok/reason | **абляция** |
 | редактор | механика работает; годных правок мало, правки кода хуков часто ломают харнесс | **калибровка**; вход редактора (наблюдения / варианты исправлений) и число правок в узле — **абляция** |
-| проверка правок | нет: кандидат идёт в замер как есть | довести: тесты и смоук до замера |
+| проверка правок | редактор: pyflakes и smoke копии перед finish; тесты бенча — `editor/check.py`, в цикл не встроены | довести: тесты до замера |
 | замер | M = 40 без обоснования, T = 0 | **калибровка**; ранняя остановка детей (10/20/40) не перенесена |
 | поиск | лучший узел с непустым пулом | жадно / дерево / beam — **абляция** |
 | слияние узлов разных веток | нет | сделать; условия слияния не решены |
