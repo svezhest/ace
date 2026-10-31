@@ -9,6 +9,7 @@ from . import prompt as P
 from . import sandbox as S
 from . import trace as T
 from . import evidence as E
+from . import nudge as NG
 
 
 def call(run, name_, raw, res, said):
@@ -22,6 +23,9 @@ def call(run, name_, raw, res, said):
             res["say_rejected"] = True
             st["bash_calls"] += 1                 # 31.10: отказ тратит вызов, иначе петля без конца (r4app_say)
             return P.SAY_MSG, False
+        refused = NG.gate(run, name_, res)
+        if refused:
+            return refused, False
         return do_call(run, name_, raw, res)
     except Exception as e:  # noqa: BLE001  v3c: ответ модели не роняет харнесс
         st["harness_errors"] += 1

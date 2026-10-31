@@ -55,7 +55,7 @@ def session(mode, k, seed, temp, tag, resume=None, max_turns=None, runs=None):
            "compact_req": P.COMPACT_REQ if C.COMPACT else None, "read_counter": 1, "variant": C.VARIANT, "mode": mode, "k": k, "seed": seed, "temperature": temp, "stand": C.STAND,
            "runs": tids, "selection": sel, "view": vname, "system": P.SYSTEM, "first_user": P.first_user(), "limits": {
                "ctx": C.CTX, "max_gen": C.MAX_GEN, "warn_at": C.WARN_AT, "hard_at": C.HARD_AT, "clear_at": C.CLEAR_AT,
-               "keep_results": C.KEEP_RESULTS, "step_budget": C.STEP_BUDGET, "remind_every": C.REMIND_EVERY,
+               "keep_results": C.KEEP_RESULTS, "step_budget": C.STEP_BUDGET, "remind_every": C.REMIND_EVERY, "bounce_after": C.BOUNCE_AFTER, "draft_at": C.DRAFT_AT,
                "final_turns": C.FINAL_TURNS, "out_chars": C.OUT_CHARS, "cmd_timeout": C.CMD_TIMEOUT,
                "max_capture": C.MAX_CAPTURE, "log_head": C.LOG_HEAD, "max_cmd": C.MAX_CMD, "max_depth": C.MAX_DEPTH,
                "api_retries": M.API_RETRIES, "clear_to": C.CLEAR_TO, "clear_at_least": C.CLEAR_AT_LEAST, "stub": C.STUB,

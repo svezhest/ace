@@ -6,6 +6,7 @@ from . import cfg as C
 from . import prompt as P
 from . import model as M
 from . import tools as TO
+from . import nudge as NG
 
 
 def ask(run, est):
@@ -127,13 +128,8 @@ def _notes(run, name_, out, finished):
         if left <= C.STEP_BUDGET - C.STEP_WARN and not run.warned_steps:
             run.warned_steps = True
             out += f"\n\n[note: {left} tool calls left. Report what you have found, then call finish.]"
-        elif C.REMIND_EVERY and run.since_report and run.since_report % C.REMIND_EVERY == 0:
-            st["reminders"] += 1
-            bl = (f"{C.BASH_LIMIT - st['bash_calls']} of {C.BASH_LIMIT} bash calls" if C.BASH_LIMIT
-                  else f"{left} of {C.STEP_BUDGET} calls")
-            out += (f"\n\n[note: {run.since_report} calls since your last report; {bl} left. Record with report "
-                    "what these outputs have shown about why runs fail, or a sharper version of an earlier "
-                    "finding, together with your next command.]")
+        else:
+            out += NG.note(run)
     if C.HYPOTHESES and run.hyps and name_ in ("bash", "runs") and not run.final_left:
         out += "\n\n[hypotheses: " + "; ".join(
             f"{x['id']} {x['result']}: {x['claim'][:110]}" for x in run.hyps[-8:]) + "]"
