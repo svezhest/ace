@@ -87,5 +87,6 @@ POLICIES = {
     # 29.10: без очистки и сжатия, финал по окну на 52K, лимит bash 40; STEP_* и WARN_AT — как в сессиях A1-40
     "final": {"CLEAR_AT": None, "WARN_AT": None, "HARD_AT": 52000, "BASH_LIMIT": 40, "FINAL_FIX_TURNS": 2,
               "EVIDENCE_MODE": "free", "STEP_BUDGET": 300, "STEP_WARN": 285,
-              "PYTHON": True, "RUNS_TOOL": True, "REPEAT_STOP": 3, "FINAL_MSG": FINAL_MSG_TEXT, "SCRATCH": True},
+              "PYTHON": True, "RUNS_TOOL": True, "REPEAT_STOP": 3, "FINAL_MSG": FINAL_MSG_TEXT, "SCRATCH": True,
+              "BOUNCE_AFTER": 5},   # 31.10: дневник — отбивка (лестница: включилась только она)
 }
