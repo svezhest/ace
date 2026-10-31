@@ -1,6 +1,6 @@
-"""Stub-model tests for view_v3/src (harness + bridge) on the AgentBench task, and runner/run.py. No LLM calls.
+"""Stub-model tests for view_v3/src or $HARNESS_SRC (harness + bridge) on the AgentBench task, and runner/run.py. No LLM calls.
 
-  cd ~/Projects/nrhsi/alfworld && .venv/bin/python -m pytest -q tests
+  cd alfworld && .venv/bin/python -m pytest -q tests
 """
 import json
 import os
@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-SRC = ROOT / "view_v3" / "src"
+SRC = Path(os.environ.get("HARNESS_SRC") or ROOT / "view_v3" / "src")  # editor/check.py: правленая копия
 sys.dont_write_bytecode = True
 sys.path[:0] = [str(SRC), str(ROOT / "runner"), str(ROOT / "bench")]
 os.environ.setdefault("ALFWORLD_DATA", str(ROOT / "data" / "alfworld"))

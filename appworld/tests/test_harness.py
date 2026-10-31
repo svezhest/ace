@@ -1,7 +1,7 @@
-"""Stub-model tests for view_v3/src (harness + bridge), runner/llm.py and runner/run.py. No LLM calls.
+"""Stub-model tests for view_v3/src or $HARNESS_SRC (harness + bridge), runner/llm.py and runner/run.py. No LLM calls.
 The benchmark process (runner/env_server.py in AppWorld's venv: AppWorld's own agent loop) is real.
 
-  cd ~/Projects/nrhsi/appworld && .venv/bin/python -m pytest -q tests
+  cd appworld && .venv/bin/python -m pytest -q tests
 """
 import json
 import os
@@ -15,7 +15,7 @@ import pytest
 import requests
 
 ROOT = Path(__file__).resolve().parents[1]
-SRC = ROOT / "view_v3" / "src"
+SRC = Path(os.environ.get("HARNESS_SRC") or ROOT / "view_v3" / "src")  # editor/check.py: правленая копия
 sys.dont_write_bytecode = True
 sys.path[:0] = [str(SRC), str(ROOT / "runner")]
 

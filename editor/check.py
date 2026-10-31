@@ -2,7 +2,7 @@
 
 python check.py TAG [TAG ...]   -> out/<tag>.check.json и строка на тег
 1) py_compile всех .py в src; 2) import harness в venv бенчмарка (src копии первым в sys.path);
-3) тесты бенчмарка на заглушке модели (tests/test_<bench>.py — копии с SRC из окружения): по каждому тесту pass/fail.
+3) тесты бенчмарка на заглушке модели (<bench>/tests/test_harness.py, src копии — HARNESS_SRC): по каждому тесту pass/fail.
 Тесты «стартовое состояние» (hooks.py пуст, промпт = апстрим, повтор апстрима) падают по построению при правке
 этих файлов — они отмечены как expected_if_changed, а не как поломка.
 """
@@ -15,7 +15,8 @@ import subprocess
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-BENCH = {"alf": os.path.expanduser("~/Projects/nrhsi/alfworld"), "app": os.path.expanduser("~/Projects/nrhsi/appworld")}
+ROOT = os.path.dirname(HERE)
+BENCH = {"alf": f"{ROOT}/alfworld", "app": f"{ROOT}/appworld"}
 TESTS_TIMEOUT = 600  # с; тесты бенчмарка на заглушке идут ~25 с (ALF), ~50 с (App)
 START_STATE = {"test_hooks_file_is_empty", "test_start_state", "test_replay_equals_upstream_requests",
                "test_start_is_template_plus_patch"}
@@ -41,10 +42,10 @@ def check(tag):
     res["import_ok"] = r.stdout.strip() == "ok"
     if not res["import_ok"]:
         res["import_error"] = r.stderr[-800:]
-    env.update(BENCH_ROOT=BENCH[b], EDITOR_SRC=src)
+    env.update(HARNESS_SRC=src)
     if b == "alf":
         env.setdefault("ALFWORLD_DATA", f"{BENCH[b]}/data/alfworld")
-    p = subprocess.Popen([py, "-m", "pytest", "-q", "-rA", "-p", "no:cacheprovider", f"{HERE}/tests/test_{b}.py"],
+    p = subprocess.Popen([py, "-m", "pytest", "-q", "-rA", "-p", "no:cacheprovider", f"{BENCH[b]}/tests/test_harness.py"],
                          stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env, cwd=BENCH[b],
                          start_new_session=True)
     try:
