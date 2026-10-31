@@ -139,7 +139,8 @@ CHECK_LINE = ("- When reviewing runs, look for loops and repeated actions, contr
               "what the environment returns and what the prompt says), errors the agent does not react to, and "
               "instructions it does not follow.")
 SAY_LINE = "- Before each command, write in a sentence or two what you saw in the last output and what the command will check."
-SAY_MSG = "Not run. First write what you saw in the last output and what this command will check, then call it again."
+SAY_MSG = ("Not run. In the reply itself, before the call, write what you saw "
+           "in the last output and what this command will check; then call it.")
 LIMIT_LINE = ("bash can be called N times; after that only report and finish remain, for a few turns, and the "
               "session ends")   # A1: вместо «the session ends after STEP_BUDGET tool calls»
 

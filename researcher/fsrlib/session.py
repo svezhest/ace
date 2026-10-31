@@ -506,6 +506,7 @@ def _loop(st, reports, w, root, prof, temp, seed, resume=None, max_turns=None, s
                         and len((r["content"] or "").strip()) < C.SAY_FIRST):
                     st["say_rejected"] = st.get("say_rejected", 0) + 1
                     res["say_rejected"] = True
+                    st["bash_calls"] += 1                 # 31.10: отказ тратит вызов, иначе петля без конца (r4app_say)
                     out, finished = P.SAY_MSG, False
                 else:
                     out, finished = do_call(name_, raw, res)
@@ -514,7 +515,7 @@ def _loop(st, reports, w, root, prof, temp, seed, resume=None, max_turns=None, s
                 res["harness_error"] = traceback.format_exc()[-2000:]
                 out, finished = f"Error: {type(e).__name__}: {str(e)[:300]}", False
             since_report += 1
-            if C.REPEAT_STOP and not res.get("repeat"):
+            if C.REPEAT_STOP and not res.get("repeat") and not res.get("say_rejected"):
                 repeat_run[0] = 0
             # приписки цикла: контекст, шаги, давно не было report
             left = C.STEP_BUDGET - st["tool_calls"]
