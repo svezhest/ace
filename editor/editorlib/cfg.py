@@ -8,7 +8,7 @@ sys.path.insert(0, os.path.expanduser("~/Projects/nrhsi/researcher"))
 import fsr as F  # noqa: E402
 
 # 30.10: механика bash — fsr исследователя (политика final: python3, heredoc), «/» = корень копии.
-F.apply_policy("final", {"RUNS_TOOL": False})
+F.apply_policy("final", {"RUNS_TOOL": False, "SCRATCH": False})   # 31.10: scratch/ — только у исследователя
 
 VIEWS = {"alf": os.path.expanduser("~/Projects/nrhsi/alfworld/view"),
          "app": os.path.expanduser("~/Projects/nrhsi/appworld/view")}
