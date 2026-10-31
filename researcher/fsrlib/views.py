@@ -88,6 +88,8 @@ def build_view(name, tids):
     with open(f"{v}/logs/results.jsonl", "w") as f:
         for r in rows:
             f.write(json.dumps(r) + "\n")
+    if C.SCRATCH:
+        os.makedirs(f"{v}/{C.SCRATCH_DIR}")                # 31.10: единственное место, куда можно писать
     return os.path.realpath(v)
 
 

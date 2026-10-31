@@ -1,4 +1,5 @@
 """Разбор команды до запуска: белый список, запись, heredoc python3, тексты отказов."""
+import os
 import re
 import shlex
 
@@ -10,35 +11,82 @@ class _Deny(Exception):
     pass
 
 
-READONLY_MSG = ("the directory is read-only and nothing can be written (no files, no /tmp); "
-                "print results to stdout instead and narrow them with grep, head or sed -n")
-HEREDOC_PY_MSG = ("here-documents (<<) work only as a whole command python3 - <<'EOF' ... EOF (a pipe like | head "
-                  "may follow <<'EOF' on its first line); otherwise pass text with echo or printf through a pipe")
-HEREDOC_RE = re.compile(r"\s*python3(?:[ \t]+-)?[ \t]*<<(-?)[ \t]*(['\"]?)([A-Za-z_]\w*)\2([^\n]*)\n")
+READONLY_MSG_BASE = ("the directory is read-only and nothing can be written (no files, no /tmp); "
+                     "print results to stdout instead and narrow them with grep, head or sed -n")
 
 
-def split_heredoc(cmd):
-    """29.10 (PYTHON): python3 [-] <<[-]'EOF' [| ...]\n тело\nEOF -> ("python3 -[ | ...]", тело) или None.
-    Тело идёт в stdin как есть (без подстановок, как при 'EOF'); после строки-ограничителя — ничего.
-    Нет ограничителя — тело до конца (bash делает так же)."""
-    m = HEREDOC_RE.match(cmd)
-    if not m:
-        return None
-    tabs, word = m.group(1) == "-", m.group(3)
-    lines = cmd[m.end():].split("\n")
-    body = []
-    for i, ln in enumerate(lines):
-        x = ln.lstrip("\t") if tabs else ln
-        if x.rstrip() == word:
-            if "\n".join(lines[i + 1:]).strip():
-                return None
-            break
-        body.append(x)
-    return "python3 -" + m.group(4), "\n".join(body) + "\n"
+def readonly_msg():
+    """31.10 (SCRATCH): писать можно только в scratch/."""
+    if C.SCRATCH:
+        return (f"only {C.SCRATCH_DIR}/ can be written (> {C.SCRATCH_DIR}/NAME, or from python3); everything else is "
+                "read-only and there is no /tmp")
+    return READONLY_MSG_BASE
+
+
+HD_OP_RE = re.compile(r"<<(-?)[ \t]*(?:'([A-Za-z_][\w.-]*)'|\"([A-Za-z_][\w.-]*)\"|(\\?)([A-Za-z_][\w.-]*))")
+HD_VAR = "__H"
+HEREDOC_MSG = "here-documents (<<) are not supported here"
+
+
+def lift_heredocs(cmd):
+    """31.10 (PYTHON): here-documents в любом месте командной строки верхнего уровня. Разбор находит каждое <<WORD
+    и его тело (строки после конца строки команды до строки WORD; <<- — без ведущих табуляций; строки WORD нет —
+    до конца). Тело вынимается из команды: на месте <<WORD — < <(printf '%s\\n' "$__Hk") (тело — в переменной окружения __Hk), пустое
+    тело — </dev/null. (Не <<<: here-string bash пишет во временный файл, а /tmp закрыт.) bash тела не видит, остаток команды проверяется как обычно.
+    -> (команда без тел, {имя: тело}) или _Deny."""
+    if "<<" not in cmd:
+        return cmd, {}
+    hd = {"ops": [], "cuts": [], "pending": [], "texts": {}}
+    _scan(cmd, 0, None, [], [], None, hd=hd)
+    if hd["pending"]:
+        _bodies(cmd, len(cmd), hd)
+    if not hd["ops"]:
+        return cmd, {}
+    rep = [(a, b, (f"< <(printf '%s\\n' \"${HD_VAR}{k}\")" if hd["texts"][k] is not None else "</dev/null"))
+           for a, b, k in hd["ops"]] + [(a, b, "") for a, b in hd["cuts"]]
+    out, j = [], 0
+    for a, b, t in sorted(rep):
+        out.append(cmd[j:a] + t)
+        j = b
+    out.append(cmd[j:])
+    env = {f"{HD_VAR}{k}": v for k, v in hd["texts"].items() if v is not None}
+    return "".join(out), env
+
+
+def _bodies(s, j, hd):
+    """Тела ожидающих here-documents с позиции j (начало строки после команды) -> позиция после последнего тела."""
+    for word, tabs, quoted, k in hd["pending"]:
+        lines = []
+        while j < len(s):
+            e = s.find("\n", j)
+            e = len(s) if e < 0 else e
+            x = s[j:e].lstrip("\t") if tabs else s[j:e]
+            j = e + 1
+            if x.rstrip() == word:
+                break
+            lines.append(x)
+        body = "\n".join(lines) if lines else None
+        if body is not None and not quoted and re.search(r"[$`\\]", body):
+            raise _Deny(f"the here-document delimiter {word} is unquoted, so bash would expand $, ` and \\ in its text; "
+                        f"quote it: <<'{word}'")
+        hd["texts"][k] = body
+    hd["pending"] = []
+    return min(j, len(s))
 
 
 NO_SUBST_MSG = ("command substitution inside ${...} or $((...)) is not supported; "
                 "assign it to a variable first: v=$(...)")
+
+
+def _in_scratch(target):
+    """Цель перенаправления — относительный путь внутрь scratch/ (из корня или через ..)."""
+    t = target.strip("'\"")
+    if not t or t.startswith("/") or "$" in t or "`" in t:
+        return False
+    parts = os.path.normpath(t).split("/")
+    while parts and parts[0] == "..":
+        parts = parts[1:]
+    return len(parts) >= 2 and parts[0] == C.SCRATCH_DIR
 
 
 def _cmd_pos(cur):
@@ -57,7 +105,7 @@ def _arith_end(s, i):
     return j + 2
 
 
-def _scan(s, i, close, segs, meta=None, pipeamp=None, depth=0):
+def _scan(s, i, close, segs, meta=None, pipeamp=None, depth=0, hd=None):
     """Разбор командной строки с кавычками. Режет на простые команды (segs); подстановки $(...), `...` и <(...)
     разбираются рекурсивно как отдельные команды, на их месте остаётся слово X. meta (v3): на каждую простую
     команду {piped: вход из пайпа, procsub: есть <(...), redir_in: есть '<'}. -> индекс после close.
@@ -106,10 +154,10 @@ def _scan(s, i, close, segs, meta=None, pipeamp=None, depth=0):
                     i = _arith_end(s, i + 1)
                     buf.append("0")
                 elif s.startswith("$(", i):
-                    i = _scan(s, i + 2, ")", segs, meta, pipeamp, depth + 1)
+                    i = _scan(s, i + 2, ")", segs, meta, pipeamp, depth + 1, hd)
                     buf.append("X")
                 elif s[i] == "`":
-                    i = _scan(s, i + 1, "`", segs, meta, pipeamp, depth + 1)
+                    i = _scan(s, i + 1, "`", segs, meta, pipeamp, depth + 1, hd)
                     buf.append("X")
                 else:
                     buf.append(s[i])
@@ -119,10 +167,10 @@ def _scan(s, i, close, segs, meta=None, pipeamp=None, depth=0):
             i = _arith_end(s, i + 1)
             cur.append("0")
         elif s.startswith("$(", i):
-            i = _scan(s, i + 2, ")", segs, meta, pipeamp, depth + 1)
+            i = _scan(s, i + 2, ")", segs, meta, pipeamp, depth + 1, hd)
             cur.append("X")
         elif c == "`":
-            i = _scan(s, i + 1, "`", segs, meta, pipeamp, depth + 1)
+            i = _scan(s, i + 1, "`", segs, meta, pipeamp, depth + 1, hd)
             cur.append("X")
         elif s.startswith("${", i):
             j = s.find("}", i)
@@ -149,11 +197,27 @@ def _scan(s, i, close, segs, meta=None, pipeamp=None, depth=0):
         elif s.startswith("((", i) and _cmd_pos(cur):
             i = _arith_end(s, i)                            # v3: (( n > 3 )) — арифметика, не запись
             cur.append(":")
+        elif s.startswith("<<<", i) and C.PYTHON:
+            raise _Deny("here-strings (<<<) are not supported (bash needs a temporary file for them); "
+                        "pipe the text instead: printf '%s\\n' TEXT | ...")
+        elif s.startswith("<<", i) and hd is not None:
+            if depth:
+                raise _Deny("here-documents (<<) are not supported inside $(...) or `...`")
+            m = HD_OP_RE.match(s, i)
+            if not m:
+                raise _Deny("a here-document needs a word after <<, e.g. <<'EOF'")
+            k = len(hd["ops"]) + 1
+            word = m.group(2) or m.group(3) or m.group(5)
+            hd["ops"].append((i, m.end(), k))
+            hd["pending"].append((word, m.group(1) == "-", bool(m.group(2) or m.group(3) or m.group(4)), k))
+            st["redir_in"] = True
+            cur.append(" ")
+            i = m.end()
         elif s.startswith("<<", i):
-            raise _Deny(HEREDOC_PY_MSG if C.PYTHON else
+            raise _Deny(HEREDOC_MSG if C.PYTHON else
                         "here-documents (<<) are not supported; pass text with echo or printf through a pipe")
         elif s.startswith("<(", i):
-            i = _scan(s, i + 2, ")", segs, meta, pipeamp, depth + 1)   # v3: подстановка процесса — команда проверяется
+            i = _scan(s, i + 2, ")", segs, meta, pipeamp, depth + 1, hd)   # v3: подстановка процесса — команда проверяется
             cur.append("X")
             st["procsub"] = True
         elif s.startswith(">(", i):
@@ -170,8 +234,10 @@ def _scan(s, i, close, segs, meta=None, pipeamp=None, depth=0):
                 pass
             elif op == ">" and target.startswith("&") and target[1:].isdigit():
                 pass
+            elif C.SCRATCH and _in_scratch(target):
+                pass                                        # запись держит песочница: только каталог scratch/
             else:
-                raise _Deny(f"'{op}{target}': {READONLY_MSG}")
+                raise _Deny(f"'{op}{target}': {readonly_msg()}")
             cur.append(" ")
             i += m.end()
         elif c == "#" and (i == 0 or s[i - 1] in " \t\n;|&("):
@@ -193,6 +259,13 @@ def _scan(s, i, close, segs, meta=None, pipeamp=None, depth=0):
         elif c == "(":
             cut(st["piped"])                                # cmd | ( ... ): первая команда группы читает пайп
             i += 1
+        elif c == "\n" and hd is not None and hd["pending"]:
+            if depth:
+                raise _Deny("a line break inside $(...) or `...` follows a here-document (<<) on the same line")
+            cut()
+            j = _bodies(s, i + 1, hd)
+            hd["cuts"].append((i + 1, j))
+            i = j
         elif c in ";\n)":
             cut()
             i += 1
@@ -302,7 +375,7 @@ def _check_words(w, m, via_xargs=False):
         return (f"'{p}' is a separate tool, not a shell command: call the {p} tool directly instead of bash"
                 + (", e.g. " + P.REPORT_EXAMPLE if p == "report" else "") + ".")
     if p in C.WRITE_PROGS:
-        return f"'{p}' writes files: {READONLY_MSG}"
+        return f"'{p}' writes files: {readonly_msg()}"
     if p not in C.ALLOWED:
         return f"'{p}' is not allowed. Allowed programs: {', '.join(sorted(C.ALLOWED))}"
     if p == "command" and not (len(w) > 2 and w[1] in ("-v", "-V")):
@@ -311,13 +384,13 @@ def _check_words(w, m, via_xargs=False):
         return (f"xargs can only run a program from the list, not '{p}'; "
                 "use a loop instead: ... | while read f; do ...; done")
     if p == "sed" and any(x.startswith("-i") or x.startswith("-I") or x.startswith("--in-place") for x in w[1:]):
-        return f"sed -i is not allowed: {READONLY_MSG}"
+        return f"sed -i is not allowed: {readonly_msg()}"
     if p == "awk":
         return _awk_check(w)
     if p == "find" and C.FIND_BAD & set(w):
         return "find actions like -exec/-delete are not allowed; pipe the file list into grep, head, xargs or a for loop"
     if p == "sort" and any(x == "-o" or x.startswith("--output") or x.startswith("--compress") for x in w):
-        return f"sort -o is not allowed: {READONLY_MSG}"
+        return f"sort -o is not allowed: {readonly_msg()}"
     if p == "diff" and (m.get("procsub") or m.get("piped") and "-" in w[1:]
                         or any(x in ("-", "/dev/stdin") or x.startswith("/dev/fd/") for x in w[1:])):
         return ("diff can only compare two files here (for piped input or <(...) it needs a temporary file, and "
