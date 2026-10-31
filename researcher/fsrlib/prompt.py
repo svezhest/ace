@@ -153,8 +153,7 @@ CAUSE_JOB = ("Your job: for each failed run, find out what actually happened and
              "prevented it. A failure in which the harness had no part is a finding too: say so.")
 CAUSE_FIRST = ("Investigate the failed runs in this repository: what went wrong in each, and what in the harness, if "
                "anything, made them fail. Call finish when you are done.")
-LIMIT_LINE = ("bash can be called N times; after that only report and finish remain, for a few turns, and the "
-              "session ends")   # A1: вместо «the session ends after STEP_BUDGET tool calls»
+LIMIT_LINE = "bash can be called N times, then the session ends after a few turns"   # 31.10: без «only report and finish remain» — подсказка копить report на конец
 
 
 def build_system():

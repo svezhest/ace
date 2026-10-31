@@ -10,8 +10,8 @@ import fsr as F  # noqa: E402
 # 30.10: механика bash — fsr исследователя (политика final: python3, heredoc), «/» = корень копии.
 F.apply_policy("final", {"RUNS_TOOL": False, "SCRATCH": False})   # 31.10: scratch/ — только у исследователя
 
-VIEWS = {"alf": os.path.expanduser("~/Projects/nrhsi/alfworld/view"),
-         "app": os.path.expanduser("~/Projects/nrhsi/appworld/view")}
+VIEWS = {"alf": os.path.expanduser("~/Projects/nrhsi/alfworld/view_v3"),
+         "app": os.path.expanduser("~/Projects/nrhsi/appworld/view_v3")}
 RLOGS = os.path.expanduser("~/Projects/nrhsi/researcher/logs")
 BENCH = None   # --bench (main)
 
