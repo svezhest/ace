@@ -31,6 +31,7 @@ class Run:
         self.fix_left = C.FINAL_FIX_TURNS    # A1: сколько ходов финала ещё можно не расходовать из-за отклонённого report
         self.repeat_run = 0              # 29.10 (REPEAT_STOP): повторов подряд (сбрасывает любой вызов, кроме повтора)
         self.drafts = {}                 # 31.10 (nudge): точка предотчёта -> число report в ней
+        self.nudge_prev = False          # 1.11 (nudge): прошлый bash/runs был отказом отбивки
         self.loop_hit = False            # 29.10: повторов подряд стало REPEAT_STOP -> финал в конце хода
         if resume:
             self.messages = resume["messages"]

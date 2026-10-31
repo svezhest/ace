@@ -2,7 +2,7 @@
 - REMIND_EVERY = n — приписка к выводу каждые n вызовов без report;
 - BOUNCE_AFTER = k — после k вызовов без report bash не исполняется, пока не будет report;
 - DRAFT_AT = [b, ...] — предотчёт: на b-м bash команды не исполняются, пока не будет report.
-Отказ тратит вызов bash (иначе петля без конца, как у SAY_FIRST)."""
+Отказ тратит вызов bash (иначе петля без конца, как у SAY_FIRST); BOUNCE_CHARGE = "repeat" — только повторный отказ подряд."""
 from . import cfg as C
 
 
@@ -38,8 +38,11 @@ def gate(run, name_, res):
                                "what the outputs so far have shown about why runs fail (a partial finding counts; a "
                                "later report can sharpen it), then run the command again.")
     else:
+        run.nudge_prev = False
         return None
     st["nudge_rejected"] = st.get("nudge_rejected", 0) + 1
-    st["bash_calls"] += 1
+    if C.BOUNCE_CHARGE == "all" or run.nudge_prev:     # "repeat": первый отказ серии бесплатен, повторы тратят bash
+        st["bash_calls"] += 1
+    run.nudge_prev = True
     res["nudge_rejected"] = kind
     return msg
