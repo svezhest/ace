@@ -25,6 +25,17 @@ def user(text):
     return {"role": "user", "content": text}
 
 
+def call_hook(name, ctx, nb):
+    fn = getattr(hooks, name, None)
+    if fn is None:
+        return None
+    try:
+        out = fn(copy.deepcopy(ctx), nb)
+    except Exception:
+        return None
+    return out if isinstance(out, dict) else None
+
+
 def text_to_messages(text):
     """Split the prompt into messages at the role markers "USER:\\n", "ASSISTANT:\\n", "SYSTEM:\\n"."""
     messages, start = [], 0
@@ -55,22 +66,11 @@ def output_message(output):
     return user("Output:\n```\n" + output + ("" if output.endswith("\n") else "\n") + "```\n\n")
 
 
-def call_hook(name, ctx, nb):
-    fn = getattr(hooks, name, None)
-    if fn is None:
-        return None
-    try:
-        out = fn(copy.deepcopy(ctx), nb)
-    except Exception:
-        return None
-    return out if isinstance(out, dict) else None
-
-
-def make_ctx(messages, episode, history, reply="", code=""):
+def make_ctx(messages, episode, history, output="", code=""):
     return {
         "messages": copy.deepcopy(messages),
         "observation": history["last_observations"][-1] if history["last_observations"] else "",
-        "output": reply,
+        "output": output,
         "code": code,
         "step": episode.steps,
         "max_step": bridge.STEP_LIMIT,
@@ -84,7 +84,6 @@ def run(episode, llm):
     nb = {}
     history = {"last_actions": [], "last_observations": []}
     messages = text_to_messages(episode.fill(prompt("starting_prompt.md").lstrip()) + "\n\n")
-
     out = call_hook("on_init", make_ctx(messages, episode, history), nb) or {}
     skills = [s["text"] for s in out.get("skills") or [] if isinstance(s, dict) and s.get("text")]
     if skills:
@@ -97,23 +96,23 @@ def run(episode, llm):
             messages.append(user(out["message"]))
 
         reply = llm(messages)
-        code, text = extract_code(reply.get("content") or "")
+        action, text = extract_code(reply.get("content") or "")
         reply["content"] = text + "\n\n"
         messages.append(reply)
 
-        out = call_hook("on_before_action", make_ctx(messages, episode, history, text, code), nb)
+        out = call_hook("on_before_action", make_ctx(messages, episode, history, text, action), nb)
         if out and out.get("kind") == "block_and_prompt":
             messages.append(user(out.get("message") or "Harness blocked this code. Write another step."))
             continue
 
-        output = episode.execute(code)
-        if output is None:
+        obs = episode.execute(action)
+        if obs is None:
             break
-        messages.append(output_message(output))
-        history["last_actions"].append(code)
-        history["last_observations"].append(output)
+        messages.append(output_message(obs))
+        history["last_actions"].append(action)
+        history["last_observations"].append(obs)
 
-        out = call_hook("on_post_step", make_ctx(messages, episode, history, text, code), nb)
+        out = call_hook("on_post_step", make_ctx(messages, episode, history, text, action), nb)
         if out and out.get("kind") == "inject_hint" and out.get("message"):
             messages.append(user(out["message"]))
     return messages

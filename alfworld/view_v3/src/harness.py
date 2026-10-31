@@ -13,7 +13,6 @@ import hooks
 
 SRC = Path(__file__).parent
 ACTIONS = " AVAILABLE ACTIONS: "  # how the task lists the valid actions after its text
-
 TOOLS = [{
     "type": "function",
     "function": {
@@ -62,11 +61,11 @@ def action_of(reply):
         return None
 
 
-def make_ctx(state, episode, history, raw=""):
+def make_ctx(state, episode, history, output=""):
     return {
         "observation": state["observation"],
         "admissible": list(state["admissible"]),
-        "output": raw,
+        "output": output,
         "step": episode.turns,
         "max_step": bridge.STEP_LIMIT,
         "remaining_steps": bridge.STEP_LIMIT - episode.turns,
@@ -82,7 +81,6 @@ def run(episode, llm):
     first = [m for m in episode.start() if m["role"] == "user"]  # the task's own system prompt is replaced
     obs, admissible = split_actions(first[0]["content"])
     state = {"observation": obs, "admissible": admissible}
-
     system = prompt("starting_prompt.md")
     out = call_hook("on_init", make_ctx(state, episode, history), nb) or {}
     skills = [s["text"] for s in out.get("skills") or [] if isinstance(s, dict) and s.get("text")]
@@ -91,7 +89,6 @@ def run(episode, llm):
     if out.get("tool_hint"):
         fn = tools[0]["function"]
         fn["description"] = f"{fn['description']}\n\n{out['tool_hint']}".strip()
-
     messages = [{"role": "system", "content": system}] + first
 
     while not episode.finished:
@@ -101,9 +98,9 @@ def run(episode, llm):
 
         reply = llm(messages, tools)
         messages.append(reply)
-        raw = action_of(reply)
+        action = action_of(reply)
 
-        out = call_hook("on_before_action", make_ctx(state, episode, history, raw or ""), nb)
+        out = call_hook("on_before_action", make_ctx(state, episode, history, action or ""), nb)
         if out and out.get("kind") == "block_and_prompt":
             messages.append(user(out.get("message") or "Harness blocked this action. Choose a valid action."))
             continue
@@ -113,12 +110,14 @@ def run(episode, llm):
                 messages.append(m)
                 obs, admissible = split_actions(m["content"])
                 state = {"observation": obs, "admissible": admissible}
-                history["last_actions"].append((raw or "").strip().lower())
+                history["last_actions"].append((action or "").strip().lower())
                 history["last_observations"].append(obs.strip().lower())
             elif m["role"] == "user":  # the task did not take the reply as an action
                 messages.append(user(prompt("no_tool_call.md" if not reply.get("tool_calls") else "invalid_tool_call.md")))
-        if messages[-1]["role"] == "tool":
-            out = call_hook("on_post_step", make_ctx(state, episode, history, raw or ""), nb)
-            if out and out.get("kind") == "inject_hint" and out.get("message"):
-                messages.append(user(out["message"]))
+        if messages[-1]["role"] != "tool":  # no action was taken: no post-step hook
+            continue
+
+        out = call_hook("on_post_step", make_ctx(state, episode, history, action or ""), nb)
+        if out and out.get("kind") == "inject_hint" and out.get("message"):
+            messages.append(user(out["message"]))
     return messages

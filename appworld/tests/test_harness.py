@@ -75,6 +75,16 @@ def test_start_state():
     assert (SRC / "starting_prompt.md").read_bytes() == UPSTREAM_PROMPT.read_bytes()
 
 
+def test_start_is_template_plus_patch(tmp_path):
+    """The starting src/ is start/template/ + start/appworld.patch + start/appworld/ (tools/make_start.py), byte for byte."""
+    out = tmp_path / "src"
+    subprocess.run([sys.executable, str(ROOT.parent / "tools" / "make_start.py"), "appworld", "--out", str(out)],
+                   check=True, capture_output=True)
+    names = sorted(p.name for p in SRC.iterdir() if p.is_file())
+    assert sorted(p.name for p in out.iterdir()) == names
+    assert all((out / n).read_bytes() == (SRC / n).read_bytes() for n in names)
+
+
 def test_extract_code_matches_upstream_cases():
     assert harness.extract_code("a\n```python\nx = 1\n```\nb\n```python\ny\n```") == ("x = 1", "a\n```python\nx = 1\n```")
     assert harness.extract_code("a\n```python\nx = 1\n") == ("x = 1", "a\n```python\nx = 1\n```")

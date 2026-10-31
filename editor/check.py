@@ -17,7 +17,8 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 BENCH = {"alf": os.path.expanduser("~/Projects/nrhsi/alfworld"), "app": os.path.expanduser("~/Projects/nrhsi/appworld")}
 TESTS_TIMEOUT = 600  # с; тесты бенчмарка на заглушке идут ~25 с (ALF), ~50 с (App)
-START_STATE = {"test_hooks_file_is_empty", "test_start_state", "test_replay_equals_upstream_requests"}
+START_STATE = {"test_hooks_file_is_empty", "test_start_state", "test_replay_equals_upstream_requests",
+               "test_start_is_template_plus_patch"}
 
 
 def check(tag):
