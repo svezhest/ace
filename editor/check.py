@@ -10,6 +10,7 @@ import glob
 import json
 import os
 import re
+import signal
 import subprocess
 import sys
 
@@ -42,13 +43,16 @@ def check(tag):
     env.update(BENCH_ROOT=BENCH[b], EDITOR_SRC=src)
     if b == "alf":
         env.setdefault("ALFWORLD_DATA", f"{BENCH[b]}/data/alfworld")
+    p = subprocess.Popen([py, "-m", "pytest", "-q", "-rA", "-p", "no:cacheprovider", f"{HERE}/tests/test_{b}.py"],
+                         stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env, cwd=BENCH[b],
+                         start_new_session=True)
     try:
-        r = subprocess.run([py, "-m", "pytest", "-q", "-rA", "-p", "no:cacheprovider", f"{HERE}/tests/test_{b}.py"],
-                           capture_output=True, text=True, env=env, cwd=BENCH[b], timeout=TESTS_TIMEOUT)
-    except subprocess.TimeoutExpired as e:   # правка подвесила тест (бесконечный цикл): это результат проверки
-        out = e.stdout.decode() if isinstance(e.stdout, bytes) else (e.stdout or "")
-        r = subprocess.CompletedProcess(e.cmd, -1, out, "")
+        out, err = p.communicate(timeout=TESTS_TIMEOUT)
+    except subprocess.TimeoutExpired:   # правка подвесила тест (бесконечный цикл): это результат проверки
+        os.killpg(p.pid, signal.SIGKILL)   # вместе с run.py и его рабочими процессами, которые запустил тест
+        out, err = p.communicate()
         res["tests_timeout"] = TESTS_TIMEOUT
+    r = subprocess.CompletedProcess(p.args, p.returncode, out, err)
     tests = {}
     for m in re.finditer(r"^(PASSED|FAILED|ERROR|SKIPPED)\s+\S*::(\w+)(\[[^\]]*\])?", r.stdout, re.M):
         tests[m.group(2) + (m.group(3) or "")] = m.group(1)
