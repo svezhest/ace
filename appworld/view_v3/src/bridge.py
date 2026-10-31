@@ -18,6 +18,8 @@ the harness's requests to it:
     "error", ...}.
 
 Success is checked by the benchmark after the episode; the agent never sees anything about it.
+The model reaches the harness through guard(): the same reply REPEATS times in a row ends the episode
+(end: "error", detail "repeated reply").
 """
 import json
 import urllib.request
@@ -50,3 +52,29 @@ class Episode:
             self.finished = True
             self.end = {k: v for k, v in out["end"].items() if k != "steps"}
         return out["output"]
+
+
+REPEATS = 3  # the same model reply this many times in a row ends the episode (guard)
+
+
+class Loop(Exception):
+    """guard() ended the episode: the model sent the same reply REPEATS times in a row."""
+
+
+def _same(m):
+    calls = [(c["function"]["name"], c["function"]["arguments"]) for c in m.get("tool_calls") or []]
+    return m.get("content"), calls
+
+
+def guard(episode, llm):
+    """The model as the harness gets it, with a crude guard of the stand (not part of the harness): before
+    each call, if the model's last REPEATS replies in the conversation are the same, the episode ends with
+    end = {"reason": "error", "detail": "repeated reply"} and Loop is raised."""
+    def call(messages, *args, **kwargs):
+        last = [_same(m) for m in messages if m.get("role") == "assistant"][-REPEATS:]
+        if len(last) == REPEATS and all(x == last[0] for x in last):
+            episode.finished = True
+            episode.end = {"reason": "error", "detail": "repeated reply"}
+            raise Loop()
+        return llm(messages, *args, **kwargs)
+    return call

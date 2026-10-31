@@ -33,7 +33,7 @@ def expert_plan(game=GAME):
     return expert_hint(game, 2).removeprefix("expert plan: ").split("; ")
 
 
-def play(script, hooks=None, game=GAME):
+def play(script, hooks=None, game=GAME, guard=False):
     rec = Recorder(fixture.Episode(game, os.environ["ALFWORLD_DATA"]))
     ep = bridge.Episode(rec)
     llm = Fake(script)
@@ -41,8 +41,8 @@ def play(script, hooks=None, game=GAME):
     harness.hooks = hooks if hooks is not None else types.SimpleNamespace()
     try:
         try:
-            msgs = harness.run(ep, llm)
-        except EpisodeEnd:
+            msgs = harness.run(ep, bridge.guard(ep, llm) if guard else llm)
+        except (EpisodeEnd, bridge.Loop):
             msgs = llm.conversation
     finally:
         harness.hooks = old
@@ -94,6 +94,23 @@ def test_repeated_action_ends_episode():
     ep, rec, llm, msgs = play(["look"])
     assert ep.end == {"reason": "error", "status": "agent invalid action", "detail": "repeated action"}
     assert not rec.bench.won() and len(llm.calls) == 4  # the task's rule: the last 3 actions identical
+
+
+def test_guard_ends_a_loop_without_turns():
+    def block(ctx, nb):
+        return {"kind": "block_and_prompt", "message": "blocked"}
+
+    ep, rec, llm, msgs = play(["look"], hooks=types.SimpleNamespace(on_before_action=block), guard=True)
+    assert ep.end == {"reason": "error", "detail": "repeated reply"} and ep.finished
+    assert ep.turns == 0 and len(llm.calls) == 3  # three same replies, none handed to the task
+
+
+def test_guard_in_the_runner():
+    import run
+    r = run.play({"run": 1, "game": GAME, "src": str(SRC), "fake": [{"text": "x"}], "gen": None,
+                  "hint_level": 0, "wall_limit": 600})
+    assert r["reason"] == "repeated reply" and r["meta"]["turns"] == 3 and r["meta"]["model_calls"] == 3
+    assert r["events"][-1] == {"event": "bridge", "call": "end", "reason": "error", "detail": "repeated reply"}
 
 
 def test_turn_limit_of_the_task():

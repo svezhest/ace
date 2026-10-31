@@ -119,7 +119,9 @@ def play(job):
         ep = bridge.Episode(bench.url)
         rec = Recorder(ep, llm)
         try:
-            messages = harness.run(ep, llm)
+            messages = harness.run(ep, bridge.guard(ep, llm))
+        except bridge.Loop:
+            pass
         except EpisodeEnd as e:
             reason, detail = e.reason, e.detail
         except Exception:
@@ -138,7 +140,8 @@ def play(job):
     elif end and end["reason"] == "finished":
         reason = "wrong result"
     elif reason is None:
-        reason = end["reason"] if end else "harness stopped early"
+        reason = (end.get("detail") if end.get("detail") == "repeated reply" else end["reason"]) if end else \
+            "harness stopped early"
     as_json = [json.dumps(m, sort_keys=True) for m in messages]
     append_only = all([json.dumps(m, sort_keys=True) for m in r] == as_json[:len(r)] for r in llm.requests)
     prompt_tokens = [c["prompt_tokens"] or 0 for c in llm.calls]

@@ -67,7 +67,9 @@ def play(job):
         g = job["gen"]
         llm = Client(g["url"], g["model"], job["wall_limit"], max_tokens=g["max_tokens"], temperature=g["temperature"])
     try:
-        messages = harness.run(ep, llm)
+        messages = harness.run(ep, bridge.guard(ep, llm))
+    except bridge.Loop:
+        pass
     except EpisodeEnd as e:
         reason, detail = e.reason, e.detail
     except Exception:
@@ -83,8 +85,8 @@ def play(job):
     elif reason is None:
         if ep.end is None:
             reason = "harness stopped early"
-        elif ep.end.get("detail") == "repeated action":
-            reason = "repeated action"
+        elif ep.end.get("detail") in ("repeated action", "repeated reply"):
+            reason = ep.end["detail"]
         elif ep.end["reason"] == "step limit":
             reason = "step limit"  # the task's turn limit, or the game's own limit of actions
         else:

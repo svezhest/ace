@@ -36,7 +36,7 @@ PRINT_SET = "Let me look.\n\n```python\nprint({'rock', 'jazz', 'pop', 'indie', '
 COMPLETE = "Done.\n\n```python\napis.supervisor.complete_task()\n```"
 
 
-def play(script, task=TASK, hooks=None, tmp=None, full=False):
+def play(script, task=TASK, hooks=None, tmp=None, full=False, guard=False):
     """-> (messages, llm, completed, evaluation) [+ (episode, recorder) if full]."""
     old = harness.hooks
     harness.hooks = hooks if hooks is not None else types.SimpleNamespace()
@@ -48,8 +48,8 @@ def play(script, task=TASK, hooks=None, tmp=None, full=False):
         ep = bridge.Episode(bench.url)
         rec = Recorder(ep, llm)
         try:
-            msgs = harness.run(ep, llm)
-        except EpisodeEnd:
+            msgs = harness.run(ep, bridge.guard(ep, llm) if guard else llm)
+        except (EpisodeEnd, bridge.Loop):
             msgs = llm.conversation
         completed = bool(ep.end) and ep.end["reason"] == "finished"
         evaluation = bench.finish()
@@ -171,6 +171,16 @@ def test_hook_effects_reach_conversation(tmp):
     assert msgs[n + 2] == {"role": "user", "content": "blocked"}
     assert msgs[n + 4]["content"] == "Output:\n```\n2\n```\n\n"
     assert completed and ep.steps == 2 and len(llm.calls) == 3  # the blocked code was not run: no step
+
+
+def test_guard_ends_a_loop_without_steps(tmp):
+    def block(ctx, nb):
+        return {"kind": "block_and_prompt", "message": "blocked"}
+
+    msgs, llm, completed, ev, ep, rec = play(["```python\nprint(1)\n```"], hooks=types.SimpleNamespace(
+        on_before_action=block), tmp=tmp, full=True, guard=True)
+    assert ep.end == {"reason": "error", "detail": "repeated reply"} and ep.finished and not completed
+    assert ep.steps == 0 and len(llm.calls) == 3  # three same replies, none run
 
 
 def test_transport_body_and_endings(monkeypatch):
