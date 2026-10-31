@@ -38,7 +38,7 @@ def main():
     ap.add_argument("--tasks", nargs="*")
     ap.add_argument("--workers", type=int, default=2)
     ap.add_argument("--hint-level", type=int, default=0, help="фидбек бенчмарка в results.jsonl (абляция A8)")
-    ap.add_argument("--url", help="по умолчанию — как в прогонах материала: ALFWorld через :8089, AppWorld :8090")
+    ap.add_argument("--url", help="по умолчанию — шлюз :8090 (без thinking, без прокси)")
     ap.add_argument("--model", default="ornith15-9b")
     ap.add_argument("--wall-limit", type=int, default=3600, help="секунд на эпизод")
     a = ap.parse_args()
@@ -48,7 +48,7 @@ def main():
         sys.exit("test is reserved for the final measurement (--allow-test)")
     if a.split not in splits:
         sys.exit(f"{a.bench} has no {a.split} split")
-    a.url = a.url or {"alfworld": "http://127.0.0.1:8089/v1", "appworld": "http://127.0.0.1:8090/v1"}[a.bench]
+    a.url = a.url or "http://127.0.0.1:8090/v1"
     tasks = a.tasks or random.Random(a.seed).sample(splits[a.split], a.n)
     out = Path(a.out).resolve()
     if out.exists():
