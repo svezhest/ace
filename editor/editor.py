@@ -259,6 +259,22 @@ def numbered(lines, a, b):
     return "".join(f"{i + 1:>6}\t{lines[i]}" for i in range(a, b))
 
 
+def mismatch(text, old):
+    """Для отказа not_found: докуда old_string совпадает с файлом и что там в файле вместо остального."""
+    lo, hi = 0, len(old)
+    while lo < hi:                      # самое длинное начало old_string, которое есть в файле
+        mid = (lo + hi + 1) // 2
+        if old[:mid] in text:
+            lo = mid
+        else:
+            hi = mid - 1
+    if lo < 20:
+        return " Even its beginning does not occur in the file."
+    at = text.find(old[:lo])
+    return (f" Its first {lo} characters match the file at line {text.count(chr(10), 0, at) + 1}; after them the file "
+            f"has {text[at + lo:at + lo + 60]!r}, old_string has {old[lo:lo + 60]!r}.")
+
+
 def do_edit(args, root, st):
     """-> (текст для модели, запись в лог). Применяет одну замену в root/src/..., либо объясняет отказ."""
     path, old, new = args.get("path"), args.get("old_string"), args.get("new_string")
@@ -302,7 +318,7 @@ def do_edit(args, root, st):
         n = text.count(old)
         if n == 0:
             return fail("not_found", f"old_string does not occur in {rel}; it must be copied exactly from the "
-                                     "file's current text.")
+                                     "file's current text." + mismatch(text, old))
         if n > 1:
             starts, i = [], text.find(old)
             while i >= 0:
@@ -492,10 +508,14 @@ def run_session(role, system, first_user, root, prof, seed, log_path, n_obs=0):
                           "final": bool(final_left)})
             return f"Proposal {st['proposals']} recorded.", False
         if name == "finish":
-            lint_ = lint_changed(root) if role == "editor" and not st.get("lint_at_finish") else ""
-            if lint_:   # один раз: те же предупреждения, что после edit, но по итогу всех правок
+            gate = "" if role != "editor" or st.get("lint_at_finish") else lint_changed(root)
+            if role == "editor" and not st.get("lint_at_finish") and os.path.exists(f"{root}/tests/smoke.py"):
+                ok_, out_, full_, _, _ = F.bash_output("python3 tests/smoke.py", root, prof)   # 31.10: правки без проверки
+                if not ok_ or "Traceback" in full_:
+                    gate += ("\n" if gate else "") + "python3 tests/smoke.py now prints:\n" + out_
+            if gate:   # один раз: предупреждения pyflakes и падение smoke по итогу всех правок
                 st["lint_at_finish"] = True
-                return (f"Not finished yet. {lint_}\nFix them with edit, or call finish again to end as is."), False
+                return (f"Not finished yet. {gate}\nFix them with edit, or call finish again to end as is."), False
             return "Finished.", True
         st["bad_call"] += 1
         res["format_fail"] = "unknown_tool"

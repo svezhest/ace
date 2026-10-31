@@ -263,7 +263,8 @@ def run_bash(cmd, root, prof, info=None):
         p.stderr.close()
     info.update(rc=rc, capped=capped, timed_out=timed)
     if timed:
-        return False, f"Error: command timed out after {C.CMD_TIMEOUT}s; narrow it (search fewer files, use head)."
+        return False, (f"Error: the command did not end within {C.CMD_TIMEOUT}s and was stopped (a search over many "
+                       "files, or a program that does not end).")
     out = out.decode("utf-8", "replace")
     out, er = root_paths(out, root), root_paths(er.decode("utf-8", "replace"), root)
     er = N.XARGS_PIPE_RE.sub("", er)                      # ... | xargs ... | head: xargs жалуется на закрытый пайп
