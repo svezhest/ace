@@ -13,7 +13,7 @@ from . import session as SE
 
 def parse_args():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--bench", choices=list(C.VIEWS), required=True)
+    ap.add_argument("--bench", choices=list(C.BENCHES), required=True)
     ap.add_argument("--input", required=True, help="тег сессии исследователя (report на входе)")
     ap.add_argument("--arm", choices=["obs", "fix"], required=True)
     ap.add_argument("--seed", type=int, default=1)
@@ -22,6 +22,9 @@ def parse_args():
     ap.add_argument("--view", help="вид узла (src/ и README.md), по умолчанию — корневой вид бенчмарка")
     ap.add_argument("--predict", action="store_true", help="плечо: перед smoke записать ожидаемый вывод, после — сверить")
     ap.add_argument("--stand", default="default", help="профиль стенда (stands/<имя>.json): модель и генерация")
+    ap.add_argument("--home", default=C.HERE, required=C.HERE is None, help="каталог сессий: logs/, out/, work/")
+    ap.add_argument("--rlogs", default=C.RLOGS, required=C.RLOGS is None, help="логи сессий исследователя")
+    ap.add_argument("--lint", default=C.LINT, help="каталог с pyflakes (иначе — из окружения)")
     return ap.parse_args()
 
 
@@ -74,6 +77,9 @@ def editor_step(a, first, src_before, summary):
 
 def main():
     a = parse_args()
+    C.HERE, C.RLOGS, C.LINT = os.path.abspath(a.home), a.rlogs, a.lint
+    if not a.view and a.bench not in C.VIEWS:
+        raise SystemExit(f"--view is required: no default view for {a.bench}")
     if a.view:
         C.VIEWS[a.bench] = os.path.realpath(os.path.expanduser(a.view))
     if not a.dry:

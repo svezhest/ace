@@ -113,7 +113,7 @@ def _loop(st, reports, w, root, prof, temp, seed, resume=None, max_turns=None, s
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--view", default=C.LAYOUT)
+    ap.add_argument("--view", default=C.LAYOUT, required=C.LAYOUT is None)
     ap.add_argument("--runs", help="проваленные run через запятую (иначе --k случайных с --seed)")
     ap.add_argument("--k", type=int, default=3)
     ap.add_argument("--seed", type=int, default=1)
@@ -122,7 +122,9 @@ def main():
     ap.add_argument("--set", action="append", default=[], help="KEY=JSON поверх политики")
     ap.add_argument("--tag", default="t")
     ap.add_argument("--dry", action="store_true", help="только выбор трасс и промпт")
+    ap.add_argument("--home", default=C.HERE, required=C.HERE is None, help="каталог сессий: logs/, views/")
     a = ap.parse_args()
+    C.HERE = os.path.abspath(a.home)
     C.LAYOUT = os.path.realpath(os.path.expanduser(a.view))
     PO.apply_policy(a.policy, {k: json.loads(v) for k, v in (x.split("=", 1) for x in a.set)})
     runs = [int(x) for x in a.runs.split(",")] if a.runs else None

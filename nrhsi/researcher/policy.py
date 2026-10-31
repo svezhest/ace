@@ -1,9 +1,8 @@
-"""Политики: переопределение имён любого модуля fsrlib (POLICIES, --set KEY=JSON) и пересборка промпта.
+"""Политики: переопределение имён любого модуля исследователя (POLICIES, --set KEY=JSON) и пересборка промпта.
 Имя меняется в модуле-владельце (owner): там его читают функции, так что новое значение видно всем."""
-import os
 import sys
-import types
 
+from .. import facade as _facade
 from . import cfg as C
 from . import prompt as P
 from . import views as V
@@ -22,18 +21,11 @@ from . import phase as PH
 from . import nudge as NG
 
 PARTS = (C, P, V, S, K, N, T, E, M, L, R, CX, TO, TU, PH, NG, sys.modules[__name__])
-_NO = object()
 
 
 def owner(k):
-    """Модуль fsrlib, где определено имя k (импортированные модули не в счёт) -> модуль или None."""
-    if k.startswith("__"):
-        return None
-    for m in PARTS:
-        v = vars(m).get(k, _NO)
-        if v is not _NO and not isinstance(v, types.ModuleType):
-            return m
-    return None
+    """Модуль пакета, где определено имя k (импортированные модули не в счёт) -> модуль или None."""
+    return _facade.owner(PARTS, k)
 
 
 STAND_KEYS = {"URL", "MODEL", "TEMP", "THINKING", "THINK_BUDGET", "MAX_GEN", "STAND"}   # только из профиля стенда
@@ -56,9 +48,8 @@ def apply_policy(name, overrides=None):
 
 def apply_stand(name, roles=("agent",)):
     """Модель и параметры генерации — из профиля стенда; живой стенд сверяется с ним (иначе SystemExit)."""
-    root = os.path.dirname(C.HERE)
-    if root not in sys.path:
-        sys.path.insert(0, root)
+    if C.ROOT not in sys.path:
+        sys.path.insert(0, C.ROOT)                     # stand.py и stands/ — в корне репозитория
     import stand as ST
     prof = ST.load(name)
     rec = ST.check(prof, list(roles))

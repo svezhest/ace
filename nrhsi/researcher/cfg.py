@@ -3,8 +3,10 @@
 import os
 
 
-HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # researcher/: каталог fsr.py
-LAYOUT = os.path.join(os.path.dirname(HERE), "alfworld", "view_v3")   # --view
+PKG = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))     # nrhsi/
+ROOT = os.path.dirname(PKG)                                            # корень репозитория: stand.py, stands/
+HERE = None              # каталог сессий: logs/, views/ (--home; researcher/fsr.py — researcher/)
+LAYOUT = None            # вид по умолчанию (--view; researcher/fsr.py — alfworld/view_v3)
 # модель и генерация — только из профиля стенда (stands/<имя>.json, apply_stand в policy.py); до него None
 URL = MODEL = TEMP = THINKING = THINK_BUDGET = STAND = None
 
@@ -72,8 +74,8 @@ SCRATCH = False          # 31.10: каталог SCRATCH_DIR/ в виде, ку�
 SCRATCH_DIR = "scratch"
 SCRATCH_MAX = 64 * 2**20         # больше — каталог очищается после команды (и модели это сказано)
 SCRATCH_FILE_KB = 16384          # ulimit -f: файл не больше стольких КБ
-BIN = os.path.join(HERE, "bin")                  # runs и python3 -> PY_LINK; в PATH песочницы первым
-SITE = os.path.join(HERE, "site")                # sitecustomize.py: «/» = корень вида и для python3
+BIN = os.path.join(PKG, "bin")                   # runs и python3 -> PY_LINK; в PATH песочницы первым
+SITE = os.path.join(PKG, "site")                 # sitecustomize.py: «/» = корень вида и для python3
 PY_LINK = "/Library/Developer/CommandLineTools/usr/bin/python3"   # /usr/bin/python3 — обёртка xcode-select:
                                                                   # в песочнице не работает
 

@@ -1,7 +1,8 @@
 #!/Library/Developer/CommandLineTools/usr/bin/python3
-"""runs — навигация по логам: logs/run_N.jsonl (одна строка = одно сообщение) и logs/results.jsonl.
+"""runs — навигация по логам вида: logs/run_N.jsonl (одна строка = одно сообщение) и logs/results.jsonl.
 Сообщение печатается сырой строкой jsonl как есть, номер сообщения = номер строки файла. О бенчмарке ничего не
-знает, только читает. Запускается в песочнице агента (PATH = nrhsi/bin:...)."""
+знает, только читает. Запускается в песочнице исследователя (PATH = nrhsi/bin:...); интерпретатор — CLT python 3.9
+(/usr/bin/python3 — обёртка xcode-select, в песочнице не работает)."""
 import json
 import os
 import re
@@ -9,28 +10,39 @@ import shlex
 import sys
 
 sys.dont_write_bytecode = True
-OUT = int(os.environ.get("RUNS_OUT_CHARS") or 8000)   # = agent.OUT_CHARS: больше — агент обрежет вывод вслепую
+OUT = int(os.environ.get("RUNS_OUT_CHARS") or 8000)   # = fsr OUT_CHARS: больше — fsr обрежет вывод вслепую
 PART = 4000                                           # столько символов одного сообщения за раз
 CTX = 150                                             # grep: символов вокруг совпадения
 SNIP_MAX = 600
 PER_MSG = 3                                           # grep: сниппетов на сообщение, дальше — счёт
 RESERVE = 300                                         # место под метку продолжения
+FORMAT = os.environ.get("RUNS_FORMAT") or "raw"       # raw: строка jsonl как есть; text: поля сообщения текстом
 
-HELP = """runs — the run logs, message by message (a message = one line of logs/run_N.jsonl, printed raw)
+HELP = """runs — the run logs, message by message (a message = one line of logs/run_N.jsonl, printed FMT)
 
   runs                          list runs: result, reason, size
   runs show N 40-45             messages 40-45 (= lines 40-45 of logs/run_N.jsonl)
   runs show N --tail 6          the last 6 messages
   runs grep -i "error" N M      matches in runs N and M, with message numbers
+  runs steps N                  one line per model call: what it sent and what came back
 
-runs show N [A | A-B | A-] [--tail K] [--role R[,R]] [--chars A-B]
-  Each message: a header '--- 12 assistant (1830 chars)' and the message under it (raw).
+runs show N [A | A-B | A B | A-] [--tail K] [--role R[,R]] [--event E[,E]] [--chars A-B]
+  Each message: a header '--- 12 assistant (1830 chars)' and the message under it (FMT).
+  If the log is a stream of events, the header names the event ('--- 12 model assistant', '--- 13 bridge execute');
+  --event bridge,model shows only those events.
   A message longer than 4000 characters is shown 4000 at a time: runs show N 12 --chars 4001- shows the next part.
   A long output stops at a message boundary and ends with the command that continues it.
 runs grep [-i] [-c] PATTERN [N ...]
-  PATTERN is a regular expression (Python syntax) searched in the messages (raw) of all runs, or of runs N ...
+  PATTERN is a regular expression (Python syntax) searched in the messages (FMT) of all runs, or of runs N ...
   Each match: logs/run_N.jsonl:LINE role: ...150 characters on each side...
-  -i  ignore case;  -c  count matches in each run.
+  -i  ignore case;  -c  count matches in each run;  -E, -n  accepted, change nothing (PATTERN is always an
+  extended regular expression, line numbers are always shown).
+runs steps N [A-B]
+  The run's opening lines (the fields of its first events), then one line per model call: the call number,
+  @ the log line, what the model sent (its tool call arguments, or the first line of its code or text), then
+  → the first line of the env message that followed, and [..] other events before the next call (records
+  without a message that follow most calls are not marked; the header names them). Last: the log's last line.
+  A-B selects model calls.
 """
 
 
@@ -73,8 +85,49 @@ def role_of(line):
         o = json.loads(line)
     except ValueError:
         return "(not JSON)"
+    if isinstance(o, dict) and isinstance(o.get("event"), str):          # лог-поток событий: «event call/role»
+        m = o.get("message")
+        sub = o.get("call") if o["event"] == "bridge" else m.get("role") if isinstance(m, dict) else None
+        return o["event"] + (f" {sub}" if isinstance(sub, str) else "")
     r = o.get("role") if isinstance(o, dict) else None
     return r if isinstance(r, str) else "?"
+
+
+def event_of(line):
+    try:
+        o = json.loads(line)
+    except ValueError:
+        return None
+    return o.get("event") if isinstance(o, dict) else None
+
+
+def as_text(line):
+    """FORMAT=text: поля сообщения текстом, без раскодирования действий. content — как есть (строка без экранов);
+    у вызова — имя и строка arguments ровно теми символами, что написала модель; прочие поля — key: value."""
+    try:
+        o = json.loads(line)
+    except ValueError:
+        return line
+    if not isinstance(o, dict):
+        return line
+    out = []
+    c = o.get("content")
+    out.append(c if isinstance(c, str) else "(no content)" if c is None else json.dumps(c, ensure_ascii=False))
+    for tc in o.get("tool_calls") or []:
+        f = tc.get("function") if isinstance(tc, dict) else None
+        if isinstance(f, dict):
+            a = f.get("arguments")
+            out.append(f"tool call: {f.get('name')} {a if isinstance(a, str) else json.dumps(a, ensure_ascii=False)}")
+        else:
+            out.append(f"tool call: {json.dumps(tc, ensure_ascii=False)}")
+    for k, v in o.items():
+        if k not in ("role", "content", "tool_calls"):
+            out.append(f"{k}: {v if isinstance(v, str) else json.dumps(v, ensure_ascii=False)}")
+    return "\n".join(out)
+
+
+def view(line):
+    return as_text(line) if FORMAT == "text" else line
 
 
 def run_no(tok):
@@ -82,6 +135,25 @@ def run_no(tok):
     if not m:
         raise Err(f"'{tok}' is not a run number")
     return int(m.group(1))
+
+
+def _first_run(args, cmd):
+    """Номер run — первым после show/steps; стоит не там -> usage и та же команда с номером на месте."""
+    try:
+        return run_no(args[0])
+    except Err:
+        pass
+    for j, x in enumerate(args[1:], 1):
+        if args[j - 1] in ("--tail", "--role", "--event", "--chars"):
+            continue                                        # значение опции, не номер run
+        try:
+            run_no(x)
+        except Err:
+            continue
+        fixed = [args[j]] + args[:j] + args[j + 1:]
+        raise Err(f"'{args[0]}' is not a run number; usage: runs {cmd} N ...  e.g. runs {cmd} "
+                  + " ".join(shlex.quote(a) for a in fixed))
+    return run_no(args[0])
 
 
 def get_run(logs, n):
@@ -135,14 +207,15 @@ def parse_range(tok, total):
 def cmd_show(logs, args):
     if not args:
         raise Err("usage: runs show N [A-B] [--tail K] [--role R[,R]] [--chars A-B]")
-    n = run_no(args[0])
+    n = _first_run(args, "show")
     lines = get_run(logs, n)
     total = len(lines)
-    rng = tail = roles = chars = None
+    rng = tail = roles = events = chars = None
+    one = False
     i = 1
     while i < len(args):
         x = args[i]
-        if x in ("--tail", "--role", "--chars") and i + 1 >= len(args):
+        if x in ("--tail", "--role", "--event", "--chars") and i + 1 >= len(args):
             raise Err(f"{x} needs a value")
         if x == "--tail":
             if not args[i + 1].isdigit() or int(args[i + 1]) < 1:
@@ -152,6 +225,9 @@ def cmd_show(logs, args):
         elif x == "--role":
             roles = {r.strip() for r in args[i + 1].split(",") if r.strip()}
             i += 2
+        elif x == "--event":
+            events = {r.strip() for r in args[i + 1].split(",") if r.strip()}
+            i += 2
         elif x == "--chars":
             m = re.fullmatch(r"(\d+)-(\d*)", args[i + 1])
             if not m or int(m.group(1)) < 1:
@@ -160,6 +236,11 @@ def cmd_show(logs, args):
             i += 2
         elif re.fullmatch(r"\d+(-\d*)?", x) and rng is None:
             rng = parse_range(x, total)
+            one = x.isdigit()
+            i += 1
+        elif x.isdigit() and one:                           # 31.10: show N 1 15 = show N 1-15
+            rng = (rng[0], int(x))
+            one = False
             i += 1
         elif re.fullmatch(r"\d+(-\d*)?", x):
             raise Err(f"unexpected '{x}': one range per command, written like 18-21 (runs --help)")
@@ -169,22 +250,25 @@ def cmd_show(logs, args):
         return f"logs/run_{n}.jsonl is empty\n"
     a, b = rng or (1, total)
     if a < 1 or a > total:
-        raise Err(f"logs/run_{n}.jsonl has {total} messages (lines 1-{total})")
+        raise Err(f"logs/run_{n}.jsonl has {total} messages (lines 1-{total})" + ("; numbering starts at 1" if a == 0 else ""))
     if b < a:
         a, b = b, a
     b = min(b, total)
-    sel = [k for k in range(a, b + 1) if roles is None or role_of(lines[k - 1]) in roles]
+    sel = [k for k in range(a, b + 1) if (roles is None or role_of(lines[k - 1]).split()[-1] in roles)
+           and (events is None or event_of(lines[k - 1]) in events)]
     if tail:
         sel = sel[-tail:]
     if not sel:
-        return f"no messages with role {','.join(sorted(roles))} in messages {a}-{b} of logs/run_{n}.jsonl\n"
+        what = " and ".join(x for x in (f"role {','.join(sorted(roles))}" if roles else "",
+                                         f"event {','.join(sorted(events))}" if events else "") if x)
+        return f"no messages with {what} in messages {a}-{b} of logs/run_{n}.jsonl\n"
     if chars and len(sel) != 1:
         raise Err("--chars works on one message: runs show N 12 --chars 4001-")
-    role_flag = f" --role {','.join(sorted(roles))}" if roles else ""
+    role_flag = (f" --role {','.join(sorted(roles))}" if roles else "") + (f" --event {','.join(sorted(events))}" if events else "")
     blocks = []
     for k in sel:
         raw = lines[k - 1]
-        line = raw
+        line = view(raw)
         L = len(line)
         c1, c2 = chars if chars else (1, None)
         if c1 > max(L, 1):
@@ -210,7 +294,240 @@ def cmd_show(logs, args):
     return "".join(out)
 
 
+# ---------------------------------------------------------------- runs steps
+
+TASK_CHARS = 600                                      # steps: первое сообщение env до первого вызова модели
+FIELD_CHARS = 160                                     # steps: значение поля события до первого вызова
+END_CHARS = 600
+
+
+def _obj(line):
+    try:
+        o = json.loads(line)
+    except ValueError:
+        return None
+    return o if isinstance(o, dict) else None
+
+
+def _flat(t):
+    return " ⏎ ".join(x.strip() for x in str(t).split("\n") if x.strip() and not x.strip().startswith("```"))
+
+
+def _first(t):
+    """Первая непустая строка (не ```); строка, кончающаяся на ':', — вместе со следующей."""
+    out = []
+    for x in str(t).split("\n"):
+        x = x.strip()
+        if not x or x.startswith("```"):
+            continue
+        out.append(x)
+        if not (x.endswith(":") or len(x) < 3):
+            break
+    return " ".join(out)
+
+
+def _cut(t, w):
+    t = " ".join(t.split(" ")) if t else ""
+    return t if len(t) <= w else t[:max(1, w - 1)] + "…"
+
+
+def _kind(o):
+    """Тип события по общим полям: event (+ call, если это строка) или role."""
+    if o is None:
+        return "(not JSON)"
+    if isinstance(o.get("event"), str):
+        c = o.get("call")
+        return o["event"] + (f" {c}" if isinstance(c, str) else "")
+    m = o.get("message") if isinstance(o.get("message"), dict) else o
+    return m.get("role") if isinstance(m.get("role"), str) else "?"
+
+
+def _msg(o):
+    m = o.get("message") if isinstance(o.get("message"), dict) else o
+    return m if isinstance(m, dict) else {}
+
+
+def _is_model(o):
+    return o is not None and (o.get("event") == "model" if "event" in o else _msg(o).get("role") == "assistant")
+
+
+def _is_env(o):
+    return o is not None and (o.get("event") == "env" if "event" in o else _msg(o).get("role") in ("user", "tool"))
+
+
+def _text(m):
+    c = m.get("content")
+    return c if isinstance(c, str) else "" if c is None else json.dumps(c, ensure_ascii=False)
+
+
+def _sent(m, one_name):
+    """Что отправила модель: вызовы инструментов (аргументы; одно строковое — само значение), иначе первая строка
+    первого блока кода ```...```, иначе первая строка текста."""
+    out = []
+    for tc in m.get("tool_calls") or []:
+        f = tc.get("function") if isinstance(tc, dict) else None
+        if not isinstance(f, dict):
+            out.append(json.dumps(tc, ensure_ascii=False))
+            continue
+        a = f.get("arguments")
+        try:
+            a = json.loads(a) if isinstance(a, str) else a
+        except ValueError:
+            pass
+        if isinstance(a, dict) and len(a) == 1 and isinstance(list(a.values())[0], str):
+            a = list(a.values())[0]
+        a = a if isinstance(a, str) else json.dumps(a, ensure_ascii=False)
+        out.append(_flat(a) if one_name else f"{f.get('name')}: {_flat(a)}")
+    if out:
+        return " ; ".join(out)
+    t = _text(m)
+    blocks = re.findall(r"```[^\n]*\n(.*?)(?:```|$)", t, re.S)
+    if blocks:
+        first = next((x for x in blocks[0].split("\n") if x.strip()), "")
+        more = f" (+{len(blocks) - 1} more code blocks)" if len(blocks) > 1 else ""
+        return first.strip() + more
+    first = next((x for x in t.split("\n") if x.strip()), "")
+    return f"text: {first.strip()}" if first else "(empty reply)"
+
+
+def _mark(o):
+    """Метка события между вызовами: тип и начало его содержимого (или полей, кроме event/call)."""
+    k = _kind(o)
+    if o is None:
+        return k
+    m = _msg(o) if isinstance(o.get("message"), dict) else None
+    extra = {x: v for x, v in o.items() if x not in ("event", "call", "message", "turn", "step")}
+    bits = [f"{x}={v}" for x, v in extra.items() if isinstance(v, str)]
+    bits += [f"{x}: {_flat(_text(v[0]) if isinstance(v, list) and v and isinstance(v[0], dict) else json.dumps(v, ensure_ascii=False))}"
+             for x, v in extra.items() if not isinstance(v, str)]
+    if m is not None and _text(m):
+        bits.append(_flat(_text(m)))
+    return k + (": " + " ".join(bits) if bits else "")
+
+
+def cmd_steps(logs, args):
+    if not args:
+        raise Err("usage: runs steps N [A-B]   (A-B: model calls, e.g. runs steps 4 20-)")
+    n = _first_run(args, "steps")
+    lines = get_run(logs, n)
+    rng = None
+    for x in args[1:]:
+        if re.fullmatch(r"\d+(-\d*)?", x) and rng is None:
+            rng = x
+        else:
+            raise Err(f"unexpected '{x}': runs steps N [A-B]")
+    objs = [_obj(x) for x in lines]
+    calls = [i for i, o in enumerate(objs) if _is_model(o)]
+    if not calls:
+        return f"logs/run_{n}.jsonl has {len(lines)} lines and no model replies\n"
+    names = {(tc.get("function") or {}).get("name") for i in calls for tc in (_msg(objs[i]).get("tool_calls") or [])
+             if isinstance(tc, dict)}
+    one_name = len(names) == 1
+    last = len(lines) - 1
+    # события между вызовами k и k+1 (без последней строки лога — она печатается в конце)
+    between = []
+    for j, i in enumerate(calls):
+        e = calls[j + 1] if j + 1 < len(calls) else last
+        between.append([x for x in range(i + 1, e) if x != last])
+    def key(o):
+        return (_kind(o), tuple(sorted(o)) if o else ())
+    cnt = {}
+    for b in between:
+        firstenv = next((x for x in b if _is_env(objs[x])), None)
+        for kk in {key(objs[x]) for x in b if x != firstenv}:
+            cnt[kk] = cnt.get(kk, 0) + 1
+    # не помечаются только записи без сообщения (message), идущие после большинства вызовов (bridge send/execute)
+    routine = {kk for kk, c in cnt.items() if c > len(calls) / 2 and "message" not in kk[1]}
+    a, b_ = parse_range(rng, len(calls)) if rng else (1, len(calls))
+    if a < 1 or a > len(calls):
+        raise Err(f"logs/run_{n}.jsonl has {len(calls)} model calls (1-{len(calls)})")
+    b_ = min(max(a, b_), len(calls))
+    res = ""
+    try:
+        for l in read_lines(os.path.join(logs, "results.jsonl")):
+            r = _obj(l)
+            if r and r.get("run") == n:
+                res = "; results.jsonl: " + json.dumps(r, ensure_ascii=False)
+    except OSError:
+        pass
+    head = [f"logs/run_{n}.jsonl: {len(lines)} lines, {len(calls)} model calls{res}"]
+    if a == 1:
+        head.append(f"lines 1-{calls[0]}:")
+        groups = []
+        for x in range(calls[0]):
+            o = objs[x]
+            if o is not None and o.get("event") == "bridge" or _is_env(o) and not any(_is_env(objs[y]) for y in range(x)):
+                if groups and groups[-1][0] == "_":
+                    groups[-1][2] = x
+                groups.append([_kind(o), x, x, True])
+            elif groups and groups[-1][0] == _kind(o) and not groups[-1][3]:
+                groups[-1][2] = x
+            else:
+                groups.append([_kind(o), x, x, False])
+        for k, x0, x1, show in groups:
+            o = objs[x0]
+            if not show:
+                head.append(f"  {k}: lines {x0 + 1}-{x1 + 1}" if x1 > x0 else f"  {k}: line {x0 + 1}")
+            elif _is_env(o):
+                head.append(f"  {k} (line {x0 + 1}): {_cut(_flat(_text(_msg(o))), TASK_CHARS)}")
+            else:
+                head.append(f"  {k} (line {x0 + 1})")
+                for f_, v in o.items():
+                    if f_ in ("event", "call"):
+                        continue
+                    if isinstance(v, dict):
+                        for k2, v2 in v.items():
+                            head.append(f"    {f_}.{k2}: {_cut(_flat(v2 if isinstance(v2, str) else json.dumps(v2, ensure_ascii=False)), FIELD_CHARS)}")
+                    else:
+                        head.append(f"    {f_}: {_cut(_flat(v if isinstance(v, str) else json.dumps(v, ensure_ascii=False)), FIELD_CHARS)}")
+    rt = sorted({kk[0] for kk in routine})
+    head.append("calls: number @line  what the model sent → first line of the next env message"
+                + ("" if one_name or not names else "") + (f"  (tool {next(iter(names))})" if one_name else "")
+                + ("; [..] other events before the next call" + (f" (not marked: {', '.join(rt)}, which follow most calls)" if rt else "")))
+    end = f"last line ({last + 1}): {_cut(lines[last], END_CHARS)}" if b_ == len(calls) else ""
+    budget = OUT - RESERVE - sum(len(x) + 1 for x in head) - len(end) - 1
+    k = b_ - a + 1
+    per = max(56, min(170, budget // max(1, k) - 1))
+    rows = []
+    for j in range(a - 1, b_):
+        i = calls[j]
+        o = objs[i]
+        num = o.get("call") if isinstance(o.get("call"), int) else j + 1
+        firstenv = next((x for x in between[j] if _is_env(objs[x])), None)
+        if firstenv is None and j == len(calls) - 1 and _is_env(objs[last]):
+            firstenv = last
+        marks = [_mark(objs[x]) for x in between[j] if x != firstenv and key(objs[x]) not in routine]
+        pre = f"{num} @{i + 1} "
+        room = per - len(pre) - 3
+        rep = _first(_text(_msg(objs[firstenv]))) if firstenv is not None else "(no env message)"
+        mk = ""
+        if marks:
+            mroom = room // 2 if firstenv is not None else room * 3 // 5
+            each = max(24, mroom // len(marks) - 3)
+            mk = " [" + " | ".join(_cut(x, each) for x in marks[:4]) + (f" | +{len(marks) - 4}" if len(marks) > 4 else "") + "]"
+        ws = max(25, (room - len(mk)) * 9 // 20)
+        sent = _cut(_sent(_msg(o), one_name), ws)
+        rep = _cut(rep, max(20, room - len(sent) - len(mk)))
+        rows.append(pre + sent + " → " + rep + mk)
+    out, used, shown = [], 0, a - 1
+    for r in rows:
+        if out and used + len(r) + 1 > budget:
+            break
+        out.append(r)
+        used += len(r) + 1
+        shown += 1
+    txt = "\n".join(head) + "\n" + "\n".join(out) + "\n"
+    if shown < b_:
+        txt += f"[calls {a}-{shown} of {len(calls)} shown; next: runs steps {n} {shown + 1}-]\n"
+    elif end:
+        txt += end + "\n"
+    return txt
+
+
 # ---------------------------------------------------------------- runs grep
+
+GREP_USAGE = "usage: runs grep [-i] [-c] PATTERN [N ...]"
+
 
 def snippets(line, rx):
     """-> (сниппеты, совпадений всего). Совпадение внутри окна предыдущего сниппета нового не даёт."""
@@ -234,11 +551,16 @@ def cmd_grep(logs, args):
     pat = None
     nums = []
     i = 0
+    flags = []
     while i < len(args):
         x = args[i]
-        if pat is None and re.fullmatch(r"-[ic]+", x):
+        if pat is None and re.fullmatch(r"-[A-Za-z]+", x):
+            bad = [ch for ch in x[1:] if ch not in "icEn"]   # -E, -n: ничего не меняют (PATTERN и так regex, номера есть всегда)
+            if bad:
+                raise Err(f"grep: invalid option -- '{bad[0]}'\n{GREP_USAGE}")
             icase |= "i" in x
             count |= "c" in x
+            flags.append(x)
         elif x == "--skip" and i + 1 < len(args) and args[i + 1].isdigit():
             skip = int(args[i + 1])
             i += 1
@@ -248,10 +570,20 @@ def cmd_grep(logs, args):
         elif pat is None:
             pat = x
         else:
-            nums.append(run_no(x))
+            try:
+                nums.append(run_no(x))
+            except Err:
+                rest = [a for a in args[i:] if a != "--skip"]
+                if re.fullmatch(r"(?:(?:\./)?(?:logs/)?run_)?\d+(?:\.jsonl)?", pat):
+                    fixed = flags + [x, pat] + [str(k) for k in nums] + rest[1:]   # номер run стоял перед шаблоном
+                    raise Err(f"'{x}' is not a run number; {GREP_USAGE}  e.g. runs grep "
+                              + " ".join(shlex.quote(a) for a in fixed))
+                if re.fullmatch(r"\d+-\d*", x) and nums:
+                    raise Err(f"'{x}' is not a run number; {GREP_USAGE}  (messages {x}: runs show {nums[-1]} {x})")
+                raise Err(f"'{x}' is not a run number; {GREP_USAGE}")
         i += 1
     if pat is None or pat == "":
-        raise Err('usage: runs grep [-i] [-c] PATTERN [N ...]   e.g. runs grep -i "error" 12 33')
+        raise Err(GREP_USAGE + '   e.g. runs grep -i "error" 12 33')
     flags = re.I if icase else 0
     try:
         rx = re.compile(pat, flags)
@@ -266,7 +598,7 @@ def cmd_grep(logs, args):
         out = []
         for k in todo:
             msgs = tot = 0
-            for line in read_lines(files[k]):
+            for line in map(view, read_lines(files[k])):
                 c = sum(1 for m in rx.finditer(line) if m.end() > m.start())
                 msgs += bool(c)
                 tot += c
@@ -275,11 +607,13 @@ def cmd_grep(logs, args):
     hits = []
     for k in todo:
         for j, raw in enumerate(read_lines(files[k]), 1):
-            line = raw
+            line = view(raw)
             sn, n = snippets(line, rx)
             if not sn:
                 continue
             role = role_of(raw)
+            if FORMAT == "text":
+                sn = [x.replace("\n", " ⏎ ") for x in sn]
             for s_i, s in enumerate(sn[:PER_MSG]):
                 more = ""
                 if s_i == PER_MSG - 1 and len(sn) > PER_MSG:
@@ -306,7 +640,7 @@ def cmd_grep(logs, args):
 
 def main(argv):
     if argv and argv[0] in ("-h", "--help", "help"):
-        sys.stdout.write(HELP)
+        sys.stdout.write(HELP.replace("FMT", "raw" if FORMAT != "text" else "as text: its content, then each tool call with its arguments as written, then other fields"))
         return 0
     try:
         logs = find_logs()
@@ -316,6 +650,8 @@ def main(argv):
             out = cmd_show(logs, argv[1:])
         elif argv[0] == "grep":
             out = cmd_grep(logs, argv[1:])
+        elif argv[0] == "steps":
+            out = cmd_steps(logs, argv[1:])
         else:
             raise Err(f"unknown command '{argv[0]}' (runs --help)")
     except Err as e:

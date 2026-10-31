@@ -1,39 +1,25 @@
-"""Исследователь харнесса на 9B: цикл с инструментами bash (только чтение) / report / finish [/ note].
-Перенос fsr v3b (scratchpad/reviewer_probe/fsr/fsr.py) на раскладку view/ (README.md, src/, logs/run_N.jsonl,
-logs/results.jsonl). Политики контекста (A2) — --policy, см. POLICIES и JOURNAL.md.
+"""Исследователь харнесса на 9B — запуск на стенде. Код — nrhsi/researcher/; сессии — здесь: logs/<имя>.jsonl,
+views/<имя>/; вид по умолчанию — alfworld/view_v3.
 
 python fsr.py --view ../alfworld/view_v3 --runs 4,8,12 --policy base --seed 1 --tag s1
-Вид сессии: views/<name>_<tag>/ = README.md, src/, logs/ (K проваленных + все пройденные, results.jsonl только по ним).
-Лог сессии — logs/<name>_<tag>.jsonl.
+python fsr.py --view ../appworld/view_v3 --k 5 --seed 1 --policy final --tag s1
 
-Код — в fsrlib/: cfg (настройки), prompt, views, sandbox, check, notes, trace, evidence, model, session (сессия и
-cikl
-Здесь — общий интерфейс: fsr.ИМЯ = имя из модуля-владельца, и чтение, и присваивание (F.THINKING = True,
+fsr.ИМЯ = имя из модуля-владельца nrhsi.researcher, и чтение, и присваивание (fsr.THINKING = True,
 fsr.chat = заглушка) идут туда, откуда его читают функции.
 """
+import os
 import sys
-import types
 
 sys.dont_write_bytecode = True
-from fsrlib import policy as _policy  # noqa: E402
+_HERE = os.path.dirname(os.path.abspath(__file__))
+if os.path.dirname(_HERE) not in sys.path:
+    sys.path.insert(0, os.path.dirname(_HERE))
+from nrhsi import facade as _facade  # noqa: E402
+from nrhsi.researcher import cfg as _cfg, policy as _policy  # noqa: E402
 
-
-class _Fsr(types.ModuleType):
-    def __getattr__(self, k):
-        m = _policy.owner(k)
-        if m is None:
-            raise AttributeError(f"module {self.__name__!r} has no attribute {k!r}")
-        return getattr(m, k)
-
-    def __setattr__(self, k, v):
-        m = _policy.owner(k)
-        if m is None:
-            super().__setattr__(k, v)
-        else:
-            setattr(m, k, v)
-
-
-sys.modules[__name__].__class__ = _Fsr
+_cfg.HERE = _HERE
+_cfg.LAYOUT = os.path.join(os.path.dirname(_HERE), "alfworld", "view_v3")
+_facade.install(__name__, _policy.PARTS)
 
 if __name__ == "__main__":
     _policy.L.main()

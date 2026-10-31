@@ -1,4 +1,4 @@
-"""pyflakes по правкам: новые предупреждения после edit и по итогу всех правок копии (editor/lint/)."""
+"""pyflakes по правкам: новые предупреждения после edit и по итогу всех правок копии (pyflakes — из C.LINT или окружения)."""
 import glob
 import io
 import os
@@ -10,7 +10,8 @@ from . import cfg as C
 
 def lint(text, rel):
     """pyflakes по тексту файла -> [(строка, сообщение)]."""
-    sys.path.insert(0, f"{C.HERE}/lint")
+    if C.LINT:
+        sys.path.insert(0, C.LINT)
     from pyflakes import api, reporter
     out = io.StringIO()
     api.check(text, rel, reporter.Reporter(out, out))

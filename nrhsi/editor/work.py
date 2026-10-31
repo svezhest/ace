@@ -38,7 +38,7 @@ def build_work(bench, tag, smoke=True):
     shutil.copytree(f"{C.VIEWS[bench]}/src", f"{v}/src", ignore=shutil.ignore_patterns("__pycache__"))
     if smoke:
         os.makedirs(f"{v}/tests")
-        shutil.copy(f"{C.HERE}/smoke/{bench}.py", f"{v}/tests/smoke.py")
+        shutil.copy(f"{C.SMOKE}/{bench}.py", f"{v}/tests/smoke.py")
     for p in glob.glob(f"{v}/src/*"):
         assert os.stat(p).st_nlink == 1, p          # копия, не жёсткая ссылка
     return os.path.realpath(v)

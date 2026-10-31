@@ -1,45 +1,84 @@
 """Цикл NRHSI: замер узла -> исследование провалов -> правки (пул детей узла) -> замер ребёнка -> выбор узла.
 
-  python nrhsi/tree.py alfworld --out runs/tree1 --m 40 --k 5 --s 3 --children 10
+  python -m nrhsi.tree alfworld --out runs/tree1 --m 40 --k 5 --s 3 --children 10
 
-Узел — вариант src/ и его замер на M свежих случайных задачах (bench/run.py). Пул узла — S кандидатов:
-S сессий исследователя по K провалам, каждая -> редактор -> правленая копия src/. Каждый раз развивается узел
-с лучшей долей ok, у которого есть что взять: неисследованный или с непустым пулом. Плохой ребёнок не сдвигает
-родителя: следующим берётся другой кандидат из пула того же узла. Состояние — OUT/tree.json, запуск возобновляем.
+Узел — вид: README.md, src/ и логи замера на M свежих случайных задачах train (logs/run_N.jsonl, logs/results.jsonl;
+раннер бенча <bench>/runner/run.py --out). Корень — стартовый харнесс (tools/make_start.py). Пул узла — S кандидатов:
+S сессий исследователя (nrhsi.researcher, политика final) по K провалам, каждая -> редактор (nrhsi.editor, плечо obs)
+-> правленая копия src/. Каждый раз развивается узел с лучшей долей ok, у которого есть что взять: неисследованный
+или с непустым пулом. Плохой ребёнок не сдвигает родителя: следующим берётся другой кандидат из пула того же узла.
+Состояние — OUT/tree.json, запуск возобновляем. Роли и замер — отдельные процессы (у ролей настройки модульные).
+
+OUT/<узел>/ — вид узла и прогон раннера; OUT/<узел>.research/<j>/ — logs/, views/ сессии исследователя;
+OUT/<узел>.edit/<j>/ — logs/, out/, work/<tag>/ (README.md + src/ — кандидат) сессии редактора.
 """
 import argparse
+import glob
 import json
 import os
+import shutil
 import subprocess
 import sys
 
-import editor
-import researcher
-
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-BENCH_PY = os.environ.get("NRHSI_BENCH_PY", sys.executable)    # python с зависимостями бенчмарка
+sys.path.insert(0, os.path.join(ROOT, "tools"))
+import make_start  # noqa: E402
+
+SHORT = {"alfworld": "alf", "appworld": "app"}   # имя бенча у редактора
 
 
-def measure(bench, src, out, m, seed):
+def measure(a, view, out, seed):
+    """Замер src/ вида view: M случайных задач train -> доля ok; out — вид узла (README.md, src/, logs/)."""
     if not os.path.exists(f"{out}/summary.json"):
-        subprocess.run([BENCH_PY, f"{ROOT}/bench/run.py", bench, "--src", src, "--out", out, "--n", str(m),
-                        "--seed", str(seed)], check=True)
+        subprocess.run([a.bench_py, f"{ROOT}/{a.bench}/runner/run.py", "--view", view, "--out", out,
+                        "--tag", os.path.basename(out), "--split", "train", "--n", str(a.m), "--seed", str(seed),
+                        "--workers", str(a.workers), "--stand", a.stand, "--no-publish"], check=True)
+        shutil.copy(f"{ROOT}/start/{a.bench}.README.md", f"{out}/README.md")
     s = json.load(open(f"{out}/summary.json"))
     return s["ok"] / s["n"]
 
 
+def role(*args):
+    subprocess.run([sys.executable, "-m", *args], cwd=ROOT, check=True)
+
+
+def research(a, node, home, tag, seed):
+    """Сессия исследователя по K провалам узла -> принятые report."""
+    if not glob.glob(f"{home}/logs/*_{tag}.jsonl"):
+        role("nrhsi.researcher", "--home", home, "--view", node, "--k", str(a.k), "--seed", str(seed),
+             "--policy", "final", "--stand", a.stand, "--tag", tag)
+    log, = glob.glob(f"{home}/logs/*_{tag}.jsonl")
+    end = [json.loads(x) for x in open(log) if '"type": "end"' in x][-1]
+    return end["reports"]
+
+
+def edit(a, node, rhome, home, tag, seed):
+    """Сессия редактора по report сессии tag -> (вид кандидата: README.md + src/, число применённых правок)."""
+    summ = f"{home}/out/{tag}.summary.json"
+    if not os.path.exists(summ):
+        role("nrhsi.editor", "--home", home, "--rlogs", f"{rhome}/logs", "--bench", SHORT[a.bench], "--view", node,
+             "--input", tag, "--arm", "obs", "--seed", str(seed), "--stand", a.stand, "--tag", tag,
+             *(["--lint", a.lint] if a.lint else []))
+    s = json.load(open(summ))
+    return f"{home}/work/{tag}", s["editor"]["stats"]["edits_applied"]
+
+
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("bench", choices=["alfworld", "appworld"])
+    ap.add_argument("bench", choices=sorted(SHORT))
     ap.add_argument("--out", required=True)
     ap.add_argument("--m", type=int, default=40, help="задач на замер узла")
     ap.add_argument("--k", type=int, default=5, help="проваленных трасс на сессию исследователя")
     ap.add_argument("--s", type=int, default=3, help="сессий исследователя (= кандидатов) на узел")
     ap.add_argument("--children", type=int, default=10, help="сколько детей замерить")
     ap.add_argument("--seed", type=int, default=1)
+    ap.add_argument("--stand", default="default", help="профиль стенда (stands/<имя>.json) для замера и ролей")
+    ap.add_argument("--workers", type=int, default=2, help="эпизодов замера параллельно")
+    ap.add_argument("--bench-py", help="python с зависимостями бенчмарка (по умолчанию <bench>/.venv/bin/python)")
+    ap.add_argument("--lint", help="каталог с pyflakes для редактора (иначе — из окружения)")
     a = ap.parse_args()
+    a.bench_py = a.bench_py or f"{ROOT}/{a.bench}/.venv/bin/python"
     out = os.path.realpath(a.out)
-    readme = f"{ROOT}/bench/{a.bench}/view_readme.md"
     path = f"{out}/tree.json"
     tree = json.load(open(path)) if os.path.exists(path) else {"nodes": {}}
     nodes = tree["nodes"]
@@ -48,16 +87,17 @@ def main():
         json.dump(tree, open(path + ".tmp", "w"), indent=1)
         os.replace(path + ".tmp", path)
 
-    def add_node(nid, parent, src):
-        d = f"{out}/{nid}"
-        score = measure(a.bench, src, d, a.m, a.seed * 100_000 + len(nodes))   # свежие задачи на каждый замер
+    def add_node(nid, parent, view):
+        score = measure(a, view, f"{out}/{nid}", a.seed * 100_000 + len(nodes))   # свежие задачи на каждый замер
         nodes[nid] = {"parent": parent, "score": score, "pool": None}
         save()
         print(f"{nid}: {score:.3f} (parent {parent})", flush=True)
 
     os.makedirs(out, exist_ok=True)
     if "n0" not in nodes:
-        add_node("n0", None, f"{ROOT}/bench/{a.bench}/src")
+        if not os.path.isdir(f"{out}/start"):
+            make_start.make_view(a.bench, f"{out}/start")
+        add_node("n0", None, f"{out}/start")
     while len(nodes) - 1 < a.children:
         open_ = [n for n, v in nodes.items() if v["pool"] is None or v["pool"]]
         if not open_:
@@ -68,17 +108,13 @@ def main():
         if node["pool"] is None:                              # исследовать узел: S сессий -> S кандидатов
             node["pool"] = []
             for j in range(a.s):
-                r = f"{out}/{nid}.research/{j}"
-                reports = researcher.run(f"{out}/{nid}", readme, a.k, a.seed * 1000 + j, r) \
-                    if not os.path.exists(f"{r}/reports.json") else json.load(open(f"{r}/reports.json"))["reports"]
-                if not reports:
+                tag, seed = f"{nid}_{j}", a.seed * 1000 + j
+                rhome = f"{out}/{nid}.research/{j}"
+                if not research(a, f"{out}/{nid}", rhome, tag, seed):
                     continue
-                e = f"{out}/{nid}.edit/{j}"
-                src, applied = editor.run(f"{out}/{nid}/src", readme, reports, e, a.seed * 1000 + j) \
-                    if not os.path.exists(f"{e}/edits.json") else \
-                    (f"{e}/work/src", sum(x["applied"] for x in json.load(open(f"{e}/edits.json"))["edits"]))
+                view, applied = edit(a, f"{out}/{nid}", rhome, f"{out}/{nid}.edit/{j}", tag, seed)
                 if applied:
-                    node["pool"].append(src)
+                    node["pool"].append(view)
             save()
             continue
         child = f"n{len(nodes)}"
