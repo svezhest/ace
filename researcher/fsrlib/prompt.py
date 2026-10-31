@@ -76,46 +76,51 @@ RUNS_LINE = """- runs (a program in bash) reads the run logs message by message:
     runs                          list runs: result, reason, size
     runs show N 40-45             messages 40-45 (= lines 40-45 of logs/run_N.jsonl)
     runs show N --tail 6          the last 6 messages
-    runs grep -i "error" N M      matches in runs N and M, with message numbers"""
+    runs grep -i "error" N M      matches in runs N and M, with message numbers
+    runs steps N                  one line per model call: what it sent and what came back"""
 RUNS_TOOL_LINE = """- runs(args): reads the run logs message by message; args as on a command line:
     runs(args="")                       list runs: result, reason, size
     runs(args="show N 40-45")           messages 40-45 (= lines 40-45 of logs/run_N.jsonl)
     runs(args="show N --tail 6")        the last 6 messages
     runs(args="grep -i error N M")      matches in runs N and M, with message numbers
+    runs(args="steps N")                one line per model call: what it sent and what came back
   It counts as a bash call."""
 RUNS_BOTH_NOTE = "\n  The same program is also available inside bash as runs, e.g. for r in 4 7; do runs show $r --tail 4; done."
-RUNS_TOOL_EXAMPLE = """- An example of how a session can start:
-    bash: cat README.md
-    >> (the layout)
-    bash: cat -n src/harness.py
-    >> (the code)
-    ... the prompts and other files you need
-    runs: ""
-    >> (runs with their results)
-    runs: "show N 1-2"
-    >> (the first messages, trimmed) -- the prompt from src/, as expected
-    runs: "show N --tail 6"
-    >> (how the run ended)
-    ... then find where it went wrong, compare with a passed run, report."""
-RUNS_EXAMPLE = """- An example of how a session can start:
-    bash: cat README.md
-    >> (the layout)
-    bash: cat -n src/harness.py
-    >> (the code)
-    ... the prompts and other files you need
-    bash: runs
-    >> (runs with their results)
-    bash: runs show N 1-2
-    >> (the first messages, trimmed) -- the prompt from src/, as expected
-    bash: runs show N --tail 6
-    >> (how the run ended)
-    ... then find where it went wrong, compare with a passed run, report."""
+# 31.10: пример — выдуманная система (агент пересчитывает рецепты инструментом convert), только форма инструментов
+EXAMPLE_T = """- An example of the tools:
+    {r}{q}{q}
+    >>   run  ok     reason        messages  chars
+    >>     2  false  wrong answer        31  18210
+    {r}{q}steps 2{q}
+    >> logs/run_2.jsonl: 31 lines, 9 model calls; results.jsonl: {{"run": 2, "ok": false, "reason": "wrong answer"}}
+    >> ...
+    >> 4 @12 convert: {{"amount": "1/2 cup"}} → 1 cup = 236 ml
+    >> 5 @15 text: Half a cup is 236 ml, so the sauce needs 472 ml. → (no env message) [harness: from=src/answer.md ...]
+    {r}{q}show 2 12-13{q}
+    >> --- 12 model assistant (214 chars)
+    >> ...
+    {r}{q}grep -c '1 cup = 236' 2 5{q}
+    >> logs/run_2.jsonl: 3 matches in 3 messages
+    >> logs/run_5.jsonl: 0 matches in 0 messages
+    bash: grep -n "def parse_amount" -A 12 src/units.py
+    >> ...
+    bash: python3 -c 'import sys; sys.path.insert(0, "src"); import units; print(units.parse_amount("1/2 cup"))'
+    >> (1.0, 'cup')"""
+RUNS_EXAMPLE = EXAMPLE_T.format(r="bash: runs ", q="").replace("bash: runs \n", "bash: runs\n")
+RUNS_TOOL_EXAMPLE = EXAMPLE_T.format(r="runs: ", q='"')
 BASH_TAIL = "so read big files in parts (sed -n '40,90p' FILE, head, tail) and search with grep -n."
 BASH_TAIL_RUNS = "so read big files in parts (sed -n '40,90p' FILE, head, tail) and search with grep -n; read the logs with runs."
 TARGETED = "- Targeted commands (grep -n, sed -n ranges) work better than printing many whole files at once."
 TARGETED_RUNS = "- Targeted commands (grep -n, sed -n ranges, runs show N A-B) work better than printing many whole files at once."
 BSD_LINE = "- The shell is bash 3.2 with macOS/BSD utilities: GNU-only options are missing (use grep -E, not grep -P; no find -printf)."
 PYTHON_LINE = "- python3 is available (standard library; no network, nothing can be written)."
+PYTHON_SCRATCH_LINE = "- python3 is available (standard library; no network; it can write only in SCRATCH/)."
+IMPORT_LINE = ("- In python3, modules in src/ can be imported and their functions called: "
+               "python3 -c 'import sys; sys.path.insert(0, \"src\"); import MODULE; print(MODULE.FUNCTION(...))'.")
+NOWRITE = "Nothing can be written (no files, no /tmp)."
+RO_SHELL = "a read-only shell in"
+SCRATCH_WRITE = ("Files can be written only in SCRATCH/ (empty at the start; > SCRATCH/NAME, or from python3); "
+                 "everything else is read-only, and there is no /tmp.")
 
 RECORD_LINE = "- Record each finding with report as soon as you have its supporting lines."
 DIARY_LINE = """- Keep a diary of findings with report: whenever an output shows you something about why runs fail, record it right away, in the same reply as your next command. Small and partial findings count too; a later report can refine an earlier one. Most of your replies should contain a report.
@@ -195,7 +200,10 @@ def build_system():
         s = s.replace(JOB, CAUSE_JOB)
     if C.PYTHON:
         assert BSD_LINE in s
-        s = s.replace(BSD_LINE, BSD_LINE + "\n" + PYTHON_LINE)
+        s = s.replace(BSD_LINE, BSD_LINE + "\n" + (PYTHON_SCRATCH_LINE if C.SCRATCH else PYTHON_LINE) + "\n" + IMPORT_LINE)
+    if C.SCRATCH:       # 31.10: писать можно в scratch/ вида
+        assert NOWRITE in s and RO_SHELL in s
+        s = s.replace(NOWRITE, SCRATCH_WRITE).replace("SCRATCH/", C.SCRATCH_DIR + "/").replace(RO_SHELL, "a shell in")
     progs = sorted(C.ALLOWED - ({"runs"} if C.RUNS_TOOL and C.RUNS_MODE == "tool" else set()))
     return (s.replace("PROGRAMS", ", ".join(progs)).replace("OUT_CHARS", str(C.OUT_CHARS))
             .replace("the session ends after STEP_BUDGET tool calls", LIMIT_LINE.replace("N", str(C.BASH_LIMIT))
@@ -220,8 +228,9 @@ REPORT_EXAMPLE = build_report_example()
 def build_tools():
     t = [
         {"type": "function", "function": {
-            "name": "bash", "description": "Run a read-only shell command in the working directory. Pipes, ';', '&&', '||', "
-            "$(...), for/while loops and if work; nothing can be written. Long output is truncated: use grep -n, sed -n 'a,bp', head, tail.",
+            "name": "bash", "description": "Run a " + ("" if C.SCRATCH else "read-only ") + "shell command in the working directory. Pipes, ';', '&&', '||', "
+            "$(...), for/while loops and if work; " + (f"only {C.SCRATCH_DIR}/ can be written" if C.SCRATCH else "nothing can be written")
+            + ". Long output is truncated: use grep -n, sed -n 'a,bp', head, tail.",
             "parameters": {"type": "object", "properties": {"command": {"type": "string", "description": "The command line"}},
                            "required": ["command"]}}},
         {"type": "function", "function": {
@@ -257,7 +266,7 @@ def build_tools():
     if C.RUNS_TOOL and C.RUNS_MODE in ("tool", "both"):
         t.insert(1, {"type": "function", "function": {
             "name": "runs", "description": "Read the run logs message by message. args as on a command line: '' lists "
-            "runs; 'show N 40-45', 'show N --tail 6', 'grep -i PATTERN N M'; 'help' for all options.",
+            "runs; 'show N 40-45', 'show N --tail 6', 'grep -i PATTERN N M', 'steps N'; 'help' for all options.",
             "parameters": {"type": "object", "properties": {"args": {"type": "string", "description": "The arguments"}},
                            "required": ["args"]}}})
     if C.NOTES:

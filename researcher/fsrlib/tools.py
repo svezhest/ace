@@ -1,7 +1,6 @@
 """Вызовы инструментов: bash, report, note, hypothesis, verdict, finish -> (текст для модели, finish ли).
 res — запись вызова для лога (поля дописываются сюда)."""
 import json
-import re
 import traceback
 
 from . import cfg as C
@@ -187,10 +186,7 @@ def _report(run, args, res):
     st = run.st
     kind = args.get("kind")
     obs = args.get("observation")
-    ev = args.get("evidence")
-    if isinstance(ev, str):
-        ev = ([ev.strip()] if ev.strip() else []) if C.EVIDENCE_MODE == "free" else \
-            [x.strip() for x in re.split(r"[,\n]", ev) if x.strip()]   # free: цитату по запятым не резать
+    ev = args.get("evidence")       # 31.10: строка не разбирается — отказ говорит, что пришла строка
     errs, ev_norm = _report_errors(kind, obs, ev, run.root)
     if errs:
         st["reports_rejected"] += 1
@@ -213,7 +209,12 @@ def _report(run, args, res):
                         "step": st["tool_calls"], "final": bool(run.final_left)})
     res["recorded"] = len(run.reports)
     run.since_report = -1
-    return f"Recorded finding #{len(run.reports)}.", False
+    out = f"Recorded finding #{len(run.reports)}."
+    cited = E.cited_lines(ev_norm, run.root)
+    if cited:
+        res["cited"] = cited
+        out += "\n" + cited
+    return out, False
 
 
 # ---------------------------------------------------------------- note, hypothesis, verdict, finish

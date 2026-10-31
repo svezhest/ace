@@ -68,6 +68,10 @@ FINAL_MSG = None         # одно сообщение финала для вс�
 REPEAT_MSG = "Don't repeat yourself."
 FINAL_MSG_TEXT = ("Limit reached, stop exploring. Write your findings now: one report call per finding, "
                   "then finish.")
+SCRATCH = False          # 31.10: каталог SCRATCH_DIR/ в виде, куда можно писать (песочница: запись только туда)
+SCRATCH_DIR = "scratch"
+SCRATCH_MAX = 64 * 2**20         # больше — каталог очищается после команды (и модели это сказано)
+SCRATCH_FILE_KB = 16384          # ulimit -f: файл не больше стольких КБ
 BIN = os.path.join(HERE, "bin")                  # runs и python3 -> PY_LINK; в PATH песочницы первым
 SITE = os.path.join(HERE, "site")                # sitecustomize.py: «/» = корень вида и для python3
 PY_LINK = "/Library/Developer/CommandLineTools/usr/bin/python3"   # /usr/bin/python3 — обёртка xcode-select:
@@ -83,5 +87,5 @@ POLICIES = {
     # 29.10: без очистки и сжатия, финал по окну на 52K, лимит bash 40; STEP_* и WARN_AT — как в сессиях A1-40
     "final": {"CLEAR_AT": None, "WARN_AT": None, "HARD_AT": 52000, "BASH_LIMIT": 40, "FINAL_FIX_TURNS": 2,
               "EVIDENCE_MODE": "free", "STEP_BUDGET": 300, "STEP_WARN": 285,
-              "PYTHON": True, "RUNS_TOOL": True, "REPEAT_STOP": 3, "FINAL_MSG": FINAL_MSG_TEXT},
+              "PYTHON": True, "RUNS_TOOL": True, "REPEAT_STOP": 3, "FINAL_MSG": FINAL_MSG_TEXT, "SCRATCH": True},
 }

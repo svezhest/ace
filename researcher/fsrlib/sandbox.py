@@ -3,9 +3,9 @@ import atexit
 import os
 import re
 import selectors
+import shutil
 import signal
 import subprocess
-import threading
 import time
 
 from . import cfg as C
@@ -81,7 +81,16 @@ def profile_text(root):
 (allow file-write-data (literal "/dev/null"))
 (allow file-read* (subpath "{root}"))
 (allow file-read-metadata (literal "{os.path.dirname(root)}"))
-""" + _py_profile()
+""" + _py_profile() + _scratch_profile(root)
+
+
+def _scratch_profile(root):
+    """31.10 (SCRATCH): запись — только в каталог scratch/ вида; ссылки там не создаются (жёсткие запрещает deny
+    default: file-link не разрешён; символьные — правило ниже)."""
+    if not C.SCRATCH:
+        return ""
+    return (f'(allow file-write* (subpath "{os.path.join(root, C.SCRATCH_DIR)}"))\n'
+            "(deny file-write-create (vnode-type SYMLINK))\n")
 
 
 def _py_profile():
@@ -222,11 +231,14 @@ def run_bash(cmd, root, prof, info=None):
     вывод читается потоком с потолком MAX_CAPTURE. info <- pid, rc, capped, timed_out, parsed, notes."""
     info = {} if info is None else info
     parsed, pipeamp = [], []
-    body = None
+    bodies = {}
     if C.PYTHON:
-        hd = K.split_heredoc(cmd)
-        if hd:
-            cmd, body = hd
+        try:
+            cmd, bodies = K.lift_heredocs(cmd)
+        except K._Deny as e:
+            info.update(parsed=parsed, notes=[], capped=False, timed_out=False, pid=None, rc=None)
+            return False, f"Error: {e}"
+        if bodies:
             info["heredoc"] = True
     err = K.check_command(cmd, parsed, pipeamp)
     info.update(parsed=parsed, notes=[], capped=False, timed_out=False, pid=None, rc=None)
@@ -239,13 +251,11 @@ def run_bash(cmd, root, prof, info=None):
     env = {"PATH": "/usr/bin:/bin", "LANG": "en_US.UTF-8", "HOME": root}
     if C.PYTHON or C.RUNS_TOOL:
         env.update(PATH=f"{C.BIN}:/usr/bin:/bin", PYTHONDONTWRITEBYTECODE="1", RUNS_OUT_CHARS=str(C.OUT_CHARS), RUNS_FORMAT=C.RUNS_FORMAT)
-    run = root_prelude(root) + run
-    env.update(NRHSI_ROOT=root, PYTHONPATH=C.SITE, NRHSI_SYS=C.BIN)
+    run = root_prelude(root) + (f"ulimit -f {C.SCRATCH_FILE_KB}\n" if C.SCRATCH else "") + run
+    env.update(NRHSI_ROOT=root, PYTHONPATH=C.SITE, NRHSI_SYS=C.BIN, **bodies)
     p = subprocess.Popen(["sandbox-exec", "-f", prof, "/bin/bash", "--noprofile", "--norc", "-c", run],
-                         cwd=root, stdin=subprocess.DEVNULL if body is None else subprocess.PIPE,
+                         cwd=root, stdin=subprocess.DEVNULL,
                          stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True, env=env)
-    if body is not None:
-        threading.Thread(target=_feed, args=(p.stdin, body.encode("utf-8")), daemon=True).start()
     info["pid"] = p.pid
     out = er = b""
     capped = timed = False
@@ -273,6 +283,8 @@ def run_bash(cmd, root, prof, info=None):
         text = f"(no output, exit code {rc})"
     elif not text:
         text = "(no output)"
+    if C.SCRATCH:
+        info["notes"] += _scratch_limit(root)
     note = N._stdin_note(parsed, cmd, empty=not out.strip())
     if note:
         info["notes"].append(note)
@@ -281,17 +293,25 @@ def run_bash(cmd, root, prof, info=None):
     return True, text
 
 
-def _feed(f, data):
-    """Тело heredoc -> stdin команды (в потоке: команда может не читать stdin, пайп не должен зависнуть)."""
-    try:
-        f.write(data)
-    except OSError:
-        pass
-    finally:
-        try:
-            f.close()
-        except OSError:
-            pass
+def _scratch_limit(root):
+    """scratch/ больше SCRATCH_MAX -> каталог очищается; модели — заметка."""
+    d = os.path.join(root, C.SCRATCH_DIR)
+    total = 0
+    for r, _, fs in os.walk(d):
+        for f in fs:
+            try:
+                total += os.lstat(os.path.join(r, f)).st_size
+            except OSError:
+                pass
+    if total <= C.SCRATCH_MAX:
+        return []
+    for x in os.listdir(d):
+        q = os.path.join(d, x)
+        if os.path.isdir(q) and not os.path.islink(q):
+            shutil.rmtree(q, ignore_errors=True)
+        else:
+            os.unlink(q)
+    return [f"{C.SCRATCH_DIR}/ held {total // 2**20} MB, over the {C.SCRATCH_MAX // 2**20} MB limit, and was emptied"]
 
 
 def bash_output(cmd, root, prof):
