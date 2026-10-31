@@ -33,6 +33,7 @@ REMIND_EVERY = None      # A2: напоминание выключено (был
 BOUNCE_AFTER = None      # 31.10 (nudge): после стольких вызовов без report bash не исполняется
 DRAFT_AT = None          # 31.10 (nudge): предотчёт на этих номерах bash, напр. [15, 30]
 BOUNCE_CHARGE = "all"    # 1.11 (nudge): "all" — каждый отказ тратит вызов bash; "repeat" — только повторный подряд
+BOUNCE_TEXT = "long"     # 1.11 (nudge): "terse" — отказ отбивки одной строкой «Not run: N calls since your last report.»
 FINAL_TURNS = 4          # после бюджета/контекста — ходы только с report/finish (S1: 2 -> 4)
 BASH_LIMIT = None        # A1: после стольких вызовов bash (все, вкл. повторы и отказы) — финальная фаза; None — нет
 FINAL_FIX_TURNS = 0      # A1: пока отклонённый в финале report не исправлен (нет хода с принятым report без отказов),

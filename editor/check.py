@@ -24,9 +24,15 @@ START_STATE = {"test_hooks_file_is_empty", "test_start_state", "test_replay_equa
 
 def check(tag):
     summ = json.load(open(f"{HERE}/out/{tag}.summary.json"))
-    b = summ["bench"]
-    src = f"{HERE}/work/{tag}/src"
-    res = {"tag": tag, "bench": b}
+    view = summ.get("view") or f"{BENCH[summ['bench']]}/view"   # в старых summary вида нет: был <бенч>/view
+    res = {"tag": tag, **check_src(summ["bench"], f"{HERE}/work/{tag}/src", f"{view}/src/starting_prompt.md")}
+    json.dump(res, open(f"{HERE}/out/{tag}.check.json", "w"), ensure_ascii=False, indent=1)
+    return res
+
+
+def check_src(b, src, orig):
+    """Проверки копии src бенчмарка b; orig — starting_prompt.md, с которого начал редактор (сверка слотов App)."""
+    res = {"bench": b}
     errs = []
     for p in glob.glob(f"{src}/**/*.py", recursive=True):
         try:
@@ -65,8 +71,7 @@ def check(tag):
                                              and k.split("[")[0] in START_STATE)
     if bad or res.get("tests_timeout"):
         res["pytest_tail"] = r.stdout[-6000:]
-    orig = f"{summ['view']}/src/starting_prompt.md"   # src, с которого начал редактор
-    if b == "app" and os.path.exists(f"{src}/starting_prompt.md"):
+    if b == "app" and os.path.exists(f"{src}/starting_prompt.md") and os.path.exists(orig):
         slots = lambda t: set(re.findall(r"\{\{\s*([\w.]+)\s*\}\}", t))      # noqa: E731
         roles = lambda t: re.findall(r"^(USER|ASSISTANT|SYSTEM):$", t, re.M)  # noqa: E731
         a, e = open(orig).read(), open(f"{src}/starting_prompt.md").read()
@@ -74,7 +79,6 @@ def check(tag):
         res["prompt_roles"] = f"{len(roles(a))}->{len(roles(e))}"
     for p in glob.glob(f"{src}/**/__pycache__", recursive=True):
         subprocess.run(["rm", "-rf", p])
-    json.dump(res, open(f"{HERE}/out/{tag}.check.json", "w"), ensure_ascii=False, indent=1)
     return res
 
 

@@ -34,7 +34,8 @@ def gate(run, name_, res):
                               "record with report each finding you have so far (partial ones count; later reports "
                               "can sharpen them), then run the command again.")
     elif C.BOUNCE_AFTER and run.since_report >= C.BOUNCE_AFTER:
-        kind, msg = "bounce", (f"Not run: {run.since_report} calls since your last report. First record with report "
+        kind, msg = "bounce", (f"Not run: {run.since_report} calls since your last report." if C.BOUNCE_TEXT == "terse"
+                               else f"Not run: {run.since_report} calls since your last report. First record with report "
                                "what the outputs so far have shown about why runs fail (a partial finding counts; a "
                                "later report can sharpen it), then run the command again.")
     else:
