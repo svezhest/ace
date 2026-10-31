@@ -53,7 +53,7 @@ def session(mode, k, seed, temp, tag, resume=None, max_turns=None, runs=None):
         w({"type": "meta", "version": 3, "mechanics": "v3b-view", "policy": C.POLICY, "layout": C.LAYOUT,
            "tools": [x["function"]["name"] for x in P.TOOLS], "notes_tool": C.NOTES, "compact": C.COMPACT,
            "compact_req": P.COMPACT_REQ if C.COMPACT else None, "read_counter": 1, "variant": C.VARIANT, "mode": mode, "k": k, "seed": seed, "temperature": temp, "stand": C.STAND,
-           "runs": tids, "selection": sel, "view": vname, "system": P.SYSTEM, "first_user": P.FIRST_USER, "limits": {
+           "runs": tids, "selection": sel, "view": vname, "system": P.SYSTEM, "first_user": P.first_user(), "limits": {
                "ctx": C.CTX, "max_gen": C.MAX_GEN, "warn_at": C.WARN_AT, "hard_at": C.HARD_AT, "clear_at": C.CLEAR_AT,
                "keep_results": C.KEEP_RESULTS, "step_budget": C.STEP_BUDGET, "remind_every": C.REMIND_EVERY,
                "final_turns": C.FINAL_TURNS, "out_chars": C.OUT_CHARS, "cmd_timeout": C.CMD_TIMEOUT,
@@ -61,7 +61,7 @@ def session(mode, k, seed, temp, tag, resume=None, max_turns=None, runs=None):
                "api_retries": M.API_RETRIES, "clear_to": C.CLEAR_TO, "clear_at_least": C.CLEAR_AT_LEAST, "stub": C.STUB,
                "evidence_mode": C.EVIDENCE_MODE, "trace_mode": C.TRACE_MODE,
                "bash_limit": C.BASH_LIMIT, "final_fix_turns": C.FINAL_FIX_TURNS, "python": C.PYTHON,
-               "runs_tool": C.RUNS_TOOL, "runs_format": C.RUNS_FORMAT, "runs_mode": C.RUNS_MODE, "say_first": C.SAY_FIRST, "checklist": C.CHECKLIST, "taxonomy": C.TAXONOMY, "diary": C.DIARY, "hypotheses": C.HYPOTHESES, "thinking": C.THINKING, "think_budget": C.THINK_BUDGET, "repeat_stop": C.REPEAT_STOP, "final_msg": C.FINAL_MSG}})
+               "runs_tool": C.RUNS_TOOL, "runs_format": C.RUNS_FORMAT, "runs_mode": C.RUNS_MODE, "say_first": C.SAY_FIRST, "cause": C.CAUSE, "checklist": C.CHECKLIST, "taxonomy": C.TAXONOMY, "diary": C.DIARY, "hypotheses": C.HYPOTHESES, "thinking": C.THINKING, "think_budget": C.THINK_BUDGET, "repeat_stop": C.REPEAT_STOP, "final_msg": C.FINAL_MSG}})
         end = _loop(st, reports, w, root, prof, temp, seed, resume=resume, max_turns=max_turns,
                     snap_name=os.path.basename(logp)[:-6])
     except BaseException as e:  # noqa: BLE001  v3c: сбой харнесса не теряет лог — пишется error и end
@@ -89,7 +89,7 @@ def _loop(st, reports, w, root, prof, temp, seed, resume=None, max_turns=None, s
     'Error: ...', в лог — harness_error с трассой.
     v3b: resume — снимок (SNAPSHOT_DIR) для ветвления: история и счётчики продолжаются с него; max_turns — сколько
     ходов сделать после снимка."""
-    messages = [{"role": "system", "content": P.SYSTEM}, {"role": "user", "content": P.FIRST_USER}]
+    messages = [{"role": "system", "content": P.SYSTEM}, {"role": "user", "content": P.first_user()}]
     seen_cmds = {}                   # команда -> (номер вызова, индекс tool-сообщения)
     tool_msgs = []                   # индексы tool-сообщений в messages по порядку
     tool_meta = {}                   # v3b: индекс tool-сообщения -> (номер вызова, команда или имя инструмента)

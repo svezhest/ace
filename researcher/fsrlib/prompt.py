@@ -141,6 +141,13 @@ CHECK_LINE = ("- When reviewing runs, look for loops and repeated actions, contr
 SAY_LINE = "- Before each command, write in a sentence or two what you saw in the last output and what the command will check."
 SAY_MSG = ("Not run. In the reply itself, before the call, write what you saw "
            "in the last output and what this command will check; then call it.")
+JOB = "Your job: find the weaknesses of the harness — in its prompts or its code — that make runs fail, and show how each one leads to failure."
+CAUSE_JOB = ("Your job: for each failed run, find out what actually happened and why the task failed, as the "
+             "environment's responses show it (what the agent says about its own progress is a claim to check against "
+             "them); then find what in the harness — its prompts or its code — made that failure likely or could have "
+             "prevented it. A failure in which the harness had no part is a finding too: say so.")
+CAUSE_FIRST = ("Investigate the failed runs in this repository: what went wrong in each, and what in the harness, if "
+               "anything, made them fail. Call finish when you are done.")
 LIMIT_LINE = ("bash can be called N times; after that only report and finish remain, for a few turns, and the "
               "session ends")   # A1: вместо «the session ends after STEP_BUDGET tool calls»
 
@@ -183,6 +190,9 @@ def build_system():
         i_ = s.index(w_)
         j_ = s.index("\n", i_)
         s = s[:j_ + 1] + SAY_LINE + "\n" + s[j_ + 1:]
+    if C.CAUSE:         # 31.10 (аудит R3, R4): цель — что произошло по ответам среды, потом роль харнесса
+        assert JOB in s
+        s = s.replace(JOB, CAUSE_JOB)
     if C.PYTHON:
         assert BSD_LINE in s
         s = s.replace(BSD_LINE, BSD_LINE + "\n" + PYTHON_LINE)
@@ -191,6 +201,10 @@ def build_system():
             .replace("the session ends after STEP_BUDGET tool calls", LIMIT_LINE.replace("N", str(C.BASH_LIMIT))
                      if C.BASH_LIMIT else "the session ends after STEP_BUDGET tool calls")
             .replace("STEP_BUDGET", str(C.STEP_BUDGET)).replace("EX_EV", ex_ev()))
+
+
+def first_user():
+    return CAUSE_FIRST if C.CAUSE else FIRST_USER
 
 
 SYSTEM = build_system()
