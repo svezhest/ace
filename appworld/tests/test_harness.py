@@ -76,13 +76,14 @@ def test_start_state():
 
 
 def test_start_is_template_plus_patch(tmp_path):
-    """The starting src/ is start/template/ + start/appworld.patch + start/appworld/ (tools/make_start.py), byte for byte."""
+    """The starting src/ is start/template/ + start/appworld.patch + start/appworld/ (tools/make_start.py), byte for byte; start/appworld.README.md is view_v3/README.md."""
     out = tmp_path / "src"
     subprocess.run([sys.executable, str(ROOT.parent / "tools" / "make_start.py"), "appworld", "--out", str(out)],
                    check=True, capture_output=True)
     names = sorted(p.name for p in SRC.iterdir() if p.is_file())
     assert sorted(p.name for p in out.iterdir()) == names
     assert all((out / n).read_bytes() == (SRC / n).read_bytes() for n in names)
+    assert (ROOT.parent / "start" / "appworld.README.md").read_bytes() == (ROOT / "view_v3" / "README.md").read_bytes()
 
 
 def test_extract_code_matches_upstream_cases():

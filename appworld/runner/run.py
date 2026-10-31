@@ -2,7 +2,7 @@
 
 Everything here is outside src/: the benchmark process (env_server.py, one per episode, in AppWorld's
 venv), model transport, budget, logging, results. A full copy of the run (src snapshot, logs, private
-per-run meta with the benchmark's evaluation, worker/gateway env, AppWorld outputs) goes to runs/<tag>/;
+per-run meta with the benchmark's evaluation, worker/gateway env, AppWorld outputs) goes to runs/<tag>/ (or --out);
 <view>/logs is then replaced by this run's logs, so the logs always come from the code in <view>/src.
 
   python run.py --split train --n 20 --seed 1 --workers 2 --tag material1
@@ -28,7 +28,7 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 sys.path.insert(0, str(ROOT.parent))   # stand.py — профиль стенда
 import stand as STAND                  # noqa: E402
-APPWORLD = Path.home() / "Projects" / "appworld"           # AppWorld root (data) and its venv
+APPWORLD = Path(os.environ.get("APPWORLD_DIR") or Path.home() / "Projects" / "appworld")   # AppWorld repo: data, venv
 APPWORLD_PY = APPWORLD / ".venv" / "bin" / "python"
 def src_hash(src):
     h = hashlib.sha256()
@@ -171,6 +171,7 @@ def parse_args():
     ap.add_argument("--fake", help="JSON script for the stub model (no LLM calls)")
     ap.add_argument("--tag", required=True)
     ap.add_argument("--no-publish", action="store_true", help="do not replace <view>/logs")
+    ap.add_argument("--out", help="directory of the run (default: runs/<tag>)")
     return ap.parse_args()
 
 
@@ -270,7 +271,7 @@ def publish(view, src, out, info):
 
 def main():
     a = parse_args()
-    view, out = Path(a.view).resolve(), ROOT / "runs" / a.tag
+    view, out = Path(a.view).resolve(), Path(a.out).resolve() if a.out else ROOT / "runs" / a.tag
     if out.exists():
         sys.exit(f"{out} exists")
     src = view / "src"

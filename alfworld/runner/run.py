@@ -1,7 +1,7 @@
 """Run the harness in <view>/src on ALFWorld games and write <view>/logs.
 
 Everything here is outside src/: model transport, budget, logging, results. A full copy of the run
-(src snapshot, logs, private per-run meta, worker env) goes to runs/<tag>/; <view>/logs is then
+(src snapshot, logs, private per-run meta, worker env) goes to runs/<tag>/ (or --out); <view>/logs is then
 replaced by this run's logs, so the logs always come from the code currently in <view>/src.
 
   python run.py --view ../view --split train --n 8 --seed 1 --workers 4 --tag smoke1
@@ -24,7 +24,7 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 sys.path.insert(0, str(ROOT.parent))   # stand.py — профиль стенда
 import stand as STAND                  # noqa: E402
-DATA = ROOT / "data" / "alfworld"
+DATA = Path(os.environ.get("ALFWORLD_DATA") or ROOT / "data" / "alfworld")   # game files of the splits
 def src_hash(src):
     h = hashlib.sha256()
     for p in sorted(Path(src).glob("*")):
@@ -122,11 +122,12 @@ def main():
     ap.add_argument("--fake", help="JSON script for the stub model (no LLM calls)")
     ap.add_argument("--tag", required=True)
     ap.add_argument("--no-publish", action="store_true", help="do not replace <view>/logs")
+    ap.add_argument("--out", help="directory of the run (default: runs/<tag>)")
     a = ap.parse_args()
 
     if a.split == "test" and not a.allow_test:
         sys.exit("test split is reserved for the final measurement (use --allow-test)")
-    view, out = Path(a.view).resolve(), ROOT / "runs" / a.tag
+    view, out = Path(a.view).resolve(), Path(a.out).resolve() if a.out else ROOT / "runs" / a.tag
     if out.exists():
         sys.exit(f"{out} exists")
     src = view / "src"
