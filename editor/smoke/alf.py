@@ -2,9 +2,10 @@
 
     python3 tests/smoke.py
 
-Two scenarios: a task that is never solved and a task that is solved. For each it prints how the run ended and
-what the harness added to the conversation after which model reply (model replies and environment results are
-left out), or the error with its traceback. Nothing is written.
+Two scenarios: the stub task does not end the episode, and it ends it at turn 4. The stub knows nothing of
+the real task: it answers every reply with a placeholder, as the bridge's contract allows. For each scenario
+it prints how the run ended and what the harness added to the conversation after which model reply (model
+replies and environment results are left out), or the error with its traceback. Nothing is written.
 """
 import os
 import sys
@@ -22,83 +23,38 @@ class StubStop(Exception):
 # ---------------------------------------------------------------- stub task and model
 
 class AlfTask:
-    """Stub of the task behind src/bridge.py: what the AgentBench task returns (messages, status, finish)."""
-    PLACES = ["cabinet 1", "countertop 1", "drawer 1", "fridge 1", "shelf 1"]
-    GOAL = "put mug 1 in/on cabinet 1"
+    """Stub of the task behind src/bridge.py, at the level of the bridge's contract: start() gives a system
+    message and an opening message, every reply handed over is a turn and gets one message back (role "tool"
+    when it has a tool call, role "user" when it has none), and the stub ends the episode at turn `ends_at`
+    or at the limit. The texts are placeholders; nothing about the real task, its game or its rules."""
 
-    def __init__(self):
-        self.observation, self.admissible = "", []
-        self._sent, self.at, self.holding, self.turns = [], None, False, 0
-        self.status, self.results = "running", []
-
-    def _acts(self):
-        a = [f"go to {p}" for p in self.PLACES if p != self.at] + ["inventory", "look"]
-        if self.at == "countertop 1" and not self.holding:
-            a.append("take mug 1 from countertop 1")
-        if self.at == "cabinet 1" and self.holding:
-            a.append(self.GOAL)
-        return a
-
-    def _text(self):
-        return self.observation + " AVAILABLE ACTIONS: " + "\n".join(self.admissible) + "\n"
+    def __init__(self, ends_at=None):
+        self.ends_at, self.turns, self.status, self.results = ends_at, 0, "running", []
 
     def _out(self, messages):
         return {"messages": messages, "status": self.status, "finish": self.status != "running"}
 
     def start(self):
-        self.observation = ("You are in the middle of a room. Looking quickly around you, you see a cabinet 1, a "
-                            "countertop 1, a drawer 1, a fridge 1, and a shelf 1.\n\nYour task is to: put a mug in "
-                            "cabinet 1.")
-        self.admissible = self._acts()
-        return self._out([{"role": "system", "content": "(the task's system prompt)"},
-                          {"role": "user", "content": "Here is your task. " + self._text()}])
+        return self._out([{"role": "system", "content": "(stub: the task's system message)"},
+                          {"role": "user", "content": "(stub: the task's opening message)"}])
 
     def interact(self, reply):
-        import json
         self.turns += 1
         calls = reply.get("tool_calls") or []
-        out = []
-        if not calls:
-            out.append({"role": "user", "content": "No executable tool calls found. Please call a tool instead"})
+        if calls:
+            text = f"(stub: the environment's answer to turn {self.turns})"
+            self.results.append(text)
+            out = [{"role": "tool", "tool_call_id": calls[0].get("id"), "content": text}]
         else:
-            try:
-                raw = list(json.loads(calls[0]["function"]["arguments"]).values())[0]
-            except Exception:  # noqa: BLE001
-                raw = None
-            if raw is None:
-                out.append({"role": "user", "content": "No valid tool calls found. Please call a tool instead."})
-            else:
-                r = str(raw).strip().lower()
-                self._step(r if r in self.admissible else self.admissible[0])
-                text = self._text()
-                self.results.append(text)
-                out.append({"role": "tool", "tool_call_id": calls[0]["id"], "content": text})
-                self._sent.append(raw)
-                if len(self._sent) > 3 and len(set(self._sent[-3:])) == 1:
-                    self.status = "agent invalid action"
-        if self.status == "running" and self.turns >= N_REPLIES:
-            self.status = "task limit reached"
+            out = [{"role": "user", "content": f"(stub: the task's message to turn {self.turns}, a reply without a tool call)"}]
+        if self.ends_at and self.turns >= self.ends_at:
+            self.status = "ended"
+        elif self.turns >= N_REPLIES:
+            self.status = "limit"
         return self._out(out)
 
-    def _step(self, action):
-        if action.startswith("go to "):
-            self.at = action[6:]
-            self.observation = f"On the {self.at}, you see " + ("a mug 1." if self.at == "countertop 1" and not self.holding else "nothing.")
-        elif action.startswith("take mug"):
-            self.holding, self.observation = True, "You pick up the mug 1 from the countertop 1."
-        elif action == self.GOAL:
-            self.holding, self.status = False, "completed"
-            self.observation = "You put the mug 1 in/on the cabinet 1."
-        elif action == "inventory":
-            self.observation = "You are carrying: a mug 1." if self.holding else "You are not carrying anything."
-        else:
-            self.observation = f"You are facing the {self.at or 'middle of the room'}."
-        self.admissible = self._acts()
-
     def end_of(self, status):
-        if status == "agent invalid action":
-            return {"reason": "error", "status": status, "detail": "repeated action"}
-        return {"reason": "step limit" if status == "task limit reached" else "finished", "status": status}
+        return {"reason": "step limit" if status == "limit" else "finished", "status": status}
 
 
 def alf_reply(i, item):
@@ -114,11 +70,9 @@ def alf_reply(i, item):
 
 
 def scenarios():
-    cycle = ["go to drawer 1", "go to fridge 1", "look", "go to shelf 1", "inventory", "go to countertop 1"]
-    fail = [cycle[i % len(cycle)] for i in range(N_REPLIES)]
-    win = ["go to countertop 1", "take mug 1 from countertop 1", "go to cabinet 1", AlfTask.GOAL]
-    return [("the task is not solved: 50 replies with ordinary actions", AlfTask, fail, alf_reply),
-            ("the task is solved at reply 4", AlfTask, win, alf_reply)]
+    acts = [f"(stub action {k})" for k in range(1, N_REPLIES + 1)]
+    return [("the stub task does not end the episode: 50 replies, each with a tool call", AlfTask, acts, alf_reply),
+            ("the stub task ends the episode at turn 4", lambda: AlfTask(ends_at=4), acts, alf_reply)]
 
 
 # ---------------------------------------------------------------- run

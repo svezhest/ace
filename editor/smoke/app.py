@@ -2,9 +2,10 @@
 
     python3 tests/smoke.py
 
-Two scenarios: a task that is never solved and a task that is solved. For each it prints how the run ended and
-what the harness added to the conversation after which model reply (model replies and environment results are
-left out), or the error with its traceback. Nothing is written.
+Two scenarios: 50 replies with different code, and complete_task at reply 5. The stub knows nothing of the
+real benchmark: it answers every step with a placeholder, as the bridge's contract allows. For each scenario it
+prints how the run ended and what the harness added to the conversation after which model reply (model replies
+and environment results are left out), or the error with its traceback. Nothing is written.
 """
 import os
 import sys
@@ -22,10 +23,12 @@ class StubStop(Exception):
 # ---------------------------------------------------------------- stub benchmark and model
 
 class AppEpisode:
-    """Stub of src/bridge.py's Episode and the benchmark behind it (fill, execute, steps, finished, end)."""
-    SLOTS = {"instruction": "Find the stub value and report it.", "main_user.first_name": "Sam",
-             "main_user.last_name": "Stub", "main_user.email": "sam@stub.example",
-             "main_user.phone_number": "5550100", "app_descriptions": '{"supervisor": "stub app"}'}
+    """Stub of src/bridge.py's Episode at the level of its contract (fill, execute, steps, finished, end): fill puts
+    placeholder values into the slots, every execute is a step and returns a placeholder, and the episode ends on
+    complete_task or at the limit, as src/bridge.py says. Nothing about the real benchmark's apps or outputs."""
+    SLOTS = {"instruction": "(stub: the task)", "main_user.first_name": "(stub: first name)",
+             "main_user.last_name": "(stub: last name)", "main_user.email": "(stub: email)",
+             "main_user.phone_number": "(stub: phone number)", "app_descriptions": "(stub: the apps)"}
 
     def __init__(self):
         self.steps, self.finished, self.end = 0, False, None
@@ -38,13 +41,9 @@ class AppEpisode:
     def execute(self, code):
         assert not self.finished, "the episode is over"
         self.steps += 1
-        if "complete_task" in code:
+        out = f"(stub: what the code of step {self.steps} printed)"
+        if "apis.supervisor.complete_task" in code:   # src/bridge.py: the loop ends the episode on complete_task
             self.finished, self.end = True, {"reason": "finished"}
-            out = "Execution successful."
-        elif not code.strip():
-            out = "No code available to execute."
-        else:
-            out = "stub output: " + str(abs(hash(code)) % 10 ** 6)
         if not self.finished and self.steps >= N_REPLIES:
             self.finished, self.end = True, {"reason": "step limit"}
         self.results.append(out)
@@ -59,8 +58,8 @@ def scenarios():
     code = lambda c: "Next step.\n```python\n" + c + "\n```"                      # noqa: E731
     fail = [code(f"print({i + 1})") for i in range(N_REPLIES)]
     win = [code(f"print({i + 1})") for i in range(4)] + [code('apis.supervisor.complete_task(answer="stub")')]
-    return [("the task is not solved: 50 replies with different code", AppEpisode, fail, app_reply),
-            ("the task is solved at reply 5 (complete_task)", AppEpisode, win, app_reply)]
+    return [("50 replies with different code, no complete_task", AppEpisode, fail, app_reply),
+            ("complete_task at reply 5", AppEpisode, win, app_reply)]
 
 
 # ---------------------------------------------------------------- run
