@@ -65,7 +65,7 @@ def check(tag):
                                              and k.split("[")[0] in START_STATE)
     if bad or res.get("tests_timeout"):
         res["pytest_tail"] = r.stdout[-6000:]
-    orig = f"{BENCH[b]}/view/src/starting_prompt.md"
+    orig = f"{summ['view']}/src/starting_prompt.md"   # src, с которого начал редактор
     if b == "app" and os.path.exists(f"{src}/starting_prompt.md"):
         slots = lambda t: set(re.findall(r"\{\{\s*([\w.]+)\s*\}\}", t))      # noqa: E731
         roles = lambda t: re.findall(r"^(USER|ASSISTANT|SYSTEM):$", t, re.M)  # noqa: E731

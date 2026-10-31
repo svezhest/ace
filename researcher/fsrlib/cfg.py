@@ -4,7 +4,7 @@ import os
 
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # researcher/: каталог fsr.py
-LAYOUT = os.path.expanduser("~/Projects/nrhsi/alfworld/view")   # --view
+LAYOUT = os.path.join(os.path.dirname(HERE), "alfworld", "view_v3")   # --view
 # модель и генерация — только из профиля стенда (stands/<имя>.json, apply_stand в policy.py); до него None
 URL = MODEL = TEMP = THINKING = THINK_BUDGET = STAND = None
 

@@ -3,7 +3,7 @@
 (opening message, every observation incl. the action list) with what their agent saw.
 No model involved; only the environment and the bridge's formatting/parsing are exercised.
 
-  .venv/bin/python -I tools/replay_hr1.py ref/Harness-R1/reproduction/alfworld_e0/data view/src data/alfworld
+  .venv/bin/python -I tools/replay_hr1.py ref/Harness-R1/reproduction/alfworld_e0/data view_v3/src data/alfworld
 """
 import collections
 import json

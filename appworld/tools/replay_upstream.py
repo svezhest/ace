@@ -1,4 +1,4 @@
-"""Replay upstream AppWorld runs through view/src + env_server and compare with what upstream sent.
+"""Replay upstream AppWorld runs through view_v3/src + env_server and compare with what upstream sent.
 
 For each task of an upstream experiment (appworld run with the simplified ReAct agent, lm_calls logged),
 the logged model replies are fed back through our harness (stub model). Checked:

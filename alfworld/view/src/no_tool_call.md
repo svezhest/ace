@@ -1,1 +1,0 @@
-You MUST call the take_action tool — do NOT output plain text without a tool call.

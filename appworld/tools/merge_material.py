@@ -1,4 +1,4 @@
-"""Append the logs of runs/<tag> to view/logs after the runs already there (run_N continue), checking the src hash.
+"""Append the logs of runs/<tag> to view_v3/logs after the runs already there (run_N continue), checking the src hash.
 .venv/bin/python -I tools/merge_material.py material1"""
 import json, shutil, sys
 from pathlib import Path
@@ -7,9 +7,9 @@ sys.path.insert(0, str(ROOT / "runner"))
 from run import src_hash  # noqa: E402
 
 tag = sys.argv[1]
-run, logs = ROOT / "runs" / tag, ROOT / "view" / "logs"
+run, logs = ROOT / "runs" / tag, ROOT / "view_v3" / "logs"
 info = json.loads((run / "run.json").read_text())
-assert info["src_hash"] == src_hash(ROOT / "view" / "src") == src_hash(run / "src"), "src differs"
+assert info["src_hash"] == src_hash(ROOT / "view_v3" / "src") == src_hash(run / "src"), "src differs"
 assert info["hint_level"] == 0 and info["fake"] is None
 rows = [json.loads(l) for l in (logs / "results.jsonl").read_text().splitlines() if l.strip()]
 base = max(r["run"] for r in rows)

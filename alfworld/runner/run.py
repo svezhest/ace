@@ -109,7 +109,7 @@ def play(job):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--view", default=str(ROOT / "view"))
+    ap.add_argument("--view", default=str(ROOT / "view_v3"))
     ap.add_argument("--split", default="train", choices=["train", "val", "test"])
     ap.add_argument("--allow-test", action="store_true", help="test split is for the final measurement only")
     ap.add_argument("--n", type=int, default=8)

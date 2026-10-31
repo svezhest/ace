@@ -20,3 +20,12 @@ researcher/out/
 .DS_Store
 editor/lint/
 start/build/
+# старые виды (до view_v3): на диске у стенда, не в git
+alfworld/view/
+alfworld/view_b2/
+alfworld/view_ev/
+alfworld/view_v2/
+appworld/view/
+appworld/view_b2/
+appworld/view_ev/
+appworld/view_v2/

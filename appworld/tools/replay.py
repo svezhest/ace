@@ -1,6 +1,6 @@
 """Replay of logged model replies through a view's src/ and the benchmark: is the conversation the same?
 
-  .venv/bin/python tools/replay.py --logs view/logs --tasks runs/material_tasks_seed1.json --src view_v3/src
+  .venv/bin/python tools/replay.py --logs view_v3/logs --tasks runs/material_tasks_seed1.json --src view_v3/src
 For each run: the model's replies from the log are given back in order (stub model, no LLM), and the
 conversation that comes out is compared with the log, message by message; also ok/reason. A reply is
 logged as the harness kept it (cut after the first ```python block, + "\\n\\n"); a reply without a

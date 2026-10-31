@@ -2,7 +2,7 @@
 Перенос fsr v3b (scratchpad/reviewer_probe/fsr/fsr.py) на раскладку view/ (README.md, src/, logs/run_N.jsonl,
 logs/results.jsonl). Политики контекста (A2) — --policy, см. POLICIES и JOURNAL.md.
 
-python fsr.py --view ~/Projects/nrhsi/alfworld/view --runs 4,8,12 --policy base --seed 1 --tag s1
+python fsr.py --view ../alfworld/view_v3 --runs 4,8,12 --policy base --seed 1 --tag s1
 Вид сессии: views/<name>_<tag>/ = README.md, src/, logs/ (K проваленных + все пройденные, results.jsonl только по ним).
 Лог сессии — logs/<name>_<tag>.jsonl.
 

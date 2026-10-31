@@ -159,7 +159,7 @@ def play(job):
 
 def parse_args():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--view", default=str(ROOT / "view"))
+    ap.add_argument("--view", default=str(ROOT / "view_v3"))
     ap.add_argument("--split", default="train", choices=["train", "val"])
     ap.add_argument("--n", type=int, default=3)
     ap.add_argument("--seed", type=int, default=0)

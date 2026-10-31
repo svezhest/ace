@@ -1,4 +1,4 @@
-"""One AppWorld task as a local HTTP service: the black box behind view/src/bridge.py.
+"""One AppWorld task as a local HTTP service: the black box behind src/bridge.py.
 
 Runs in AppWorld's own venv, one process per episode. The episode is AppWorld's own agent loop as
 published (appworld repo, experiments/code/simplified/agent.py: Agent.solve_tasks for this one task),
