@@ -7,7 +7,7 @@
 S сессий исследователя (nrhsi.researcher, политика final) по K провалам, каждая -> редактор (nrhsi.editor, плечо obs)
 -> правленая копия src/. Вариант ревьювера и редактора на сессию — случайный из REVIEWERS / EDITORS, с коммитом
 метода, входом и выходом пишется в node.sessions; ребёнок помнит сессию в from. Каждый раз развивается узел с лучшей долей ok, у которого есть что взять: неисследованный
-или с непустым пулом; с вероятностью --explore — случайный из остальных --top лучших. Плохой ребёнок не сдвигает родителя: следующим берётся другой кандидат из пула того же узла.
+или с непустым пулом: из --top лучших по softmax(доля ok / --temp). Плохой ребёнок не сдвигает родителя: следующим берётся другой кандидат из пула того же узла.
 Состояние — OUT/tree.json, запуск возобновляем. Роли и замер — отдельные процессы (у ролей настройки модульные).
 
 OUT/<узел>/ — вид узла и прогон раннера; OUT/<узел>.research/<j>/ — logs/, views/ сессии исследователя;
@@ -18,6 +18,7 @@ import glob
 import json
 import os
 import shutil
+import math
 import random
 import subprocess
 import sys
@@ -82,8 +83,8 @@ def main():
     ap.add_argument("--s", type=int, default=3, help="сессий исследователя (= кандидатов) на узел")
     ap.add_argument("--children", type=int, default=10, help="сколько детей замерить")
     ap.add_argument("--seed", type=int, default=1)
-    ap.add_argument("--top", type=int, default=5, help="из скольких лучших открытых узлов изредка берётся не лучший")
-    ap.add_argument("--explore", type=float, default=0.2, help="вероятность взять не лучший из --top")
+    ap.add_argument("--top", type=int, default=5, help="из скольких лучших открытых узлов выбирается развиваемый")
+    ap.add_argument("--temp", type=float, default=0.06, help="T softmax по доле ok среди --top (порядка шума замера)")
     ap.add_argument("--stand", default="default", help="профиль стенда (stands/<имя>.json) для замера и ролей")
     ap.add_argument("--workers", type=int, default=2, help="эпизодов замера параллельно")
     ap.add_argument("--bench-py", help="python с зависимостями бенчмарка (по умолчанию <bench>/.venv/bin/python)")
@@ -119,7 +120,8 @@ def main():
             break
         top = sorted(open_, key=lambda n: -nodes[n]["score"])[:a.top]
         rng = random.Random(f"{a.seed}/pick/{len(nodes)}/{sum(v['pool'] is not None for v in nodes.values())}")
-        nid = rng.choice(top[1:]) if len(top) > 1 and rng.random() < a.explore else top[0]   # изредка — не лучший
+        w = [math.exp((nodes[n]["score"] - nodes[top[0]]["score"]) / a.temp) for n in top]   # softmax(доля ok / T)
+        nid = rng.choices(top, weights=w)[0]
         tree.setdefault("picks", []).append({"node": nid, "top": top})
         node = nodes[nid]
         if node["pool"] is None:                              # исследовать узел: S сессий -> S кандидатов
