@@ -27,6 +27,8 @@ def load_reports(tag):
         if not isinstance(ev, list):
             ev = r.get("evidence") or []
         out.append({"kind": r["kind"], "observation": r["observation"], "evidence": [str(x) for x in ev]})
+        if r.get("check"):                   # 3.11, исследователь EVIDENCE_MODE=check: команда и её вывод
+            out[-1].update(check=r["check"], check_out=r.get("check_out", ""))
     return out
 
 
@@ -68,6 +70,10 @@ def observations_text(reports, root=None):
     for i, r in enumerate(reports, 1):
         ev = "\n".join(f"- {x}" for x in r["evidence"]) or "- (none)"
         part = f"## Observation {i} ({r['kind']})\n{r['observation']}\nEvidence:\n{ev}"
+        if "check" in r:
+            o, cap = r["check_out"], CITE_CHARS * CITE_LINES
+            part = (f"## Observation {i} ({r['kind']})\n{r['observation']}\nCheck: {r['check']}\nIt printed:\n"
+                    + (o if len(o) <= cap else o[:cap] + f"\n[... {len(o)} characters in all]"))
         lines = cited(r["evidence"], root) if root else []
         if lines:
             part += "\nCited log lines, as the file has them:\n" + "\n".join(lines)

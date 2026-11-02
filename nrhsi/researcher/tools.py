@@ -1,6 +1,7 @@
 """Вызовы инструментов: bash, report, note, hypothesis, verdict, finish -> (текст для модели, finish ли).
 res — запись вызова для лога (поля дописываются сюда)."""
 import json
+import re
 import traceback
 
 from . import cfg as C
@@ -182,12 +183,33 @@ def _report_errors(kind, obs, ev, root):
     return errs + ev_errs, ev_norm
 
 
+EMPTY_RE = re.compile(r"^\(no output(, exit code \d+)?\)$")
+
+
+def _check(run, cmd):
+    """3.11, EVIDENCE_MODE=check: команда check -> (ошибки, запись {check, check_out}, что показать модели)."""
+    if not isinstance(cmd, str) or not cmd.strip():
+        return ["check must be a non-empty string: a shell command"], None, ""
+    ok, shown, full, info, tr = S.bash_output(cmd, run.root, run.prof)
+    if not ok:
+        return ["the check did not run: " + shown.strip()[:500]], None, ""
+    body, _, err = full.partition("\n[stderr]\n")
+    if not body.strip() or EMPTY_RE.match(body.strip()):          # пустой stdout (у песочницы — «(no output…)»)
+        return ["Check printed nothing." + (f" [stderr] {err.strip()[:300]}" if err.strip() else "")], None, ""
+    return [], {"check": cmd, "check_out": full[:C.CHECK_KEEP]}, shown
+
+
 def _report(run, args, res):
     st = run.st
     kind = args.get("kind")
     obs = args.get("observation")
-    ev = args.get("evidence")       # 31.10: строка не разбирается — отказ говорит, что пришла строка
-    errs, ev_norm = _report_errors(kind, obs, ev, run.root)
+    if C.EVIDENCE_MODE == "check":
+        errs, _ = _report_errors(kind, obs, ["README.md"], run.root)
+        cerrs, chk, shown = _check(run, args.get("check")) if not errs else ([], None, "")
+        errs, ev, ev_norm = errs + cerrs, [], []
+    else:
+        ev = args.get("evidence")       # 31.10: строка не разбирается — отказ говорит, что пришла строка
+        errs, ev_norm = _report_errors(kind, obs, ev, run.root)
     if errs:
         st["reports_rejected"] += 1
         res["rejected"] = errs
@@ -195,7 +217,8 @@ def _report(run, args, res):
         if run.final_left:
             st["final_rejected"] += 1
             run.pend = True
-        hint = ("Each evidence item is free-form text: a short quote with the path of its file, 'path:line', "
+        hint = ("" if C.EVIDENCE_MODE == "check" else
+                "Each evidence item is free-form text: a short quote with the path of its file, 'path:line', "
                 "'path:start-end' or a path; a path in it must exist in the directory. "
                 if C.EVIDENCE_MODE == "free" else
                 "Each evidence item is 'path:line' or 'path:start-end' (line numbers as grep -n or "
@@ -210,6 +233,9 @@ def _report(run, args, res):
     res["recorded"] = len(run.reports)
     run.since_report = -1
     out = f"Recorded finding #{len(run.reports)}."
+    if C.EVIDENCE_MODE == "check":
+        run.reports[-1].update(chk)
+        return out + " The check printed:\n" + shown, False
     cited = E.cited_lines(ev_norm, run.root)
     if cited:
         res["cited"] = cited

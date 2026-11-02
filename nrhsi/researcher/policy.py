@@ -37,7 +37,7 @@ def apply_policy(name, overrides=None):
         assert m is not None, k
         assert k not in STAND_KEYS, f"{k} comes from the stand profile (stands/*.json), not from a policy or --set"
         setattr(m, k, v)
-    assert C.EVIDENCE_MODE in ("strict", "free"), C.EVIDENCE_MODE
+    assert C.EVIDENCE_MODE in ("strict", "free", "check"), C.EVIDENCE_MODE
     C.ALLOWED = set(C.ALLOWED_BASE) | ({"python3"} if C.PYTHON else set()) | ({"runs"} if C.RUNS_TOOL else set())
     C.POLICY = C.VARIANT = name
     P.REPORT_EXAMPLE = P.build_report_example()

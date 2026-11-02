@@ -20,6 +20,16 @@ EV_FREE_DESC = ("What supports the finding, in free form: a short quote with the
                 "checked to exist")
 
 
+# 3.11: EVIDENCE_MODE="check" — вместо evidence команда check; харнесс её выполняет (не в счёт bash) и хранит вывод
+# с находкой; пустой вывод — отказ. Меняются строка report, схема инструмента, пример report.
+EX_CHECK = "\"runs show N 40-44; grep -n '<short quote>' src/FILE\""
+REPORT_STRICT_HEAD = "report(kind, observation, evidence)"
+EV_CHECK_SYS = ("check is a shell command whose output shows what the finding rests on, for example EX_CHECK; it is run "
+                "when the report is recorded, does not count as a bash call, and its output is kept with the finding. "
+                "A report whose check prints nothing is not recorded.")
+CHECK_DESC = "A shell command whose output shows what the finding rests on; run when the report is recorded"
+
+
 def ex_ev():
     return EX_EV_FREE if C.EVIDENCE_MODE == "free" else EX_EV
 
@@ -162,6 +172,9 @@ def build_system():
     if C.EVIDENCE_MODE == "free":
         assert EV_STRICT_SYS in s
         s = s.replace(EV_STRICT_SYS, EV_FREE_SYS)
+    if C.EVIDENCE_MODE == "check":
+        assert EV_STRICT_SYS in s and s.count(REPORT_STRICT_HEAD) == 1 and not C.DIARY
+        s = s.replace(EV_STRICT_SYS, EV_CHECK_SYS).replace(REPORT_STRICT_HEAD, "report(kind, observation, check)")
     if C.RUNS_TOOL:     # 29.10 v2: runs — в Tools, пример начала сессии вместо строки про jq
         assert JQ_LINE in s and BASH_TAIL in s and TARGETED in s and BSD_LINE in s
         if C.RUNS_MODE == "bash":
@@ -207,7 +220,7 @@ def build_system():
     return (s.replace("PROGRAMS", ", ".join(progs)).replace("OUT_CHARS", str(C.OUT_CHARS))
             .replace("the session ends after STEP_BUDGET tool calls", LIMIT_LINE.replace("N", str(C.BASH_LIMIT))
                      if C.BASH_LIMIT else "the session ends after STEP_BUDGET tool calls")
-            .replace("STEP_BUDGET", str(C.STEP_BUDGET)).replace("EX_EV", ex_ev()))
+            .replace("STEP_BUDGET", str(C.STEP_BUDGET)).replace("EX_EV", ex_ev()).replace("EX_CHECK", EX_CHECK))
 
 
 def first_user():
@@ -218,6 +231,8 @@ SYSTEM = build_system()
 
 
 def build_report_example():
+    if C.EVIDENCE_MODE == "check":
+        return f'report(kind="pattern", observation="...", check={EX_CHECK})'
     return f'report(kind="pattern", observation="...", evidence={ex_ev()})'
 
 
@@ -248,6 +263,11 @@ def build_tools():
     ]
     if C.EVIDENCE_MODE == "free":
         t[1]["function"]["parameters"]["properties"]["evidence"]["description"] = EV_FREE_DESC
+    if C.EVIDENCE_MODE == "check":
+        fp = t[1]["function"]["parameters"]
+        del fp["properties"]["evidence"]
+        fp["properties"]["check"] = {"type": "string", "description": CHECK_DESC}
+        fp["required"] = ["kind", "observation", "check"]
     if C.HYPOTHESES:
         t[-1:-1] = [
             {"type": "function", "function": {
