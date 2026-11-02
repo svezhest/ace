@@ -14,6 +14,7 @@ RLOGS = None             # логи сессий исследователя, --i
 LINT = None              # каталог с pyflakes (pip install --target), первым в sys.path; None — pyflakes окружения
 SMOKE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "smoke")   # smoke/<бенч>.py -> tests/smoke.py копии
 BENCH = None   # --bench (main)
+CHECKED = False   # --checked: в финальных ходах (bash уже нет) правки не применяются
 
 BASH_LIMIT = 25          # вызовов bash; потом — финальные ходы
 STEP_BUDGET = 60         # всех вызовов инструментов

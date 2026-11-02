@@ -77,6 +77,9 @@ def fill(t, arm=None):
 
 CHECK_LINE = ("- Check each change: run python3 tests/smoke.py, and read the changed lines together with the code that "
               "calls or uses them.")
+LIMIT_LINE = "- bash can be called BASH_LIMIT times; after that only edit and finish remain, for a few turns, and the session ends."
+CHECKED_LIMIT_LINE = ("- bash can be called BASH_LIMIT times; after that edits can no longer be checked and are not applied: "
+                      "only finish remains, and the session ends.")
 PREDICT_LINE = ("- Check each change: before you run python3 tests/smoke.py, write down what you expect it to print "
                 "after your change (which messages, after which replies, how the run ends); after it runs, compare "
                 "the output with what you wrote, line by line, and say where they differ before you go on. Read the "

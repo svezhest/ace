@@ -8,7 +8,8 @@ def enter_final(run, why):
     head = (f"You have used all {C.BASH_LIMIT} bash calls." if why == "bash limit" else
             f"You have used all {C.STEP_BUDGET} tool calls." if why == "step budget" else
             "The context is almost full.")
-    tail = ("Make the edits you have settled on with edit now (several edit calls in one reply are fine), then "
+    tail = ("Edits can no longer be checked, so they are not applied: call finish." if run.role == "editor" and C.CHECKED else
+            "Make the edits you have settled on with edit now (several edit calls in one reply are fine), then "
             "call finish." if run.role == "editor" else
             "Record the proposals you have settled on with propose now (several propose calls in one reply are "
             "fine), then call finish.")

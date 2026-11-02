@@ -44,6 +44,11 @@ def bash_call(run, args, res):
 
 def edit_call(run, args, res):
     run.st["edits_attempted"] += 1
+    if C.CHECKED and run.final_left:
+        run.st["edit_fail"]["unchecked"] = run.st["edit_fail"].get("unchecked", 0) + 1
+        res["edit"] = {"rel": args.get("path"), "fail": "unchecked", "applied": False}
+        run.items.append({"path": args.get("path"), "fail": "unchecked", "call": run.st["tool_calls"], "final": True})
+        return "Error: edit not applied: no bash calls left to check it. Call finish.", False
     text, rec = ED.do_edit(args, run.root, run.st)
     rec["call"] = run.st["tool_calls"]
     rec["final"] = bool(run.final_left)
