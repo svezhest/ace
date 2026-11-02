@@ -14,6 +14,21 @@ SMOKE_README = ("- `tests/smoke.py` — a smoke test: runs src/harness.py with a
                 "Run it with `python3 tests/smoke.py`.\n")
 
 
+SMOKE_CALLS_README = (" After each scenario it lists the functions of src/harness.py and src/hooks.py that were called "
+                      "and how many times, with the exceptions raised in them, also those that a caller catches; after "
+                      "the first scenario also the arguments and the return value of each function's first call.")
+LOOP = "    for n, (desc, Ep, script, mk) in enumerate(scenarios(), 1):\n"
+TAIL = "            print(line)\n\n\nif __name__"
+
+
+def smoke_calls(src):
+    """--smoke-calls (3.11): в копию smoke — трассировка вызовов (smoke/calls.py), после каждого сценария."""
+    assert src.count(LOOP) == 1 and src.count(TAIL) == 1
+    src = src.replace(LOOP, "    import calls\n    import hooks\n    calls.install(harness, hooks)\n" + LOOP +
+                      "        calls.reset()\n")
+    return src.replace(TAIL, "            print(line)\n        for line in calls.lines(full=n == 1):\n            print(line)\n\n\nif __name__")
+
+
 def readme_without_logs(text):
     out = []
     for line in text.splitlines(keepends=True):
@@ -32,13 +47,18 @@ def build_work(bench, tag, smoke=True):
     with open(f"{C.VIEWS[bench]}/README.md") as f:
         readme = readme_without_logs(f.read())
     if smoke:
-        readme += SMOKE_README
+        readme += SMOKE_README if not C.SMOKE_CALLS else SMOKE_README.replace(
+            "or the error. ", "or the error." + SMOKE_CALLS_README + " ")
     with open(f"{v}/README.md", "w") as f:
         f.write(readme)
     shutil.copytree(f"{C.VIEWS[bench]}/src", f"{v}/src", ignore=shutil.ignore_patterns("__pycache__"))
     if smoke:
         os.makedirs(f"{v}/tests")
         shutil.copy(f"{C.SMOKE}/{bench}.py", f"{v}/tests/smoke.py")
+        if C.SMOKE_CALLS:
+            with open(f"{v}/tests/smoke.py", "w") as f:
+                f.write(smoke_calls(open(f"{C.SMOKE}/{bench}.py").read()))
+            shutil.copy(f"{C.SMOKE}/calls.py", f"{v}/tests/calls.py")
     for p in glob.glob(f"{v}/src/*"):
         assert os.stat(p).st_nlink == 1, p          # копия, не жёсткая ссылка
     return os.path.realpath(v)
