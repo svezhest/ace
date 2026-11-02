@@ -14,8 +14,9 @@ from . import session as SE
 def parse_args():
     ap = argparse.ArgumentParser()
     ap.add_argument("--bench", choices=list(C.BENCHES), required=True)
-    ap.add_argument("--input", required=True, help="тег сессии исследователя (report на входе)")
-    ap.add_argument("--arm", choices=["obs", "fix"], required=True)
+    ap.add_argument("--input", help="тег сессии исследователя (report на входе); не нужен для --arm merge")
+    ap.add_argument("--arm", choices=["obs", "fix", "merge"], required=True,
+                    help="merge: комбинатор, --view — вид editor/merge3.py --markers")
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--tag", required=True)
     ap.add_argument("--dry", action="store_true")
@@ -26,7 +27,7 @@ def parse_args():
     ap.add_argument("--checked", action="store_true", help="после конца bash правки не применяются (их нечем проверить)")
     ap.add_argument("--stand", default="default", help="профиль стенда (stands/<имя>.json): модель и генерация")
     ap.add_argument("--home", default=C.HERE, required=C.HERE is None, help="каталог сессий: logs/, out/, work/")
-    ap.add_argument("--rlogs", default=C.RLOGS, required=C.RLOGS is None, help="логи сессий исследователя")
+    ap.add_argument("--rlogs", default=C.RLOGS, help="логи сессий исследователя (кроме --arm merge)")
     ap.add_argument("--lint", default=C.LINT, help="каталог с pyflakes (иначе — из окружения)")
     return ap.parse_args()
 
@@ -93,7 +94,9 @@ def main():
         C.VIEWS[a.bench] = os.path.realpath(os.path.expanduser(a.view))
     if not a.dry:
         F.apply_stand(a.stand)
-    reports = IN.load_reports(a.input)
+    if (a.arm == "merge") == bool(a.input and a.rlogs):
+        raise SystemExit("--input and --rlogs are needed for obs/fix and not for merge")
+    reports = [] if a.arm == "merge" else IN.load_reports(a.input)
     src_before = WK.tree_hash(f"{C.VIEWS[a.bench]}/src")
     os.makedirs(f"{C.HERE}/logs", exist_ok=True)
     os.makedirs(f"{C.HERE}/out", exist_ok=True)
@@ -106,6 +109,8 @@ def main():
         if not props:
             return
         first = IN.first_user_editor_fix(props)
+    elif a.arm == "merge":
+        first = IN.first_user_merge(C.VIEWS[a.bench])
     else:
         first = IN.first_user_editor_obs(reports, IN.review_root(a.input) if a.cite else None)
     editor_step(a, first, src_before, summary)

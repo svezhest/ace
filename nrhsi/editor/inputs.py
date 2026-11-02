@@ -2,6 +2,7 @@
 import glob
 import json
 import os
+import subprocess
 
 from . import cfg as C
 from ..researcher import evidence as EV
@@ -82,6 +83,23 @@ def first_user_editor_obs(reports, root=None):
 def first_user_proposer(reports):
     return (observations_text(reports) + "\n\nPropose fixes to the harness for these observations. Call finish when "
             "you are done.")
+
+
+def src_diff(x, y):
+    """diff -ruN src/ двух узлов, пути — src/FILE."""
+    r = subprocess.run(["diff", "-ruN", "-x", "__pycache__", f"{x}/src", f"{y}/src"], capture_output=True, text=True)
+    return r.stdout.replace(f"{x}/src/", "src/").replace(f"{y}/src/", "src/")
+
+
+def first_user_merge(view):
+    """--arm merge (3.11): изменения a и b против общего предка и файлы с конфликтом — по merge.json вида (editor/merge3.py)."""
+    m = json.load(open(f"{view}/merge.json"))
+    conf = [f"src/{f}" for f, s in m["files"].items() if s.startswith("conflict")]
+    parts = [f"## Changes in {k} against the original\n```diff\n{src_diff(m['base'], m[k]).rstrip()}\n```" for k in ("a", "b")]
+    tail = ("Files where a and b changed the same lines, with git conflict markers (<<<<<<< a, =======, >>>>>>> b): "
+            + ", ".join(conf) + "." if conf else "No file has conflicts: a and b changed different lines.")
+    return ("\n\n".join(parts) + "\n\n" + tail + "\n\nMake src/ one working harness with what each version adds. "
+            "Call finish when you are done.")
 
 
 def first_user_editor_fix(props):

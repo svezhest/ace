@@ -25,6 +25,11 @@ ARM_EDITOR = {
             "Each observation that points to a weakness of the harness is a candidate for a change. An observation "
             "may also be inaccurate, or point to something the harness cannot change; what it says about src/ you "
             "can check by reading src/."),
+    "merge": ("Two versions of this harness, a and b, were made independently from the same original version, each to "
+              "make the agent fail fewer tasks. src/ here is the two merged line by line; their changes against the "
+              "original, and the files where both changed the same lines, are in the first message.",
+              "Keep what each version adds: resolve every conflict, and where a and b do the same thing in different "
+              "ways or get in each other's way, keep one way that works."),
     "fix": ("A colleague studied the agent's failed runs and proposed fixes for the harness; the proposals are in the "
             "first message. The runs themselves are not in this copy.",
             "Make the proposed fixes you judge sound; where several proposals address the same weakness in "
