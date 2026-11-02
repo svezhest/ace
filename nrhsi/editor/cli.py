@@ -21,6 +21,7 @@ def parse_args():
     ap.add_argument("--dry", action="store_true")
     ap.add_argument("--view", help="вид узла (src/ и README.md), по умолчанию — корневой вид бенчмарка")
     ap.add_argument("--predict", action="store_true", help="плечо: перед smoke записать ожидаемый вывод, после — сверить")
+    ap.add_argument("--cite", action="store_true", help="под каждым наблюдением — цитированные им строки логов, как в файле")
     ap.add_argument("--stand", default="default", help="профиль стенда (stands/<имя>.json): модель и генерация")
     ap.add_argument("--home", default=C.HERE, required=C.HERE is None, help="каталог сессий: logs/, out/, work/")
     ap.add_argument("--rlogs", default=C.RLOGS, required=C.RLOGS is None, help="логи сессий исследователя")
@@ -89,7 +90,7 @@ def main():
     os.makedirs(f"{C.HERE}/logs", exist_ok=True)
     os.makedirs(f"{C.HERE}/out", exist_ok=True)
     summary = {"tag": a.tag, "bench": a.bench, "input": a.input, "arm": a.arm, "seed": a.seed,
-               "view": C.VIEWS[a.bench], "predict": a.predict, "stand": F.STAND,
+               "view": C.VIEWS[a.bench], "predict": a.predict, "cite": a.cite, "stand": F.STAND,
                "n_reports": len(reports), "view_src_hash": src_before}
     if a.arm == "fix":
         props = propose_step(a, reports, src_before, summary)
@@ -97,5 +98,5 @@ def main():
             return
         first = IN.first_user_editor_fix(props)
     else:
-        first = IN.first_user_editor_obs(reports)
+        first = IN.first_user_editor_obs(reports, IN.review_root(a.input) if a.cite else None)
     editor_step(a, first, src_before, summary)
