@@ -25,6 +25,7 @@ def parse_args():
     ap.add_argument("--cite", action="store_true", help="под каждым наблюдением — цитированные им строки логов, как в файле")
     ap.add_argument("--import-src", action="store_true", help="строка в Tools: модули src/ импортируются из python3")
     ap.add_argument("--smoke-calls", action="store_true", help="smoke: вызовы функций harness/hooks, аргументы, исключения")
+    ap.add_argument("--input-text", help="плечо obs: вместо наблюдений --input — текст из этого файла как есть")
     ap.add_argument("--checked", action="store_true", help="после конца bash правки не применяются (их нечем проверить)")
     ap.add_argument("--stand", default="default", help="профиль стенда (stands/<имя>.json): модель и генерация")
     ap.add_argument("--home", default=C.HERE, required=C.HERE is None, help="каталог сессий: logs/, out/, work/")
@@ -104,7 +105,7 @@ def main():
     os.makedirs(f"{C.HERE}/out", exist_ok=True)
     summary = {"tag": a.tag, "bench": a.bench, "input": a.input, "arm": a.arm, "seed": a.seed,
                "view": C.VIEWS[a.bench], "predict": a.predict, "cite": a.cite, "import_src": a.import_src,
-               "checked": a.checked, "smoke_calls": a.smoke_calls, "stand": F.STAND,
+               "checked": a.checked, "smoke_calls": a.smoke_calls, "input_text": a.input_text, "stand": F.STAND,
                "n_reports": len(reports), "view_src_hash": src_before}
     if a.arm == "fix":
         props = propose_step(a, reports, src_before, summary)
@@ -113,6 +114,8 @@ def main():
         first = IN.first_user_editor_fix(props)
     elif a.arm == "merge":
         first = IN.first_user_merge(C.VIEWS[a.bench])
+    elif a.input_text:
+        first = IN.first_user_editor_text(a.input_text)
     else:
         first = IN.first_user_editor_obs(reports, IN.review_root(a.input) if a.cite else None)
     editor_step(a, first, src_before, summary)

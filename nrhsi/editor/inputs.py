@@ -81,9 +81,16 @@ def observations_text(reports, root=None):
     return "\n\n".join(parts)
 
 
+OBS_TAIL = "\n\nChange src/ so that the agent fails fewer tasks. Call finish when you are done."
+
+
 def first_user_editor_obs(reports, root=None):
-    return (observations_text(reports, root) + "\n\nChange src/ so that the agent fails fewer tasks. Call finish "
-            "when you are done.")
+    return observations_text(reports, root) + OBS_TAIL
+
+
+def first_user_editor_text(path):
+    """3.11, проба потолка формата: вместо блока наблюдений — готовый текст из файла, как есть."""
+    return open(path).read().rstrip() + OBS_TAIL
 
 
 def first_user_proposer(reports):
