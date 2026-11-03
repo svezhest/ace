@@ -42,6 +42,25 @@ def short(m, n=160):
     return f'{m["role"]}: {s[:n]}{"…" if len(s) > n else ""}'
 
 
+def val(x, depth=0):
+    """--at: значение коротко — строки до 100 символов, у длинных списков — последние 3, словари до 2 уровней."""
+    if isinstance(x, dict):
+        if depth > 1:
+            return f"dict[{len(x)}]"
+        items = [f"{k!r}: {val(v, depth + 1)}" for k, v in list(x.items())[:12]]
+        return "{" + ", ".join(items) + (", ..." if len(x) > 12 else "") + "}"
+    if isinstance(x, (list, tuple)):
+        if depth > 2:
+            return f"{type(x).__name__}[{len(x)}]"
+        xs = [val(v, depth + 1) for v in x[-3:]]
+        body = ", ".join(([f"... {len(x) - 3} more"] if len(x) > 3 else []) + xs)
+        return ("[" + body + "]") if isinstance(x, list) else ("(" + body + ("," if len(x) == 1 else "") + ")")
+    if isinstance(x, (str, int, float, bool, type(None))):
+        r = repr(x)
+        return r if len(r) <= 100 else r[:100] + "…"
+    return f"<{type(x).__name__}>"
+
+
 # ---------------------------------------------------------------- worker: один src в своём процессе
 class Diverged(Exception):
     pass
@@ -150,7 +169,7 @@ def app_episode(bridge, ev, sent_replies, state, diverge):
     return Episode()
 
 
-def play(bench, src, log):
+def play(bench, src, log, at=None):
     sys.path[:0] = [src]
     import bridge
     import harness
@@ -206,6 +225,34 @@ def play(bench, src, log):
             return wrapped
 
     real_hooks = harness.hooks
+    if at:   # --at K: вызовы функций src/harness.py и src/hooks.py перед вызовом модели K, со значениями
+        trace["at"], depth = [], [0]
+
+        def watch(mod, name, fn):
+            def w(*a, **kw):
+                rec = None
+                if state["call"] + 1 == at:
+                    args = [val(x) for x in a] + [f"{n}={val(v)}" for n, v in kw.items()]
+                    rec = {"f": f"{mod.__name__}.{name}", "args": args, "depth": depth[0]}
+                    trace["at"].append(rec)
+                depth[0] += 1
+                try:
+                    out = fn(*a, **kw)
+                except Exception as e:
+                    if rec:
+                        rec["raised"] = f"{type(e).__name__}: {e}"
+                    raise
+                finally:
+                    depth[0] -= 1
+                if rec:
+                    rec["ret"] = val(out)
+                return out
+            return w
+        import types
+        for mod in (harness, real_hooks):
+            for name, fn in list(vars(mod).items()):
+                if isinstance(fn, types.FunctionType) and fn.__module__ == mod.__name__ and name != "run":
+                    setattr(mod, name, watch(mod, name, fn))
     harness.hooks = Hooks()
     sent = [conv[i] for i in model_pos]
     ep = {"alf": alf_episode, "app": app_episode}[bench](bridge, ev, sent, state, diverge)
@@ -238,16 +285,18 @@ def play(bench, src, log):
     return trace
 
 
-def worker(bench, src, logs):
+def worker(bench, src, logs, runs=None, at=None):
     """Все прогоны вида на одном src, в этом же процессе: модули src перезагружаются для каждого прогона."""
     sys.dont_write_bytecode = True
     out = {}
     for p in sorted(Path(logs).glob("run_*.jsonl"), key=lambda p: int(p.stem.split("_")[1])):
+        if runs is not None and p.stem.split("_")[1] not in runs:
+            continue
         saved = list(sys.path)
         for m in ("harness", "bridge", "hooks"):
             sys.modules.pop(m, None)
         try:
-            out[p.stem.split("_")[1]] = play(bench, src, str(p))
+            out[p.stem.split("_")[1]] = play(bench, src, str(p), at)
         finally:
             sys.path[:] = saved
             for m in ("harness", "bridge", "hooks"):
@@ -340,6 +389,42 @@ def report(new, old, res, runs, detail):
     return "\n".join(out)
 
 
+def report_at(r, t, log, at, ok):
+    """--at K: что было в логе перед вызовом модели K и вызовы функций src с их значениями."""
+    ev, conv, line_of = load_log(log)
+    pos = [i for i, m in enumerate(conv) if m["role"] == "assistant" and ev[line_of[i] - 1]["event"] == "model"]
+    d = t["div"]
+    head = f"run {r} ({'passed' if ok else 'failed'})"
+    if at > len(pos) + 1:
+        return f"{head}: the log has {len(pos)} model calls, there is no model call {at}"
+    if d is not None and d["call"] < at:
+        return (f"{head}: the replay stops at model call {d['call']}, before model call {at}; see python3 tests/rerun.py {r}")
+    j = pos[at - 1] if at <= len(pos) else len(conv)
+    line = line_of[j] if j < len(line_of) else None
+    out = [f"{head}, before model call {at}" + (f" (log line {line})" if line else "") + ":",
+           "  the log just before it:"] + [f"    {short(m)}" for m in conv[max(0, j - 2):j]]
+    calls = t.get("at") or []
+    out.append("  calls of the functions in src/harness.py and src/hooks.py, with the values they got and returned:"
+               if calls else "  no function of src/harness.py or src/hooks.py is called there")
+    seen = set()
+    for c in calls[:40]:
+        args = []
+        for x in c["args"]:
+            args.append(x if len(x) < 40 or x not in seen else "<same as above>")
+            seen.add(x)
+        s = f"{c['f']}({', '.join(args)})"
+        ret = c.get("ret")
+        ret = ret if ret is None or len(ret) < 40 or ret not in seen else "<same as above>"
+        seen.add(c.get("ret"))
+        s = (s if len(s) <= 700 else s[:700] + "…)") + (f" raised {c['raised']}" if "raised" in c else f" -> {ret}")
+        out.append("    " + "  " * c["depth"] + s)
+    if len(calls) > 40:
+        out.append(f"    ... {len(calls) - 40} more calls")
+    if d is not None and d["call"] == at:
+        out.append(f"  at this call the replay stops: {d['text']}; see python3 tests/rerun.py {r}")
+    return "\n".join(out)
+
+
 def runs_label(tags, total):
     """[(run, ok)] -> 'runs 1, 4, 6 (2 failed, 1 passed)' или 'all 30 runs (…)'."""
     ok = sum(1 for _, o in tags if o)
@@ -353,8 +438,15 @@ def main():
     ap.add_argument("--src", required=True)
     ap.add_argument("--logs", required=True)
     ap.add_argument("--old", help="src, на котором записаны логи: для сравнения ответов хуков")
+    ap.add_argument("--at", type=int, help="с одним прогоном N: вызовы функций src перед вызовом модели K, со значениями")
     ap.add_argument("runs", nargs="*")
     a = ap.parse_args()
+    if a.at:
+        assert len(a.runs) == 1, "--at needs one run"
+        t = worker(a.bench, os.path.abspath(a.src), a.logs, a.runs, a.at)[a.runs[0]]
+        ok = bool(results(a.logs).get(a.runs[0], {}).get("ok"))
+        print(report_at(a.runs[0], t, str(Path(a.logs) / f"run_{a.runs[0]}.jsonl"), a.at, ok))
+        return
     new = worker(a.bench, os.path.abspath(a.src), a.logs)
     old = worker(a.bench, os.path.abspath(a.old), a.logs) if a.old else None
     runs = a.runs or list(new)

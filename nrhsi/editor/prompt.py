@@ -85,6 +85,8 @@ RERUN_ARM = ("The runs themselves are not in this copy.",
              "The runs are in logs/: trust your colleague initially; if you are confused, you may check the logs.")
 RERUN_CHECK_LINE = ("- Check each change: run python3 tests/smoke.py and python3 tests/rerun.py (see README.md), and read "
                     "the changed lines together with the code that calls or uses them.")
+RERUN_AT_LINE = (" To see the values your code gets at a step of a real run, run python3 tests/rerun.py N --at K "
+                 "(see README.md).")
 CHECK_LINE = ("- Check each change: run python3 tests/smoke.py, and read the changed lines together with the code that "
               "calls or uses them.")
 LIMIT_LINE = "- bash can be called BASH_LIMIT times; after that only edit and finish remain, for a few turns, and the session ends."

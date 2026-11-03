@@ -29,7 +29,10 @@ def parse_args():
     ap.add_argument("--rerun", action="store_true", help="в копии logs/ вида и tests/rerun.py: повтор записанных прогонов на src/")
     ap.add_argument("--goal-text", help="якорь цели: текст файла дописывается к последнему выводу инструмента каждого хода")
     ap.add_argument("--goal-k", type=int, default=0, help="когда осталось K вызовов bash — цель: проверить последние правки")
+    ap.add_argument("--rerun-at", action="store_true", help="с --rerun: в README — rerun.py N --at K (настоящие значения на шаге)")
+    ap.add_argument("--finish-review", action="store_true", help="первый finish показывает diff всех правок и вывод rerun")
     ap.add_argument("--checked", action="store_true", help="после конца bash правки не применяются (их нечем проверить)")
+    ap.add_argument("--temp", type=float, help="температура писателя вместо температуры агентов из профиля стенда")
     ap.add_argument("--stand", default="default", help="профиль стенда (stands/<имя>.json): модель и генерация")
     ap.add_argument("--home", default=C.HERE, required=C.HERE is None, help="каталог сессий: logs/, out/, work/")
     ap.add_argument("--rlogs", default=C.RLOGS, help="логи сессий исследователя (кроме --arm merge)")
@@ -73,6 +76,9 @@ def editor_step(a, first, src_before, summary):
         for old, new in (P.RERUN_REPO, P.RERUN_ARM, (P.CHECK_LINE, P.RERUN_CHECK_LINE)):
             assert old in esys, old
             esys = esys.replace(old, new)
+    if a.rerun_at:
+        esys = esys.replace(P.RERUN_CHECK_LINE, P.RERUN_CHECK_LINE + P.RERUN_AT_LINE)
+        assert P.RERUN_AT_LINE in esys
     if a.checked:
         esys = esys.replace(P.fill(P.LIMIT_LINE), P.fill(P.CHECKED_LIMIT_LINE))
         assert P.fill(P.CHECKED_LIMIT_LINE) in esys
@@ -98,6 +104,8 @@ def main():
     a = parse_args()
     C.HERE, C.RLOGS, C.LINT, C.CHECKED, C.SMOKE_CALLS, C.RERUN, C.GOAL_K = (
         os.path.abspath(a.home), a.rlogs, a.lint, a.checked, a.smoke_calls, a.rerun, a.goal_k)
+    C.RERUN_AT, C.FINISH_REVIEW = a.rerun_at, a.finish_review
+    assert not a.rerun_at or a.rerun, "--rerun-at needs --rerun"
     C.GOAL_TEXT = open(a.goal_text).read().strip() if a.goal_text else None
     if not a.view and a.bench not in C.VIEWS:
         raise SystemExit(f"--view is required: no default view for {a.bench}")
@@ -105,6 +113,8 @@ def main():
         C.VIEWS[a.bench] = os.path.realpath(os.path.expanduser(a.view))
     if not a.dry:
         F.apply_stand(a.stand)
+        if a.temp is not None:
+            F.TEMP = a.temp
     if (a.arm == "merge") == bool(a.input and a.rlogs):
         raise SystemExit("--input and --rlogs are needed for obs/fix and not for merge")
     reports = [] if a.arm == "merge" else IN.load_reports(a.input)
@@ -113,7 +123,7 @@ def main():
     os.makedirs(f"{C.HERE}/out", exist_ok=True)
     summary = {"tag": a.tag, "bench": a.bench, "input": a.input, "arm": a.arm, "seed": a.seed,
                "view": C.VIEWS[a.bench], "predict": a.predict, "cite": a.cite, "import_src": a.import_src,
-               "checked": a.checked, "smoke_calls": a.smoke_calls, "rerun": a.rerun, "goal_k": a.goal_k, "goal_text": a.goal_text, "input_text": a.input_text, "stand": F.STAND,
+               "checked": a.checked, "smoke_calls": a.smoke_calls, "rerun": a.rerun, "rerun_at": a.rerun_at, "finish_review": a.finish_review, "goal_k": a.goal_k, "goal_text": a.goal_text, "temp": F.TEMP, "input_text": a.input_text, "stand": F.STAND,
                "n_reports": len(reports), "view_src_hash": src_before}
     if a.arm == "fix":
         props = propose_step(a, reports, src_before, summary)

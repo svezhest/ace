@@ -31,6 +31,20 @@ run 3 (failed): diverges at model call 17 (log line 52): what the model sees dif
 
 READ_FAILED = "  - Read the failed runs; the passed runs are there for comparison and grep.\n"
 
+RERUN_AT_README = """`python3 tests/rerun.py N --at K` replays run N on the current `src/` up to model call K and shows, for the step just before it, the lines of the log and every call of a function in `src/harness.py` and `src/hooks.py`, with the values it got and returned: the values the harness really has at that point of the run. An example, from the same other agent:
+```
+$ python3 tests/rerun.py 3 --at 17
+run 3 (failed), before model call 17 (log line 52):
+  the log just before it:
+    assistant: I will look in the box. | act: open box
+    tool: The box is open. In it you see a foo and a bar.
+  calls of the functions in src/harness.py and src/hooks.py, with the values they got and returned:
+    harness.make_ctx({'observation': 'The box is open. In it you see a foo and a bar.'}, {'actions': [... 12 more, 'go to box', 'open box']}) -> {'observation': 'The box is open. In it you see a foo and a bar.', 'step': 16, 'history': {'actions': [... 12 more, 'go to box', 'open box']}}
+    harness.call_hook('on_observation', <same as above>) -> {'message': 'foobar'}
+      hooks.on_observation(<same as above>) -> {'message': 'foobar'}
+```
+"""
+
 RERUN_PY = """\"\"\"Replays the runs recorded in logs/ on src/; see README.md.\"\"\"
 import os
 import sys
@@ -42,13 +56,28 @@ sys.path.insert(0, HERE)
 import rerun_core as R  # noqa: E402
 
 logs = os.path.join(ROOT, "logs")
+args = sys.argv[1:]
+if "--at" in args:
+    i = args.index("--at")
+    try:
+        at, args = int(args[i + 1]), args[:i] + args[i + 2:]
+    except (IndexError, ValueError):
+        sys.exit("usage: python3 tests/rerun.py N --at K  (K: the number of a model call in run N)")
+    if len(args) != 1:
+        sys.exit("usage: python3 tests/rerun.py N --at K  (one run N)")
+    t = R.worker(BENCH, os.path.join(ROOT, "src"), logs, args, at)
+    if args[0] not in t:
+        sys.exit(f"no run {args[0]} in logs/")
+    print(R.report_at(args[0], t[args[0]], os.path.join(logs, f"run_{args[0]}.jsonl"), at,
+                      bool(R.results(logs).get(args[0], {}).get("ok"))))
+    sys.exit(0)
 new = R.worker(BENCH, os.path.join(ROOT, "src"), logs)
 old = R.worker(BENCH, os.path.join(HERE, "orig_src"), logs)
-runs = sys.argv[1:] or list(new)
+runs = args or list(new)
 missing = [r for r in runs if r not in new]
 if missing:
     sys.exit(f"no run {', '.join(missing)} in logs/; the runs are {', '.join(new)}")
-print(R.report(new, old, R.results(logs), runs, detail=bool(sys.argv[1:])))
+print(R.report(new, old, R.results(logs), runs, detail=bool(args)))
 """
 
 
@@ -89,7 +118,7 @@ def build_work(bench, tag, smoke=True):
             readme = readme.replace(READ_FAILED, "")
         readme = readme.rstrip("\n") + "\n"
     if smoke and C.RERUN:
-        readme += RERUN_README
+        readme += RERUN_README + (RERUN_AT_README if C.RERUN_AT else "")
     if smoke:
         readme += SMOKE_README if not C.SMOKE_CALLS else SMOKE_README.replace(
             "or the error. ", "or the error." + SMOKE_CALLS_README + " ")
