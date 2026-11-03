@@ -14,18 +14,18 @@ SMOKE_README = ("- `tests/smoke.py` — a smoke test: runs src/harness.py with a
                 "Run it with `python3 tests/smoke.py`.\n")
 
 
-RERUN_README = """- `tests/rerun.py` — replays the runs recorded in `logs/` on the current `src/`. The model's replies and the task's messages are taken from the log, so neither the model nor the benchmark is called. As long as what the harness gives the model and the task is the same as in the log, the log still describes the run; at the first place where it differs, the replay of that run stops and the difference is printed: `-` what the log has there, `+` what the harness does now. From that point on the rest of the log no longer applies. It also shows the hooks whose answer changed compared with `src/` as it was at the start (a copy of it is in `tests/orig_src/`). `python3 tests/rerun.py` prints one line per group of runs that behave the same way; `python3 tests/rerun.py N` shows run N in detail, with the line of `logs/run_N.jsonl`. An example, from the harness of another agent:
+RERUN_README = """- `tests/rerun.py` — replays the runs recorded in `logs/` on the current `src/`. The model's replies and the task's messages are taken from the log, so neither the model nor the benchmark is called. As long as what the harness gives the model and the task is the same as in the log, the log still describes the run; at the first place where it differs, the replay of that run stops and the difference is printed: `-` what the log has there, `+` what the harness does now. From that point on the rest of the log no longer applies. It also shows the hooks whose answer changed compared with `src/` as it was at the start (a copy of it is in `tests/orig_src/`). `python3 tests/rerun.py` prints one line per group of runs that behave the same way; `python3 tests/rerun.py N` shows run N in detail, with the line of `logs/run_N.jsonl`. An example, from the harness of another agent, where a hook was added that says "foobar" when the observation has both "foo" and "bar" in it:
 ```
 $ python3 tests/rerun.py
 runs 2, 5, 9 (1 failed, 2 passed): same as the log to the end
-runs 1, 3, 4, 6, 7, 8 (4 failed, 2 passed): diverges at model call (31, 38, 45): what the model sees differs from the log (e.g. run 1)
-  + user: 5 steps are left.
-  hook make_pre_hint: {"message": "5 steps are left."} (was None)
+runs 1, 3, 4, 6, 7, 8 (4 failed, 2 passed): diverges at model call (12, 17, 30): what the model sees differs from the log (e.g. run 1)
+  + user: foobar
+  hook on_observation: {"message": "foobar"} (was None)
 $ python3 tests/rerun.py 3
-run 3 (failed): diverges at model call 38 (log line 114): what the model sees differs from the log
-  - assistant: Let me look for flights on the next day. | take_action: search_flights 2024-05-02
-  + user: 5 steps are left.
-  hook make_pre_hint at model call 38: {"message": "5 steps are left."} (was None)
+run 3 (failed): diverges at model call 17 (log line 52): what the model sees differs from the log
+  - assistant: The foo is next to the bar, I will take the foo. | act: take foo
+  + user: foobar
+  hook on_observation at model call 17: {"message": "foobar"} (was None)
 ```
 """
 
