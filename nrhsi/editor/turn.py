@@ -87,6 +87,10 @@ def run_calls(run, amsg, rec):
         run.pending += F.est_tokens(out) + 10
         if finished:
             break
+    if C.GOAL_TEXT and not finished and run.messages[-1]["role"] == "tool":   # --goal-text: якорь в конце хода
+        run.messages[-1]["content"] += "\n\n" + C.GOAL_TEXT
+        run.pending += F.est_tokens(C.GOAL_TEXT)
+        rec["results"][-1]["goal"] = True
     return finished
 
 

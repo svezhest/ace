@@ -17,6 +17,7 @@ BENCH = None   # --bench (main)
 SMOKE_CALLS = False   # --smoke-calls: smoke печатает вызовы функций harness/hooks, их аргументы и исключения
 RERUN = False   # --rerun: в копии logs/ вида и tests/rerun.py (повтор записанных прогонов на src/)
 CHECKED = False   # --checked: в финальных ходах (bash уже нет) правки не применяются
+GOAL_TEXT = None  # --goal-text FILE: якорь цели — текст файла после последнего вывода инструмента каждого хода
 GOAL_K = 0        # --goal-k K: когда осталось K вызовов bash, харнесс писателя ставит цель — проверить последние правки
 
 BASH_LIMIT = 25          # вызовов bash; потом — финальные ходы

@@ -27,6 +27,7 @@ def parse_args():
     ap.add_argument("--smoke-calls", action="store_true", help="smoke: вызовы функций harness/hooks, аргументы, исключения")
     ap.add_argument("--input-text", help="плечо obs: вместо наблюдений --input — текст из этого файла как есть")
     ap.add_argument("--rerun", action="store_true", help="в копии logs/ вида и tests/rerun.py: повтор записанных прогонов на src/")
+    ap.add_argument("--goal-text", help="якорь цели: текст файла дописывается к последнему выводу инструмента каждого хода")
     ap.add_argument("--goal-k", type=int, default=0, help="когда осталось K вызовов bash — цель: проверить последние правки")
     ap.add_argument("--checked", action="store_true", help="после конца bash правки не применяются (их нечем проверить)")
     ap.add_argument("--stand", default="default", help="профиль стенда (stands/<имя>.json): модель и генерация")
@@ -97,6 +98,7 @@ def main():
     a = parse_args()
     C.HERE, C.RLOGS, C.LINT, C.CHECKED, C.SMOKE_CALLS, C.RERUN, C.GOAL_K = (
         os.path.abspath(a.home), a.rlogs, a.lint, a.checked, a.smoke_calls, a.rerun, a.goal_k)
+    C.GOAL_TEXT = open(a.goal_text).read().strip() if a.goal_text else None
     if not a.view and a.bench not in C.VIEWS:
         raise SystemExit(f"--view is required: no default view for {a.bench}")
     if a.view:
@@ -111,7 +113,7 @@ def main():
     os.makedirs(f"{C.HERE}/out", exist_ok=True)
     summary = {"tag": a.tag, "bench": a.bench, "input": a.input, "arm": a.arm, "seed": a.seed,
                "view": C.VIEWS[a.bench], "predict": a.predict, "cite": a.cite, "import_src": a.import_src,
-               "checked": a.checked, "smoke_calls": a.smoke_calls, "rerun": a.rerun, "goal_k": a.goal_k, "input_text": a.input_text, "stand": F.STAND,
+               "checked": a.checked, "smoke_calls": a.smoke_calls, "rerun": a.rerun, "goal_k": a.goal_k, "goal_text": a.goal_text, "input_text": a.input_text, "stand": F.STAND,
                "n_reports": len(reports), "view_src_hash": src_before}
     if a.arm == "fix":
         props = propose_step(a, reports, src_before, summary)
