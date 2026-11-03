@@ -211,8 +211,10 @@ def play(bench, src, log):
         out = harness.run(ep, bridge.guard(ep, llm))
         if [key(m) for m in out] != [key(m) for m in conv]:
             j = next((j for j, (a, b) in enumerate(zip(out, conv)) if key(a) != key(b)), min(len(out), len(conv)))
-            diverge(kind="end", call=state["call"], text="the harness ends the episode here; the log goes on",
-                    at=j, new=out[j:j + 3], old=conv[j:j + 3])
+            text = ("the harness ends the episode here; the log goes on" if len(out) < len(conv) and j == len(out) else
+                    "the harness adds messages after the log's last one" if j == len(conv) else
+                    "the conversation at the end differs from the log")
+            diverge(kind="end", call=state["call"], text=text, at=j, new=out[j:j + 3], old=conv[j:j + 3])
     except Diverged:
         pass
     except bridge.Loop:
@@ -283,35 +285,50 @@ def prompt_diff(d, limit=12):
     return "\n".join("  " + l[:160] for l in out[:limit]) + more
 
 
+def norm(s):
+    """Для группировки: строки в кавычках и числа не различаем."""
+    import re
+    s = s.replace('\\"', "'")
+    return re.sub(r"\d+", "N", re.sub(r'"[^"\n]*"|\'[^\'\n]*\'', '"…"', s))
+
+
 def report(new, old, res, runs, detail):
-    """detail=False: одна строка на группу прогонов с одинаковым расхождением; True: и что было в логе."""
+    """detail=False: одна строка на группу прогонов с одинаковым (с точностью до кавычек и чисел) расхождением;
+    True: ещё номер вызова, строка лога и что было в логе."""
     groups = {}
     for r in runs:
         t = new[r]
         d = t["div"]
-        status = res.get(r, {})
-        tag = (r, bool(status.get("ok")))
         notes = hook_notes(t["hooks"], old[r]["hooks"]) if old else []
         if d is None:
-            sig = "same as the log to the end"
+            head, body = "same as the log to the end", ""
         elif d["kind"] == "model" and d["call"] == 1:
-            sig = "the prompt differs from the log, so nothing after it can be compared:\n" + prompt_diff(d)
+            head, body = "the prompt differs from the log, so nothing after it can be compared:", "\n" + prompt_diff(d)
         elif d["kind"] == "crash":
-            sig = f"the harness crashes" + (f" at model call {d['call']}" if detail else "") + ": " + d["text"].strip()
+            head, body = "the harness crashes" + (f" at model call {d['call']}" if detail else ""), ": " + d["text"].strip()
         else:
-            sig = f"diverges at model call {d['call']}" + (f" (log line {d['line']})" if detail and d.get("line") else "")
-            sig += f": {d['text']}"
-            if detail:
-                sig += "".join(f"\n  - {short(m)}" for m in d["old"][:2])
-            sig += "".join(f"\n  + {short(m)}" for m in d["new"][:3])
+            head = "diverges at model call " + (str(d["call"]) + (f" (log line {d['line']})" if d.get("line") else "") if detail else "{calls}")
+            head += f": {d['text']}"
+            body = ""
+            if detail or d["kind"] == "bridge":
+                body += "".join(f"\n  - {short(m)}" for m in d["old"][:2])
+            body += "".join(f"\n  + {short(m)}" for m in d["new"][:3])
         seen = {}
         for h, p in notes:
             s = f"hook {h['hook']}" + (f" at model call {h['call']}" if detail else "") + f": {fmt_hook(h)} (was {fmt_hook(p)})"
             seen[s] = seen.get(s, 0) + 1
         for s, n in list(seen.items())[:3]:
-            sig += f"\n  {s}" + (f" ×{n}" if detail and n > 1 else "")
-        groups.setdefault(sig, []).append(tag)
-    return "\n".join(runs_label(tags, len(runs)) + ": " + sig for sig, tags in groups.items())
+            body += f"\n  {s}" + (f" ×{n}" if detail and n > 1 else "")
+        g = groups.setdefault(norm(head + body), {"head": head, "body": body, "tags": [], "calls": []})
+        g["tags"].append((r, bool(res.get(r, {}).get("ok"))))
+        g["calls"].append(str(d["call"]) if d else "")
+    out = []
+    for g in groups.values():
+        calls = sorted(set(g["calls"]), key=lambda c: int(c or 0))
+        head = g["head"].replace("{calls}", calls[0] if len(calls) == 1 else "(" + ", ".join(calls) + ")")
+        ex = " (e.g. run " + g["tags"][0][0] + ")" if len(g["tags"]) > 1 and g["body"] and norm(g["body"]) != g["body"] else ""
+        out.append(runs_label(g["tags"], len(runs)) + ": " + head + ex + g["body"])
+    return "\n".join(out)
 
 
 def runs_label(tags, total):
