@@ -11,7 +11,6 @@
 import argparse
 import json
 import os
-import subprocess
 import sys
 from pathlib import Path
 
@@ -211,7 +210,7 @@ def play(bench, src, log):
         out = harness.run(ep, bridge.guard(ep, llm))
         if [key(m) for m in out] != [key(m) for m in conv]:
             j = next((j for j, (a, b) in enumerate(zip(out, conv)) if key(a) != key(b)), min(len(out), len(conv)))
-            text = ("the harness ends the episode here; the log goes on" if len(out) < len(conv) and j == len(out) else
+            text = ("the harness ends the episode here; the log goes on" if len(out) < len(conv) else
                     "the harness adds messages after the log's last one" if j == len(conv) else
                     "the conversation at the end differs from the log")
             diverge(kind="end", call=state["call"], text=text, at=j, new=out[j:j + 3], old=conv[j:j + 3])
@@ -235,14 +234,19 @@ def play(bench, src, log):
 
 
 def worker(bench, src, logs):
+    """Все прогоны вида на одном src, в этом же процессе: модули src перезагружаются для каждого прогона."""
     sys.dont_write_bytecode = True
     out = {}
     for p in sorted(Path(logs).glob("run_*.jsonl"), key=lambda p: int(p.stem.split("_")[1])):
-        r = subprocess.run([sys.executable, "-I", __file__, "--one", bench, src, str(p)], capture_output=True, text=True)
+        saved = list(sys.path)
+        for m in ("harness", "bridge", "hooks"):
+            sys.modules.pop(m, None)
         try:
-            out[p.stem.split("_")[1]] = json.loads(r.stdout)
-        except Exception:
-            out[p.stem.split("_")[1]] = {"div": {"kind": "crash", "call": 0, "text": r.stderr[-1500:], "new": [], "old": []}, "hooks": []}
+            out[p.stem.split("_")[1]] = play(bench, src, str(p))
+        finally:
+            sys.path[:] = saved
+            for m in ("harness", "bridge", "hooks"):
+                sys.modules.pop(m, None)
     return out
 
 
@@ -339,10 +343,6 @@ def runs_label(tags, total):
 
 
 def main():
-    if sys.argv[1:2] == ["--one"]:
-        bench, src, log = sys.argv[2:5]
-        print(json.dumps(play(bench, src, log), ensure_ascii=False))
-        return
     ap = argparse.ArgumentParser()
     ap.add_argument("--bench", choices=["alf", "app"], required=True)
     ap.add_argument("--src", required=True)

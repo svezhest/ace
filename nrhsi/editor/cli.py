@@ -26,6 +26,7 @@ def parse_args():
     ap.add_argument("--import-src", action="store_true", help="строка в Tools: модули src/ импортируются из python3")
     ap.add_argument("--smoke-calls", action="store_true", help="smoke: вызовы функций harness/hooks, аргументы, исключения")
     ap.add_argument("--input-text", help="плечо obs: вместо наблюдений --input — текст из этого файла как есть")
+    ap.add_argument("--rerun", action="store_true", help="в копии logs/ вида и tests/rerun.py: повтор записанных прогонов на src/")
     ap.add_argument("--checked", action="store_true", help="после конца bash правки не применяются (их нечем проверить)")
     ap.add_argument("--stand", default="default", help="профиль стенда (stands/<имя>.json): модель и генерация")
     ap.add_argument("--home", default=C.HERE, required=C.HERE is None, help="каталог сессий: logs/, out/, work/")
@@ -66,6 +67,10 @@ def editor_step(a, first, src_before, summary):
     if a.import_src:
         esys = esys.replace(F.PYTHON_LINE, F.PYTHON_LINE + "\n" + F.IMPORT_LINE)
         assert F.IMPORT_LINE in esys
+    if a.rerun:
+        for old, new in (P.RERUN_REPO, P.RERUN_ARM, (P.CHECK_LINE, P.RERUN_CHECK_LINE)):
+            assert old in esys, old
+            esys = esys.replace(old, new)
     if a.checked:
         esys = esys.replace(P.fill(P.LIMIT_LINE), P.fill(P.CHECKED_LIMIT_LINE))
         assert P.fill(P.CHECKED_LIMIT_LINE) in esys
@@ -89,8 +94,8 @@ def editor_step(a, first, src_before, summary):
 
 def main():
     a = parse_args()
-    C.HERE, C.RLOGS, C.LINT, C.CHECKED, C.SMOKE_CALLS = (os.path.abspath(a.home), a.rlogs, a.lint,
-                                                                   a.checked, a.smoke_calls)
+    C.HERE, C.RLOGS, C.LINT, C.CHECKED, C.SMOKE_CALLS, C.RERUN = (os.path.abspath(a.home), a.rlogs, a.lint,
+                                                                            a.checked, a.smoke_calls, a.rerun)
     if not a.view and a.bench not in C.VIEWS:
         raise SystemExit(f"--view is required: no default view for {a.bench}")
     if a.view:
@@ -105,7 +110,7 @@ def main():
     os.makedirs(f"{C.HERE}/out", exist_ok=True)
     summary = {"tag": a.tag, "bench": a.bench, "input": a.input, "arm": a.arm, "seed": a.seed,
                "view": C.VIEWS[a.bench], "predict": a.predict, "cite": a.cite, "import_src": a.import_src,
-               "checked": a.checked, "smoke_calls": a.smoke_calls, "input_text": a.input_text, "stand": F.STAND,
+               "checked": a.checked, "smoke_calls": a.smoke_calls, "rerun": a.rerun, "input_text": a.input_text, "stand": F.STAND,
                "n_reports": len(reports), "view_src_hash": src_before}
     if a.arm == "fix":
         props = propose_step(a, reports, src_before, summary)

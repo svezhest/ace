@@ -80,6 +80,10 @@ def fill(t, arm=None):
             .replace("BASH_LIMIT", str(C.BASH_LIMIT)))
 
 
+RERUN_REPO = ("the agent's runs and the benchmark are not here.", "the agent's recorded runs are in logs/; the benchmark is not here.")
+RERUN_ARM = ("The runs themselves are not in this copy.", "The runs are in logs/.")
+RERUN_CHECK_LINE = ("- Check each change: run python3 tests/smoke.py and python3 tests/rerun.py (see README.md), and read "
+                    "the changed lines together with the code that calls or uses them.")
 CHECK_LINE = ("- Check each change: run python3 tests/smoke.py, and read the changed lines together with the code that "
               "calls or uses them.")
 LIMIT_LINE = "- bash can be called BASH_LIMIT times; after that only edit and finish remain, for a few turns, and the session ends."

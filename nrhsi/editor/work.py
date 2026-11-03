@@ -14,6 +14,42 @@ SMOKE_README = ("- `tests/smoke.py` — a smoke test: runs src/harness.py with a
                 "Run it with `python3 tests/smoke.py`.\n")
 
 
+RERUN_README = """- `tests/rerun.py` — replays the runs recorded in `logs/` on the current `src/`. The model's replies and the task's messages are taken from the log, so neither the model nor the benchmark is called. As long as what the harness gives the model and the task is the same as in the log, the log still describes the run; at the first place where it differs, the replay of that run stops and the difference is printed: `-` what the log has there, `+` what the harness does now. From that point on the rest of the log no longer applies. It also shows the hooks whose answer changed compared with `src/` as it was at the start (a copy of it is in `tests/orig_src/`). `python3 tests/rerun.py` prints one line per group of runs that behave the same way; `python3 tests/rerun.py N` shows run N in detail, with the line of `logs/run_N.jsonl`. An example, from the harness of another agent:
+```
+$ python3 tests/rerun.py
+runs 2, 5, 9 (1 failed, 2 passed): same as the log to the end
+runs 1, 3, 4, 6, 7, 8 (4 failed, 2 passed): diverges at model call (31, 38, 45): what the model sees differs from the log (e.g. run 1)
+  + user: 5 steps are left.
+  hook make_pre_hint: {"message": "5 steps are left."} (was None)
+$ python3 tests/rerun.py 3
+run 3 (failed): diverges at model call 38 (log line 114): what the model sees differs from the log
+  - assistant: Let me look for flights on the next day. | take_action: search_flights 2024-05-02
+  + user: 5 steps are left.
+  hook make_pre_hint at model call 38: {"message": "5 steps are left."} (was None)
+```
+"""
+
+RERUN_PY = """\"\"\"Replays the runs recorded in logs/ on src/; see README.md.\"\"\"
+import os
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(HERE)
+sys.dont_write_bytecode = True
+sys.path.insert(0, HERE)
+import rerun_core as R  # noqa: E402
+
+logs = os.path.join(ROOT, "logs")
+new = R.worker(BENCH, os.path.join(ROOT, "src"), logs)
+old = R.worker(BENCH, os.path.join(HERE, "orig_src"), logs)
+runs = sys.argv[1:] or list(new)
+missing = [r for r in runs if r not in new]
+if missing:
+    sys.exit(f"no run {', '.join(missing)} in logs/; the runs are {', '.join(new)}")
+print(R.report(new, old, R.results(logs), runs, detail=bool(sys.argv[1:])))
+"""
+
+
 SMOKE_CALLS_README = (" After each scenario it lists the functions of src/harness.py and src/hooks.py that were called "
                       "and how many times, with the exceptions raised in them, also those that a caller catches; after "
                       "the first scenario also the arguments and the return value of each function's first call.")
@@ -45,7 +81,10 @@ def build_work(bench, tag, smoke=True):
         shutil.rmtree(v)
     os.makedirs(v)
     with open(f"{C.VIEWS[bench]}/README.md") as f:
-        readme = readme_without_logs(f.read())
+        readme = f.read() if C.RERUN else readme_without_logs(f.read())
+        readme = readme.rstrip("\n") + "\n"
+    if smoke and C.RERUN:
+        readme += RERUN_README
     if smoke:
         readme += SMOKE_README if not C.SMOKE_CALLS else SMOKE_README.replace(
             "or the error. ", "or the error." + SMOKE_CALLS_README + " ")
@@ -59,6 +98,12 @@ def build_work(bench, tag, smoke=True):
             with open(f"{v}/tests/smoke.py", "w") as f:
                 f.write(smoke_calls(open(f"{C.SMOKE}/{bench}.py").read()))
             shutil.copy(f"{C.SMOKE}/calls.py", f"{v}/tests/calls.py")
+    if smoke and C.RERUN:
+        shutil.copytree(f"{C.VIEWS[bench]}/logs", f"{v}/logs")
+        shutil.copytree(f"{C.VIEWS[bench]}/src", f"{v}/tests/orig_src", ignore=shutil.ignore_patterns("__pycache__"))
+        shutil.copy(os.path.join(os.path.dirname(C.SMOKE), "..", "..", "editor", "rerun.py"), f"{v}/tests/rerun_core.py")
+        with open(f"{v}/tests/rerun.py", "w") as f:
+            f.write(RERUN_PY.replace("BENCH", repr(bench)))
     for p in glob.glob(f"{v}/src/*"):
         assert os.stat(p).st_nlink == 1, p          # копия, не жёсткая ссылка
     return os.path.realpath(v)
