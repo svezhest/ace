@@ -29,6 +29,8 @@ run 3 (failed): diverges at model call 17 (log line 52): what the model sees dif
 ```
 """
 
+READ_FAILED = "  - Read the failed runs; the passed runs are there for comparison and grep.\n"
+
 RERUN_PY = """\"\"\"Replays the runs recorded in logs/ on src/; see README.md.\"\"\"
 import os
 import sys
@@ -82,6 +84,9 @@ def build_work(bench, tag, smoke=True):
     os.makedirs(v)
     with open(f"{C.VIEWS[bench]}/README.md") as f:
         readme = f.read() if C.RERUN else readme_without_logs(f.read())
+        if C.RERUN:   # 4.11, автор: писатель сначала доверяет коллеге, логи — при сомнении (строка — для ревьювера)
+            assert readme.count(READ_FAILED) == 1
+            readme = readme.replace(READ_FAILED, "")
         readme = readme.rstrip("\n") + "\n"
     if smoke and C.RERUN:
         readme += RERUN_README

@@ -158,6 +158,7 @@ def play(bench, src, log):
     ev, conv, line_of = load_log(log)
     model_pos = [i for i, m in enumerate(conv) if m["role"] == "assistant" and ev[line_of[i] - 1]["event"] == "model"]
     trace = {"hooks": [], "div": None}
+    stopped = end_of_log(ev)[0].get("reason") == "stopped"
     state = {"call": 0, "send": 0}
 
     def diverge(**kw):
@@ -168,6 +169,8 @@ def play(bench, src, log):
         k = state["call"]
         state["call"] += 1
         if k >= len(model_pos):
+            if stopped and [key(m) for m in messages] == [key(m) for m in conv]:
+                raise Diverged()   # запись оборвал стенд (контекст, время) ровно на этом запросе: расхождения нет
             diverge(kind="model", call=k + 1, text="the harness asks the model once more; the log has no reply here",
                     at=len(conv), new=messages[len(conv):] or messages[-1:], old=[])
         want = conv[:model_pos[k]]
@@ -207,7 +210,9 @@ def play(bench, src, log):
     sent = [conv[i] for i in model_pos]
     ep = {"alf": alf_episode, "app": app_episode}[bench](bridge, ev, sent, state, diverge)
     try:
-        out = harness.run(ep, bridge.guard(ep, llm))
+        # защита стенда — только если запись ею и кончилась: иначе тогда её не было (B8, r5app run 19)
+        guarded = end_of_log(ev)[0].get("detail") == "repeated reply"
+        out = harness.run(ep, bridge.guard(ep, llm) if guarded else llm)
         if [key(m) for m in out] != [key(m) for m in conv]:
             j = next((j for j, (a, b) in enumerate(zip(out, conv)) if key(a) != key(b)), min(len(out), len(conv)))
             text = ("the harness ends the episode here; the log goes on" if len(out) < len(conv) else

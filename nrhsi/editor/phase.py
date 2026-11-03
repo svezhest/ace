@@ -29,4 +29,9 @@ def after_turn(run, finished):
         enter_final(run, "bash limit")
     elif run.st["tool_calls"] >= C.STEP_BUDGET:
         enter_final(run, "step budget")
+    elif C.GOAL_K and not run.goal_sent and run.st["bash_calls"] >= C.BASH_LIMIT - C.GOAL_K:
+        run.goal_sent = True
+        checks = "python3 tests/smoke.py and python3 tests/rerun.py" if C.RERUN else "python3 tests/smoke.py"
+        run.note_user(f"{C.BASH_LIMIT - run.st['bash_calls']} bash calls are left. Goal now: check your latest edits "
+                      f"with {checks}.")
     return None

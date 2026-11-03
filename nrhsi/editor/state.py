@@ -21,6 +21,7 @@ class Run:
         self.items = []                  # правки (editor) или предложения (proposer)
         self.seen = {}                   # команда bash -> (номер вызова, вывод); сброс после применённой правки
         self.final_left, self.final_why = 0, None
+        self.goal_sent = False             # --goal-k: цель уже поставлена
         self.last_prompt = self.pending = 0      # pending = оценка токенов, добавленных после последнего ответа
         self.log = open(log_path, "w", encoding="utf-8", errors="backslashreplace")
 
