@@ -359,7 +359,7 @@ def report(new, old, res, runs, detail):
         d = t["div"]
         notes = hook_notes(t["hooks"], old[r]["hooks"]) if old else []
         if d is None:
-            head, body = "same as the log to the end", ""
+            head, body = "no changes (same as the log to the end)", ""
         elif d["kind"] == "model" and d["call"] == 1:
             head, body = "the prompt differs from the log, so nothing after it can be compared:", "\n" + prompt_diff(d)
         elif d["kind"] == "crash":

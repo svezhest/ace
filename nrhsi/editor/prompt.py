@@ -84,7 +84,8 @@ RERUN_REPO = ("the agent's runs and the benchmark are not here.", "the agent's r
 RERUN_ARM = ("The runs themselves are not in this copy.",
              "The runs are in logs/: trust your colleague initially; if you are confused, you may check the logs.")
 RERUN_CHECK_LINE = ("- Check each change: run python3 tests/smoke.py and python3 tests/rerun.py (see README.md), and read "
-                    "the changed lines together with the code that calls or uses them.")
+                    "the changed lines together with the code that calls or uses them. If python3 tests/rerun.py shows "
+                    "no changes in the runs an observation is about, your change may have missed.")
 RERUN_AT_LINE = (" To see the values your code gets at a step of a real run, run python3 tests/rerun.py N --at K "
                  "(see README.md).")
 CHECK_LINE = ("- Check each change: run python3 tests/smoke.py, and read the changed lines together with the code that "
