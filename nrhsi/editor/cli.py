@@ -139,7 +139,7 @@ def main():
     if a.stages:
         C.STAGES = tuple(int(x) for x in a.stages.split(","))
         assert len(C.STAGES) == 2 and not a.bash_limit and not a.goal_k, "--stages R,K; без --bash-limit и --goal-k"
-        C.BASH_LIMIT, a.checked = sum(C.STAGES), True
+        C.BASH_LIMIT, a.checked, C.CHECKED = sum(C.STAGES), True, True   # C.CHECKED уже выставлен выше — ставим и его
         C.STEP_BUDGET = max(C.STEP_BUDGET, C.BASH_LIMIT + 35)
     assert not a.rerun_tool or (a.rerun and not a.rerun_at), "--rerun-tool needs --rerun, not with --rerun-at"
     C.AUTO_CHECK, C.RERUN_TOOL, C.SCRATCH = a.auto_check, a.rerun_tool, a.scratch
