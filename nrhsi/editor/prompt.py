@@ -88,6 +88,11 @@ RERUN_CHECK_LINE = ("- Check each change: run python3 tests/smoke.py and python3
                     "no changes in the runs an observation is about, your change may have missed.")
 RERUN_AT_LINE = (" To see the values your code gets at a step of a real run, run python3 tests/rerun.py N --at K "
                  "(see README.md).")
+FINISH_LINE = "- finish(): end the session when your changes are done."
+FINISH_REVIEW_LINE = ("- finish(submit): hand in your changes and end the session. Before they are handed in, you see "
+                      "all your changes and what python3 tests/rerun.py prints on them; then call finish again to hand "
+                      "them in, change them with edit, or call finish with submit=false to hand in nothing (src/ goes "
+                      "back to how it was at the start).")
 CHECK_LINE = ("- Check each change: run python3 tests/smoke.py, and read the changed lines together with the code that "
               "calls or uses them.")
 LIMIT_LINE = "- bash can be called BASH_LIMIT times; after that only edit and finish remain, for a few turns, and the session ends."

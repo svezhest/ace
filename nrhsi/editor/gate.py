@@ -16,26 +16,40 @@ def smoke_failure(run):
     return "python3 tests/smoke.py now prints:\n" + out if not ok or "Traceback" in full else ""
 
 
-def finish(run):
-    """finish -> (текст для модели, конец ли). Шаг вариантов и повторный finish редактора — конец сразу."""
-    if run.role != "editor" or run.st.get("lint_at_finish"):
+def finish(run, args=None):
+    """finish -> (текст для модели, конец ли). Шаг вариантов — конец сразу. Редактор: ворота pyflakes и smoke —
+    один раз; --finish-review — обзор (все правки и rerun на них) при каждом finish после изменения src;
+    finish(submit=false) — правки отбрасываются, src как в начале."""
+    if run.role != "editor":
         return "Finished.", True
-    gate = LI.lint_changed(run.root)
-    smoke = smoke_failure(run)
+    from . import work as WK
+    if C.FINISH_REVIEW and (args or {}).get("submit") in (False, "false", "False"):
+        d = WK.diff_src(C.BENCH, run.root)
+        run.w({"type": "dropped", "diff": d})
+        WK.restore_src(C.BENCH, run.root)
+        run.st["submitted"] = False
+        return "Finished: nothing handed in; src/ is back to how it was at the start.", True
+    h = WK.tree_hash(f"{run.root}/src")
+    review = C.FINISH_REVIEW and run.st["edits_applied"] and h != run.st.get("reviewed_hash")
+    if run.st.get("lint_at_finish") and not review:
+        return "Finished.", True
+    gate = "" if run.st.get("lint_at_finish") else LI.lint_changed(run.root)
+    smoke = "" if run.st.get("lint_at_finish") else smoke_failure(run)
     if smoke:
         gate += ("\n" if gate else "") + smoke
-    review = review_text(run) if C.FINISH_REVIEW and run.st["edits_applied"] else ""
-    if not gate and not review:
-        return "Finished.", True
     run.st["lint_at_finish"] = True
     if not review:
+        if not gate:
+            return "Finished.", True
         return f"Not finished yet. {gate}\nFix them with edit, or call finish again to end as is.", False
-    run.st["finish_review"] = True
-    if run.final_left:
-        run.final_left += 1                  # ход на ответ после показа
-    return ("Not finished yet: here are your changes and what python3 tests/rerun.py prints on them."
-            + (f"\n{gate}" if gate else "") + f"\n\n{review}\n\nIf this is the change you meant, call finish again; "
-            "otherwise change it with edit."), False
+    run.st["reviewed_hash"] = h
+    run.st["reviews"] = run.st.get("reviews", 0) + 1
+    if run.final_left and run.st["reviews"] == 1:
+        run.final_left += 1                  # ход на ответ после первого обзора
+    return ("Not handed in yet. Here are all your changes and what python3 tests/rerun.py prints on them."
+            + (f"\n{gate}" if gate else "") + f"\n\n{review_text(run)}\n\nIs this the change the observation "
+            "needs? If it is, call finish again to hand it in. If not, change it with edit; or, if you think you "
+            "could not make it, call finish with submit=false to hand in nothing."), False
 
 
 def review_text(run):

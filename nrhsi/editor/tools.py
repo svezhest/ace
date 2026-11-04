@@ -105,7 +105,7 @@ def do_call(run, name, raw, res):
     if name == "propose" and run.role == "proposer":
         return propose_call(run, args, res)
     if name == "finish":
-        return GA.finish(run)
+        return GA.finish(run, args)
     run.st["bad_call"] += 1
     res["format_fail"] = "unknown_tool"
     names = [t["function"]["name"] for t in run.offered()]

@@ -27,6 +27,15 @@ FINISH_SCHEMA = {"type": "function", "function": {
     "name": "finish", "description": "End the session.", "parameters": {"type": "object", "properties": {}}}}
 
 
+FINISH_SUBMIT_SCHEMA = {"type": "function", "function": {
+    "name": "finish", "description": "Hand in your changes and end the session; submit=false hands in nothing.",
+    "parameters": {"type": "object", "properties": {
+        "submit": {"type": "boolean", "description": "false: drop all your changes, src/ goes back to how it was at "
+                   "the start, and nothing is handed in. Default true."}}}}}
+
+
 def role_tools(role):
     """Набор инструментов роли (editor | proposer); в финальных ходах — без bash, [1:]."""
-    return [BASH_SCHEMA, EDIT_SCHEMA if role == "editor" else PROPOSE_SCHEMA, FINISH_SCHEMA]
+    from . import cfg as C
+    fin = FINISH_SUBMIT_SCHEMA if role == "editor" and C.FINISH_REVIEW else FINISH_SCHEMA
+    return [BASH_SCHEMA, EDIT_SCHEMA if role == "editor" else PROPOSE_SCHEMA, fin]

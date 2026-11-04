@@ -159,6 +159,12 @@ def tree_hash(d):
     return h.hexdigest()[:16]
 
 
+def restore_src(bench, root):
+    """finish(submit=false): src/ копии — снова как src/ вида."""
+    shutil.rmtree(f"{root}/src")
+    shutil.copytree(f"{C.VIEWS[bench]}/src", f"{root}/src", ignore=shutil.ignore_patterns("__pycache__"))
+
+
 def diff_src(bench, root):
     r = subprocess.run(["diff", "-ruN", "-x", "__pycache__", f"{C.VIEWS[bench]}/src", f"{root}/src"],
                        capture_output=True, text=True)

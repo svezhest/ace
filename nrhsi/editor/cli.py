@@ -79,6 +79,9 @@ def editor_step(a, first, src_before, summary):
     if a.rerun_at:
         esys = esys.replace(P.RERUN_CHECK_LINE, P.RERUN_CHECK_LINE + P.RERUN_AT_LINE)
         assert P.RERUN_AT_LINE in esys
+    if a.finish_review:
+        assert a.rerun and P.FINISH_LINE in esys, "--finish-review needs --rerun"
+        esys = esys.replace(P.FINISH_LINE, P.FINISH_REVIEW_LINE)
     if a.checked:
         esys = esys.replace(P.fill(P.LIMIT_LINE), P.fill(P.CHECKED_LIMIT_LINE))
         assert P.fill(P.CHECKED_LIMIT_LINE) in esys
