@@ -29,6 +29,23 @@ run 3 (failed): diverges at model call 17 (log line 52): what the model sees dif
 ```
 """
 
+def rerun_tool_readme():
+    """--rerun-tool (4.11): тот же текст README про повтор — для инструмента rerun(change, run)."""
+    t = RERUN_README
+    for old, new in (("- `tests/rerun.py` — replays", "- the rerun tool — replays"),
+                     (" (a copy of it is in `tests/orig_src/`)", ""),
+                     ("`python3 tests/rerun.py` prints one line per group of runs that behave the same way; "
+                      "`python3 tests/rerun.py N` shows run N in detail, with the line of `logs/run_N.jsonl`.",
+                      "rerun without run prints one line per group of runs that behave the same way; rerun with run=N "
+                      "shows run N in detail, with the line of `logs/run_N.jsonl`. Before that, rerun says whether the "
+                      "runs went as you expected with change: `ok` or `failed`."),
+                     ("$ python3 tests/rerun.py\n", "rerun(change=true)\nok:\n"),
+                     ("$ python3 tests/rerun.py 3\n", "rerun(change=false, run=3)\nfailed!:\n")):
+        assert t.count(old) == 1, old
+        t = t.replace(old, new)
+    return t
+
+
 READ_FAILED = "  - Read the failed runs; the passed runs are there for comparison and grep.\n"
 
 RERUN_AT_README = """`python3 tests/rerun.py N --at K` replays run N on the current `src/` up to model call K and shows, for the step just before it, the lines of the log and every call of a function in `src/harness.py` and `src/hooks.py`, with the values it got and returned: the values the harness really has at that point of the run. An example, from the same other agent:
@@ -121,7 +138,7 @@ def build_work(bench, tag, smoke=True):
             readme = readme.replace(READ_FAILED, "")
         readme = readme.rstrip("\n") + "\n"
     if smoke and C.RERUN:
-        readme += RERUN_README + (RERUN_AT_README if C.RERUN_AT else "")
+        readme += (rerun_tool_readme() if C.RERUN_TOOL else RERUN_README) + (RERUN_AT_README if C.RERUN_AT else "")
     if smoke:
         readme += SMOKE_README if not C.SMOKE_CALLS else SMOKE_README.replace(
             "or the error. ", "or the error." + SMOKE_CALLS_README + " ")
@@ -135,8 +152,11 @@ def build_work(bench, tag, smoke=True):
             with open(f"{v}/tests/smoke.py", "w") as f:
                 f.write(smoke_calls(open(f"{C.SMOKE}/{bench}.py").read()))
             shutil.copy(f"{C.SMOKE}/calls.py", f"{v}/tests/calls.py")
+    if C.SCRATCH:
+        os.makedirs(f"{v}/{F.SCRATCH_DIR}")
     if smoke and C.RERUN:
         shutil.copytree(f"{C.VIEWS[bench]}/logs", f"{v}/logs")
+    if smoke and C.RERUN and not C.RERUN_TOOL:      # --rerun-tool: повтор — инструмент, ядра в копии нет
         shutil.copytree(f"{C.VIEWS[bench]}/src", f"{v}/tests/orig_src", ignore=shutil.ignore_patterns("__pycache__"))
         shutil.copy(os.path.join(os.path.dirname(C.SMOKE), "..", "..", "editor", "rerun.py"), f"{v}/tests/rerun_core.py")
         with open(f"{v}/tests/rerun.py", "w") as f:

@@ -5,7 +5,7 @@ from . import lint as LI
 
 def enter_final(run, why):
     run.final_left, run.final_why = C.FINAL_TURNS, why
-    head = (f"You have used all {C.BASH_LIMIT} bash calls." if why == "bash limit" else
+    head = (f"You have used all {run.bash_limit} bash calls." if why == "bash limit" else
             f"You have used all {C.STEP_BUDGET} tool calls." if why == "step budget" else
             "The context is almost full.")
     tail = ("Edits can no longer be checked, so they are not applied: call finish." if run.role == "editor" and C.CHECKED else
@@ -25,7 +25,11 @@ def after_turn(run, finished):
         run.final_left -= 1
         if not run.final_left:
             return f"forced: {run.final_why} (final turns used)"
-    elif run.st["bash_calls"] >= C.BASH_LIMIT:
+    elif run.st["bash_calls"] >= run.bash_limit and C.STAGES and not run.stage2:
+        run.stage2, run.bash_limit = True, run.bash_limit + C.STAGES[1]
+        run.note_user(f"You have used the {C.STAGES[0]} bash calls for reading, so the check part starts: make your "
+                      f"edits; you have {C.STAGES[1]} bash calls left to check them.")
+    elif run.st["bash_calls"] >= run.bash_limit:
         enter_final(run, "bash limit")
     elif run.st["tool_calls"] >= C.STEP_BUDGET:
         enter_final(run, "step budget")

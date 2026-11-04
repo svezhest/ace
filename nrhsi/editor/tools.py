@@ -17,7 +17,7 @@ def json_args(raw):
 
 def bash_call(run, args, res):
     st = run.st
-    if run.final_left or st["bash_calls"] >= C.BASH_LIMIT:
+    if run.final_left or st["bash_calls"] >= run.bash_limit:
         st["bad_call"] += 1
         res["format_fail"] = "bash_unavailable"
         return f"Error: bash is no longer available; this command was not run. Use {run.act}, then call finish.", False
@@ -56,7 +56,37 @@ def edit_call(run, args, res):
     res["edit"] = {k: rec.get(k) for k in ("rel", "fail", "applied", "syntax")}
     if rec.get("applied"):
         run.seen.clear()                     # файлы изменились: повтор чтения разрешён
+        if C.STAGES and not run.stage2:
+            run.stage2, run.bash_limit = True, run.st["bash_calls"] + C.STAGES[1]
+            text += (f"\n\nThis is your first edit, so the check part starts: you have {C.STAGES[1]} bash calls "
+                     "left to check your edits.")
+        if C.AUTO_CHECK:
+            text += "\n\n" + GA.edit_checks(run)
     return text, False
+
+
+def rerun_call(run, args, res):
+    """--rerun-tool: rerun(change, run) -> ok / failed по ожиданию change, затем вывод повтора."""
+    ch, n = args.get("change"), args.get("run")
+    if isinstance(ch, str) and ch.lower() in ("true", "false"):
+        ch = ch.lower() == "true"
+    if not isinstance(ch, bool):
+        run.st["bad_call"] += 1
+        res["format_fail"] = "bad_args"
+        return "Error: change is required: true or false.", False
+    if n is not None:
+        try:
+            n = int(n)
+        except (TypeError, ValueError):
+            run.st["bad_call"] += 1
+            res["format_fail"] = "bad_args"
+            return "Error: run must be a run number.", False
+    run.st["reruns"] = run.st.get("reruns", 0) + 1
+    out, changed = GA.rerun_output(run, n)
+    res.update(change=ch, changed=changed)
+    if ch == changed:
+        return ("ok:\n" + out if changed else "ok, no changes"), False
+    return ("failed!:\n" + out if changed else "failed: no changes!"), False
 
 
 def check_proposal(args, n_obs):
@@ -104,6 +134,8 @@ def do_call(run, name, raw, res):
         return edit_call(run, args, res)
     if name == "propose" and run.role == "proposer":
         return propose_call(run, args, res)
+    if name == "rerun" and C.RERUN_TOOL:
+        return rerun_call(run, args, res)
     if name == "finish":
         return GA.finish(run, args)
     run.st["bad_call"] += 1

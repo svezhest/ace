@@ -102,3 +102,21 @@ PREDICT_LINE = ("- Check each change: before you run python3 tests/smoke.py, wri
                 "after your change (which messages, after which replies, how the run ends); after it runs, compare "
                 "the output with what you wrote, line by line, and say where they differ before you go on. Read the "
                 "changed lines together with the code that calls or uses them.")
+
+# 4.11, автор: этапы, проверки в правке, rerun с ожиданием, scratch/
+STAGES_LINE = ("- bash: the first STAGE_R calls are for reading. Your first edit starts the check part: from then on you "
+               "have STAGE_K more bash calls to check your edits (if the STAGE_R calls run out before you edit, the check "
+               "part starts then). After the check part, edits can no longer be checked and are not applied: only "
+               "finish remains, and the session ends.")
+AUTO_CHECK_LINE = (" After each edit that is applied, pyflakes, python3 tests/smoke.py and RERUN_NAME are run on src/; "
+                   "their output comes with the edit's answer and uses no bash calls.")
+RERUN_TOOL_LINE = ("- rerun(change, run): replays the runs in logs/ on the current src/ (see README.md). change: true if "
+                   "you expect your changes to make these runs go differently from the log, false if you expect them "
+                   "to go the same. It answers ok or failed (did the runs go as you expected), then what changed; run: "
+                   "one run in detail.")
+RERUN_TOOL_CHECK_LINE = ("- Check each change: run python3 tests/smoke.py and the rerun tool (see README.md), and read the "
+                         "changed lines together with the code that calls or uses them. If rerun shows no changes in "
+                         "the runs an observation is about, your change may have missed.")
+SCRATCH_NOWRITE = "Nothing can be written with it."
+SCRATCH_WRITE = ("Files can be written only in scratch/ (empty at the start; > scratch/NAME, or from python3); "
+                 "everything else is read-only, and there is no /tmp.")

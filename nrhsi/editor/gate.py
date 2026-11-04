@@ -1,5 +1,7 @@
 """Ворота finish редактора: один раз по итогу всех правок — новые предупреждения pyflakes и падение smoke."""
 import os
+import subprocess
+import sys
 
 from .cfg import F
 from . import cfg as C
@@ -46,7 +48,7 @@ def finish(run, args=None):
     run.st["reviews"] = run.st.get("reviews", 0) + 1
     if run.final_left and run.st["reviews"] == 1:
         run.final_left += 1                  # ход на ответ после первого обзора
-    return ("Not handed in yet. Here are all your changes and what python3 tests/rerun.py prints on them."
+    return (f"Not handed in yet. Here are all your changes and what {rerun_name()} prints on them."
             + (f"\n{gate}" if gate else "") + f"\n\n{review_text(run)}\n\nIs this the change the observation "
             "needs? If it is, call finish again to hand it in. If not, change it with edit; or, if you think you "
             "could not make it, call finish with submit=false to hand in nothing."), False
@@ -58,8 +60,50 @@ def review_text(run):
     d = WK.diff_src(C.BENCH, run.root)
     d = d if len(d) <= REVIEW_DIFF else d[:REVIEW_DIFF] + f"\n[... {len(d)} characters in all]"
     out = f"Your changes against the start:\n```diff\n{d.rstrip()}\n```"
-    if os.path.exists(f"{run.root}/tests/rerun.py"):
-        _, r, full, _, _ = F.bash_output("python3 tests/rerun.py", run.root, run.prof)
-        r = full if len(full) <= REVIEW_RERUN else full[:REVIEW_RERUN] + f"\n[... {len(full)} characters in all]"
-        out += f"\n\npython3 tests/rerun.py prints:\n{r.rstrip()}"
+    if C.RERUN:
+        r = clip(rerun_output(run)[0], REVIEW_RERUN)
+        out += f"\n\n{rerun_name()} prints:\n{r.rstrip()}"
     return out
+
+
+def clip(t, n):
+    return t if len(t) <= n else t[:n] + f"\n[... {len(t)} characters in all]"
+
+
+def rerun_name():
+    return "rerun" if C.RERUN_TOOL else "python3 tests/rerun.py"
+
+
+RERUN_CORE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "editor", "rerun.py")
+
+
+def rerun_output(run, n=None):
+    """Вывод повтора прогонов на текущем src/ -> (текст, есть ли расхождение хоть в одном прогоне).
+    --rerun-tool: ядро editor/rerun.py вне копии (в копии его нет), старый src — вид; иначе tests/rerun.py в песочнице."""
+    if C.RERUN_TOOL:
+        cmd = [sys.executable, RERUN_CORE, "--bench", C.BENCH, "--src", f"{run.root}/src", "--logs", f"{run.root}/logs",
+               "--old", f"{C.VIEWS[C.BENCH]}/src"] + ([str(n)] if n is not None else [])
+        p = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        full = (p.stdout + p.stderr).strip()
+    else:
+        _, _, full, _, _ = F.bash_output("python3 tests/rerun.py" + (f" {n}" if n is not None else ""), run.root, run.prof)
+        full = full.strip()
+    heads = [l for l in full.splitlines() if l and not l[0].isspace()]
+    changed = any("no changes" not in l for l in heads)
+    return clip(full, F.OUT_CHARS), changed
+
+
+def edit_checks(run):
+    """--auto-check (4.11): после применённой правки — новые предупреждения pyflakes, smoke, rerun; bash не тратится."""
+    lint_ = LI.lint_changed(run.root)
+    ok, out, full, _, _ = F.bash_output("python3 tests/smoke.py", run.root, run.prof)
+    smoke = (f"python3 tests/smoke.py prints:\n{out}" if not ok or "Traceback" in full else
+             "python3 tests/smoke.py runs without errors.")
+    t = "Checks run on src/ after this edit (they use no bash calls):\n"
+    if lint_:
+        t += lint_ + "\n"
+    if C.RERUN:
+        t += smoke + f"\n{rerun_name()} prints:\n" + clip(rerun_output(run)[0], REVIEW_RERUN).rstrip()
+    else:
+        t += smoke
+    return t

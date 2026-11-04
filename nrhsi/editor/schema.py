@@ -34,8 +34,32 @@ FINISH_SUBMIT_SCHEMA = {"type": "function", "function": {
                    "the start, and nothing is handed in. Default true."}}}}}
 
 
+RERUN_SCHEMA = {"type": "function", "function": {
+    "name": "rerun", "description": "Replay the runs in logs/ on the current src/ (see README.md) and say whether they "
+    "went as you expected.",
+    "parameters": {"type": "object", "properties": {
+        "change": {"type": "boolean", "description": "true: you expect your changes to make these runs go differently "
+                   "from the log; false: you expect them to go the same as the log."},
+        "run": {"type": "integer", "description": "One run, shown in detail. Without it: all runs, one line per group "
+                "of runs that behave the same way."}},
+        "required": ["change"]}}}
+
+
+def bash_schema():
+    """--scratch: в описании bash — запись только в scratch/."""
+    from . import cfg as C
+    if not C.SCRATCH:
+        return BASH_SCHEMA
+    f = dict(BASH_SCHEMA["function"])
+    f["description"] = f["description"].replace("Run a read-only shell", "Run a shell").replace(
+        "nothing can be written", "only scratch/ can be written")
+    assert f["description"] != BASH_SCHEMA["function"]["description"]
+    return {"type": "function", "function": f}
+
+
 def role_tools(role):
     """Набор инструментов роли (editor | proposer); в финальных ходах — без bash, [1:]."""
     from . import cfg as C
     fin = FINISH_SUBMIT_SCHEMA if role == "editor" and C.FINISH_REVIEW else FINISH_SCHEMA
-    return [BASH_SCHEMA, EDIT_SCHEMA if role == "editor" else PROPOSE_SCHEMA, fin]
+    rr = [RERUN_SCHEMA] if role == "editor" and C.RERUN_TOOL else []
+    return [bash_schema(), EDIT_SCHEMA if role == "editor" else PROPOSE_SCHEMA] + rr + [fin]

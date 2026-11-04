@@ -20,6 +20,10 @@ FINISH_REVIEW = False   # --finish-review: первый finish — diff всех
 RERUN = False   # --rerun: в копии logs/ вида и tests/rerun.py (повтор записанных прогонов на src/)
 CHECKED = False   # --checked: в финальных ходах (bash уже нет) правки не применяются
 GOAL_TEXT = None  # --goal-text FILE: якорь цели — текст файла после последнего вывода инструмента каждого хода
+STAGES = None    # --stages R,K: R bash на чтение; первая правка (или конец R) — ещё K bash на проверку; потом правки не применяются
+AUTO_CHECK = False   # --auto-check: каждая применённая правка — pyflakes, smoke и rerun в ответе edit, без bash
+RERUN_TOOL = False   # --rerun-tool: rerun — инструмент rerun(change, run) с ожиданием; в копии нет tests/rerun.py
+SCRATCH = False      # --scratch: каталог scratch/ копии, куда можно писать (механика исследователя)
 GOAL_K = 0        # --goal-k K: когда осталось K вызовов bash, харнесс писателя ставит цель — проверить последние правки
 
 BASH_LIMIT = 25          # вызовов bash; потом — финальные ходы

@@ -2,6 +2,7 @@
 import json
 
 from .cfg import F
+from . import cfg as C
 from . import schema as SC
 
 
@@ -22,6 +23,8 @@ class Run:
         self.seen = {}                   # команда bash -> (номер вызова, вывод); сброс после применённой правки
         self.final_left, self.final_why = 0, None
         self.goal_sent = False             # --goal-k: цель уже поставлена
+        self.bash_limit = C.STAGES[0] if C.STAGES else C.BASH_LIMIT     # --stages: сдвигается в начале проверки
+        self.stage2 = False                # --stages: часть проверки началась
         self.last_prompt = self.pending = 0      # pending = оценка токенов, добавленных после последнего ответа
         self.log = open(log_path, "w", encoding="utf-8", errors="backslashreplace")
 
