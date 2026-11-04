@@ -105,6 +105,9 @@ def readme_without_logs(text):
     return "".join(out).rstrip("\n") + "\n"
 
 
+WORK_MTIME = 1793491200   # 2026-11-01 00:00 UTC
+
+
 def build_work(bench, tag, smoke=True):
     C.BENCH = bench
     v = f"{C.HERE}/work/{tag}"
@@ -140,6 +143,11 @@ def build_work(bench, tag, smoke=True):
             f.write(RERUN_PY.replace("BENCH", repr(bench)))
     for p in glob.glob(f"{v}/src/*"):
         assert os.stat(p).st_nlink == 1, p          # копия, не жёсткая ссылка
+    for d, dirs, files in os.walk(v, topdown=False):    # время файлов одно на все сессии: ls -la не разводит пары
+        for x in files + dirs:
+            os.utime(os.path.join(d, x), (WORK_MTIME, WORK_MTIME), follow_symlinks=False)
+    for x in (v, os.path.dirname(v)):                    # и «..» копии: work/ свой у каждой сессии
+        os.utime(x, (WORK_MTIME, WORK_MTIME))
     return os.path.realpath(v)
 
 

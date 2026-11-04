@@ -32,6 +32,7 @@ def parse_args():
     ap.add_argument("--rerun-at", action="store_true", help="с --rerun: в README — rerun.py N --at K (настоящие значения на шаге)")
     ap.add_argument("--finish-review", action="store_true", help="первый finish показывает diff всех правок и вывод rerun")
     ap.add_argument("--checked", action="store_true", help="после конца bash правки не применяются (их нечем проверить)")
+    ap.add_argument("--bash-limit", type=int, help="число вызовов bash вместо cfg.BASH_LIMIT (бюджет всех вызовов растёт с ним)")
     ap.add_argument("--temp", type=float, help="температура писателя вместо температуры агентов из профиля стенда")
     ap.add_argument("--stand", default="default", help="профиль стенда (stands/<имя>.json): модель и генерация")
     ap.add_argument("--home", default=C.HERE, required=C.HERE is None, help="каталог сессий: logs/, out/, work/")
@@ -108,6 +109,8 @@ def main():
     C.HERE, C.RLOGS, C.LINT, C.CHECKED, C.SMOKE_CALLS, C.RERUN, C.GOAL_K = (
         os.path.abspath(a.home), a.rlogs, a.lint, a.checked, a.smoke_calls, a.rerun, a.goal_k)
     C.RERUN_AT, C.FINISH_REVIEW = a.rerun_at, a.finish_review
+    if a.bash_limit:
+        C.BASH_LIMIT, C.STEP_BUDGET = a.bash_limit, max(C.STEP_BUDGET, a.bash_limit + 35)
     assert not a.rerun_at or a.rerun, "--rerun-at needs --rerun"
     C.GOAL_TEXT = open(a.goal_text).read().strip() if a.goal_text else None
     if not a.view and a.bench not in C.VIEWS:
