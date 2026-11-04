@@ -75,7 +75,8 @@ def session(name):
     return {"name": name, "end": s["editor"]["end"], "bash": end["stats"]["bash_calls"] if "stats" in end else "?",
             "edits": f"{s['editor']['stats']['edits_applied']}/{s['editor']['stats']['edits_attempted']}",
             "rerun_after_last_edit": after("rerun"), "smoke_after_last_edit": after("smoke"),
-            "n_rerun": sum(c[1] == "rerun" for c in calls), "seq": seq, "notes": notes, "files": files,
+            "n_rerun": sum(c[1] == "rerun" for c in calls), "reviews": end.get("stats", {}).get("reviews", 0),
+            "submitted": end.get("stats", {}).get("submitted", True), "seq": seq, "notes": notes, "files": files,
             "diff_lines": sum(1 for l in diff.splitlines() if l[:1] in "+-" and l[:3] not in ("+++", "---")),
             "rerun": out, "ticket": tk}
 
@@ -87,7 +88,8 @@ def main():
         if s is None:
             continue
         print(f"=== {n}: {s['end']}; bash {s['bash']}, edits {s['edits']}, diff ±{s['diff_lines']} in {', '.join(s['files'])}")
-        print(f"  rerun calls {s['n_rerun']}; after last applied edit: rerun {s['rerun_after_last_edit']}, smoke {s['smoke_after_last_edit']}")
+        print(f"  rerun calls {s['n_rerun']}; after last applied edit: rerun {s['rerun_after_last_edit']}, smoke {s['smoke_after_last_edit']}"
+              f"; finish reviews {s['reviews']}, submitted {s['submitted']}")
         print(f"  seq: {s['seq']}")
         for t in s["notes"]:
             print(f"  note: {t}")
