@@ -108,6 +108,9 @@ STAGES_LINE = ("- bash: the first STAGE_R calls are for reading. Your first edit
                "have STAGE_K more bash calls to check your edits (if the STAGE_R calls run out before you edit, the check "
                "part starts then). After the check part, edits can no longer be checked and are not applied: only "
                "finish remains, and the session ends.")
+INTENT_LINE = (" With each edit say what you expect it to do: expect_runs, the numbers of the recorded runs in logs/ "
+               "whose course it changes ([] if none), and expect, what the harness will do differently in them. The "
+               "checks after the edit compare this with the runs that did change.")
 AUTO_CHECK_LINE = (" After each edit that is applied, pyflakes, python3 tests/smoke.py and RERUN_NAME are run on src/; "
                    "their output comes with the edit's answer and uses no bash calls.")
 RERUN_TOOL_LINE = ("- rerun(expect_diff, run): replays the runs in logs/ on the current src/ (see README.md). "

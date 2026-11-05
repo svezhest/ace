@@ -1,5 +1,7 @@
 """Ворота finish редактора: один раз по итогу всех правок — новые предупреждения pyflakes и падение smoke."""
+import json
 import os
+import re
 import subprocess
 import sys
 
@@ -94,6 +96,45 @@ def rerun_output(run, n=None):
     return clip(full, F.OUT_CHARS), changed
 
 
+def type_name(x):
+    return "nothing" if x is None else "array[str]" if isinstance(x, list) and any(isinstance(y, str) for y in x) else type(x).__name__
+
+
+HEAD = re.compile(r"(all \d+ runs|runs? [\d, ]+) \(")
+
+
+def changed_runs(full, root):
+    """Строки-заголовки вывода rerun -> (изменившиеся прогоны, удачные, отличается ли промпт)."""
+    res = [json.loads(l) for l in open(f"{root}/logs/results.jsonl")]
+    every = [r["run"] for r in res]
+    passed = {r["run"] for r in res if r.get("ok")}
+    ch, prompt = set(), False
+    for l in full.splitlines():
+        if not l or l[0].isspace():
+            continue
+        m = HEAD.match(l)
+        if not m:
+            continue
+        rs = every if m.group(1).startswith("all") else [int(x) for x in re.findall(r"\d+", m.group(1))]
+        if "the prompt differs" in l:
+            prompt = True
+        elif "no changes" not in l:
+            ch.update(rs)
+    return ch, passed, prompt
+
+
+def intent_report(run, expect):
+    """--intent: ожидание правки (expect_runs) против прогонов, что изменились в повторе."""
+    ch, passed, prompt = changed_runs(run.last_rerun or "", run.root)
+    if prompt:
+        return ("Your expectation: runs " + (", ".join(map(str, expect)) or "none") + ". The prompt differs from the "
+                "log, so every run may go differently from the start; the replay cannot tell which runs change.")
+    fmt = lambda rs: ", ".join(f"{r} (passed)" if r in passed else str(r) for r in sorted(rs)) or "none"
+    ex = set(expect)
+    return (f"Your expectation: runs {fmt(ex)}. Runs that changed: {fmt(ch)}. Changed but not expected: {fmt(ch - ex)}. "
+            f"Expected but unchanged: {fmt(ex - ch)}.")
+
+
 def edit_checks(run):
     """--auto-check (4.11): после применённой правки — новые предупреждения pyflakes, smoke, rerun; bash не тратится."""
     lint_ = LI.lint_changed(run.root)
@@ -104,7 +145,9 @@ def edit_checks(run):
     if lint_:
         t += lint_ + "\n"
     if C.RERUN:
-        t += smoke + f"\n{rerun_name()} prints:\n" + clip(rerun_output(run)[0], REVIEW_RERUN).rstrip()
+        full = rerun_output(run)[0]
+        run.last_rerun = full
+        t += smoke + f"\n{rerun_name()} prints:\n" + clip(full, REVIEW_RERUN).rstrip()
     else:
         t += smoke
     return t

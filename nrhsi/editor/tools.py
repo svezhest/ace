@@ -64,6 +64,19 @@ def edit_call(run, args, res):
         res["edit"] = {"rel": args.get("path"), "fail": "unchecked", "applied": False}
         run.items.append({"path": args.get("path"), "fail": "unchecked", "call": run.st["tool_calls"], "final": True})
         return "Error: edit not applied: no bash calls left to check it. Call finish.", False
+    if C.INTENT:
+        er, ex = args.get("expect_runs"), args.get("expect")
+        errs = []
+        if not isinstance(er, list) or not all(isinstance(x, int) and not isinstance(x, bool) for x in er):
+            errs.append(f"expect_runs: expected type: array[int], got: {GA.type_name(er)}")
+        if not isinstance(ex, str) or not ex.strip():
+            errs.append(f"expect: expected a non-empty string, got: {GA.type_name(ex)}")
+        if errs:
+            run.st["edit_fail"]["intent"] = run.st["edit_fail"].get("intent", 0) + 1
+            res["edit"] = {"rel": args.get("path"), "fail": "intent", "applied": False}
+            run.items.append({"path": args.get("path"), "fail": "intent", "call": run.st["tool_calls"],
+                              "final": bool(run.final_left)})
+            return "Error: edit not applied. " + "; ".join(errs) + ".", False
     text, rec = ED.do_edit(args, run.root, run.st)
     rec["call"] = run.st["tool_calls"]
     rec["final"] = bool(run.final_left)
@@ -77,6 +90,9 @@ def edit_call(run, args, res):
                      "left to check your edits.")
         if C.AUTO_CHECK:
             text += "\n\n" + GA.edit_checks(run)
+            if C.INTENT:
+                text += "\n" + GA.intent_report(run, args["expect_runs"])
+                rec["expect_runs"], rec["expect"] = args["expect_runs"], args["expect"]
     return text, False
 
 

@@ -1,3 +1,4 @@
+import json
 """Схемы инструментов: bash, edit (редактор), propose (шаг вариантов), finish."""
 
 
@@ -61,9 +62,24 @@ def bash_schema():
     return {"type": "function", "function": f}
 
 
+def edit_schema():
+    """--intent: edit с expect_runs и expect (ожидание правки, сверяется после авто-проверки)."""
+    from . import cfg as C
+    if not C.INTENT:
+        return EDIT_SCHEMA
+    f = json.loads(json.dumps(EDIT_SCHEMA["function"]))
+    f["parameters"]["properties"]["expect_runs"] = {
+        "type": "array", "items": {"type": "integer"},
+        "description": "Numbers of the recorded runs in logs/ whose course this edit changes; [] if none"}
+    f["parameters"]["properties"]["expect"] = {
+        "type": "string", "description": "What the harness will do differently in those runs"}
+    f["parameters"]["required"] = f["parameters"]["required"] + ["expect_runs", "expect"]
+    return {"type": "function", "function": f}
+
+
 def role_tools(role):
     """Набор инструментов роли (editor | proposer); в финальных ходах — без bash, [1:]."""
     from . import cfg as C
     fin = FINISH_SUBMIT_SCHEMA if role == "editor" and C.FINISH_REVIEW else FINISH_SCHEMA
     rr = [RERUN_SCHEMA] if role == "editor" and C.RERUN_TOOL else []
-    return [bash_schema(), EDIT_SCHEMA if role == "editor" else PROPOSE_SCHEMA] + rr + [fin]
+    return [bash_schema(), edit_schema() if role == "editor" else PROPOSE_SCHEMA] + rr + [fin]

@@ -39,6 +39,7 @@ def parse_args():
     ap.add_argument("--scratch", action="store_true", help="каталог scratch/ копии, куда можно писать")
     ap.add_argument("--tools-dir", default="tests", help="5.11: каталог rerun/smoke в копии (tests, tools, __tools)")
     ap.add_argument("--hide-tools", action="store_true", help="5.11: исходников rerun/smoke в копии нет; это команды")
+    ap.add_argument("--intent", action="store_true", help="5.11, с --auto-check --rerun: edit(…, expect_runs, expect); сверка с изменившимися прогонами")
     ap.add_argument("--navigator", action="store_true", help="5.11: в системном промпте пример прицельного поиска (выдуманный репозиторий)")
     ap.add_argument("--given-files", action="store_true", help="5.11, абляция, с --input-text: README.md и все файлы src/ целиком")
     ap.add_argument("--given-code", action="store_true", help="5.11, с --input-text: под текстом — код src/ вида по его ссылкам")
@@ -112,6 +113,11 @@ def editor_step(a, first, src_before, summary):
         if not a.rerun:
             add = add.replace(", python3 tests/smoke.py and python3 tests/rerun.py", " and python3 tests/smoke.py")
         esys = esys.replace(chk, chk + add)
+    if a.intent:
+        assert a.auto_check and a.rerun and not a.rerun_tool, "--intent needs --auto-check --rerun"
+        assert P.EDIT_TOOL_LINE in esys
+        esys = esys.replace(P.EDIT_TOOL_LINE, P.EDIT_TOOL_LINE.replace("- edit(path, old_string, new_string)",
+                            "- edit(path, old_string, new_string, expect_runs, expect)") + P.INTENT_LINE)
     if a.scratch:
         esys = esys.replace(P.SCRATCH_NOWRITE, P.SCRATCH_WRITE).replace("a read-only shell in", "a shell in").replace(
             F.PYTHON_LINE, F.PYTHON_SCRATCH_LINE.replace("SCRATCH/", F.SCRATCH_DIR + "/"))
@@ -152,6 +158,7 @@ def main():
         C.STEP_BUDGET = max(C.STEP_BUDGET, C.BASH_LIMIT + 35)
     assert not a.rerun_tool or (a.rerun and not a.rerun_at), "--rerun-tool needs --rerun, not with --rerun-at"
     C.AUTO_CHECK, C.RERUN_TOOL, C.SCRATCH = a.auto_check, a.rerun_tool, a.scratch
+    C.INTENT = a.intent
     assert not (a.hide_tools or a.tools_dir != "tests") or not a.rerun_tool, "--tools-dir/--hide-tools без --rerun-tool"
     C.TOOLS_DIR, C.HIDE_TOOLS = a.tools_dir, a.hide_tools
     if a.hide_tools:
@@ -175,7 +182,7 @@ def main():
     os.makedirs(f"{C.HERE}/out", exist_ok=True)
     summary = {"tag": a.tag, "bench": a.bench, "input": a.input, "arm": a.arm, "seed": a.seed,
                "view": C.VIEWS[a.bench], "predict": a.predict, "cite": a.cite, "import_src": a.import_src,
-               "checked": a.checked, "smoke_calls": a.smoke_calls, "rerun": a.rerun, "rerun_at": a.rerun_at, "finish_review": a.finish_review, "goal_k": a.goal_k, "stages": a.stages, "auto_check": a.auto_check, "rerun_tool": a.rerun_tool, "scratch": a.scratch, "tools_dir": a.tools_dir, "hide_tools": a.hide_tools, "given_code": a.given_code, "given_files": a.given_files, "navigator": a.navigator, "bash_limit": C.BASH_LIMIT, "goal_text": a.goal_text, "temp": F.TEMP, "input_text": a.input_text, "stand": F.STAND,
+               "checked": a.checked, "smoke_calls": a.smoke_calls, "rerun": a.rerun, "rerun_at": a.rerun_at, "finish_review": a.finish_review, "goal_k": a.goal_k, "stages": a.stages, "auto_check": a.auto_check, "rerun_tool": a.rerun_tool, "scratch": a.scratch, "tools_dir": a.tools_dir, "hide_tools": a.hide_tools, "given_code": a.given_code, "given_files": a.given_files, "navigator": a.navigator, "intent": a.intent, "bash_limit": C.BASH_LIMIT, "goal_text": a.goal_text, "temp": F.TEMP, "input_text": a.input_text, "stand": F.STAND,
                "n_reports": len(reports), "view_src_hash": src_before}
     if a.arm == "fix":
         props = propose_step(a, reports, src_before, summary)

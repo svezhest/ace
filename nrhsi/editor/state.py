@@ -20,6 +20,7 @@ class Run:
                    "length_stops": 0, "edits_attempted": 0, "edits_applied": 0, "edit_fail": {}, "proposals": 0,
                    "proposals_rejected": 0}
         self.items = []                  # правки (editor) или предложения (proposer)
+        self.last_rerun = None           # --intent: полный вывод rerun последней авто-проверки
         self.seen = {}                   # команда bash -> (номер вызова, вывод); сброс после применённой правки
         self.final_left, self.final_why = 0, None
         self.goal_sent = False             # --goal-k: цель уже поставлена

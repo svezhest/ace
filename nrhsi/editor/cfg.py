@@ -21,6 +21,7 @@ RERUN = False   # --rerun: в копии logs/ вида и tests/rerun.py (по�
 CHECKED = False   # --checked: в финальных ходах (bash уже нет) правки не применяются
 GOAL_TEXT = None  # --goal-text FILE: якорь цели — текст файла после последнего вывода инструмента каждого хода
 STAGES = None    # --stages R,K: R bash на чтение; первая правка (или конец R) — ещё K bash на проверку; потом правки не применяются
+INTENT = False       # --intent (5.11): edit(…, expect_runs, expect); после авто-проверки — сверка с тем, что изменилось
 AUTO_CHECK = False   # --auto-check: каждая применённая правка — pyflakes, smoke и rerun в ответе edit, без bash
 RERUN_TOOL = False   # --rerun-tool: rerun — инструмент rerun(change, run) с ожиданием; в копии нет tests/rerun.py
 SCRATCH = False      # --scratch: каталог scratch/ копии, куда можно писать (механика исследователя)
