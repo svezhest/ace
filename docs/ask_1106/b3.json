@@ -1,0 +1,304 @@
+[
+ {
+  "id": "01_min",
+  "obs": "01",
+  "code": true,
+  "turns": [
+   "What is the smallest change to src/ that would make this run go right? Show it."
+  ]
+ },
+ {
+  "id": "01_rewrite",
+  "obs": "01",
+  "code": true,
+  "turns": [
+   "Rewrite the code the observation points to from scratch, so that this does not happen. Show the whole new version."
+  ]
+ },
+ {
+  "id": "01_test",
+  "obs": "01",
+  "code": true,
+  "turns": [
+   "Before changing anything: write two checks, each as (what the harness sees -> what it should do): one for the run in the observation, and one for a run where the current code already does the right thing.",
+   "Now: what would you change in src/ so that both checks pass?"
+  ]
+ },
+ {
+  "id": "01_para",
+  "obs": "01",
+  "code": true,
+  "turns": [
+   "In one sentence, without proposing a fix: what exactly goes wrong?",
+   "What would you change in src/ so that this does not happen? Describe the change."
+  ]
+ },
+ {
+  "id": "01_own",
+  "obs": "01",
+  "code": true,
+  "turns": [
+   "What would you change in src/ so that this does not happen? Describe the change.",
+   {
+    "assistant": "I would compare the new code with every earlier step of the episode, and warn on any match."
+   },
+   "What could go wrong with this change?"
+  ]
+ },
+ {
+  "id": "01_anon",
+  "obs": "01",
+  "code": true,
+  "turns": [
+   "Here is a change to src/: Compare the new code with every earlier step of the episode, and warn on any match. What could go wrong with this change?"
+  ]
+ },
+ {
+  "id": "01_choice",
+  "obs": "01",
+  "code": true,
+  "turns": [
+   "Two changes to src/ are proposed. (a) Compare the new code with every earlier step of the episode, and warn on any match. (b) Warn when the new code equals the code two steps back and the previous step equals the code three steps back (an A, B, A, B cycle). Which one would you make, and why?"
+  ]
+ },
+ {
+  "id": "02_min",
+  "obs": "02",
+  "code": true,
+  "turns": [
+   "What is the smallest change to src/ that would make this run go right? Show it."
+  ]
+ },
+ {
+  "id": "02_rewrite",
+  "obs": "02",
+  "code": true,
+  "turns": [
+   "Rewrite the code the observation points to from scratch, so that this does not happen. Show the whole new version."
+  ]
+ },
+ {
+  "id": "02_test",
+  "obs": "02",
+  "code": true,
+  "turns": [
+   "Before changing anything: write two checks, each as (what the harness sees -> what it should do): one for the run in the observation, and one for a run where the current code already does the right thing.",
+   "Now: what would you change in src/ so that both checks pass?"
+  ]
+ },
+ {
+  "id": "02_para",
+  "obs": "02",
+  "code": true,
+  "turns": [
+   "In one sentence, without proposing a fix: what exactly goes wrong?",
+   "What would you change in src/ so that this does not happen? Describe the change."
+  ]
+ },
+ {
+  "id": "02_own",
+  "obs": "02",
+  "code": true,
+  "turns": [
+   "What would you change in src/ so that this does not happen? Describe the change.",
+   {
+    "assistant": "I would remove the `continue` after the warning, so that the repeated code is run as a step."
+   },
+   "What could go wrong with this change?"
+  ]
+ },
+ {
+  "id": "02_anon",
+  "obs": "02",
+  "code": true,
+  "turns": [
+   "Here is a change to src/: Remove the `continue` after the warning, so that the repeated code is run as a step. What could go wrong with this change?"
+  ]
+ },
+ {
+  "id": "02_choice",
+  "obs": "02",
+  "code": true,
+  "turns": [
+   "Two changes to src/ are proposed. (a) When the code equals the previous step's code, end the episode. (b) Remove the `continue` after the warning, so that the repeated code is run as a step. Which one would you make, and why?"
+  ]
+ },
+ {
+  "id": "04_min",
+  "obs": "04",
+  "code": true,
+  "turns": [
+   "What is the smallest change to src/ that would make this run go right? Show it."
+  ]
+ },
+ {
+  "id": "04_rewrite",
+  "obs": "04",
+  "code": true,
+  "turns": [
+   "Rewrite the code the observation points to from scratch, so that this does not happen. Show the whole new version."
+  ]
+ },
+ {
+  "id": "04_test",
+  "obs": "04",
+  "code": true,
+  "turns": [
+   "Before changing anything: write two checks, each as (what the harness sees -> what it should do): one for the run in the observation, and one for a run where the current code already does the right thing.",
+   "Now: what would you change in src/ so that both checks pass?"
+  ]
+ },
+ {
+  "id": "04_para",
+  "obs": "04",
+  "code": true,
+  "turns": [
+   "In one sentence, without proposing a fix: what exactly goes wrong?",
+   "What would you change in src/ so that this does not happen? Describe the change."
+  ]
+ },
+ {
+  "id": "04_own",
+  "obs": "04",
+  "code": true,
+  "turns": [
+   "What would you change in src/ so that this does not happen? Describe the change.",
+   {
+    "assistant": "I would in _is_new_step, compare only the code and drop the comparison of outputs."
+   },
+   "What could go wrong with this change?"
+  ]
+ },
+ {
+  "id": "04_anon",
+  "obs": "04",
+  "code": true,
+  "turns": [
+   "Here is a change to src/: In _is_new_step, compare only the code and drop the comparison of outputs. What could go wrong with this change?"
+  ]
+ },
+ {
+  "id": "05_min",
+  "obs": "05",
+  "code": true,
+  "turns": [
+   "What is the smallest change to src/ that would make this run go right? Show it."
+  ]
+ },
+ {
+  "id": "05_rewrite",
+  "obs": "05",
+  "code": true,
+  "turns": [
+   "Rewrite the code the observation points to from scratch, so that this does not happen. Show the whole new version."
+  ]
+ },
+ {
+  "id": "05_test",
+  "obs": "05",
+  "code": true,
+  "turns": [
+   "Before changing anything: write two checks, each as (what the harness sees -> what it should do): one for the run in the observation, and one for a run where the current code already does the right thing.",
+   "Now: what would you change in src/ so that both checks pass?"
+  ]
+ },
+ {
+  "id": "05_para",
+  "obs": "05",
+  "code": true,
+  "turns": [
+   "In one sentence, without proposing a fix: what exactly goes wrong?",
+   "What would you change in src/ so that this does not happen? Describe the change."
+  ]
+ },
+ {
+  "id": "05_own",
+  "obs": "05",
+  "code": true,
+  "turns": [
+   "What would you change in src/ so that this does not happen? Describe the change.",
+   {
+    "assistant": "I would change the example's last step to `apis.supervisor.complete_task()` without an answer."
+   },
+   "What could go wrong with this change?"
+  ]
+ },
+ {
+  "id": "05_anon",
+  "obs": "05",
+  "code": true,
+  "turns": [
+   "Here is a change to src/: Change the example's last step to `apis.supervisor.complete_task()` without an answer. What could go wrong with this change?"
+  ]
+ },
+ {
+  "id": "05_choice",
+  "obs": "05",
+  "code": true,
+  "turns": [
+   "Two changes to src/ are proposed. (a) Change the example's last step to `apis.supervisor.complete_task()` without an answer. (b) Remove only the sentence \"Since this task has an answer to be returned, I will pass that as an argument.\" and keep `answer=num_playlists`. Which one would you make, and why?"
+  ]
+ },
+ {
+  "id": "06_min",
+  "obs": "06",
+  "code": true,
+  "turns": [
+   "What is the smallest change to src/ that would make this run go right? Show it."
+  ]
+ },
+ {
+  "id": "06_rewrite",
+  "obs": "06",
+  "code": true,
+  "turns": [
+   "Rewrite the code the observation points to from scratch, so that this does not happen. Show the whole new version."
+  ]
+ },
+ {
+  "id": "06_test",
+  "obs": "06",
+  "code": true,
+  "turns": [
+   "Before changing anything: write two checks, each as (what the harness sees -> what it should do): one for the run in the observation, and one for a run where the current code already does the right thing.",
+   "Now: what would you change in src/ so that both checks pass?"
+  ]
+ },
+ {
+  "id": "06_para",
+  "obs": "06",
+  "code": true,
+  "turns": [
+   "In one sentence, without proposing a fix: what exactly goes wrong?",
+   "What would you change in src/ so that this does not happen? Describe the change."
+  ]
+ },
+ {
+  "id": "06_own",
+  "obs": "06",
+  "code": true,
+  "turns": [
+   "What would you change in src/ so that this does not happen? Describe the change.",
+   {
+    "assistant": "I would in on_before_action, block any action that is not in ctx[\"admissible\"] and ask the model again."
+   },
+   "What could go wrong with this change?"
+  ]
+ },
+ {
+  "id": "06_anon",
+  "obs": "06",
+  "code": true,
+  "turns": [
+   "Here is a change to src/: In on_before_action, block any action that is not in ctx[\"admissible\"] and ask the model again. What could go wrong with this change?"
+  ]
+ },
+ {
+  "id": "06_choice",
+  "obs": "06",
+  "code": true,
+  "turns": [
+   "Two changes to src/ are proposed. (a) In on_before_action, block any action that is not in ctx[\"admissible\"] and ask the model again. (b) Change the prompt's line about \"Nothing happened\" to say that an invalid action may be replaced by a different action. Which one would you make, and why?"
+  ]
+ }
+]

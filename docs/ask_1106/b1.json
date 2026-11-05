@@ -1,0 +1,292 @@
+[
+ {
+  "id": "01_fix",
+  "obs": "01",
+  "code": true,
+  "turns": [
+   "What would you change in src/ so that this does not happen? Describe the change."
+  ]
+ },
+ {
+  "id": "01_cause",
+  "obs": "01",
+  "code": true,
+  "turns": [
+   "Which lines of the code above make this happen, and why?"
+  ]
+ },
+ {
+  "id": "01_keep",
+  "obs": "01",
+  "code": true,
+  "turns": [
+   "Should the line `if history[\"last_actions\"] and code == history[\"last_actions\"][-1]:` stay as it is? Answer keep, change or extend, then say why."
+  ]
+ },
+ {
+  "id": "01_good",
+  "obs": "01",
+  "code": true,
+  "turns": [
+   "Describe a run where the code above already does the right thing and must keep doing it after a change."
+  ]
+ },
+ {
+  "id": "01_crit",
+  "obs": "01",
+  "code": true,
+  "turns": [
+   "A colleague proposes: compare the new code with every earlier step of the episode, and warn on any match. What could go wrong with this change?"
+  ]
+ },
+ {
+  "id": "01_plan",
+  "obs": "01",
+  "code": true,
+  "turns": [
+   "Before changing anything: describe, step by step, how the run in the observation should go once the harness is right.",
+   "Now: what would you change in src/ to make it go that way?"
+  ]
+ },
+ {
+  "id": "01_sfix",
+  "obs": "01",
+  "form": "s",
+  "code": false,
+  "turns": [
+   "What would you change in src/ so that this does not happen? Describe the change."
+  ]
+ },
+ {
+  "id": "02_fix",
+  "obs": "02",
+  "code": true,
+  "turns": [
+   "What would you change in src/ so that this does not happen? Describe the change."
+  ]
+ },
+ {
+  "id": "02_cause",
+  "obs": "02",
+  "code": true,
+  "turns": [
+   "Which lines of the code above make this happen, and why?"
+  ]
+ },
+ {
+  "id": "02_keep",
+  "obs": "02",
+  "code": true,
+  "turns": [
+   "Should the `continue` after the warning stay as it is? Answer keep, change or remove, then say why."
+  ]
+ },
+ {
+  "id": "02_good",
+  "obs": "02",
+  "code": true,
+  "turns": [
+   "Describe a run where the code above already does the right thing and must keep doing it after a change."
+  ]
+ },
+ {
+  "id": "02_crit",
+  "obs": "02",
+  "code": true,
+  "turns": [
+   "A colleague proposes: remove the `continue` after the warning, so that the repeated code is run as a step. What could go wrong with this change?"
+  ]
+ },
+ {
+  "id": "02_plan",
+  "obs": "02",
+  "code": true,
+  "turns": [
+   "Before changing anything: describe, step by step, how the run in the observation should go once the harness is right.",
+   "Now: what would you change in src/ to make it go that way?"
+  ]
+ },
+ {
+  "id": "02_sfix",
+  "obs": "02",
+  "form": "s",
+  "code": false,
+  "turns": [
+   "What would you change in src/ so that this does not happen? Describe the change."
+  ]
+ },
+ {
+  "id": "04_fix",
+  "obs": "04",
+  "code": true,
+  "turns": [
+   "What would you change in src/ so that this does not happen? Describe the change."
+  ]
+ },
+ {
+  "id": "04_cause",
+  "obs": "04",
+  "code": true,
+  "turns": [
+   "Which lines of the code above make this happen, and why?"
+  ]
+ },
+ {
+  "id": "04_keep",
+  "obs": "04",
+  "code": true,
+  "turns": [
+   "Should the line `if prev_code == code and prev_output == output:` stay as it is? Answer keep, change or remove, then say why."
+  ]
+ },
+ {
+  "id": "04_good",
+  "obs": "04",
+  "code": true,
+  "turns": [
+   "Describe a run where the code above already does the right thing and must keep doing it after a change."
+  ]
+ },
+ {
+  "id": "04_crit",
+  "obs": "04",
+  "code": true,
+  "turns": [
+   "A colleague proposes: in _is_new_step, compare only the code and drop the comparison of outputs. What could go wrong with this change?"
+  ]
+ },
+ {
+  "id": "04_plan",
+  "obs": "04",
+  "code": true,
+  "turns": [
+   "Before changing anything: describe, step by step, how the run in the observation should go once the harness is right.",
+   "Now: what would you change in src/ to make it go that way?"
+  ]
+ },
+ {
+  "id": "04_sfix",
+  "obs": "04",
+  "form": "s",
+  "code": false,
+  "turns": [
+   "What would you change in src/ so that this does not happen? Describe the change."
+  ]
+ },
+ {
+  "id": "05_fix",
+  "obs": "05",
+  "code": true,
+  "turns": [
+   "What would you change in src/ so that this does not happen? Describe the change."
+  ]
+ },
+ {
+  "id": "05_cause",
+  "obs": "05",
+  "code": true,
+  "turns": [
+   "Which lines of the code above make this happen, and why?"
+  ]
+ },
+ {
+  "id": "05_keep",
+  "obs": "05",
+  "code": true,
+  "turns": [
+   "Should the example's last step `apis.supervisor.complete_task(answer=num_playlists)` stay as it is? Answer keep, change or remove, then say why."
+  ]
+ },
+ {
+  "id": "05_good",
+  "obs": "05",
+  "code": true,
+  "turns": [
+   "Describe a run where the code above already does the right thing and must keep doing it after a change."
+  ]
+ },
+ {
+  "id": "05_crit",
+  "obs": "05",
+  "code": true,
+  "turns": [
+   "A colleague proposes: change the example's last step to `apis.supervisor.complete_task()` without an answer. What could go wrong with this change?"
+  ]
+ },
+ {
+  "id": "05_plan",
+  "obs": "05",
+  "code": true,
+  "turns": [
+   "Before changing anything: describe, step by step, how the run in the observation should go once the harness is right.",
+   "Now: what would you change in src/ to make it go that way?"
+  ]
+ },
+ {
+  "id": "05_sfix",
+  "obs": "05",
+  "form": "s",
+  "code": false,
+  "turns": [
+   "What would you change in src/ so that this does not happen? Describe the change."
+  ]
+ },
+ {
+  "id": "06_fix",
+  "obs": "06",
+  "code": true,
+  "turns": [
+   "What would you change in src/ so that this does not happen? Describe the change."
+  ]
+ },
+ {
+  "id": "06_cause",
+  "obs": "06",
+  "code": true,
+  "turns": [
+   "Which lines of the code above make this happen, and why?"
+  ]
+ },
+ {
+  "id": "06_keep",
+  "obs": "06",
+  "code": true,
+  "turns": [
+   "Should the hook on_before_action keep returning None? Answer keep or change, then say why."
+  ]
+ },
+ {
+  "id": "06_good",
+  "obs": "06",
+  "code": true,
+  "turns": [
+   "Describe a run where the code above already does the right thing and must keep doing it after a change."
+  ]
+ },
+ {
+  "id": "06_crit",
+  "obs": "06",
+  "code": true,
+  "turns": [
+   "A colleague proposes: in on_before_action, block any action that is not in ctx[\"admissible\"] and ask the model again. What could go wrong with this change?"
+  ]
+ },
+ {
+  "id": "06_plan",
+  "obs": "06",
+  "code": true,
+  "turns": [
+   "Before changing anything: describe, step by step, how the run in the observation should go once the harness is right.",
+   "Now: what would you change in src/ to make it go that way?"
+  ]
+ },
+ {
+  "id": "06_sfix",
+  "obs": "06",
+  "form": "s",
+  "code": false,
+  "turns": [
+   "What would you change in src/ so that this does not happen? Describe the change."
+  ]
+ }
+]

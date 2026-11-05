@@ -1,0 +1,192 @@
+[
+ {
+  "id": "00_self",
+  "obs": "00",
+  "code": true,
+  "turns": [
+   "What would you change in src/ so that this does not happen? Describe the change.",
+   "What could go wrong with the change you propose? Think of a run where the current code already does the right thing.",
+   "Now give the change you would actually make."
+  ]
+ },
+ {
+  "id": "00_goodfix",
+  "obs": "00",
+  "code": true,
+  "turns": [
+   "Describe a run where the code above already does the right thing and must keep doing it after a change.",
+   "What would you change in src/ so that this does not happen? Describe the change."
+  ]
+ },
+ {
+  "id": "01_self",
+  "obs": "01",
+  "code": true,
+  "turns": [
+   "What would you change in src/ so that this does not happen? Describe the change.",
+   "What could go wrong with the change you propose? Think of a run where the current code already does the right thing.",
+   "Now give the change you would actually make."
+  ]
+ },
+ {
+  "id": "01_goodfix",
+  "obs": "01",
+  "code": true,
+  "turns": [
+   "Describe a run where the code above already does the right thing and must keep doing it after a change.",
+   "What would you change in src/ so that this does not happen? Describe the change."
+  ]
+ },
+ {
+  "id": "02_self",
+  "obs": "02",
+  "code": true,
+  "turns": [
+   "What would you change in src/ so that this does not happen? Describe the change.",
+   "What could go wrong with the change you propose? Think of a run where the current code already does the right thing.",
+   "Now give the change you would actually make."
+  ]
+ },
+ {
+  "id": "02_goodfix",
+  "obs": "02",
+  "code": true,
+  "turns": [
+   "Describe a run where the code above already does the right thing and must keep doing it after a change.",
+   "What would you change in src/ so that this does not happen? Describe the change."
+  ]
+ },
+ {
+  "id": "03_self",
+  "obs": "03",
+  "code": true,
+  "turns": [
+   "What would you change in src/ so that this does not happen? Describe the change.",
+   "What could go wrong with the change you propose? Think of a run where the current code already does the right thing.",
+   "Now give the change you would actually make."
+  ]
+ },
+ {
+  "id": "03_goodfix",
+  "obs": "03",
+  "code": true,
+  "turns": [
+   "Describe a run where the code above already does the right thing and must keep doing it after a change.",
+   "What would you change in src/ so that this does not happen? Describe the change."
+  ]
+ },
+ {
+  "id": "04_self",
+  "obs": "04",
+  "code": true,
+  "turns": [
+   "What would you change in src/ so that this does not happen? Describe the change.",
+   "What could go wrong with the change you propose? Think of a run where the current code already does the right thing.",
+   "Now give the change you would actually make."
+  ]
+ },
+ {
+  "id": "04_goodfix",
+  "obs": "04",
+  "code": true,
+  "turns": [
+   "Describe a run where the code above already does the right thing and must keep doing it after a change.",
+   "What would you change in src/ so that this does not happen? Describe the change."
+  ]
+ },
+ {
+  "id": "05_self",
+  "obs": "05",
+  "code": true,
+  "turns": [
+   "What would you change in src/ so that this does not happen? Describe the change.",
+   "What could go wrong with the change you propose? Think of a run where the current code already does the right thing.",
+   "Now give the change you would actually make."
+  ]
+ },
+ {
+  "id": "05_goodfix",
+  "obs": "05",
+  "code": true,
+  "turns": [
+   "Describe a run where the code above already does the right thing and must keep doing it after a change.",
+   "What would you change in src/ so that this does not happen? Describe the change."
+  ]
+ },
+ {
+  "id": "06_self",
+  "obs": "06",
+  "code": true,
+  "turns": [
+   "What would you change in src/ so that this does not happen? Describe the change.",
+   "What could go wrong with the change you propose? Think of a run where the current code already does the right thing.",
+   "Now give the change you would actually make."
+  ]
+ },
+ {
+  "id": "06_goodfix",
+  "obs": "06",
+  "code": true,
+  "turns": [
+   "Describe a run where the code above already does the right thing and must keep doing it after a change.",
+   "What would you change in src/ so that this does not happen? Describe the change."
+  ]
+ },
+ {
+  "id": "07_self",
+  "obs": "07",
+  "code": true,
+  "turns": [
+   "What would you change in src/ so that this does not happen? Describe the change.",
+   "What could go wrong with the change you propose? Think of a run where the current code already does the right thing.",
+   "Now give the change you would actually make."
+  ]
+ },
+ {
+  "id": "07_goodfix",
+  "obs": "07",
+  "code": true,
+  "turns": [
+   "Describe a run where the code above already does the right thing and must keep doing it after a change.",
+   "What would you change in src/ so that this does not happen? Describe the change."
+  ]
+ },
+ {
+  "id": "08_self",
+  "obs": "08",
+  "code": true,
+  "turns": [
+   "What would you change in src/ so that this does not happen? Describe the change.",
+   "What could go wrong with the change you propose? Think of a run where the current code already does the right thing.",
+   "Now give the change you would actually make."
+  ]
+ },
+ {
+  "id": "08_goodfix",
+  "obs": "08",
+  "code": true,
+  "turns": [
+   "Describe a run where the code above already does the right thing and must keep doing it after a change.",
+   "What would you change in src/ so that this does not happen? Describe the change."
+  ]
+ },
+ {
+  "id": "09_self",
+  "obs": "09",
+  "code": true,
+  "turns": [
+   "What would you change in src/ so that this does not happen? Describe the change.",
+   "What could go wrong with the change you propose? Think of a run where the current code already does the right thing.",
+   "Now give the change you would actually make."
+  ]
+ },
+ {
+  "id": "09_goodfix",
+  "obs": "09",
+  "code": true,
+  "turns": [
+   "Describe a run where the code above already does the right thing and must keep doing it after a change.",
+   "What would you change in src/ so that this does not happen? Describe the change."
+  ]
+ }
+]

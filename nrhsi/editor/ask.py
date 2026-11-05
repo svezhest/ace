@@ -1,5 +1,5 @@
 """Ручной режим (6.11): точечный вопрос модели без агентской обвязки — наблюдение (+код по его ссылкам) и вопрос.
-Батарея — JSON-список {id, obs, form (v|s), code (bool), turns: [вопрос, вопрос-продолжение, ...]}; по N сэмплов.
+Батарея — JSON-список {id, obs, form (v|s), code (bool), turns: [вопрос, {"assistant": подставленный ответ}, вопрос-продолжение, ...]}; по N сэмплов.
 python3 -m nrhsi.editor.ask BATTERY.json OUT.jsonl --samples 5"""
 import argparse
 import glob
@@ -45,7 +45,13 @@ def main():
             seed = 61100 + k * 1000 + sum(map(ord, q["id"])) % 997
             msgs, answers = [], []
             for i, turn in enumerate(q["turns"]):
+                if isinstance(turn, dict):   # подставленный ответ модели (атрибуция «твоя правка»)
+                    msgs.append({"role": "assistant", "content": turn["assistant"]})
+                    answers.append(None)
+                    continue
                 msgs.append({"role": "user", "content": (ctx + "\n\n" + turn) if i == 0 else turn})
+                if i + 1 < len(q["turns"]) and isinstance(q["turns"][i + 1], dict):
+                    continue
                 resp, err = M.chat(msgs, RC.TEMP, seed)
                 txt = err or ((resp.get("choices") or [{}])[0].get("message") or {}).get("content") or ""
                 answers.append(txt)
