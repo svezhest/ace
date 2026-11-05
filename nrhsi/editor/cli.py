@@ -39,6 +39,7 @@ def parse_args():
     ap.add_argument("--scratch", action="store_true", help="каталог scratch/ копии, куда можно писать")
     ap.add_argument("--tools-dir", default="tests", help="5.11: каталог rerun/smoke в копии (tests, tools, __tools)")
     ap.add_argument("--hide-tools", action="store_true", help="5.11: исходников rerun/smoke в копии нет; это команды")
+    ap.add_argument("--given-files", action="store_true", help="5.11, абляция, с --input-text: README.md и все файлы src/ целиком")
     ap.add_argument("--given-code", action="store_true", help="5.11, с --input-text: под текстом — код src/ вида по его ссылкам")
     ap.add_argument("--bash-limit", type=int, help="число вызовов bash вместо cfg.BASH_LIMIT (бюджет всех вызовов растёт с ним)")
     ap.add_argument("--temp", type=float, help="температура писателя вместо температуры агентов из профиля стенда")
@@ -170,7 +171,7 @@ def main():
     os.makedirs(f"{C.HERE}/out", exist_ok=True)
     summary = {"tag": a.tag, "bench": a.bench, "input": a.input, "arm": a.arm, "seed": a.seed,
                "view": C.VIEWS[a.bench], "predict": a.predict, "cite": a.cite, "import_src": a.import_src,
-               "checked": a.checked, "smoke_calls": a.smoke_calls, "rerun": a.rerun, "rerun_at": a.rerun_at, "finish_review": a.finish_review, "goal_k": a.goal_k, "stages": a.stages, "auto_check": a.auto_check, "rerun_tool": a.rerun_tool, "scratch": a.scratch, "tools_dir": a.tools_dir, "hide_tools": a.hide_tools, "given_code": a.given_code, "bash_limit": C.BASH_LIMIT, "goal_text": a.goal_text, "temp": F.TEMP, "input_text": a.input_text, "stand": F.STAND,
+               "checked": a.checked, "smoke_calls": a.smoke_calls, "rerun": a.rerun, "rerun_at": a.rerun_at, "finish_review": a.finish_review, "goal_k": a.goal_k, "stages": a.stages, "auto_check": a.auto_check, "rerun_tool": a.rerun_tool, "scratch": a.scratch, "tools_dir": a.tools_dir, "hide_tools": a.hide_tools, "given_code": a.given_code, "given_files": a.given_files, "bash_limit": C.BASH_LIMIT, "goal_text": a.goal_text, "temp": F.TEMP, "input_text": a.input_text, "stand": F.STAND,
                "n_reports": len(reports), "view_src_hash": src_before}
     if a.arm == "fix":
         props = propose_step(a, reports, src_before, summary)
@@ -180,7 +181,8 @@ def main():
     elif a.arm == "merge":
         first = IN.first_user_merge(C.VIEWS[a.bench])
     elif a.input_text:
-        first = IN.first_user_editor_text(a.input_text, f"{C.VIEWS[a.bench]}/src" if a.given_code else None)
+        first = IN.first_user_editor_text(a.input_text, f"{C.VIEWS[a.bench]}/src" if a.given_code or a.given_files else None,
+                                          files=a.given_files)
     else:
         first = IN.first_user_editor_obs(reports, IN.review_root(a.input) if a.cite else None)
     editor_step(a, first, src_before, summary)

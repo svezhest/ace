@@ -90,11 +90,25 @@ def first_user_editor_obs(reports, root=None):
     return observations_text(reports, root) + OBS_TAIL
 
 
-def first_user_editor_text(path, src=None):
+def first_user_editor_text(path, src=None, files=False):
     """3.11, проба потолка формата: вместо блока наблюдений — готовый текст из файла, как есть.
-    5.11 --given-code: src — src/ вида; под текстом — код, на который он ссылается (given_code)."""
+    5.11 --given-code: src — src/ вида; под текстом — код, на который он ссылается (given_code).
+    5.11 --given-files (абляция): под текстом — README.md и все файлы src/ целиком."""
     t = open(path).read().rstrip()
-    return t + (given_code(t, src) if src else "") + OBS_TAIL
+    extra = given_files(src) if src and files else given_code(t, src) if src else ""
+    return t + extra + OBS_TAIL
+
+
+def given_files(src):
+    """README.md вида и все файлы src/ целиком, как есть."""
+    root = os.path.dirname(src)
+    parts = []
+    for f in ["README.md"] + [f"src/{x}" for x in sorted(os.listdir(src)) if not x.startswith((".", "__"))]:
+        p = f"{root}/{f}"
+        if os.path.isfile(p):
+            lang = "python" if f.endswith(".py") else ""
+            parts.append(f"{f}:\n```{lang}\n" + open(p).read().rstrip() + "\n```")
+    return "\n\n## The files, as they are now\n\n" + "\n\n".join(parts)
 
 
 REF = re.compile(r"(src/[\w.-]+)?:(\d+)(?:-(\d+))?")
