@@ -48,6 +48,9 @@ def parse_args():
     ap.add_argument("--navigator", action="store_true", help="5.11: в системном промпте пример прицельного поиска (выдуманный репозиторий)")
     ap.add_argument("--given-files", action="store_true", help="5.11, абляция, с --input-text: README.md и все файлы src/ целиком")
     ap.add_argument("--given-code", action="store_true", help="5.11, с --input-text: под текстом — код src/ вида по его ссылкам")
+    ap.add_argument("--resume", help="6.11: лог сессии писателя; история до --resume-turn, этот ход исполняется заново")
+    ap.add_argument("--resume-turn", type=int)
+    ap.add_argument("--resume-bash", type=int, default=15, help="сколько bash добавить с хода воскрешения")
     ap.add_argument("--bash-limit", type=int, help="число вызовов bash вместо cfg.BASH_LIMIT (бюджет всех вызовов растёт с ним)")
     ap.add_argument("--temp", type=float, help="температура писателя вместо температуры агентов из профиля стенда")
     ap.add_argument("--stand", default="default", help="профиль стенда (stands/<имя>.json): модель и генерация")
@@ -147,8 +150,15 @@ def editor_step(a, first, src_before, summary):
         return
     root = WK.build_work(a.bench, a.tag)
     prof = WK.make_profile(root, a.tag)
+    resume = None
+    if a.resume:
+        from . import resume as RS
+        recs = RS.load(a.resume)
+        print(json.dumps({"resume_edits_replayed": RS.apply_edits(recs, a.resume_turn, root)}), flush=True)
+        resume = RS.restorer(recs, a.resume_turn, a.resume_bash)
+        summary["resume"] = {"log": a.resume, "turn": a.resume_turn, "bash": a.resume_bash}
     end, st, edits = SE.run_session("editor", esys, first, root, prof, a.seed * 1000 + 11,
-                                    f"{C.HERE}/logs/{a.tag}.jsonl")
+                                    f"{C.HERE}/logs/{a.tag}.jsonl", resume=resume)
     assert WK.tree_hash(f"{C.VIEWS[a.bench]}/src") == src_before, "view src changed!"
     d = WK.diff_src(a.bench, root)
     with open(f"{C.HERE}/out/{a.tag}.diff", "w") as f:
