@@ -135,6 +135,16 @@ def intent_report(run, expect):
             f"Expected but unchanged: {fmt(ex - ch)}.")
 
 
+def ask_changed(run):
+    """--ask-changed: удачные в логе прогоны, что после правки идут иначе -> вопрос (None, если таких нет или промпт другой)."""
+    ch, passed, prompt = changed_runs(run.last_rerun or "", run.root)
+    hit = sorted(ch & passed)
+    if prompt or not hit:
+        return None
+    return (f"Runs that passed in the log and go differently now: {', '.join(map(str, hit))}. "
+            "Is that what this edit is for?")
+
+
 def edit_checks(run):
     """--auto-check (4.11): после применённой правки — новые предупреждения pyflakes, smoke, rerun; bash не тратится."""
     lint_ = LI.lint_changed(run.root)

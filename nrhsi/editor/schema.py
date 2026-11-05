@@ -73,7 +73,8 @@ def edit_schema():
         "description": "Numbers of the recorded runs in logs/ whose course this edit changes; [] if none"}
     f["parameters"]["properties"]["expect"] = {
         "type": "string", "description": "What the harness will do differently in those runs"}
-    f["parameters"]["required"] = f["parameters"]["required"] + ["expect_runs", "expect"]
+    if not C.INTENT_OPT:
+        f["parameters"]["required"] = f["parameters"]["required"] + ["expect_runs", "expect"]
     return {"type": "function", "function": f}
 
 

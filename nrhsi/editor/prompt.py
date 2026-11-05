@@ -111,6 +111,9 @@ STAGES_LINE = ("- bash: the first STAGE_R calls are for reading. Your first edit
 INTENT_LINE = (" With each edit say what you expect it to do: expect_runs, the numbers of the recorded runs in logs/ "
                "whose course it changes ([] if none), and expect, what the harness will do differently in them. The "
                "checks after the edit compare this with the runs that did change.")
+INTENT_OPT_LINE = (" With an edit you may say what you expect it to do: expect_runs, the numbers of the recorded runs in "
+                   "logs/ whose course it changes, and expect, what the harness will do differently in them; the checks "
+                   "after the edit then compare this with the runs that did change.")
 AUTO_CHECK_LINE = (" After each edit that is applied, pyflakes, python3 tests/smoke.py and RERUN_NAME are run on src/; "
                    "their output comes with the edit's answer and uses no bash calls.")
 RERUN_TOOL_LINE = ("- rerun(expect_diff, run): replays the runs in logs/ on the current src/ (see README.md). "
@@ -148,3 +151,40 @@ bash(command="sed -n '55,70p' src/report.py")
 
 bash(command="grep -n 'rows' logs/run_4.jsonl | cut -c1-200 | head -5")
 ..."""
+
+
+# 5.11 --navigator 2: тот же выдуманный репозиторий, но поиск начинается с места из наблюдения
+NAV_EXAMPLE2 = """# Example: finding what a change needs (another repository)
+Observation: "Exported reports lose their last row: write_rows() (src/export.py:40-52) stops one row early."
+
+bash(command="sed -n '36,56p' src/export.py")
+def write_rows(out, table):
+    for i in range(n_rows(table) - 1):
+    ...
+
+bash(command="grep -n 'n_rows\\|write_rows(' src/*.py")
+src/export.py:18:def n_rows(table):
+src/export.py:40:def write_rows(out, table):
+src/report.py:63:    write_rows(f, table)
+
+bash(command="sed -n '16,24p' src/export.py")
+..."""
+
+# 5.11 --plan-line: планирование тикета в ответе модели (не отдельный шаг)
+PLAN_LINE = ("- Before an edit, write in your reply how the run the observation is about will go once the edit is in: "
+             "at which step the harness acts differently, and what the agent then sees and does. Then make the edit "
+             "that does that.")
+
+# 5.11 --broad-example: правка, которая делает больше задуманного (выдуманный репозиторий), без пояснений
+BROAD_EXAMPLE = """# Example: an edit that changes more than the run it is for (another repository)
+Observation: "Run 7 shows a stale price: get_price() (src/cache.py:20-31) returns the cached value without checking its age."
+
+edit(path="src/cache.py", old_string="    return CACHE[item]", new_string="    return fetch(item)")
+python3 tests/rerun.py prints:
+runs 2, 5, 7, 9 (1 failed, 3 passed): diverges at model call 3: what the model sees differs from the log
+runs 1, 3, 4, 6, 8 (2 failed, 3 passed): no changes (same as the log to the end)
+
+edit(path="src/cache.py", old_string="    return fetch(item)", new_string="    if time.time() - STAMP[item] > MAX_AGE:\n        return fetch(item)\n    return CACHE[item]")
+python3 tests/rerun.py prints:
+run 7 (failed): diverges at model call 3: what the model sees differs from the log
+runs 1, 2, 3, 4, 5, 6, 8, 9 (2 failed, 6 passed): no changes (same as the log to the end)"""

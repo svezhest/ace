@@ -39,6 +39,11 @@ def parse_args():
     ap.add_argument("--scratch", action="store_true", help="каталог scratch/ копии, куда можно писать")
     ap.add_argument("--tools-dir", default="tests", help="5.11: каталог rerun/smoke в копии (tests, tools, __tools)")
     ap.add_argument("--hide-tools", action="store_true", help="5.11: исходников rerun/smoke в копии нет; это команды")
+    ap.add_argument("--intent-opt", action="store_true", help="5.11: как --intent, но поля необязательны")
+    ap.add_argument("--ask-changed", action="store_true", help="5.11, с --auto-check --rerun: вопрос про изменившиеся удачные прогоны")
+    ap.add_argument("--plan-line", action="store_true", help="5.11: строка «до правки опиши, как пойдёт прогон тикета»")
+    ap.add_argument("--broad-example", action="store_true", help="5.11: пример правки шире задуманного (выдуманный репозиторий)")
+    ap.add_argument("--nav-v", type=int, default=1, help="5.11: вариант примера навигатора (1, 2)")
     ap.add_argument("--intent", action="store_true", help="5.11, с --auto-check --rerun: edit(…, expect_runs, expect); сверка с изменившимися прогонами")
     ap.add_argument("--navigator", action="store_true", help="5.11: в системном промпте пример прицельного поиска (выдуманный репозиторий)")
     ap.add_argument("--given-files", action="store_true", help="5.11, абляция, с --input-text: README.md и все файлы src/ целиком")
@@ -113,18 +118,29 @@ def editor_step(a, first, src_before, summary):
         if not a.rerun:
             add = add.replace(", python3 tests/smoke.py and python3 tests/rerun.py", " and python3 tests/smoke.py")
         esys = esys.replace(chk, chk + add)
+    if a.intent_opt:
+        a.intent = True
+    if a.ask_changed:
+        assert a.auto_check and a.rerun and not a.rerun_tool, "--ask-changed needs --auto-check --rerun"
     if a.intent:
         assert a.auto_check and a.rerun and not a.rerun_tool, "--intent needs --auto-check --rerun"
         assert P.EDIT_TOOL_LINE in esys
+        sig = "expect_runs?, expect?" if a.intent_opt else "expect_runs, expect"
         esys = esys.replace(P.EDIT_TOOL_LINE, P.EDIT_TOOL_LINE.replace("- edit(path, old_string, new_string)",
-                            "- edit(path, old_string, new_string, expect_runs, expect)") + P.INTENT_LINE)
+                            f"- edit(path, old_string, new_string, {sig})") + (P.INTENT_OPT_LINE if a.intent_opt else P.INTENT_LINE))
     if a.scratch:
         esys = esys.replace(P.SCRATCH_NOWRITE, P.SCRATCH_WRITE).replace("a read-only shell in", "a shell in").replace(
             F.PYTHON_LINE, F.PYTHON_SCRATCH_LINE.replace("SCRATCH/", F.SCRATCH_DIR + "/"))
         assert P.SCRATCH_WRITE in esys and "read-only shell" not in esys
     if a.navigator:
         assert "\n# How to work\n" in esys
-        esys = esys.replace("\n# How to work\n", "\n" + P.NAV_EXAMPLE + "\n\n# How to work\n")
+        esys = esys.replace("\n# How to work\n", "\n" + (P.NAV_EXAMPLE2 if a.nav_v == 2 else P.NAV_EXAMPLE) + "\n\n# How to work\n")
+    if a.broad_example:
+        assert a.rerun and "\n# How to work\n" in esys
+        esys = esys.replace("\n# How to work\n", "\n" + P.BROAD_EXAMPLE + "\n\n# How to work\n")
+    if a.plan_line:
+        assert "\n# How to work\n" in esys
+        esys = esys.replace("\n# How to work\n", "\n# How to work\n" + P.PLAN_LINE + "\n")
     esys = WK.tt(esys)        # 5.11 --tools-dir / --hide-tools
     if a.dry:
         print(esys, "\n-----\n", first)
@@ -158,7 +174,7 @@ def main():
         C.STEP_BUDGET = max(C.STEP_BUDGET, C.BASH_LIMIT + 35)
     assert not a.rerun_tool or (a.rerun and not a.rerun_at), "--rerun-tool needs --rerun, not with --rerun-at"
     C.AUTO_CHECK, C.RERUN_TOOL, C.SCRATCH = a.auto_check, a.rerun_tool, a.scratch
-    C.INTENT = a.intent
+    C.INTENT, C.INTENT_OPT, C.ASK_CHANGED = a.intent or a.intent_opt, a.intent_opt, a.ask_changed
     assert not (a.hide_tools or a.tools_dir != "tests") or not a.rerun_tool, "--tools-dir/--hide-tools без --rerun-tool"
     C.TOOLS_DIR, C.HIDE_TOOLS = a.tools_dir, a.hide_tools
     if a.hide_tools:
@@ -182,7 +198,7 @@ def main():
     os.makedirs(f"{C.HERE}/out", exist_ok=True)
     summary = {"tag": a.tag, "bench": a.bench, "input": a.input, "arm": a.arm, "seed": a.seed,
                "view": C.VIEWS[a.bench], "predict": a.predict, "cite": a.cite, "import_src": a.import_src,
-               "checked": a.checked, "smoke_calls": a.smoke_calls, "rerun": a.rerun, "rerun_at": a.rerun_at, "finish_review": a.finish_review, "goal_k": a.goal_k, "stages": a.stages, "auto_check": a.auto_check, "rerun_tool": a.rerun_tool, "scratch": a.scratch, "tools_dir": a.tools_dir, "hide_tools": a.hide_tools, "given_code": a.given_code, "given_files": a.given_files, "navigator": a.navigator, "intent": a.intent, "bash_limit": C.BASH_LIMIT, "goal_text": a.goal_text, "temp": F.TEMP, "input_text": a.input_text, "stand": F.STAND,
+               "checked": a.checked, "smoke_calls": a.smoke_calls, "rerun": a.rerun, "rerun_at": a.rerun_at, "finish_review": a.finish_review, "goal_k": a.goal_k, "stages": a.stages, "auto_check": a.auto_check, "rerun_tool": a.rerun_tool, "scratch": a.scratch, "tools_dir": a.tools_dir, "hide_tools": a.hide_tools, "given_code": a.given_code, "given_files": a.given_files, "navigator": a.navigator, "intent": a.intent or a.intent_opt, "intent_opt": a.intent_opt, "ask_changed": a.ask_changed, "plan_line": a.plan_line, "broad_example": a.broad_example, "nav_v": a.nav_v, "bash_limit": C.BASH_LIMIT, "goal_text": a.goal_text, "temp": F.TEMP, "input_text": a.input_text, "stand": F.STAND,
                "n_reports": len(reports), "view_src_hash": src_before}
     if a.arm == "fix":
         props = propose_step(a, reports, src_before, summary)

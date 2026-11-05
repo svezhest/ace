@@ -67,9 +67,10 @@ def edit_call(run, args, res):
     if C.INTENT:
         er, ex = args.get("expect_runs"), args.get("expect")
         errs = []
-        if not isinstance(er, list) or not all(isinstance(x, int) and not isinstance(x, bool) for x in er):
+        opt = C.INTENT_OPT and er is None and ex is None
+        if not opt and (not isinstance(er, list) or not all(isinstance(x, int) and not isinstance(x, bool) for x in er)):
             errs.append(f"expect_runs: expected type: array[int], got: {GA.type_name(er)}")
-        if not isinstance(ex, str) or not ex.strip():
+        if not opt and (not isinstance(ex, str) or not ex.strip()):
             errs.append(f"expect: expected a non-empty string, got: {GA.type_name(ex)}")
         if errs:
             run.st["edit_fail"]["intent"] = run.st["edit_fail"].get("intent", 0) + 1
@@ -90,9 +91,14 @@ def edit_call(run, args, res):
                      "left to check your edits.")
         if C.AUTO_CHECK:
             text += "\n\n" + GA.edit_checks(run)
-            if C.INTENT:
+            if C.INTENT and args.get("expect_runs") is not None:
                 text += "\n" + GA.intent_report(run, args["expect_runs"])
-                rec["expect_runs"], rec["expect"] = args["expect_runs"], args["expect"]
+                rec["expect_runs"], rec["expect"] = args["expect_runs"], args.get("expect")
+            if C.ASK_CHANGED:
+                q = GA.ask_changed(run)
+                if q:
+                    text += "\n" + q
+                    rec["asked"] = True
     return text, False
 
 
