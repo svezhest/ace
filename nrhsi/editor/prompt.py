@@ -121,3 +121,27 @@ RERUN_TOOL_CHECK_LINE = ("- Check each change: run python3 tests/smoke.py and th
 SCRATCH_NOWRITE = "Nothing can be written with it."
 SCRATCH_WRITE = ("Files can be written only in scratch/ (empty at the start; > scratch/NAME, or from python3); "
                  "everything else is read-only, and there is no /tmp.")
+
+
+# 5.11 --navigator: пример прицельного поиска (выдуманный репозиторий), без пояснений
+NAV_EXAMPLE = """# Example: finding what a change needs (another repository)
+Observation: "Exported reports lose their last row: write_rows() (src/export.py:40-52) stops one row early."
+
+bash(command="grep -n 'write_rows\\|n_rows' src/*.py")
+src/export.py:18:def n_rows(table):
+src/export.py:40:def write_rows(out, table):
+src/report.py:63:    write_rows(f, table)
+
+bash(command="sed -n '36,56p' src/export.py")
+def write_rows(out, table):
+    for i in range(n_rows(table) - 1):
+    ...
+
+bash(command="sed -n '16,24p' src/export.py")
+...
+
+bash(command="sed -n '55,70p' src/report.py")
+...
+
+bash(command="grep -n 'rows' logs/run_4.jsonl | cut -c1-200 | head -5")
+..."""
