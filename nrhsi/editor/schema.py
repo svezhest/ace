@@ -38,11 +38,15 @@ RERUN_SCHEMA = {"type": "function", "function": {
     "name": "rerun", "description": "Replay the runs in logs/ on the current src/ (see README.md) and say whether they "
     "went as you expected.",
     "parameters": {"type": "object", "properties": {
-        "change": {"type": "boolean", "description": "true: you expect your changes to make these runs go differently "
-                   "from the log; false: you expect them to go the same as the log."},
+        "expect_diff": {"type": "string", "enum": ["none", "prompt", "control"], "description":
+                        "What you expect the replay to show on the current src/. none: the runs go exactly as in the "
+                        "log (src/ as at the start, or a change that should not touch these runs). prompt: you changed "
+                        "the prompt, so the runs differ from the log at the prompt and nothing after it is compared. "
+                        "control: you changed the harness code, so from some point on the runs go differently from "
+                        "the log."},
         "run": {"type": "integer", "description": "One run, shown in detail. Without it: all runs, one line per group "
                 "of runs that behave the same way."}},
-        "required": ["change"]}}}
+        "required": ["expect_diff"]}}}
 
 
 def bash_schema():

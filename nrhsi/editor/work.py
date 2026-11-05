@@ -30,7 +30,7 @@ run 3 (failed): diverges at model call 17 (log line 52): what the model sees dif
 """
 
 def rerun_tool_readme():
-    """--rerun-tool (4.11): тот же текст README про повтор — для инструмента rerun(change, run)."""
+    """--rerun-tool (4.11): тот же текст README про повтор — для инструмента rerun(expect_diff, run)."""
     t = RERUN_README
     for old, new in (("- `tests/rerun.py` — replays", "- the rerun tool — replays"),
                      (" (a copy of it is in `tests/orig_src/`)", ""),
@@ -38,10 +38,9 @@ def rerun_tool_readme():
                       "`python3 tests/rerun.py N` shows run N in detail, with the line of `logs/run_N.jsonl`.",
                       "rerun without run prints one line per group of runs that behave the same way; rerun with run=N "
                       "shows run N in detail, with the line of `logs/run_N.jsonl`. Before that, rerun says whether the "
-                      "runs went as you expected with change: `ok` or `failed`; `cannot check` when the prompt differs from the "
-                      "log, so the runs cannot be replayed on it."),
-                     ("$ python3 tests/rerun.py\n", "rerun(change=true)\nok:\n"),
-                     ("$ python3 tests/rerun.py 3\n", "rerun(change=false, run=3)\nfailed!:\n")):
+                      "runs went as you expected with expect_diff: `ok` or `failed`."),
+                     ("$ python3 tests/rerun.py\n", 'rerun(expect_diff="control")\nok:\n'),
+                     ("$ python3 tests/rerun.py 3\n", 'rerun(expect_diff="none", run=3)\nfailed!:\n')):
         assert t.count(old) == 1, old
         t = t.replace(old, new)
     return t

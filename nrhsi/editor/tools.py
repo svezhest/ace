@@ -66,14 +66,12 @@ def edit_call(run, args, res):
 
 
 def rerun_call(run, args, res):
-    """--rerun-tool: rerun(change, run) -> ok / failed по ожиданию change, затем вывод повтора."""
-    ch, n = args.get("change"), args.get("run")
-    if isinstance(ch, str) and ch.lower() in ("true", "false"):
-        ch = ch.lower() == "true"
-    if not isinstance(ch, bool):
+    """--rerun-tool: rerun(expect_diff, run) -> ok / failed по ожиданию (none | prompt | control), затем вывод повтора."""
+    ex, n = args.get("expect_diff"), args.get("run")
+    if ex not in ("none", "prompt", "control"):
         run.st["bad_call"] += 1
         res["format_fail"] = "bad_args"
-        return "Error: change is required: true or false.", False
+        return "Error: expect_diff is required: none, prompt or control.", False
     if n is not None:
         try:
             n = int(n)
@@ -83,14 +81,13 @@ def rerun_call(run, args, res):
             return "Error: run must be a run number.", False
     run.st["reruns"] = run.st.get("reruns", 0) + 1
     out, changed = GA.rerun_output(run, n)
-    res.update(change=ch, changed=changed)
     top = [l for l in out.splitlines() if l.strip() and not l[0].isspace() and not l.startswith("…")]
-    if top and all("the prompt differs from the log" in l for l in top):   # 5.11: правку промпта повтор не проверяет
-        res["changed"] = None
-        return "cannot check:\n" + out, False
-    if ch == changed:
-        return ("ok:\n" + out if changed else "ok, no changes"), False
-    return ("failed!:\n" + out if changed else "failed: no changes!"), False
+    got = ("none" if not changed else
+           "prompt" if top and all("the prompt differs from the log" in l for l in top) else "control")
+    res.update(expect_diff=ex, got_diff=got)
+    if ex == got:
+        return ("ok, no changes" if got == "none" else "ok:\n" + out), False
+    return ("failed: no changes!" if got == "none" else "failed!:\n" + out), False
 
 
 def check_proposal(args, n_obs):
