@@ -24,6 +24,9 @@ STAGES = None    # --stages R,K: R bash на чтение; первая прав
 AUTO_CHECK = False   # --auto-check: каждая применённая правка — pyflakes, smoke и rerun в ответе edit, без bash
 RERUN_TOOL = False   # --rerun-tool: rerun — инструмент rerun(change, run) с ожиданием; в копии нет tests/rerun.py
 SCRATCH = False      # --scratch: каталог scratch/ копии, куда можно писать (механика исследователя)
+TOOLS_DIR = "tests"   # 5.11 --tools-dir: каталог rerun/smoke в копии (tests, tools, __tools)
+HIDE_TOOLS = False   # 5.11 --hide-tools: исходников инструментов в копии нет; rerun и smoke — команды
+HIDDEN = None        # --hide-tools: каталог инструментов вне копии (work/.tools_<tag>)
 GOAL_K = 0        # --goal-k K: когда осталось K вызовов bash, харнесс писателя ставит цель — проверить последние правки
 
 BASH_LIMIT = 25          # вызовов bash; потом — финальные ходы

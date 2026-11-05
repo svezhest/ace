@@ -6,16 +6,17 @@ import sys
 from .cfg import F
 from . import cfg as C
 from . import lint as LI
+from . import work as WK
 
 REVIEW_DIFF, REVIEW_RERUN = 5000, 2500   # --finish-review: символов diff и вывода rerun
 
 
 def smoke_failure(run):
     """31.10: правки без проверки — вывод python3 tests/smoke.py, если он упал (или '' — прошёл, нет теста)."""
-    if not os.path.exists(f"{run.root}/tests/smoke.py"):
+    if not os.path.exists(f"{C.HIDDEN if C.HIDE_TOOLS else run.root + '/' + C.TOOLS_DIR}/smoke.py"):
         return ""
-    ok, out, full, _, _ = F.bash_output("python3 tests/smoke.py", run.root, run.prof)
-    return "python3 tests/smoke.py now prints:\n" + out if not ok or "Traceback" in full else ""
+    ok, out, full = WK.tool_run(run, "smoke")
+    return WK.tt("python3 tests/smoke.py now prints:\n") + out if not ok or "Traceback" in full else ""
 
 
 def finish(run, args=None):
@@ -71,7 +72,7 @@ def clip(t, n):
 
 
 def rerun_name():
-    return "rerun" if C.RERUN_TOOL else "python3 tests/rerun.py"
+    return "rerun" if C.RERUN_TOOL else WK.tt("python3 tests/rerun.py")
 
 
 RERUN_CORE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "editor", "rerun.py")
@@ -86,7 +87,7 @@ def rerun_output(run, n=None):
         p = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
         full = (p.stdout + p.stderr).strip()
     else:
-        _, _, full, _, _ = F.bash_output("python3 tests/rerun.py" + (f" {n}" if n is not None else ""), run.root, run.prof)
+        _, _, full = WK.tool_run(run, "rerun", f" {n}" if n is not None else "")
         full = full.strip()
     heads = [l for l in full.splitlines() if l and not l[0].isspace()]
     changed = any("no changes" not in l for l in heads)
@@ -96,9 +97,9 @@ def rerun_output(run, n=None):
 def edit_checks(run):
     """--auto-check (4.11): после применённой правки — новые предупреждения pyflakes, smoke, rerun; bash не тратится."""
     lint_ = LI.lint_changed(run.root)
-    ok, out, full, _, _ = F.bash_output("python3 tests/smoke.py", run.root, run.prof)
-    smoke = (f"python3 tests/smoke.py prints:\n{out}" if not ok or "Traceback" in full else
-             "python3 tests/smoke.py runs without errors.")
+    ok, out, full = WK.tool_run(run, "smoke")
+    smoke = (WK.tt("python3 tests/smoke.py prints:\n") + out if not ok or "Traceback" in full else
+             WK.tt("python3 tests/smoke.py runs without errors."))
     t = "Checks run on src/ after this edit (they use no bash calls):\n"
     if lint_:
         t += lint_ + "\n"

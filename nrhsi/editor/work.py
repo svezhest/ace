@@ -122,6 +122,37 @@ def readme_without_logs(text):
     return "".join(out).rstrip("\n") + "\n"
 
 
+def tt(s):
+    """5.11 --tools-dir / --hide-tools: имена инструментов в тексте, который видит писатель."""
+    if C.HIDE_TOOLS:
+        for a, b in ((" (a copy of it is in `tests/orig_src/`)", ""), ("python3 tests/rerun.py", "rerun"),
+                     ("python3 tests/smoke.py", "smoke"), ("`tests/rerun.py`", "`rerun`"), ("`tests/smoke.py`", "`smoke`"),
+                     ("tests/rerun.py", "rerun"), ("tests/smoke.py", "smoke")):
+            s = s.replace(a, b)
+        assert "tests/" not in s, s[max(0, s.find("tests/") - 80):s.find("tests/") + 40]
+        return s
+    return s if C.TOOLS_DIR == "tests" else s.replace("tests/", C.TOOLS_DIR + "/")
+
+
+def tool_run(run, name, args=""):
+    """Запуск rerun/smoke харнессом -> (ok, out, full). --hide-tools: из каталога вне копии, в песочнице с правом чтения
+    этого каталога; иначе python3 <tools>/<name>.py в обычной песочнице."""
+    if not C.HIDE_TOOLS:
+        ok, out, full, _, _ = F.bash_output(f"python3 {C.TOOLS_DIR}/{name}.py{args}", run.root, run.prof)
+        return ok, out, full
+    env = {"PATH": f"{F.BIN}:/usr/bin:/bin", "LANG": "en_US.UTF-8", "HOME": run.root, "PYTHONDONTWRITEBYTECODE": "1",
+           "PYTHONPATH": F.SITE}
+    try:
+        p = subprocess.run(["sandbox-exec", "-f", run.prof + ".tools", "/bin/bash", "--noprofile", "--norc", "-c",
+                            f"python3 {C.HIDDEN}/{name}.py{args}"], cwd=run.root, env=env, capture_output=True,
+                           text=True, timeout=F.CMD_TIMEOUT * 6, stdin=subprocess.DEVNULL)
+        full, ok = (p.stdout + p.stderr).replace(C.HIDDEN + "/", "").strip(), p.returncode == 0
+    except subprocess.TimeoutExpired:
+        full, ok = f"Error: {name} did not finish in time.", False
+    out = full if len(full) <= F.OUT_CHARS else full[:F.OUT_CHARS] + f"\n[... {len(full)} characters in all]"
+    return ok, out, full
+
+
 WORK_MTIME = 1793491200   # 2026-11-01 00:00 UTC
 
 
@@ -143,24 +174,36 @@ def build_work(bench, tag, smoke=True):
         readme += SMOKE_README if not C.SMOKE_CALLS else SMOKE_README.replace(
             "or the error. ", "or the error." + SMOKE_CALLS_README + " ")
     with open(f"{v}/README.md", "w") as f:
-        f.write(readme)
+        f.write(tt(readme))
     shutil.copytree(f"{C.VIEWS[bench]}/src", f"{v}/src", ignore=shutil.ignore_patterns("__pycache__"))
+    td = C.HIDDEN if C.HIDE_TOOLS else f"{v}/{C.TOOLS_DIR}"     # 5.11: каталог инструментов
+    if C.HIDE_TOOLS and os.path.lexists(td):
+        shutil.rmtree(td)
     if smoke:
-        os.makedirs(f"{v}/tests")
-        shutil.copy(f"{C.SMOKE}/{bench}.py", f"{v}/tests/smoke.py")
+        os.makedirs(td)
+        sm = open(f"{C.SMOKE}/{bench}.py").read()
         if C.SMOKE_CALLS:
-            with open(f"{v}/tests/smoke.py", "w") as f:
-                f.write(smoke_calls(open(f"{C.SMOKE}/{bench}.py").read()))
-            shutil.copy(f"{C.SMOKE}/calls.py", f"{v}/tests/calls.py")
+            sm = smoke_calls(sm)
+            shutil.copy(f"{C.SMOKE}/calls.py", f"{td}/calls.py")
+        if C.HIDE_TOOLS:      # src/ — копии, а не соседа файла
+            old = 'os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src")'
+            assert sm.count(old) == 1
+            sm = sm.replace(old, repr(f"{v}/src"))
+        with open(f"{td}/smoke.py", "w") as f:
+            f.write(tt(sm))
     if C.SCRATCH:
         os.makedirs(f"{v}/{F.SCRATCH_DIR}")
     if smoke and C.RERUN:
         shutil.copytree(f"{C.VIEWS[bench]}/logs", f"{v}/logs")
     if smoke and C.RERUN and not C.RERUN_TOOL:      # --rerun-tool: повтор — инструмент, ядра в копии нет
-        shutil.copytree(f"{C.VIEWS[bench]}/src", f"{v}/tests/orig_src", ignore=shutil.ignore_patterns("__pycache__"))
-        shutil.copy(os.path.join(os.path.dirname(C.SMOKE), "..", "..", "editor", "rerun.py"), f"{v}/tests/rerun_core.py")
-        with open(f"{v}/tests/rerun.py", "w") as f:
-            f.write(RERUN_PY.replace("BENCH", repr(bench)))
+        shutil.copytree(f"{C.VIEWS[bench]}/src", f"{td}/orig_src", ignore=shutil.ignore_patterns("__pycache__"))
+        shutil.copy(os.path.join(os.path.dirname(C.SMOKE), "..", "..", "editor", "rerun.py"), f"{td}/rerun_core.py")
+        py = tt(RERUN_PY.replace("BENCH", repr(bench)))
+        if C.HIDE_TOOLS:
+            assert py.count("ROOT = os.path.dirname(HERE)") == 1
+            py = py.replace("ROOT = os.path.dirname(HERE)", f"ROOT = {v!r}")
+        with open(f"{td}/rerun.py", "w") as f:
+            f.write(py)
     for p in glob.glob(f"{v}/src/*"):
         assert os.stat(p).st_nlink == 1, p          # копия, не жёсткая ссылка
     for d, dirs, files in os.walk(v, topdown=False):    # время файлов одно на все сессии: ls -la не разводит пары
@@ -176,6 +219,10 @@ def make_profile(root, tag):
     with open(p, "w") as f:
         f.write(F.profile_text(root))
     F._PROFILES.append(p)
+    if C.HIDE_TOOLS:      # 5.11: для запуска rerun/smoke харнессом — то же + чтение каталога инструментов
+        with open(p + ".tools", "w") as f:
+            f.write(F.profile_text(root) + f'(allow file-read* (subpath "{C.HIDDEN}"))\n')
+        F._PROFILES.append(p + ".tools")
     return p
 
 

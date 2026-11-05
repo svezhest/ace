@@ -1,11 +1,13 @@
 """Вызовы инструментов: bash, edit (редактор), propose (шаг вариантов), finish -> (текст для модели, конец ли).
 res — запись вызова для лога (поля дописываются сюда)."""
 import json
+import re
 
 from .cfg import F
 from . import cfg as C
 from . import edit as ED
 from . import gate as GA
+from . import work as WK
 
 
 def json_args(raw):
@@ -27,6 +29,19 @@ def bash_call(run, args, res):
         st["bad_call"] += 1
         return "Error: bash needs a 'command' string.", False
     key = " ".join(cmd.split())
+    m = (re.match(r"(rerun|smoke)((?: [\w-]+)*)((?: \| (?:head|tail|grep|wc|nl|sed)\b[^;&`$<>(){}|]*)*)$", key)
+         if C.HIDE_TOOLS else None)       # 5.11 --hide-tools: rerun и smoke — команды харнесса, можно с | head и т.п.
+    if C.HIDE_TOOLS and not m and re.match(r"(rerun|smoke)\b", key):
+        return ("Error: rerun and smoke run on their own; only | head, tail, grep, wc, nl or sed may follow "
+                "them."), False
+    if m and key not in run.seen:
+        if m.group(1) == "smoke" and m.group(2):
+            return "Error: smoke takes no arguments.", False
+        ok, out, full = WK.tool_run(run, m.group(1), (m.group(2) or "") + (m.group(3) or ""))
+        st["denied"] += not ok
+        run.seen[key] = (st["tool_calls"], out)
+        res.update(ok=ok, full_chars=len(full), truncated=len(full) > len(out))
+        return out, False
     if key in run.seen:
         st["repeats"] += 1
         res["repeat"] = True

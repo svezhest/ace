@@ -36,6 +36,8 @@ def after_turn(run, finished):
     elif C.GOAL_K and not run.goal_sent and run.st["bash_calls"] >= C.BASH_LIMIT - C.GOAL_K:
         run.goal_sent = True
         checks = "python3 tests/smoke.py and python3 tests/rerun.py" if C.RERUN else "python3 tests/smoke.py"
+        from . import work as WK
+        checks = WK.tt(checks)
         run.note_user(f"{C.BASH_LIMIT - run.st['bash_calls']} bash calls are left. Goal now: check your latest edits "
                       f"with {checks}.")
     return None

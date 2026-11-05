@@ -37,6 +37,8 @@ def parse_args():
     ap.add_argument("--auto-check", action="store_true", help="каждая применённая правка — pyflakes, smoke, rerun в ответе edit")
     ap.add_argument("--rerun-tool", action="store_true", help="с --rerun: rerun — инструмент rerun(change, run), ok/failed по ожиданию")
     ap.add_argument("--scratch", action="store_true", help="каталог scratch/ копии, куда можно писать")
+    ap.add_argument("--tools-dir", default="tests", help="5.11: каталог rerun/smoke в копии (tests, tools, __tools)")
+    ap.add_argument("--hide-tools", action="store_true", help="5.11: исходников rerun/smoke в копии нет; это команды")
     ap.add_argument("--bash-limit", type=int, help="число вызовов bash вместо cfg.BASH_LIMIT (бюджет всех вызовов растёт с ним)")
     ap.add_argument("--temp", type=float, help="температура писателя вместо температуры агентов из профиля стенда")
     ap.add_argument("--stand", default="default", help="профиль стенда (stands/<имя>.json): модель и генерация")
@@ -111,6 +113,7 @@ def editor_step(a, first, src_before, summary):
         esys = esys.replace(P.SCRATCH_NOWRITE, P.SCRATCH_WRITE).replace("a read-only shell in", "a shell in").replace(
             F.PYTHON_LINE, F.PYTHON_SCRATCH_LINE.replace("SCRATCH/", F.SCRATCH_DIR + "/"))
         assert P.SCRATCH_WRITE in esys and "read-only shell" not in esys
+    esys = WK.tt(esys)        # 5.11 --tools-dir / --hide-tools
     if a.dry:
         print(esys, "\n-----\n", first)
         return
@@ -143,6 +146,10 @@ def main():
         C.STEP_BUDGET = max(C.STEP_BUDGET, C.BASH_LIMIT + 35)
     assert not a.rerun_tool or (a.rerun and not a.rerun_at), "--rerun-tool needs --rerun, not with --rerun-at"
     C.AUTO_CHECK, C.RERUN_TOOL, C.SCRATCH = a.auto_check, a.rerun_tool, a.scratch
+    assert not (a.hide_tools or a.tools_dir != "tests") or not a.rerun_tool, "--tools-dir/--hide-tools без --rerun-tool"
+    C.TOOLS_DIR, C.HIDE_TOOLS = a.tools_dir, a.hide_tools
+    if a.hide_tools:
+        C.HIDDEN = f"{os.path.abspath(a.home)}/work/.tools_{a.tag}"
     F.SCRATCH = a.scratch            # 4.11: механика scratch/ исследователя — и у писателя
     assert not a.rerun_at or a.rerun, "--rerun-at needs --rerun"
     C.GOAL_TEXT = open(a.goal_text).read().strip() if a.goal_text else None
@@ -162,7 +169,7 @@ def main():
     os.makedirs(f"{C.HERE}/out", exist_ok=True)
     summary = {"tag": a.tag, "bench": a.bench, "input": a.input, "arm": a.arm, "seed": a.seed,
                "view": C.VIEWS[a.bench], "predict": a.predict, "cite": a.cite, "import_src": a.import_src,
-               "checked": a.checked, "smoke_calls": a.smoke_calls, "rerun": a.rerun, "rerun_at": a.rerun_at, "finish_review": a.finish_review, "goal_k": a.goal_k, "stages": a.stages, "auto_check": a.auto_check, "rerun_tool": a.rerun_tool, "scratch": a.scratch, "bash_limit": C.BASH_LIMIT, "goal_text": a.goal_text, "temp": F.TEMP, "input_text": a.input_text, "stand": F.STAND,
+               "checked": a.checked, "smoke_calls": a.smoke_calls, "rerun": a.rerun, "rerun_at": a.rerun_at, "finish_review": a.finish_review, "goal_k": a.goal_k, "stages": a.stages, "auto_check": a.auto_check, "rerun_tool": a.rerun_tool, "scratch": a.scratch, "tools_dir": a.tools_dir, "hide_tools": a.hide_tools, "bash_limit": C.BASH_LIMIT, "goal_text": a.goal_text, "temp": F.TEMP, "input_text": a.input_text, "stand": F.STAND,
                "n_reports": len(reports), "view_src_hash": src_before}
     if a.arm == "fix":
         props = propose_step(a, reports, src_before, summary)
