@@ -112,7 +112,8 @@ AUTO_CHECK_LINE = (" After each edit that is applied, pyflakes, python3 tests/sm
                    "their output comes with the edit's answer and uses no bash calls.")
 RERUN_TOOL_LINE = ("- rerun(change, run): replays the runs in logs/ on the current src/ (see README.md). change: true if "
                    "you expect your changes to make these runs go differently from the log, false if you expect them "
-                   "to go the same. It answers ok or failed (did the runs go as you expected), then what changed; run: "
+                   "to go the same. It answers ok or failed (did the runs go as you expected), or cannot check (the runs cannot be "
+                   "replayed on a changed prompt), then what changed; run: "
                    "one run in detail.")
 RERUN_TOOL_CHECK_LINE = ("- Check each change: run python3 tests/smoke.py and the rerun tool (see README.md), and read the "
                          "changed lines together with the code that calls or uses them. If rerun shows no changes in "

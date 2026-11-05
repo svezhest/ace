@@ -38,7 +38,8 @@ def rerun_tool_readme():
                       "`python3 tests/rerun.py N` shows run N in detail, with the line of `logs/run_N.jsonl`.",
                       "rerun without run prints one line per group of runs that behave the same way; rerun with run=N "
                       "shows run N in detail, with the line of `logs/run_N.jsonl`. Before that, rerun says whether the "
-                      "runs went as you expected with change: `ok` or `failed`."),
+                      "runs went as you expected with change: `ok` or `failed`; `cannot check` when the prompt differs from the "
+                      "log, so the runs cannot be replayed on it."),
                      ("$ python3 tests/rerun.py\n", "rerun(change=true)\nok:\n"),
                      ("$ python3 tests/rerun.py 3\n", "rerun(change=false, run=3)\nfailed!:\n")):
         assert t.count(old) == 1, old

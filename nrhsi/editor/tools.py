@@ -84,6 +84,10 @@ def rerun_call(run, args, res):
     run.st["reruns"] = run.st.get("reruns", 0) + 1
     out, changed = GA.rerun_output(run, n)
     res.update(change=ch, changed=changed)
+    top = [l for l in out.splitlines() if l.strip() and not l[0].isspace() and not l.startswith("…")]
+    if top and all("the prompt differs from the log" in l for l in top):   # 5.11: правку промпта повтор не проверяет
+        res["changed"] = None
+        return "cannot check:\n" + out, False
     if ch == changed:
         return ("ok:\n" + out if changed else "ok, no changes"), False
     return ("failed!:\n" + out if changed else "failed: no changes!"), False
