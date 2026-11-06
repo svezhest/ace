@@ -35,6 +35,7 @@ def parse_args():
     ap.add_argument("--stages", help="R,K: R bash на чтение; первая правка (или конец R) — ещё K bash на проверку; "
                     "потом правки не применяются (включает --checked)")
     ap.add_argument("--auto-check", action="store_true", help="каждая применённая правка — pyflakes, smoke, rerun в ответе edit")
+    ap.add_argument("--check-auto-only", action="store_true", help="6.11 CL, с --rerun --auto-check: строка проверки — только факт про авто-проверку; ручной rerun — для одного прогона в деталях")
     ap.add_argument("--rerun-tool", action="store_true", help="с --rerun: rerun — инструмент rerun(change, run), ok/failed по ожиданию")
     ap.add_argument("--scratch", action="store_true", help="каталог scratch/ копии, куда можно писать")
     ap.add_argument("--tools-dir", default="tests", help="5.11: каталог rerun/smoke в копии (tests, tools, __tools)")
@@ -80,6 +81,12 @@ def ticket_line(first, t):
     line = {"control": f"Change expected: control — what the harness code does in {runs} should change, not only the texts the model reads.",
             "prompt": f"Change expected: prompt — the texts the model reads in {runs} should change.",
             "any": f"Change expected: any — {runs} should go differently, through the texts the model reads or through the harness code."}[t["change_expected"]]
+    ks = t.get("keep") or []   # 6.11 TKK: вторая половина — что должно остаться
+    if ks:
+        kr = f"Run {ks[0]}" if len(ks) == 1 else "Runs " + ", ".join(map(str, ks[:-1])) + f" and {ks[-1]}"
+        line += (f" {kr} passed and should go as in the log: there the harness already does what it should. "
+                 "The check after each edit tells you whether both hold; when both hold, the change does what the "
+                 "observation asks.")
     assert first.count(TICKET_TASK) == 1, "task line not found"
     return first.replace(TICKET_TASK, "\n\n" + line + TICKET_TASK)
 
@@ -145,6 +152,12 @@ def editor_step(a, first, src_before, summary):
         if not a.rerun:
             add = add.replace(", python3 tests/smoke.py and python3 tests/rerun.py", " and python3 tests/smoke.py")
         esys = esys.replace(chk, chk + add)
+        if a.check_auto_only:   # 6.11 CL: строка проверки — факт про авто-проверку, без «run smoke and rerun»
+            assert chk == P.RERUN_CHECK_LINE and a.rerun and not a.rerun_tool, "--check-auto-only needs --rerun --auto-check"
+            esys = esys.replace(chk + add, P.CHECK_AUTO_ONLY_LINE)
+            assert P.CHECK_AUTO_ONLY_LINE in esys
+    elif getattr(a, "check_auto_only", False):
+        raise SystemExit("--check-auto-only needs --auto-check")
     if a.intent_opt:
         a.intent = True
     if a.ask_changed:
@@ -252,7 +265,7 @@ def main():
     os.makedirs(f"{C.HERE}/out", exist_ok=True)
     summary = {"tag": a.tag, "bench": a.bench, "input": a.input, "arm": a.arm, "seed": a.seed,
                "view": C.VIEWS[a.bench], "predict": a.predict, "cite": a.cite, "import_src": a.import_src,
-               "checked": a.checked, "smoke_calls": a.smoke_calls, "rerun": a.rerun, "rerun_at": a.rerun_at, "finish_review": a.finish_review, "goal_k": a.goal_k, "stages": a.stages, "auto_check": a.auto_check, "rerun_tool": a.rerun_tool, "scratch": a.scratch, "tools_dir": a.tools_dir, "hide_tools": a.hide_tools, "given_code": a.given_code, "given_files": a.given_files, "navigator": a.navigator, "intent": a.intent or a.intent_opt, "intent_opt": a.intent_opt, "ask_changed": a.ask_changed, "plan_line": a.plan_line, "broad_example": a.broad_example, "nav_v": a.nav_v, "ticket": C.TICKET, "bash_limit": C.BASH_LIMIT, "goal_text": a.goal_text, "temp": F.TEMP, "input_text": a.input_text, "stand": F.STAND,
+               "checked": a.checked, "smoke_calls": a.smoke_calls, "rerun": a.rerun, "rerun_at": a.rerun_at, "finish_review": a.finish_review, "goal_k": a.goal_k, "stages": a.stages, "auto_check": a.auto_check, "check_auto_only": a.check_auto_only, "rerun_tool": a.rerun_tool, "scratch": a.scratch, "tools_dir": a.tools_dir, "hide_tools": a.hide_tools, "given_code": a.given_code, "given_files": a.given_files, "navigator": a.navigator, "intent": a.intent or a.intent_opt, "intent_opt": a.intent_opt, "ask_changed": a.ask_changed, "plan_line": a.plan_line, "broad_example": a.broad_example, "nav_v": a.nav_v, "ticket": C.TICKET, "bash_limit": C.BASH_LIMIT, "goal_text": a.goal_text, "temp": F.TEMP, "input_text": a.input_text, "stand": F.STAND,
                "n_reports": len(reports), "view_src_hash": src_before}
     if a.arm == "fix":
         props = propose_step(a, reports, src_before, summary)

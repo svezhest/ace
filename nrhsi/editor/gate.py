@@ -597,6 +597,23 @@ def ticket_check(run):
                 upto, cl = _cover_lines(changed, cov.get(str(r)) or {}, a)
                 out.append(f"The lines you changed, as run {r} replays them ({upto}):\n" + "\n".join(cl))
         lines = out
+    keep = C.TICKET.get("keep") or []   # 6.11 TKK: вторая половина тикета — прогоны, которые должны пойти как в логе
+    if keep:
+        kc = _replay(f"{run.root}/src", run.root, keep)
+        kk = _replay(_old_texts_src(run), run.root, keep) if texts else kc
+        for r in keep:
+            a, b = kc.get(str(r)), kk.get(str(r))
+            crash = next((d for d in (a, b) if d and d["kind"] == "crash"), None)
+            d = b if texts else a   # при правке текстов все прогоны меняются со старта: «остаться» проверяется по коду
+            if crash:
+                lines.append(f"Failed: in run {r} the harness crashes" + (f" at model call {crash['call']}" if crash["call"] else "")
+                             + f": {crash['text'].strip().splitlines()[0][:300] if crash['text'].strip() else 'no message'}")
+            elif d is None:
+                lines.append(f"Ok: run {r}, which should go as in the log, goes as in the log"
+                             + (" (with the old texts)" if texts else "") + ".")
+            else:
+                lines.append(f"Failed: run {r} passed in the log and should go as in it; "
+                             + ("with the old texts " if texts else "") + f"{_where(d)}.")
     if getattr(C, "TICKET_PASSED", False):   # 6.11: факт о первом задетом удачном прогоне
         if watch is None:
             changed = changed or _changed_lines(run)

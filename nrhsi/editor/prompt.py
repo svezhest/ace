@@ -114,6 +114,11 @@ INTENT_LINE = (" With each edit say what you expect it to do: expect_runs, the n
 INTENT_OPT_LINE = (" With an edit you may say what you expect it to do: expect_runs, the numbers of the recorded runs in "
                    "logs/ whose course it changes, and expect, what the harness will do differently in them; the checks "
                    "after the edit then compare this with the runs that did change.")
+CHECK_AUTO_ONLY_LINE = ("- Checks run by themselves: after each edit that is applied, pyflakes, python3 tests/smoke.py and "
+                        "python3 tests/rerun.py are run on src/, and their output comes with the edit's answer; this uses no "
+                        "bash calls. Read the changed lines together with the code that calls or uses them. To look at one "
+                        "run in detail, run python3 tests/rerun.py N yourself (see README.md). If the runs an observation is "
+                        "about show no changes, your change may have missed.")
 AUTO_CHECK_LINE = (" After each edit that is applied, pyflakes, python3 tests/smoke.py and RERUN_NAME are run on src/; "
                    "their output comes with the edit's answer and uses no bash calls.")
 RERUN_TOOL_LINE = ("- rerun(expect_diff, run): replays the runs in logs/ on the current src/ (see README.md). "
