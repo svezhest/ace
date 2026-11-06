@@ -49,6 +49,7 @@ def parse_args():
     ap.add_argument("--given-files", action="store_true", help="5.11, абляция, с --input-text: README.md и все файлы src/ целиком")
     ap.add_argument("--given-code", action="store_true", help="5.11, с --input-text: под текстом — код src/ вида по его ссылкам")
     ap.add_argument("--ticket", help="6.11, с --auto-check --rerun: json тикета {change_expected, runs} — скрытое ожидание ревьювера")
+    ap.add_argument("--ticket-show", action="store_true", help="6.11, с --ticket: ожидание ревьювера — строкой в наблюдении (писатель видит)")
     ap.add_argument("--resume", help="6.11: лог сессии писателя; история до --resume-turn, этот ход исполняется заново")
     ap.add_argument("--resume-turn", type=int)
     ap.add_argument("--resume-bash", type=int, default=15, help="сколько bash добавить с хода воскрешения")
@@ -59,6 +60,20 @@ def parse_args():
     ap.add_argument("--rlogs", default=C.RLOGS, help="логи сессий исследователя (кроме --arm merge)")
     ap.add_argument("--lint", default=C.LINT, help="каталог с pyflakes (иначе — из окружения)")
     return ap.parse_args()
+
+
+TICKET_TASK = "\n\nChange src/ so that the agent fails fewer tasks."
+
+
+def ticket_line(first, t):
+    """6.11 --ticket-show: ожидание ревьювера — абзацем в конце наблюдения, перед задачей."""
+    rs = t["runs"]
+    runs = f"run {rs[0]}" if len(rs) == 1 else "runs " + ", ".join(map(str, rs[:-1])) + f" and {rs[-1]}"
+    line = {"control": f"Change expected: control — what the harness code does in {runs} should change, not only the texts the model reads.",
+            "prompt": f"Change expected: prompt — the texts the model reads in {runs} should change.",
+            "any": f"Change expected: any — {runs} should go differently, through the texts the model reads or through the harness code."}[t["change_expected"]]
+    assert first.count(TICKET_TASK) == 1, "task line not found"
+    return first.replace(TICKET_TASK, "\n\n" + line + TICKET_TASK)
 
 
 def save_summary(tag, summary):
@@ -227,4 +242,8 @@ def main():
                                           files=a.given_files)
     else:
         first = IN.first_user_editor_obs(reports, IN.review_root(a.input) if a.cite else None)
+    if a.ticket_show:
+        assert C.TICKET, "--ticket-show needs --ticket"
+        first = ticket_line(first, C.TICKET)
+    summary["ticket_show"] = a.ticket_show
     editor_step(a, first, src_before, summary)
