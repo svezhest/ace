@@ -29,6 +29,7 @@ TICKET_FIRST = False  # --ticket-first (6.11): проверка по тикет�
 TICKET_LINE = False  # --ticket-line (6.11): факт покрытия одной фразой в строке Failed
 TICKET_WHY = False     # --ticket-why (6.11): к факту — почему не действует (перекрытый def, нет ключа), форма длинных строк, факт и при «только тексты»
 TICKET_PASSED = False  # --ticket-passed (6.11): к проверке — первый задетый удачный прогон: где расходится и какие изменённые условия в нём сработали
+TICKET_ANCHOR = False  # --ticket-anchor (6.11): к значениям — строка лога с ответом модели; у «нет ключа» — что в словаре есть, со значениями
 TICKET_VALUES = False  # --ticket-values (6.11): к факту в строке Failed — значения операндов условия на последнем выполнении
 TICKET = None       # --ticket (6.11): {change_expected: prompt|control|any, runs}; писатель не видит, проверка после правки
 INTENT = False       # --intent (5.11): edit(…, expect_runs, expect); после авто-проверки — сверка с тем, что изменилось

@@ -298,7 +298,7 @@ def _watch(changed):
     return w
 
 
-def _dead_fact(changed, cov, hide=frozenset()):
+def _dead_fact(changed, cov, hide=frozenset(), r=None):
     """Одна фраза для строки Failed (6.11 --ticket-line): до двух изменённых условий, которые выполнялись и ни разу
     не были истинны (`if` без выполненного тела; `return <выражение>` с одним и тем же значением), чаще выполнявшиеся — первыми;
     или «ни одна изменённая строка не выполнялась». `return False` и подобные литералы не в счёт: они постоянны по построению."""
@@ -336,7 +336,9 @@ def _dead_fact(changed, cov, hide=frozenset()):
                     and not (isinstance(v, str) and v.startswith("<") and v.endswith(">") and ("Error" in v or "Exception" in v))}
             if not vals:
                 return c[1]
-            return (c[1] + f" (at its last run, before model call {val['call'] + 1}: "
+            anc = (f", after the model's reply at logs/run_{r}.jsonl line {val['line']}" if getattr(C, "TICKET_ANCHOR", False)
+                   and val.get("line") and r is not None else "")
+            return (c[1] + f" (at its last run, before model call {val['call'] + 1}{anc}: "
                     + ", ".join(f"`{e}` = {v}" for e, v in vals.items()) + ")")
         return "your " + "; your ".join(with_vals(c) for c in cand[:2])
     if dead:
@@ -366,7 +368,9 @@ def _key_probes(changed):
                             and isinstance(c.args[0], ast.Constant) and isinstance(c.args[0].value, str)
                             and all(isinstance(n, (ast.Name, ast.Attribute, ast.Load)) for n in ast.walk(c.func.value))):
                         b, k = ast.unparse(c.func.value), c.args[0].value
-                        probe = f"(', '.join(sorted(map(str, {b}))) if {k!r} not in {b} else None)"
+                        probe = (f"('; '.join(f'{{x}} = {{repr(y)[:50]}}' for x, y in sorted({b}.items(), key=lambda t: str(t[0]))) "
+                                 f"if {k!r} not in {b} else None)" if getattr(C, "TICKET_ANCHOR", False) else
+                                 f"(', '.join(sorted(map(str, {b}))) if {k!r} not in {b} else None)")
                         out.setdefault(f"{rel}:{st.lineno}", {})[probe] = (b, k)
     return out
 
@@ -413,7 +417,12 @@ def _why_fact(changed, cov, probes, r):
             if not v or v == "None" or (v.startswith("<") and v.endswith(">")):
                 continue
             keys = v[1:-1] if v[:1] in "'\"" and v[-1:] == v[:1] else v
-            res.append(f"at src/{where} `{b}` has no key {k!r} (its keys: {keys})")
+            if getattr(C, "TICKET_ANCHOR", False):
+                ln = (vals.get(where) or {}).get("line")
+                at = f" after the model's reply at logs/run_{r}.jsonl line {ln}" if ln else ""
+                res.append(f"at src/{where}{at}, `{b}` has no key {k!r}; it has: {keys}")
+            else:
+                res.append(f"at src/{where} `{b}` has no key {k!r} (its keys: {keys})")
             break
     return res[:2]
 
@@ -577,6 +586,8 @@ def ticket_check(run):
         watch["__shape__"] = True
         if getattr(C, "TICKET_PASSED", False):
             watch["__shape2__"] = True
+        if getattr(C, "TICKET_ANCHOR", False):
+            watch["__full__"] = [p for ps in probes.values() for p in ps]
     hide = frozenset(p for ps in probes.values() for p in ps)
     cur, cov = (_replay(f"{run.root}/src", run.root, runs, cover=True, watch=watch) if cover or tline
                 else (_replay(f"{run.root}/src", run.root, runs), {}))
@@ -622,7 +633,7 @@ def ticket_check(run):
                 c = cov_code.get(str(r)) or {}   # код без новых текстов идёт как в логе — факт о нём
             else:
                 continue
-            f = [x for x in [_dead_fact(changed, c, hide)] if x] + (_why_fact(changed, c, probes, r) if why else [])
+            f = [x for x in [_dead_fact(changed, c, hide, r)] if x] + (_why_fact(changed, c, probes, r) if why else [])
             if f:
                 lines[i] = lines[i].rstrip(".") + f"; in run {r} " + "; ".join(f) + "."
     if cover and changed:   # по одной строке на прогон — после каждой её счётчики

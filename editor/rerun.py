@@ -264,6 +264,7 @@ def play(bench, src, log, at=None, cover=None, watch=None):
             last = {}
             shape = bool((watch or {}).get("__shape__"))   # 6.11 --ticket-why: у длинной строки — начало, конец и размер
             shape2 = shape and bool((watch or {}).get("__shape2__"))   # 6.11 --ticket-passed: и у элементов коротких списков
+            full = set((watch or {}).get("__full__") or [])
 
             def rv(v, n):
                 if not shape or not isinstance(v, str) or len(repr(v)) <= n:
@@ -292,11 +293,15 @@ def play(bench, src, log, at=None, cover=None, watch=None):
                                     vals[e] = v if shape else v[:240]
                                 elif shape2 and isinstance(v, (list, tuple)) and v:   # короткий список — каждый элемент со своей формой
                                     vals[e] = "[" + ", ".join(rv(x, 60) for x in v) + "]"
+                                elif e in full:   # 6.11 --ticket-anchor: пробы, которые gate сам собирает в факт, — целиком
+                                    vals[e] = repr(v)[:600]
                                 else:
                                     vals[e] = rv(v, 160)
                             except Exception as x:  # noqa: BLE001
                                 vals[e] = f"<{type(x).__name__}>"
-                        cover.setdefault("__val__", {})[f"{f[len(root):]}:{frame.f_lineno}"] = {"call": state["call"], "vals": vals}
+                        k = state["call"]   # 6.11: строка лога с последним ответом модели перед этим выполнением (для --ticket-anchor)
+                        cover.setdefault("__val__", {})[f"{f[len(root):]}:{frame.f_lineno}"] = {
+                            "call": k, "vals": vals, "line": line_of[model_pos[k - 1]] if 0 < k <= len(model_pos) else None}
                 elif event == "return":
                     last.pop(id(frame), None)   # что вернула функция src и с какой строки: "__ret__" -> {файл: {строка: {значение: раз}}}
                     v = arg if isinstance(arg, (bool, int, type(None))) else type(arg).__name__
