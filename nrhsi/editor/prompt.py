@@ -83,6 +83,7 @@ def fill(t, arm=None):
 RERUN_REPO = ("the agent's runs and the benchmark are not here.", "the agent's recorded runs are in logs/; the benchmark is not here.")
 RERUN_ARM = ("The runs themselves are not in this copy.",
              "The runs are in logs/: trust your colleague initially; if you are confused, you may check the logs.")
+NO_TRUST_ARM = "The runs are in logs/."
 RERUN_CHECK_LINE = ("- Check each change: run python3 tests/smoke.py and python3 tests/rerun.py (see README.md), and read "
                     "the changed lines together with the code that calls or uses them. If python3 tests/rerun.py shows "
                     "no changes in the runs an observation is about, your change may have missed.")

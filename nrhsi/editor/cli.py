@@ -36,6 +36,7 @@ def parse_args():
                     "потом правки не применяются (включает --checked)")
     ap.add_argument("--auto-check", action="store_true", help="каждая применённая правка — pyflakes, smoke, rerun в ответе edit")
     ap.add_argument("--check-auto-only", action="store_true", help="6.11 CL, с --rerun --auto-check: строка проверки — только факт про авто-проверку; ручной rerun — для одного прогона в деталях")
+    ap.add_argument("--no-trust", action="store_true", help="6.11 NT, с --rerun: строка о логах без «trust your colleague initially…»")
     ap.add_argument("--clean", action="store_true", help="6.11, с --rerun --auto-check: одна строка проверки (CL), конец bash — факт, повтор команды — обычный вывод, finish без повторов, число финальных ходов в промпте")
     ap.add_argument("--rerun-tool", action="store_true", help="с --rerun: rerun — инструмент rerun(change, run), ok/failed по ожиданию")
     ap.add_argument("--scratch", action="store_true", help="каталог scratch/ копии, куда можно писать")
@@ -127,6 +128,9 @@ def editor_step(a, first, src_before, summary):
         for old, new in (P.RERUN_REPO, P.RERUN_ARM, (P.CHECK_LINE, P.RERUN_CHECK_LINE)):
             assert old in esys, old
             esys = esys.replace(old, new)
+    if a.no_trust:   # 6.11 NT: отложенное с GC-6 — источник согласия в системном промпте (AGREE-1105)
+        assert a.rerun and P.RERUN_ARM[1] in esys, "--no-trust needs --rerun"
+        esys = esys.replace(P.RERUN_ARM[1], P.NO_TRUST_ARM)
     if a.rerun_at:
         esys = esys.replace(P.RERUN_CHECK_LINE, P.RERUN_CHECK_LINE + P.RERUN_AT_LINE)
         assert P.RERUN_AT_LINE in esys
@@ -276,7 +280,7 @@ def main():
     os.makedirs(f"{C.HERE}/out", exist_ok=True)
     summary = {"tag": a.tag, "bench": a.bench, "input": a.input, "arm": a.arm, "seed": a.seed,
                "view": C.VIEWS[a.bench], "predict": a.predict, "cite": a.cite, "import_src": a.import_src,
-               "checked": a.checked, "smoke_calls": a.smoke_calls, "rerun": a.rerun, "rerun_at": a.rerun_at, "finish_review": a.finish_review, "goal_k": a.goal_k, "stages": a.stages, "auto_check": a.auto_check, "check_auto_only": a.check_auto_only, "clean": a.clean, "rerun_tool": a.rerun_tool, "scratch": a.scratch, "tools_dir": a.tools_dir, "hide_tools": a.hide_tools, "given_code": a.given_code, "given_files": a.given_files, "navigator": a.navigator, "intent": a.intent or a.intent_opt, "intent_opt": a.intent_opt, "ask_changed": a.ask_changed, "plan_line": a.plan_line, "broad_example": a.broad_example, "nav_v": a.nav_v, "ticket": C.TICKET, "bash_limit": C.BASH_LIMIT, "goal_text": a.goal_text, "temp": F.TEMP, "input_text": a.input_text, "stand": F.STAND,
+               "checked": a.checked, "smoke_calls": a.smoke_calls, "rerun": a.rerun, "rerun_at": a.rerun_at, "finish_review": a.finish_review, "goal_k": a.goal_k, "stages": a.stages, "auto_check": a.auto_check, "check_auto_only": a.check_auto_only, "clean": a.clean, "no_trust": a.no_trust, "rerun_tool": a.rerun_tool, "scratch": a.scratch, "tools_dir": a.tools_dir, "hide_tools": a.hide_tools, "given_code": a.given_code, "given_files": a.given_files, "navigator": a.navigator, "intent": a.intent or a.intent_opt, "intent_opt": a.intent_opt, "ask_changed": a.ask_changed, "plan_line": a.plan_line, "broad_example": a.broad_example, "nav_v": a.nav_v, "ticket": C.TICKET, "bash_limit": C.BASH_LIMIT, "goal_text": a.goal_text, "temp": F.TEMP, "input_text": a.input_text, "stand": F.STAND,
                "n_reports": len(reports), "view_src_hash": src_before}
     if a.arm == "fix":
         props = propose_step(a, reports, src_before, summary)
