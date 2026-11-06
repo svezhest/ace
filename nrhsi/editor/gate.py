@@ -220,6 +220,42 @@ def _changed_lines(run):
     return out
 
 
+def _dead_fact(changed, cov):
+    """Одна фраза для строки Failed (6.11 --ticket-line): до двух изменённых условий, которые выполнялись и ни разу
+    не были истинны (`if` без выполненного тела; `return <выражение>` с одним и тем же значением), чаще выполнявшиеся — первыми;
+    или «ни одна изменённая строка не выполнялась». `return False` и подобные литералы не в счёт: они постоянны по построению."""
+    ret = cov.get("__ret__") or {}
+    any_ran, cand, dead = False, [], None
+    for rel, (lines, text) in sorted(changed.items()):
+        hits = {int(k): v for k, v in (cov.get(rel) or {}).items()}
+        rets = {int(k): v for k, v in (ret.get(rel) or {}).items()}
+        for ln in lines:
+            n, src = hits.get(ln, 0), text[ln - 1].strip()
+            code = src.split("  #")[0].split(" # ")[0].strip()
+            if not n and any_ran and not dead and not code.startswith(("else", "elif", "except", "finally")):
+                dead = (ln, rel, code)   # первая изменённая строка, не выполнявшаяся после выполнявшейся
+            any_ran = any_ran or n > 0
+            if not n:
+                continue
+            if src.startswith(("if ", "elif ", "while ")):
+                end = next((k for k in range(ln, min(ln + 8, len(text)) + 1) if text[k - 1].split("#")[0].rstrip().endswith(":")), None)
+                if end is None:
+                    continue
+                ind = len(text[ln - 1]) - len(text[ln - 1].lstrip())
+                body = next((k for k in range(end + 1, len(text) + 1) if text[k - 1].strip() and not text[k - 1].strip().startswith("#")), None)
+                if body and len(text[body - 1]) - len(text[body - 1].lstrip()) > ind and hits.get(body, 0) == 0:
+                    cand.append((n, f"`{src[:80]}` at src/{rel}:{ln} ran {n} times and was never true"))
+            elif code.startswith("return ") and code[7:].strip() not in ("False", "True", "None", "{}", "[]", "0", "1", '""') \
+                    and len(rets.get(ln) or {}) == 1 and next(iter(rets[ln])) in ("False", "None", "True"):
+                cand.append((n, f"`{src[:80]}` at src/{rel}:{ln} ran {n} times and returned {next(iter(rets[ln]))} every time"))
+    if cand:
+        cand.sort(key=lambda c: -c[0])
+        return "your " + "; your ".join(c[1] for c in cand[:2])
+    if dead:
+        return f"your `{dead[2][:80]}` at src/{dead[1]}:{dead[0]} never ran"
+    return None if any_ran else "none of the lines you changed ran in it"
+
+
 def _cover_lines(changed, cov, d):
     """Строки правки со счётчиками в одном прогоне: подряд идущие с одним счётчиком — одной строкой."""
     upto = ("to the end of the log" if d is None else
@@ -289,8 +325,10 @@ def _where(d):
 def ticket_check(run):
     exp, runs = C.TICKET["change_expected"], C.TICKET["runs"]
     cover = getattr(C, "TICKET_COVER", False)
-    cur, cov = _replay(f"{run.root}/src", run.root, runs, cover=True) if cover else (_replay(f"{run.root}/src", run.root, runs), {})
-    changed = _changed_lines(run) if cover else {}
+    tline = getattr(C, "TICKET_LINE", False)
+    cur, cov = (_replay(f"{run.root}/src", run.root, runs, cover=True) if cover or tline
+                else (_replay(f"{run.root}/src", run.root, runs), {}))
+    changed = _changed_lines(run) if cover or tline else {}
     texts = _texts_differ(run)
     code = _replay(_old_texts_src(run), run.root, runs) if texts else cur
     lines = []
@@ -324,6 +362,12 @@ def ticket_check(run):
                 lines.append(f"Ok: run {r} changes: {_where(a or b)}.")
             else:
                 lines.append(f"Failed: run {r} goes exactly as in the log, to the end: this edit changes nothing in it.")
+    if tline and changed:   # самый важный факт покрытия — в саму строку Failed «как в логе»
+        for i, r in enumerate(runs):
+            if lines[i].startswith(f"Failed: run {r} goes exactly as in the log"):
+                f = _dead_fact(changed, cov.get(str(r)) or {})
+                if f:
+                    lines[i] = lines[i].rstrip(".") + f"; in run {r} {f}."
     if cover and changed:   # по одной строке на прогон — после каждой её счётчики
         assert len(lines) == len(runs)
         out = []
