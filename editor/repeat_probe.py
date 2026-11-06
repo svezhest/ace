@@ -5,7 +5,10 @@
 plain — вывод целиком, как в shell; resample — ход перед повтором сэмплируется заново (повтор не исполняется);
 cut — обе копии (исходный вызов с выводом и повтор) вырезаны из истории, в конце — заметка харнесса без текста
 команды: программы, файлы, что напечатано; para — то же вырезание, а заметка — пересказ отдельного чистого вызова
-модели (команда и вывод, без контекста сессии): что команда пыталась сделать и что показала, своими словами.
+модели (только команда): её замысел своими словами, вывод — дословно.
+Место вставки пересказа (6.11, автор): para_res — вместо ответа на повтор (копий команды 2); para_user — повтор
+вырезан, ответ модели прерван, user: <пересказ> (копия 1); para_first — повторы вырезаны, пересказ дописан к ответу
+на первый вызов (копия 1, на старом месте); para — все копии вырезаны, заметка в конце (копий 0).
   python3 editor/repeat_probe.py OUT.jsonl [--k 3] [--variants old,clean,plain,resample]"""
 import argparse
 import difflib
@@ -174,6 +177,71 @@ def cut_para(msgs, p, para):
     return out
 
 
+def _clip(o):
+    o = o.strip()
+    return o if len(o) <= 400 else o[:400] + " …"
+
+
+def para_res(msgs, p, para):
+    """Ответ на повтор (последний tool) — пересказ и вывод; вызов остаётся."""
+    out = [dict(m) for m in msgs]
+    tid = f"call_{p['turn']}_{p['j']}"
+    t = next(m for m in out if m["role"] == "tool" and m["tool_call_id"] == tid)
+    t["content"] = (f"Not run: this is the same command as tool call {p['n']}, and no file has changed since, so it "
+                    f"would print the same. What it tries: {para} It printed:\n{_clip(p['orig'])}")
+    return out
+
+
+def para_user(msgs, p, para):
+    """Повтор вырезан из ответа модели (его ответ — тоже), дальше user: пересказ; первый вызов остаётся."""
+    tid = f"call_{p['turn']}_{p['j']}"
+    out = []
+    for m in msgs:
+        if m["role"] == "tool" and m["tool_call_id"] == tid:
+            continue
+        if m["role"] == "assistant" and any(c["id"] == tid for c in m.get("tool_calls") or []):
+            m = dict(m)
+            m["tool_calls"] = [c for c in m["tool_calls"] if c["id"] != tid]
+            if not m["tool_calls"]:
+                del m["tool_calls"]
+                if not (m.get("content") or "").strip():
+                    continue
+        out.append(m)
+    out.append({"role": "user", "content": f"Your last bash call was not run: it is the same command as tool call "
+                                           f"{p['n']}, and no file has changed since, so it would print the same. "
+                                           f"What it tries: {para} It printed:\n{_clip(p['orig'])}"})
+    return out
+
+
+def para_first(msgs, p, para):
+    """Повторы с тем же выводом вырезаны; к ответу на первый вызов дописан пересказ и что повтор не исполнялся."""
+    first = f"call_{p['ou']}_{p['oj']}"
+    res = {m["tool_call_id"]: m["content"] for m in msgs if m["role"] == "tool"}
+    drop = {c["id"] for m in msgs if m["role"] == "assistant" for c in m.get("tool_calls") or []
+            if c["id"] != first and c["function"]["name"] == "bash" and cmd_of(c["function"]) == p["cmd"]
+            and (res.get(c["id"]) == p["orig"] or (res.get(c["id"]) or "").startswith(REP))}
+    out = []
+    for m in msgs:
+        if m["role"] == "tool" and m["tool_call_id"] in drop:
+            continue
+        if m["role"] == "tool" and m["tool_call_id"] == first:
+            m = dict(m)
+            m["content"] = (m["content"].rstrip() + f"\n\n[This command was sent again later and not run: no file "
+                            f"had changed, so it would print the same. What it tries: {para}]")
+        if m["role"] == "assistant" and m.get("tool_calls"):
+            m = dict(m)
+            m["tool_calls"] = [c for c in m["tool_calls"] if c["id"] not in drop]
+            if not m["tool_calls"]:
+                del m["tool_calls"]
+                if not (m.get("content") or "").strip():
+                    continue
+        out.append(m)
+    return out
+
+
+POS = {"para_res": para_res, "para_user": para_user, "para_first": para_first}
+
+
 def judge(calls, cmd):
     cs = [cmd_of(c["function"]) for c in calls if c["function"]["name"] == "bash"]
     exact = any(c == cmd for c in cs)
@@ -210,7 +278,7 @@ def main():
                     msgs = history(p["recs"], p["turn"], cut_assistant=True)
                 elif v == "cut":
                     msgs = cut(history(p["recs"], p["turn"]), p)
-                elif v == "para":
+                elif v == "para" or v in POS:
                     pk = f"{p['session']}|{p['turn']}|{p['j']}"
                     if pk not in paras:
                         txt, perr2 = paraphrase(p, 800_000 + p["turn"])
@@ -219,7 +287,8 @@ def main():
                             json.dump(paras, g, ensure_ascii=False, indent=0)
                     if not paras[pk]["text"]:
                         continue
-                    msgs = cut_para(history(p["recs"], p["turn"]), p, paras[pk]["text"])
+                    h = history(p["recs"], p["turn"])
+                    msgs = POS[v](h, p, paras[pk]["text"]) if v in POS else cut_para(h, p, paras[pk]["text"])
                 else:
                     msgs = history(p["recs"], p["turn"], sub=variant_sub(p, v))
                 for s in range(a.k):
