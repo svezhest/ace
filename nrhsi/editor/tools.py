@@ -44,9 +44,12 @@ def bash_call(run, args, res):
         run.seen[key] = (st["tool_calls"], out)
         res.update(ok=ok, full_chars=len(full), truncated=len(full) > len(out))
         return out, False
-    if key in run.seen and C.CLEAN:   # 6.11: повтор — обычный вывод, как в shell; счёт повторов остаётся
+    if key in run.seen and C.CLEAN:   # 6.11, автор: повтор — сказать, что нового не будет, и что делать; вывод целиком
         st["repeats"] += 1
         res["repeat"] = True
+        return (f"This command was already run at tool call {run.seen[key][0]}, and no file has changed since, so it "
+                f"prints the same as there (repeated below). Running it again tells you nothing new: change the "
+                f"command, or go on from this output.\n{run.seen[key][1]}"), False
     elif key in run.seen:
         st["repeats"] += 1
         res["repeat"] = True
