@@ -23,6 +23,7 @@ GOAL_TEXT = None  # --goal-text FILE: якорь цели — текст фай�
 STAGES = None    # --stages R,K: R bash на чтение; первая правка (или конец R) — ещё K bash на проверку; потом правки не применяются
 INTENT_OPT = False   # --intent-opt (5.11): поля намерения необязательны; зеркало — только если заполнены
 ASK_CHANGED = False  # --ask-changed (5.11): после авто-проверки — вопрос про изменившиеся удачные прогоны
+TICKET_COVER = False  # --ticket-cover (6.11): к проверке по тикету — счётчики изменённых строк в прогоне тикета
 TICKET = None       # --ticket (6.11): {change_expected: prompt|control|any, runs}; писатель не видит, проверка после правки
 INTENT = False       # --intent (5.11): edit(…, expect_runs, expect); после авто-проверки — сверка с тем, что изменилось
 AUTO_CHECK = False   # --auto-check: каждая применённая правка — pyflakes, smoke и rerun в ответе edit, без bash

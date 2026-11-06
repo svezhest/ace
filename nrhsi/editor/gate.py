@@ -170,14 +170,73 @@ def edit_checks(run):
 # prompt — меняется то, что модель читает (тексты .md в src/); control — меняется то, что делает код харнесса
 # (видно, если вернуть тексты .md как в виде); any — что-то из двух. После каждой авто-проверки — Ok / Failed: причина.
 
-def _replay(src, root, runs):
-    cmd = [sys.executable, RERUN_CORE, "--bench", C.BENCH, "--src", src, "--logs", f"{root}/logs", "--json"] + [str(r) for r in runs]
+def _replay(src, root, runs, cover=False):
+    cmd = ([sys.executable, RERUN_CORE, "--bench", C.BENCH, "--src", src, "--logs", f"{root}/logs", "--json"]
+           + (["--cover"] if cover else []) + [str(r) for r in runs])
     p = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
     try:
-        return json.loads(p.stdout.strip().splitlines()[-1])
+        out = json.loads(p.stdout.strip().splitlines()[-1])
+        return (out["div"], out["cover"]) if cover else out
     except Exception:  # noqa: BLE001
         tail = [l for l in (p.stderr or p.stdout).strip().splitlines() if l.strip()]
-        return {str(r): {"kind": "crash", "call": None, "text": tail[-1] if tail else ""} for r in runs}  # строка ошибки, не обрывок трассы
+        div = {str(r): {"kind": "crash", "call": None, "text": tail[-1] if tail else ""} for r in runs}  # строка ошибки, не обрывок трассы
+        return (div, {}) if cover else div
+
+
+def _changed_lines(run):
+    """{файл .py в src: [номера изменённых или новых строк, которые исполняет код функций]} против вида.
+    Строки уровня модуля (def, импорт, константы) выполняются при импорте, до проигрыша, — их не считаем."""
+    import difflib
+    view = f"{C.VIEWS[C.BENCH]}/src"
+    out = {}
+    for d, _, fs in os.walk(f"{run.root}/src"):
+        for f in fs:
+            if not f.endswith(".py"):
+                continue
+            rel = os.path.relpath(os.path.join(d, f), f"{run.root}/src")
+            new = open(os.path.join(d, f), errors="replace").read().splitlines()
+            old = open(f"{view}/{rel}", errors="replace").read().splitlines() if os.path.exists(f"{view}/{rel}") else []
+            ch = set()
+            for op, _, _, j1, j2 in difflib.SequenceMatcher(None, old, new, autojunk=False).get_opcodes():
+                if op in ("replace", "insert"):
+                    ch.update(range(j1 + 1, j2 + 1))
+            if not ch:
+                continue
+            try:
+                top = compile("\n".join(new) + "\n", rel, "exec")
+            except SyntaxError:
+                continue
+            exe, stack = set(), [c for c in top.co_consts if hasattr(c, "co_lines")]
+            while stack:
+                c = stack.pop()
+                exe.update(l for _, _, l in c.co_lines() if l and (l != c.co_firstlineno or c.co_name.startswith("<")))  # строка def — не выполнение
+                stack += [k for k in c.co_consts if hasattr(k, "co_lines")]
+            lines = sorted(ch & exe)
+            if lines:
+                out[rel] = (lines, new)
+    return out
+
+
+def _cover_lines(changed, cov, d):
+    """Строки правки со счётчиками в одном прогоне: подряд идущие с одним счётчиком — одной строкой."""
+    upto = ("to the end of the log" if d is None else
+            "up to model call %s, where it goes differently" % d["call"] if d.get("call") else "until it stops")
+    res = []
+    for rel, (lines, text) in sorted(changed.items()):
+        hits = {int(k): v for k, v in (cov.get(rel) or {}).items()}
+        groups = []
+        for ln in lines:
+            n = hits.get(ln, 0)
+            if groups and groups[-1][2] == n and groups[-1][1] == ln - 1 - sum(1 for k in range(groups[-1][1] + 1, ln) if k in lines):
+                groups[-1][1] = ln
+            else:
+                groups.append([ln, ln, n])
+        for a, b, n in groups:
+            where = f"src/{rel}:{a}" + (f"-{b}" if b != a else "")
+            res.append(f"  {where}  {'never ran' if n == 0 else 'ran once' if n == 1 else f'ran {n} times'}:  {text[a - 1].strip()[:90]}")
+    if len(res) > 14:
+        res = res[:13] + [f"  ... {len(res) - 13} more groups of changed lines"]
+    return upto, res
 
 
 def _old_texts_src(run):
@@ -222,7 +281,9 @@ def _where(d):
 
 def ticket_check(run):
     exp, runs = C.TICKET["change_expected"], C.TICKET["runs"]
-    cur = _replay(f"{run.root}/src", run.root, runs)
+    cover = getattr(C, "TICKET_COVER", False)
+    cur, cov = _replay(f"{run.root}/src", run.root, runs, cover=True) if cover else (_replay(f"{run.root}/src", run.root, runs), {})
+    changed = _changed_lines(run) if cover else {}
     texts = _texts_differ(run)
     code = _replay(_old_texts_src(run), run.root, runs) if texts else cur
     lines = []
@@ -256,5 +317,16 @@ def ticket_check(run):
                 lines.append(f"Ok: run {r} changes: {_where(a or b)}.")
             else:
                 lines.append(f"Failed: run {r} goes exactly as in the log, to the end: this edit changes nothing in it.")
-    run.w({"type": "ticket_check", "expected": exp, "runs": runs, "cur": cur, "code": code, "lines": lines})
+    if cover and changed:   # по одной строке на прогон — после каждой её счётчики
+        assert len(lines) == len(runs)
+        out = []
+        for r, ln in zip(runs, lines):
+            out.append(ln)
+            a = cur.get(str(r))
+            if not (a and a["kind"] == "crash"):
+                upto, cl = _cover_lines(changed, cov.get(str(r)) or {}, a)
+                out.append(f"The lines you changed, as run {r} replays them ({upto}):\n" + "\n".join(cl))
+        lines = out
+    run.w({"type": "ticket_check", "expected": exp, "runs": runs, "cur": cur, "code": code, "lines": lines,
+           **({"cover": cov} if cover else {})})
     return "Check against the observation:\n" + "\n".join(lines)

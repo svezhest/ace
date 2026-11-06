@@ -49,6 +49,7 @@ def parse_args():
     ap.add_argument("--given-files", action="store_true", help="5.11, абляция, с --input-text: README.md и все файлы src/ целиком")
     ap.add_argument("--given-code", action="store_true", help="5.11, с --input-text: под текстом — код src/ вида по его ссылкам")
     ap.add_argument("--ticket", help="6.11, с --auto-check --rerun: json тикета {change_expected, runs} — скрытое ожидание ревьювера")
+    ap.add_argument("--ticket-cover", action="store_true", help="6.11, с --ticket: после строки проверки — сколько раз выполнились изменённые строки src в прогоне тикета")
     ap.add_argument("--ticket-show", action="store_true", help="6.11, с --ticket: ожидание ревьювера — строкой в наблюдении (писатель видит)")
     ap.add_argument("--resume", help="6.11: лог сессии писателя; история до --resume-turn, этот ход исполняется заново")
     ap.add_argument("--resume-turn", type=int)
@@ -207,6 +208,8 @@ def main():
         assert a.auto_check and a.rerun, "--ticket needs --auto-check --rerun"
         C.TICKET = json.load(open(a.ticket))
         assert C.TICKET["change_expected"] in ("prompt", "control", "any") and C.TICKET["runs"]
+    assert a.ticket or not a.ticket_cover, "--ticket-cover needs --ticket"
+    C.TICKET_COVER = a.ticket_cover
     if a.hide_tools:
         C.HIDDEN = f"{os.path.abspath(a.home)}/work/.tools_{a.tag}"
     F.SCRATCH = a.scratch            # 4.11: механика scratch/ исследователя — и у писателя
@@ -246,4 +249,5 @@ def main():
         assert C.TICKET, "--ticket-show needs --ticket"
         first = ticket_line(first, C.TICKET)
     summary["ticket_show"] = a.ticket_show
+    summary["ticket_cover"] = a.ticket_cover
     editor_step(a, first, src_before, summary)

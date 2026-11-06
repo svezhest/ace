@@ -169,7 +169,7 @@ def app_episode(bridge, ev, sent_replies, state, diverge):
     return Episode()
 
 
-def play(bench, src, log, at=None):
+def play(bench, src, log, at=None, cover=None):
     sys.path[:0] = [src]
     import bridge
     import harness
@@ -259,7 +259,22 @@ def play(bench, src, log, at=None):
     try:
         # защита стенда — только если запись ею и кончилась: иначе тогда её не было (B8, r5app run 19)
         guarded = end_of_log(ev)[0].get("detail") == "repeated reply"
-        out = harness.run(ep, bridge.guard(ep, llm) if guarded else llm)
+        if cover is not None:   # 6.11: строки src, выполненные за проигрыш (до расхождения или до конца лога)
+            root = os.path.realpath(src) + os.sep
+            def tracer(frame, event, arg):
+                f = os.path.realpath(frame.f_code.co_filename)
+                if not f.startswith(root) or frame.f_code.co_name == "<genexpr>":   # шаги генератора — не новые выполнения строки
+                    return None
+                if event == "line":
+                    c = cover.setdefault(f[len(root):], {})
+                    c[frame.f_lineno] = c.get(frame.f_lineno, 0) + 1
+                return tracer
+            sys.settrace(tracer)
+        try:
+            out = harness.run(ep, bridge.guard(ep, llm) if guarded else llm)
+        finally:
+            if cover is not None:
+                sys.settrace(None)
         if [key(m) for m in out] != [key(m) for m in conv]:
             j = next((j for j, (a, b) in enumerate(zip(out, conv)) if key(a) != key(b)), min(len(out), len(conv)))
             text = ("the harness ends the episode here; the log goes on" if len(out) < len(conv) else
@@ -285,7 +300,7 @@ def play(bench, src, log, at=None):
     return trace
 
 
-def worker(bench, src, logs, runs=None, at=None):
+def worker(bench, src, logs, runs=None, at=None, cover=None):
     """Все прогоны вида на одном src, в этом же процессе: модули src перезагружаются для каждого прогона."""
     sys.dont_write_bytecode = True
     out = {}
@@ -296,7 +311,8 @@ def worker(bench, src, logs, runs=None, at=None):
         for m in ("harness", "bridge", "hooks"):
             sys.modules.pop(m, None)
         try:
-            out[p.stem.split("_")[1]] = play(bench, src, str(p), at)
+            c = cover.setdefault(p.stem.split("_")[1], {}) if cover is not None else None
+            out[p.stem.split("_")[1]] = play(bench, src, str(p), at, c)
         finally:
             sys.path[:] = saved
             for m in ("harness", "bridge", "hooks"):
@@ -440,13 +456,16 @@ def main():
     ap.add_argument("--old", help="src, на котором записаны логи: для сравнения ответов хуков")
     ap.add_argument("--at", type=int, help="с одним прогоном N: вызовы функций src перед вызовом модели K, со значениями")
     ap.add_argument("--json", action="store_true", help="6.11: для проверки по тикету — расхождение каждого прогона как json")
+    ap.add_argument("--cover", action="store_true", help="6.11: с --json — сколько раз выполнилась каждая строка src")
     ap.add_argument("runs", nargs="*")
     a = ap.parse_args()
     if a.json:
-        new = worker(a.bench, os.path.abspath(a.src), a.logs, a.runs or None)
-        print(json.dumps({r: (None if t["div"] is None else {"kind": t["div"].get("kind"), "call": t["div"].get("call"),
-                                                              "text": str(t["div"].get("text", ""))[:600]})
-                          for r, t in new.items()}))
+        cov = {} if a.cover else None
+        new = worker(a.bench, os.path.abspath(a.src), a.logs, a.runs or None, cover=cov)
+        div = {r: (None if t["div"] is None else {"kind": t["div"].get("kind"), "call": t["div"].get("call"),
+                                                   "text": str(t["div"].get("text", ""))[:600]})
+               for r, t in new.items()}
+        print(json.dumps({"div": div, "cover": cov} if a.cover else div))
         return
     if a.at:
         assert len(a.runs) == 1, "--at needs one run"
