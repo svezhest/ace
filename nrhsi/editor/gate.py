@@ -326,10 +326,14 @@ def _dead_fact(changed, cov):
         cand.sort(key=lambda c: -c[0])
         def with_vals(c):
             val = (cov.get("__val__") or {}).get(c[2]) if getattr(C, "TICKET_VALUES", False) else None
-            if not (val and val.get("vals")):
+            # ошибка вычисления операнда — обычно это короткое замыкание (`out and out.get(...)` при out = None):
+            # такой операнд условие не вычисляло, показывать его нельзя
+            vals = {e: v for e, v in ((val or {}).get("vals") or {}).items()
+                    if not (isinstance(v, str) and v.startswith("<") and v.endswith(">") and ("Error" in v or "Exception" in v))}
+            if not vals:
                 return c[1]
             return (c[1] + f" (at its last run, before model call {val['call'] + 1}: "
-                    + ", ".join(f"`{e}` = {v}" for e, v in val["vals"].items()) + ")")
+                    + ", ".join(f"`{e}` = {v}" for e, v in vals.items()) + ")")
         return "your " + "; your ".join(with_vals(c) for c in cand[:2])
     if dead:
         return f"your `{dead[2][:80]}` at src/{dead[1]}:{dead[0]} never ran"
