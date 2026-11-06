@@ -152,6 +152,9 @@ def edit_checks(run):
     smoke = (WK.tt("python3 tests/smoke.py prints:\n") + out if not ok or "Traceback" in full else
              WK.tt("python3 tests/smoke.py runs without errors."))
     t = "Checks run on src/ after this edit (they use no bash calls):\n"
+    first = C.TICKET and getattr(C, "TICKET_FIRST", False)   # 6.11 --ticket-first: проверка по тикету — первой, до общего вывода
+    if first:
+        t += ticket_check(run) + "\n\n"
     if lint_:
         t += lint_ + "\n"
     if C.RERUN:
@@ -160,7 +163,7 @@ def edit_checks(run):
         t += smoke + f"\n{rerun_name()} prints:\n" + clip(full, REVIEW_RERUN).rstrip()
     else:
         t += smoke
-    if C.TICKET:
+    if C.TICKET and not first:
         t += "\n\n" + ticket_check(run)
     return t
 
