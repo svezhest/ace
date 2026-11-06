@@ -346,35 +346,6 @@ def _dead_fact(changed, cov, hide=frozenset(), r=None):
     return None if any_ran else "none of the lines you changed ran in it"
 
 
-def _key_probes(changed):
-    """6.11 --ticket-why: `X.get("k")` в изменённых строках -> {"файл:строка": {проба: (X, k)}}.
-    Проба вычисляется в начале строки: список ключей X, если "k" в нём нет, иначе None."""
-    import ast
-    out = {}
-    for rel, (lines, text) in changed.items():
-        try:
-            tree = ast.parse("\n".join(text) + "\n")
-        except SyntaxError:
-            continue
-        want = set(lines)
-        for st in ast.walk(tree):
-            if not isinstance(st, ast.stmt) or st.lineno not in want:
-                continue
-            parts = ([st.test] if isinstance(st, (ast.If, ast.While)) else [st.iter] if isinstance(st, ast.For) else
-                     [] if isinstance(st, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.With, ast.Try)) else [st])
-            for part in parts:
-                for c in ast.walk(part):
-                    if (isinstance(c, ast.Call) and isinstance(c.func, ast.Attribute) and c.func.attr == "get" and c.args
-                            and isinstance(c.args[0], ast.Constant) and isinstance(c.args[0].value, str)
-                            and all(isinstance(n, (ast.Name, ast.Attribute, ast.Load)) for n in ast.walk(c.func.value))):
-                        b, k = ast.unparse(c.func.value), c.args[0].value
-                        probe = (f"('; '.join(f'{{x}} = {{repr(y)[:50]}}' for x, y in sorted({b}.items(), key=lambda t: str(t[0]))) "
-                                 f"if {k!r} not in {b} else None)" if getattr(C, "TICKET_ANCHOR", False) else
-                                 f"(', '.join(sorted(map(str, {b}))) if {k!r} not in {b} else None)")
-                        out.setdefault(f"{rel}:{st.lineno}", {})[probe] = (b, k)
-    return out
-
-
 def _shadowed(changed):
     """6.11 --ticket-why: изменённые строки внутри def, который ниже в том же модуле или классе перекрыт def с тем же именем
     -> [(файл, имя, строка своего def, строка последнего def, строки своего тела)]."""
@@ -395,8 +366,8 @@ def _shadowed(changed):
     return out
 
 
-def _why_fact(changed, cov, probes, r):
-    """Почему изменённое не действует: перекрытый def; `X.get("k")` при отсутствии ключа "k" в X. Только факты прогона."""
+def _why_fact(changed, cov, r):
+    """Почему изменённые строки не выполнялись: их def перекрыт ниже определением с тем же именем. Факт прогона."""
     import ast
     res = []
     for rel, name, l1, later, mine in _shadowed(changed):
@@ -409,21 +380,6 @@ def _why_fact(changed, cov, probes, r):
         n = hits.get(body, 0)
         res.append(f"src/{rel} defines `{name}` again at line {later.lineno}, below yours at line {l1}, and the later "
                    f"definition is the one in use" + (f" (it ran {n} times in run {r})" if n else ""))
-    vals = cov.get("__val__") or {}
-    for where, ps in probes.items():
-        got = (vals.get(where) or {}).get("vals") or {}
-        for probe, (b, k) in ps.items():
-            v = got.get(probe)
-            if not v or v == "None" or (v.startswith("<") and v.endswith(">")):
-                continue
-            keys = v[1:-1] if v[:1] in "'\"" and v[-1:] == v[:1] else v
-            if getattr(C, "TICKET_ANCHOR", False):
-                ln = (vals.get(where) or {}).get("line")
-                at = f" after the model's reply at logs/run_{r}.jsonl line {ln}" if ln else ""
-                res.append(f"at src/{where}{at}, `{b}` has no key {k!r}; it has: {keys}")
-            else:
-                res.append(f"at src/{where} `{b}` has no key {k!r} (its keys: {keys})")
-            break
     return res[:2]
 
 
@@ -579,16 +535,11 @@ def ticket_check(run):
     changed = _changed_lines(run) if cover or tline else {}
     watch = _watch(changed) if tline and getattr(C, "TICKET_VALUES", False) else None
     why = watch is not None and getattr(C, "TICKET_WHY", False)
-    probes = _key_probes(changed) if why else {}
-    if why:   # 6.11 --ticket-why: пробы ключей — в те же строки наблюдения; длинные строки — с размером
-        for where, ps in probes.items():
-            watch.setdefault(where, []).extend(ps)
+    if why:   # 6.11 --ticket-why: длинные строки — с размером
         watch["__shape__"] = True
         if getattr(C, "TICKET_PASSED", False):
             watch["__shape2__"] = True
-        if getattr(C, "TICKET_ANCHOR", False):
-            watch["__full__"] = [p for ps in probes.values() for p in ps]
-    hide = frozenset(p for ps in probes.values() for p in ps)
+    hide = frozenset()
     cur, cov = (_replay(f"{run.root}/src", run.root, runs, cover=True, watch=watch) if cover or tline
                 else (_replay(f"{run.root}/src", run.root, runs), {}))
     texts = _texts_differ(run)
@@ -633,7 +584,7 @@ def ticket_check(run):
                 c = cov_code.get(str(r)) or {}   # код без новых текстов идёт как в логе — факт о нём
             else:
                 continue
-            f = [x for x in [_dead_fact(changed, c, hide, r)] if x] + (_why_fact(changed, c, probes, r) if why else [])
+            f = [x for x in [_dead_fact(changed, c, hide, r)] if x] + (_why_fact(changed, c, r) if why else [])
             if f:
                 lines[i] = lines[i].rstrip(".") + f"; in run {r} " + "; ".join(f) + "."
     if cover and changed:   # по одной строке на прогон — после каждой её счётчики
