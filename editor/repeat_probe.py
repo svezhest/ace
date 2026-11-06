@@ -4,7 +4,8 @@
 Варианты: old — как в логе; clean — «already run… tells you nothing new: change the command…» + вывод целиком;
 plain — вывод целиком, как в shell; resample — ход перед повтором сэмплируется заново (повтор не исполняется);
 cut — обе копии (исходный вызов с выводом и повтор) вырезаны из истории, в конце — заметка харнесса без текста
-команды: программы, файлы, что напечатано.
+команды: программы, файлы, что напечатано; para — то же вырезание, а заметка — пересказ отдельного чистого вызова
+модели (команда и вывод, без контекста сессии): что команда пыталась сделать и что показала, своими словами.
   python3 editor/repeat_probe.py OUT.jsonl [--k 3] [--variants old,clean,plain,resample]"""
 import argparse
 import difflib
@@ -146,8 +147,36 @@ def cut(msgs, p):
     return out
 
 
+PARA_SYS = ("You restate what a shell command in a code repository tried to do and what it showed, for a reader who "
+            "will not see the command. Describe it in your own words, in one to three sentences.")
+
+
+def paraphrase(p, seed):
+    o = p["orig"].strip()
+    o = o if len(o) <= 3000 else o[:3000] + " …"
+    msgs = [{"role": "system", "content": PARA_SYS},
+            {"role": "user", "content": f"Command:\n{p['cmd']}\n\nWhat it printed:\n{o}"}]
+    resp, err = F.chat(msgs, F.TEMP, seed)
+    r, perr = (F.parse_response(resp) if not err else (None, err))
+    return ((r or {}).get("content") or "").strip(), err or perr
+
+
+def leak(text, cmd):
+    """Самый длинный общий кусок пересказа и команды (символов)."""
+    m = difflib.SequenceMatcher(None, text, cmd, autojunk=False).find_longest_match(0, len(text), 0, len(cmd))
+    return m.size
+
+
+def cut_para(msgs, p, para):
+    out = cut(msgs, p)
+    k = out[-1]["content"].split(" identical")[0]
+    out[-1] = {"role": "user", "content": f"{k} identical bash calls were taken out of this conversation. What they did "
+                                          f"and what they showed: {para}"}
+    return out
+
+
 def judge(calls, cmd):
-    cs = [cmd_of(c) for c in calls if c["function"]["name"] == "bash"]
+    cs = [cmd_of(c["function"]) for c in calls if c["function"]["name"] == "bash"]
     exact = any(c == cmd for c in cs)
     near = exact or any(difflib.SequenceMatcher(None, c, cmd).ratio() >= 0.9 for c in cs)
     return exact, near, cs
@@ -157,7 +186,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("out")
     ap.add_argument("--k", type=int, default=3)
-    ap.add_argument("--variants", default="old,clean,plain,resample,cut")
+    ap.add_argument("--variants", default="old,clean,plain,resample,cut,para")
     ap.add_argument("--stand", default="default")
     ap.add_argument("--list", action="store_true")
     a = ap.parse_args()
@@ -169,18 +198,29 @@ def main():
         return
     F.apply_stand(a.stand)
     tools = [SC.BASH_SCHEMA, SC.EDIT_SCHEMA, SC.FINISH_SCHEMA]
+    paras = json.load(open(a.out + ".para.json")) if os.path.exists(a.out + ".para.json") else {}
     done = set()
     if os.path.exists(a.out):
         for x in open(a.out):
             r = json.loads(x)
             done.add((r["session"], r["turn"], r["j"], r["variant"], r["sample"]))
     with open(a.out, "a") as f:
-        for v in a.variants.split(","):
-            for p in pts:
+        for p in pts:
+            for v in a.variants.split(","):
                 if v == "resample":
                     msgs = history(p["recs"], p["turn"], cut_assistant=True)
                 elif v == "cut":
                     msgs = cut(history(p["recs"], p["turn"]), p)
+                elif v == "para":
+                    pk = f"{p['session']}|{p['turn']}|{p['j']}"
+                    if pk not in paras:
+                        txt, perr2 = paraphrase(p, 800_000 + p["turn"])
+                        paras[pk] = {"text": txt, "error": perr2, "leak": leak(txt, p["cmd"])}
+                        with open(a.out + ".para.json", "w") as g:
+                            json.dump(paras, g, ensure_ascii=False, indent=0)
+                    if not paras[pk]["text"]:
+                        continue
+                    msgs = cut_para(history(p["recs"], p["turn"]), p, paras[pk]["text"])
                 else:
                     msgs = history(p["recs"], p["turn"], sub=variant_sub(p, v))
                 for s in range(a.k):
