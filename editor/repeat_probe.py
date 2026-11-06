@@ -98,6 +98,124 @@ def points():
     return out
 
 
+def tools_for(s):
+    """Схема инструментов сессии по её summary (флаги intent, scratch, finish_review, rerun_tool)."""
+    from nrhsi.editor import cfg as EC
+    EC.SCRATCH = str(s.get("scratch")) == "True"
+    EC.INTENT = str(s.get("intent")) == "True" or str(s.get("intent_opt")) == "True"
+    EC.INTENT_OPT = str(s.get("intent_opt")) == "True"
+    EC.FINISH_REVIEW = str(s.get("finish_review")) == "True"
+    EC.RERUN_TOOL = str(s.get("rerun_tool")) == "True"
+    return SC.role_tools("editor")
+
+
+def summary_of(log):
+    f = os.path.join(os.path.dirname(os.path.dirname(log)), "out", os.path.basename(log)[:-6] + ".summary.json")
+    return json.load(open(f)) if os.path.exists(f) else None
+
+
+def points_wide():
+    """Точки повтора во всех логах писателя (runs/**/logs), кроме уже взятых points(); схема — по summary сессии."""
+    base = {(p["session"], p["turn"], p["j"]) for p in points()}
+    seen_ctx, out = set(), []
+    for p in sorted(glob.glob(f"{ROOT}/runs/**/logs/*.jsonl", recursive=True)):
+        try:
+            recs = [json.loads(x) for x in open(p)]
+        except Exception:  # noqa: BLE001
+            continue
+        if not recs or recs[0].get("type") != "meta" or recs[0].get("role") != "editor":
+            continue
+        s = summary_of(p)
+        if s is None or str(s.get("hide_tools")) == "True":
+            continue
+        name = p.split("/")[-3] if p.startswith(H) else os.path.relpath(p, ROOT)
+        turns = [r for r in recs if r.get("type") == "turn" and r.get("i") is not None]
+        for t in turns:
+            for j, (c, res) in enumerate(zip(t.get("tool_calls") or [], t.get("results") or [])):
+                if c["name"] != "bash" or not (res.get("shown") or "").startswith(REP) or (name, t["i"], j) in base:
+                    continue
+                key = cmd_of(c)
+                orig = next(((u["i"], jj, x) for u in turns if u["i"] < t["i"]
+                             for jj, (cc, x) in enumerate(zip(u.get("tool_calls") or [], u.get("results") or []))
+                             if cc["name"] == "bash" and cmd_of(cc) == key and not (x.get("shown") or "").startswith(REP)), None)
+                if orig is None:
+                    continue
+                h = hashlib.md5(json.dumps(history(recs, t["i"])[:-1], sort_keys=True).encode()).hexdigest()
+                if h in seen_ctx:
+                    continue
+                seen_ctx.add(h)
+                ou, oj, orig = orig
+                out.append({"session": name, "turn": t["i"], "j": j, "cmd": key, "n": int(res["shown"][len(REP):].split(",")[0]),
+                            "orig": orig["shown"], "ou": ou, "oj": oj, "recs": recs, "summary": s, "tools": tools_for(s)})
+    return out
+
+
+def failed(o):
+    o = (o or "").strip()
+    return (o.startswith("(no output") or "[stderr]" in o or "Traceback" in o or o.startswith("Error:")
+            or "did not end within" in o)
+
+
+def points_firstfail(npos=50, nneg=20):
+    """Первый провал команды (ошибка, пусто, таймаут) в сессиях писателя wvar_1104 со схемой по умолчанию.
+    pos — следующий bash в ближайших 2 ходах почти тот же (>= 0.9), neg — нет. Выбор детерминирован (md5)."""
+    pos, neg, seen_ctx = [], [], set()
+    for p in sorted(glob.glob(f"{H}/*/logs/*.jsonl")):
+        name = p.split("/")[-3]
+        s = summary_of(p)
+        if s is None or any(str(s.get(k)) == "True" for k in SIMPLE):
+            continue
+        recs = [json.loads(x) for x in open(p)]
+        turns = [r for r in recs if r.get("type") == "turn" and r.get("i") is not None]
+        seen_cmd = set()
+        for ti, t in enumerate(turns):
+            for j, (c, res) in enumerate(zip(t.get("tool_calls") or [], t.get("results") or [])):
+                if c["name"] != "bash":
+                    continue
+                key = cmd_of(c)
+                sh = res.get("shown") or ""
+                if not key or key in seen_cmd or sh.startswith(REP) or "no longer available" in sh or not failed(sh):
+                    seen_cmd.add(key)
+                    continue
+                seen_cmd.add(key)
+                nxt = [cmd_of(x) for u in turns[ti + 1: ti + 3] for x in u.get("tool_calls") or [] if x["name"] == "bash"]
+                if not nxt:
+                    continue
+                near = any(difflib.SequenceMatcher(None, x, key).ratio() >= 0.9 for x in nxt)
+                h = hashlib.md5(json.dumps(history(recs, t["i"]), sort_keys=True).encode()).hexdigest()
+                if h in seen_ctx:
+                    continue
+                seen_ctx.add(h)
+                pt = {"session": name, "turn": t["i"], "j": j, "cmd": key, "n": 0, "orig": sh, "ou": t["i"], "oj": j,
+                      "recs": recs, "summary": s, "pos": near, "rank": hashlib.md5(f"{name}{t['i']}{j}".encode()).hexdigest()}
+                (pos if near else neg).append(pt)
+    pos.sort(key=lambda x: x["rank"])
+    neg.sort(key=lambda x: x["rank"])
+    return pos[:npos] + neg[:nneg]
+
+
+def abs_now(msgs, p, para):
+    """Провалившийся вызов вырезан сразу (вызов и ответ); user: что он пытался сделать и что напечатал."""
+    tid = f"call_{p['turn']}_{p['j']}"
+    out = []
+    for m in msgs:
+        if m["role"] == "tool" and m["tool_call_id"] == tid:
+            continue
+        if m["role"] == "assistant" and any(c["id"] == tid for c in m.get("tool_calls") or []):
+            m = dict(m)
+            m["tool_calls"] = [c for c in m["tool_calls"] if c["id"] != tid]
+            if not m["tool_calls"]:
+                del m["tool_calls"]
+                if not (m.get("content") or "").strip():
+                    continue
+        out.append(m)
+    o = p["orig"].strip()
+    o = o if len(o) <= 400 else o[:400] + " …"
+    out.append({"role": "user", "content": f"Your last bash call was taken out of this conversation. What it tried: "
+                                           f"{para} It printed:\n{o}"})
+    return out
+
+
 def variant_sub(pt, v):
     if v == "old":
         return None
@@ -239,7 +357,7 @@ def para_first(msgs, p, para):
     return out
 
 
-POS = {"para_res": para_res, "para_user": para_user, "para_first": para_first}
+POS = {"para_res": para_res, "para_user": para_user, "para_first": para_first, "abs_now": abs_now}
 
 
 def judge(calls, cmd):
@@ -256,15 +374,18 @@ def main():
     ap.add_argument("--variants", default="old,clean,plain,resample,cut,para")
     ap.add_argument("--stand", default="default")
     ap.add_argument("--list", action="store_true")
+    ap.add_argument("--pool", default="base", choices=["base", "wide", "firstfail"])
+    ap.add_argument("--npos", type=int, default=60)
+    ap.add_argument("--nneg", type=int, default=20)
     a = ap.parse_args()
-    pts = points()
+    pts = (points_firstfail(a.npos, a.nneg) if a.pool == "firstfail" else {"base": points, "wide": points_wide}[a.pool]())
     print(json.dumps({"points": len(pts), "sessions": len({p["session"] for p in pts})}), flush=True)
     if a.list:
         for p in pts:
             print(p["session"], p["turn"], p["cmd"][:100])
         return
     F.apply_stand(a.stand)
-    tools = [SC.BASH_SCHEMA, SC.EDIT_SCHEMA, SC.FINISH_SCHEMA]
+    tools0 = [SC.BASH_SCHEMA, SC.EDIT_SCHEMA, SC.FINISH_SCHEMA]
     paras = json.load(open(a.out + ".para.json")) if os.path.exists(a.out + ".para.json") else {}
     done = set()
     if os.path.exists(a.out):
@@ -296,14 +417,14 @@ def main():
                         continue
                     seed = 900_000 + 1000 * s + p["turn"]          # сдвиг от seed сессии
                     t0 = time.time()
-                    resp, err = F.chat(msgs, F.TEMP, seed, tools)
+                    resp, err = F.chat(msgs, F.TEMP, seed, p.get("tools") or tools0)
                     dt = round(time.time() - t0, 1)
                     u = (resp or {}).get("usage") or {}
                     r, perr = (F.parse_response(resp) if not err else (None, err))
                     calls = (r or {}).get("calls") or []
                     ex, nr, cs = judge(calls, p["cmd"])
                     f.write(json.dumps({"session": p["session"], "turn": p["turn"], "j": p["j"], "variant": v,
-                                        "sample": s, "cmd": p["cmd"], "exact": ex, "near": nr, "next_bash": cs,
+                                        "sample": s, "cmd": p["cmd"], "exact": ex, "near": nr, "next_bash": cs, "pos": p.get("pos"),
                                         "next_tools": [c["function"]["name"] for c in calls],
                                         "content": ((r or {}).get("content") or "")[:400], "error": err or perr, "sec": dt,
                                         "prompt_tokens": u.get("prompt_tokens"),
