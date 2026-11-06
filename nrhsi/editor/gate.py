@@ -222,18 +222,22 @@ def _cover_lines(changed, cov, d):
     upto = ("to the end of the log" if d is None else
             "up to model call %s, where it goes differently" % d["call"] if d.get("call") else "until it stops")
     res = []
+    ret = (cov.get("__ret__") or {}) if getattr(C, "TICKET_RET", False) else {}
     for rel, (lines, text) in sorted(changed.items()):
         hits = {int(k): v for k, v in (cov.get(rel) or {}).items()}
+        rets = {int(k): v for k, v in (ret.get(rel) or {}).items()}
         groups = []
         for ln in lines:
             n = hits.get(ln, 0)
-            if groups and groups[-1][2] == n and groups[-1][1] == ln - 1 - sum(1 for k in range(groups[-1][1] + 1, ln) if k in lines):
+            if groups and groups[-1][2] == n and not rets.get(ln) and not rets.get(groups[-1][1]) and groups[-1][1] == ln - 1 - sum(1 for k in range(groups[-1][1] + 1, ln) if k in lines):
                 groups[-1][1] = ln
             else:
                 groups.append([ln, ln, n])
         for a, b, n in groups:
             where = f"src/{rel}:{a}" + (f"-{b}" if b != a else "")
-            res.append(f"  {where}  {'never ran' if n == 0 else 'ran once' if n == 1 else f'ran {n} times'}:  {text[a - 1].strip()[:90]}")
+            rv = rets.get(b) if text[b - 1].strip().startswith("return") else None
+            got = (" -> returned " + ", ".join(f"{k} {'once' if m == 1 else f'{m} times'}" for k, m in sorted(rv.items(), key=lambda kv: -kv[1])[:3])) if rv else ""
+            res.append(f"  {where}  {'never ran' if n == 0 else 'ran once' if n == 1 else f'ran {n} times'}:  {text[a - 1].strip()[:90]}{got}")
     if len(res) > 14:
         res = res[:13] + [f"  ... {len(res) - 13} more groups of changed lines"]
     return upto, res

@@ -261,13 +261,22 @@ def play(bench, src, log, at=None, cover=None):
         guarded = end_of_log(ev)[0].get("detail") == "repeated reply"
         if cover is not None:   # 6.11: строки src, выполненные за проигрыш (до расхождения или до конца лога)
             root = os.path.realpath(src) + os.sep
+            last = {}
             def tracer(frame, event, arg):
                 f = os.path.realpath(frame.f_code.co_filename)
                 if not f.startswith(root) or frame.f_code.co_name == "<genexpr>":   # шаги генератора — не новые выполнения строки
                     return None
                 if event == "line":
+                    if last.get(id(frame)) == frame.f_lineno:   # шаги цикла внутри одной строки — одно выполнение
+                        return tracer
+                    last[id(frame)] = frame.f_lineno
                     c = cover.setdefault(f[len(root):], {})
                     c[frame.f_lineno] = c.get(frame.f_lineno, 0) + 1
+                elif event == "return":
+                    last.pop(id(frame), None)   # что вернула функция src и с какой строки: "__ret__" -> {файл: {строка: {значение: раз}}}
+                    v = arg if isinstance(arg, (bool, int, type(None))) else type(arg).__name__
+                    c = cover.setdefault("__ret__", {}).setdefault(f[len(root):], {}).setdefault(frame.f_lineno, {})
+                    c[repr(v)] = c.get(repr(v), 0) + 1
                 return tracer
             sys.settrace(tracer)
         try:

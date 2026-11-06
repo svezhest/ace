@@ -24,6 +24,7 @@ STAGES = None    # --stages R,K: R bash на чтение; первая прав
 INTENT_OPT = False   # --intent-opt (5.11): поля намерения необязательны; зеркало — только если заполнены
 ASK_CHANGED = False  # --ask-changed (5.11): после авто-проверки — вопрос про изменившиеся удачные прогоны
 TICKET_COVER = False  # --ticket-cover (6.11): к проверке по тикету — счётчики изменённых строк в прогоне тикета
+TICKET_RET = False  # --ticket-ret (6.11): к счётчикам ещё и что вернули строки return правки
 TICKET = None       # --ticket (6.11): {change_expected: prompt|control|any, runs}; писатель не видит, проверка после правки
 INTENT = False       # --intent (5.11): edit(…, expect_runs, expect); после авто-проверки — сверка с тем, что изменилось
 AUTO_CHECK = False   # --auto-check: каждая применённая правка — pyflakes, smoke и rerun в ответе edit, без bash
