@@ -294,7 +294,7 @@ def _watch(changed):
     return w
 
 
-def _dead_fact(changed, cov):
+def _dead_fact(changed, cov, hide=frozenset()):
     """Одна фраза для строки Failed (6.11 --ticket-line): до двух изменённых условий, которые выполнялись и ни разу
     не были истинны (`if` без выполненного тела; `return <выражение>` с одним и тем же значением), чаще выполнявшиеся — первыми;
     или «ни одна изменённая строка не выполнялась». `return False` и подобные литералы не в счёт: они постоянны по построению."""
@@ -328,8 +328,8 @@ def _dead_fact(changed, cov):
             val = (cov.get("__val__") or {}).get(c[2]) if getattr(C, "TICKET_VALUES", False) else None
             # ошибка вычисления операнда — обычно это короткое замыкание (`out and out.get(...)` при out = None):
             # такой операнд условие не вычисляло, показывать его нельзя
-            vals = {e: v for e, v in ((val or {}).get("vals") or {}).items()
-                    if not (isinstance(v, str) and v.startswith("<") and v.endswith(">") and ("Error" in v or "Exception" in v))}
+            vals = {e: v for e, v in ((val or {}).get("vals") or {}).items() if e not in hide
+                    and not (isinstance(v, str) and v.startswith("<") and v.endswith(">") and ("Error" in v or "Exception" in v))}
             if not vals:
                 return c[1]
             return (c[1] + f" (at its last run, before model call {val['call'] + 1}: "
@@ -338,6 +338,80 @@ def _dead_fact(changed, cov):
     if dead:
         return f"your `{dead[2][:80]}` at src/{dead[1]}:{dead[0]} never ran"
     return None if any_ran else "none of the lines you changed ran in it"
+
+
+def _key_probes(changed):
+    """6.11 --ticket-why: `X.get("k")` в изменённых строках -> {"файл:строка": {проба: (X, k)}}.
+    Проба вычисляется в начале строки: список ключей X, если "k" в нём нет, иначе None."""
+    import ast
+    out = {}
+    for rel, (lines, text) in changed.items():
+        try:
+            tree = ast.parse("\n".join(text) + "\n")
+        except SyntaxError:
+            continue
+        want = set(lines)
+        for st in ast.walk(tree):
+            if not isinstance(st, ast.stmt) or st.lineno not in want:
+                continue
+            parts = ([st.test] if isinstance(st, (ast.If, ast.While)) else [st.iter] if isinstance(st, ast.For) else
+                     [] if isinstance(st, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.With, ast.Try)) else [st])
+            for part in parts:
+                for c in ast.walk(part):
+                    if (isinstance(c, ast.Call) and isinstance(c.func, ast.Attribute) and c.func.attr == "get" and c.args
+                            and isinstance(c.args[0], ast.Constant) and isinstance(c.args[0].value, str)
+                            and all(isinstance(n, (ast.Name, ast.Attribute, ast.Load)) for n in ast.walk(c.func.value))):
+                        b, k = ast.unparse(c.func.value), c.args[0].value
+                        probe = f"(', '.join(sorted(map(str, {b}))) if {k!r} not in {b} else None)"
+                        out.setdefault(f"{rel}:{st.lineno}", {})[probe] = (b, k)
+    return out
+
+
+def _shadowed(changed):
+    """6.11 --ticket-why: изменённые строки внутри def, который ниже в том же модуле или классе перекрыт def с тем же именем
+    -> [(файл, имя, строка своего def, строка последнего def, строки своего тела)]."""
+    import ast
+    out = []
+    for rel, (lines, text) in changed.items():
+        try:
+            tree = ast.parse("\n".join(text) + "\n")
+        except SyntaxError:
+            continue
+        for body in [tree.body] + [n.body for n in ast.walk(tree) if isinstance(n, ast.ClassDef)]:
+            defs = [n for n in body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]
+            for i, d in enumerate(defs):
+                later = [e for e in defs[i + 1:] if e.name == d.name]
+                mine = [ln for ln in lines if d.lineno <= ln <= d.end_lineno]
+                if later and mine:
+                    out.append((rel, d.name, d.lineno, later[-1], mine))
+    return out
+
+
+def _why_fact(changed, cov, probes, r):
+    """Почему изменённое не действует: перекрытый def; `X.get("k")` при отсутствии ключа "k" в X. Только факты прогона."""
+    import ast
+    res = []
+    for rel, name, l1, later, mine in _shadowed(changed):
+        hits = {int(k): v for k, v in (cov.get(rel) or {}).items()}
+        if any(hits.get(ln, 0) for ln in mine):
+            continue
+        body = later.body[0].lineno if later.body else later.lineno
+        if body and later.body and isinstance(later.body[0], ast.Expr) and len(later.body) > 1:
+            body = later.body[1].lineno   # docstring не выполняется как строка
+        n = hits.get(body, 0)
+        res.append(f"src/{rel} defines `{name}` again at line {later.lineno}, below yours at line {l1}, and the later "
+                   f"definition is the one in use" + (f" (it ran {n} times in run {r})" if n else ""))
+    vals = cov.get("__val__") or {}
+    for where, ps in probes.items():
+        got = (vals.get(where) or {}).get("vals") or {}
+        for probe, (b, k) in ps.items():
+            v = got.get(probe)
+            if not v or v == "None" or (v.startswith("<") and v.endswith(">")):
+                continue
+            keys = v[1:-1] if v[:1] in "'\"" and v[-1:] == v[:1] else v
+            res.append(f"at src/{where} `{b}` has no key {k!r} (its keys: {keys})")
+            break
+    return res[:2]
 
 
 def _cover_lines(changed, cov, d):
@@ -412,10 +486,18 @@ def ticket_check(run):
     tline = getattr(C, "TICKET_LINE", False)
     changed = _changed_lines(run) if cover or tline else {}
     watch = _watch(changed) if tline and getattr(C, "TICKET_VALUES", False) else None
+    why = watch is not None and getattr(C, "TICKET_WHY", False)
+    probes = _key_probes(changed) if why else {}
+    if why:   # 6.11 --ticket-why: пробы ключей — в те же строки наблюдения; длинные строки — с размером
+        for where, ps in probes.items():
+            watch.setdefault(where, []).extend(ps)
+        watch["__shape__"] = True
+    hide = frozenset(p for ps in probes.values() for p in ps)
     cur, cov = (_replay(f"{run.root}/src", run.root, runs, cover=True, watch=watch) if cover or tline
                 else (_replay(f"{run.root}/src", run.root, runs), {}))
     texts = _texts_differ(run)
-    code = _replay(_old_texts_src(run), run.root, runs) if texts else cur
+    code, cov_code = ((_replay(_old_texts_src(run), run.root, runs, cover=True, watch=watch) if why
+                       else (_replay(_old_texts_src(run), run.root, runs), {})) if texts else (cur, cov))
     lines = []
     for r in runs:
         a, b = cur.get(str(r)), code.get(str(r))
@@ -450,9 +532,14 @@ def ticket_check(run):
     if tline and changed:   # самый важный факт покрытия — в саму строку Failed «как в логе»
         for i, r in enumerate(runs):
             if lines[i].startswith(f"Failed: run {r} goes exactly as in the log"):
-                f = _dead_fact(changed, cov.get(str(r)) or {})
-                if f:
-                    lines[i] = lines[i].rstrip(".") + f"; in run {r} {f}."
+                c = cov.get(str(r)) or {}
+            elif why and lines[i].startswith(f"Failed: in run {r} only the texts the model reads have changed"):
+                c = cov_code.get(str(r)) or {}   # код без новых текстов идёт как в логе — факт о нём
+            else:
+                continue
+            f = [x for x in [_dead_fact(changed, c, hide)] if x] + (_why_fact(changed, c, probes, r) if why else [])
+            if f:
+                lines[i] = lines[i].rstrip(".") + f"; in run {r} " + "; ".join(f) + "."
     if cover and changed:   # по одной строке на прогон — после каждой её счётчики
         assert len(lines) == len(runs)
         out = []

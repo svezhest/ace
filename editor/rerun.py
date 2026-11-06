@@ -262,6 +262,14 @@ def play(bench, src, log, at=None, cover=None, watch=None):
         if cover is not None:   # 6.11: строки src, выполненные за проигрыш (до расхождения или до конца лога)
             root = os.path.realpath(src) + os.sep
             last = {}
+            shape = bool((watch or {}).get("__shape__"))   # 6.11 --ticket-why: у длинной строки — начало, конец и размер
+
+            def rv(v, n):
+                if not shape or not isinstance(v, str) or len(repr(v)) <= n:
+                    return repr(v)[:n]
+                k = v.count("\n") + 1
+                return (repr(v[:n // 2]) + " … " + repr(v[-(n // 4):])
+                        + f" ({len(v)} chars, {k} line{'s' if k > 1 else ''})")
             def tracer(frame, event, arg):
                 f = os.path.realpath(frame.f_code.co_filename)
                 if not f.startswith(root) or frame.f_code.co_name == "<genexpr>":   # шаги генератора — не новые выполнения строки
@@ -279,10 +287,10 @@ def play(bench, src, log, at=None, cover=None, watch=None):
                             try:
                                 v = eval(e, {**frame.f_globals, **frame.f_locals})   # одно пространство: генераторам видны локальные
                                 if isinstance(v, (list, tuple)) and len(v) > 3:   # длинный список — его хвост: туда смотрит проверка
-                                    v = f"[... {len(v)} items, last 3: " + ", ".join(repr(x)[:60] for x in v[-3:]) + "]"
-                                    vals[e] = v[:240]
+                                    v = f"[... {len(v)} items, last 3: " + ", ".join(rv(x, 60) for x in v[-3:]) + "]"
+                                    vals[e] = v if shape else v[:240]
                                 else:
-                                    vals[e] = repr(v)[:160]
+                                    vals[e] = rv(v, 160)
                             except Exception as x:  # noqa: BLE001
                                 vals[e] = f"<{type(x).__name__}>"
                         cover.setdefault("__val__", {})[f"{f[len(root):]}:{frame.f_lineno}"] = {"call": state["call"], "vals": vals}

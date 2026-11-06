@@ -27,6 +27,7 @@ TICKET_COVER = False  # --ticket-cover (6.11): к проверке по тике
 TICKET_RET = False  # --ticket-ret (6.11): к счётчикам ещё и что вернули строки return правки
 TICKET_FIRST = False  # --ticket-first (6.11): проверка по тикету — перед lint, smoke и общим rerun
 TICKET_LINE = False  # --ticket-line (6.11): факт покрытия одной фразой в строке Failed
+TICKET_WHY = False     # --ticket-why (6.11): к факту — почему не действует (перекрытый def, нет ключа), форма длинных строк, факт и при «только тексты»
 TICKET_VALUES = False  # --ticket-values (6.11): к факту в строке Failed — значения операндов условия на последнем выполнении
 TICKET = None       # --ticket (6.11): {change_expected: prompt|control|any, runs}; писатель не видит, проверка после правки
 INTENT = False       # --intent (5.11): edit(…, expect_runs, expect); после авто-проверки — сверка с тем, что изменилось
