@@ -54,6 +54,7 @@ def parse_args():
     ap.add_argument("--ticket-first", action="store_true", help="6.11, с --ticket: проверка по тикету — первой в выводе после правки")
     ap.add_argument("--ticket-line", action="store_true", help="6.11, с --ticket: в строке Failed — какое изменённое условие выполнялось и ни разу не было истинным")
     ap.add_argument("--ticket-why", action="store_true", help="6.11, с --ticket-values: перекрытый def, отсутствующий ключ, форма длинных строк; факт и к Failed «только тексты»")
+    ap.add_argument("--ticket-passed", action="store_true", help="6.11, с --ticket-values: первый задетый удачный прогон — где расходится и какие изменённые условия сработали")
     ap.add_argument("--ticket-values", action="store_true", help="6.11, с --ticket-line: значения операндов названного условия на его последнем выполнении")
     ap.add_argument("--ticket-show", action="store_true", help="6.11, с --ticket: ожидание ревьювера — строкой в наблюдении (писатель видит)")
     ap.add_argument("--resume", help="6.11: лог сессии писателя; история до --resume-turn, этот ход исполняется заново")
@@ -225,6 +226,8 @@ def main():
     C.TICKET_VALUES = a.ticket_values
     assert a.ticket_values or not a.ticket_why, "--ticket-why needs --ticket-values"
     C.TICKET_WHY = a.ticket_why
+    assert a.ticket_values or not a.ticket_passed, "--ticket-passed needs --ticket-values"
+    C.TICKET_PASSED = a.ticket_passed
     if a.hide_tools:
         C.HIDDEN = f"{os.path.abspath(a.home)}/work/.tools_{a.tag}"
     F.SCRATCH = a.scratch            # 4.11: механика scratch/ исследователя — и у писателя
@@ -270,4 +273,5 @@ def main():
     summary["ticket_line"] = a.ticket_line
     summary["ticket_values"] = a.ticket_values
     summary["ticket_why"] = a.ticket_why
+    summary["ticket_passed"] = a.ticket_passed
     editor_step(a, first, src_before, summary)

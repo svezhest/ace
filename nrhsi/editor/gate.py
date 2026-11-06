@@ -224,6 +224,23 @@ _SAFE_CALLS = {"len", "set", "list", "tuple", "sorted", "str", "int", "bool", "a
                "get", "strip", "lower", "upper", "split", "startswith", "endswith", "count", "index", "keys", "values", "items"}
 
 
+def _safe(n):
+    """Выражение без побочных эффектов: вызовы — только чистые встроенные и методы строк/словарей или функции по имени."""
+    import ast
+    for c in ast.walk(n):
+        if isinstance(c, (ast.NamedExpr, ast.Lambda, ast.Await, ast.Yield, ast.YieldFrom)):
+            return False
+        if isinstance(c, ast.Call):
+            f = c.func
+            if isinstance(f, ast.Attribute) and f.attr not in _SAFE_CALLS:
+                return False   # методы вроде execute, send, append, pop — не вычисляем
+            if isinstance(f, ast.Name) and f.id in ("print", "exec", "eval", "open", "input", "llm", "call_hook", "setattr"):
+                return False
+            if not isinstance(f, (ast.Name, ast.Attribute)):
+                return False
+    return True
+
+
 def _operands(cond):
     """Выражения-операнды условия (сравнения, `not`, and/or разбираются), которые можно вычислить без побочных эффектов:
     вызовы — только чистые встроенные и методы строк/словарей, либо функции src без аргументов-вызовов."""
@@ -233,20 +250,7 @@ def _operands(cond):
     except SyntaxError:
         return []
     out = []
-
-    def safe(n):
-        for c in ast.walk(n):
-            if isinstance(c, (ast.NamedExpr, ast.Lambda, ast.Await, ast.Yield, ast.YieldFrom)):
-                return False
-            if isinstance(c, ast.Call):
-                f = c.func
-                if isinstance(f, ast.Attribute) and f.attr not in _SAFE_CALLS:
-                    return False   # методы вроде execute, send, append, pop — не вычисляем
-                if isinstance(f, ast.Name) and f.id in ("print", "exec", "eval", "open", "input", "llm", "call_hook", "setattr"):
-                    return False
-                if not isinstance(f, (ast.Name, ast.Attribute)):
-                    return False
-        return True
+    safe = _safe
 
     def walk(n):
         if isinstance(n, ast.BoolOp):
@@ -414,6 +418,85 @@ def _why_fact(changed, cov, probes, r):
     return res[:2]
 
 
+def _cond_probes(changed):
+    """6.11 --ticket-passed: {"файл:строка": проба} — значение самого изменённого условия (если вычислимо без побочных эффектов)."""
+    import ast
+    out = {}
+    for rel, (lines, text) in changed.items():
+        for ln in lines:
+            if text[ln - 1].strip().startswith(("if ", "elif ", "while ")):
+                c = _cond_of(text, ln)
+                try:
+                    ok = c and _safe(ast.parse(c, mode="eval"))
+                except SyntaxError:
+                    ok = False
+                if ok:
+                    out[f"{rel}:{ln}"] = f"bool({c})"
+    return out
+
+
+def _fired_fact(changed, cov, hide=frozenset(), cprobe=None):
+    """6.11 --ticket-passed: изменённые условия, тело которых выполнялось в прогоне (до расхождения) и которые истинны на последнем
+    выполнении (если это вычислимо), и `return <выражение>`, вернувшие True, — до двух, со значениями операндов."""
+    res = []
+    vals = cov.get("__val__") or {}
+    ret = cov.get("__ret__") or {}
+    tm = lambda n: f"{n} time" + ("" if n == 1 else "s")
+    for rel, (lines, text) in sorted(changed.items()):
+        hits = {int(k): v for k, v in (cov.get(rel) or {}).items()}
+        rets = {int(k): v for k, v in (ret.get(rel) or {}).items()}
+        for ln in lines:
+            src = text[ln - 1].strip()
+            code = src.split("  #")[0].split(" # ")[0].strip()
+            if hits.get(ln) and code.startswith("return ") and code[7:].strip() not in ("False", "True", "None") \
+                    and (rets.get(ln) or {}).get("True"):
+                res.append((rets[ln]["True"], f"your `{src[:80]}` at src/{rel}:{ln} returned True {tm(rets[ln]['True'])}"))
+                continue
+            if not hits.get(ln) or not src.startswith(("if ", "elif ", "while ")):
+                continue
+            pv = ((vals.get(f"{rel}:{ln}") or {}).get("vals") or {}).get((cprobe or {}).get(f"{rel}:{ln}"))
+            if pv == "False":   # на последнем выполнении ложно: это охрана, не то, что сработало
+                continue
+            end = next((k for k in range(ln, min(ln + 8, len(text)) + 1) if text[k - 1].split("#")[0].rstrip().endswith(":")), None)
+            if end is None:
+                continue
+            ind = len(text[ln - 1]) - len(text[ln - 1].lstrip())
+            body = next((k for k in range(end + 1, len(text) + 1) if text[k - 1].strip() and not text[k - 1].strip().startswith("#")), None)
+            if not body or len(text[body - 1]) - len(text[body - 1].lstrip()) <= ind or not hits.get(body):
+                continue
+            v = vals.get(f"{rel}:{ln}") or {}
+            ops = {e: x for e, x in (v.get("vals") or {}).items() if e not in hide
+                   and not (isinstance(x, str) and x.startswith("<") and x.endswith(">") and ("Error" in x or "Exception" in x))}
+            res.append((hits[body], f"your `{src[:80]}` at src/{rel}:{ln} was true {tm(hits[body])}"
+                       + (f" (at its last run, before model call {v['call'] + 1}: " + ", ".join(f"`{e}` = {x}" for e, x in ops.items()) + ")"
+                          if ops else "")))
+    # то, после чего прогон разошёлся, обычно сработало раз-другой; охраны вроде `if history:` — на каждом шаге
+    return [t for _, t in sorted(res, key=lambda x: x[0])[:2]]
+
+
+def passed_fact(run, changed, watch, hide):
+    """6.11 --ticket-passed: первый удачный в логе прогон (не из тикета), который с кодом правки (тексты — как в виде) идёт иначе:
+    где он расходится и какие изменённые условия в нём сработали. None — такого нет или промпт отличается от лога."""
+    ch, passed, prompt = changed_runs(run.last_rerun or "", run.root)
+    hit = sorted((ch & passed) - set(C.TICKET["runs"]))
+    if prompt or not hit or not changed:
+        return None
+    r = hit[0]
+    src = _old_texts_src(run) if _texts_differ(run) else f"{run.root}/src"
+    cp = _cond_probes(changed)
+    w = {k: list(v) if isinstance(v, list) else v for k, v in (watch or {}).items()}
+    for where, pr in cp.items():
+        w.setdefault(where, []).append(pr)
+    div, cov = _replay(src, run.root, [r], cover=True, watch=w or None)
+    d = div.get(str(r))
+    if not d or d["kind"] == "crash":
+        return None
+    f = _fired_fact(changed, cov.get(str(r)) or {}, hide | set(cp.values()), cp)
+    more = f" (of {len(hit)} such runs: {', '.join(map(str, hit[:8]))}{' …' if len(hit) > 8 else ''})" if len(hit) > 1 else ""
+    return (f"Run {r} passed in the log{more}; with your code it goes differently from model call {d['call']} on"
+            + (": " + "; ".join(f) if f else "") + ".")
+
+
 def _cover_lines(changed, cov, d):
     """Строки правки со счётчиками в одном прогоне: подряд идущие с одним счётчиком — одной строкой."""
     upto = ("to the end of the log" if d is None else
@@ -492,6 +575,8 @@ def ticket_check(run):
         for where, ps in probes.items():
             watch.setdefault(where, []).extend(ps)
         watch["__shape__"] = True
+        if getattr(C, "TICKET_PASSED", False):
+            watch["__shape2__"] = True
     hide = frozenset(p for ps in probes.values() for p in ps)
     cur, cov = (_replay(f"{run.root}/src", run.root, runs, cover=True, watch=watch) if cover or tline
                 else (_replay(f"{run.root}/src", run.root, runs), {}))
@@ -550,6 +635,13 @@ def ticket_check(run):
                 upto, cl = _cover_lines(changed, cov.get(str(r)) or {}, a)
                 out.append(f"The lines you changed, as run {r} replays them ({upto}):\n" + "\n".join(cl))
         lines = out
+    if getattr(C, "TICKET_PASSED", False):   # 6.11: факт о первом задетом удачном прогоне
+        if watch is None:
+            changed = changed or _changed_lines(run)
+            watch = _watch(changed)
+        pf = passed_fact(run, changed, watch or None, hide)
+        if pf:
+            lines.append(pf)
     run.w({"type": "ticket_check", "expected": exp, "runs": runs, "cur": cur, "code": code, "lines": lines,
            **({"cover": cov} if cover else {})})
     return "Check against the observation:\n" + "\n".join(lines)
