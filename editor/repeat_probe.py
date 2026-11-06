@@ -147,15 +147,12 @@ def cut(msgs, p):
     return out
 
 
-PARA_SYS = ("You restate what a shell command in a code repository tried to do and what it showed, for a reader who "
-            "will not see the command. Describe it in your own words, in one to three sentences.")
+PARA_SYS = ("You restate what a shell command in a code repository tries to do, for a reader who will not see the "
+            "command. Describe its aim in your own words, in one or two sentences. The reader gets its output separately.")
 
 
 def paraphrase(p, seed):
-    o = p["orig"].strip()
-    o = o if len(o) <= 3000 else o[:3000] + " …"
-    msgs = [{"role": "system", "content": PARA_SYS},
-            {"role": "user", "content": f"Command:\n{p['cmd']}\n\nWhat it printed:\n{o}"}]
+    msgs = [{"role": "system", "content": PARA_SYS}, {"role": "user", "content": f"Command:\n{p['cmd']}"}]
     resp, err = F.chat(msgs, F.TEMP, seed)
     r, perr = (F.parse_response(resp) if not err else (None, err))
     return ((r or {}).get("content") or "").strip(), err or perr
@@ -170,8 +167,10 @@ def leak(text, cmd):
 def cut_para(msgs, p, para):
     out = cut(msgs, p)
     k = out[-1]["content"].split(" identical")[0]
-    out[-1] = {"role": "user", "content": f"{k} identical bash calls were taken out of this conversation. What they did "
-                                          f"and what they showed: {para}"}
+    o = p["orig"].strip()
+    o = o if len(o) <= 400 else o[:400] + " …"
+    out[-1] = {"role": "user", "content": f"{k} identical bash calls were taken out of this conversation. What they "
+                                          f"tried: {para} Each printed:\n{o}"}
     return out
 
 
