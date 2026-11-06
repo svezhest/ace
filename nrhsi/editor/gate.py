@@ -166,7 +166,7 @@ def edit_checks(run):
 
 
 # ---------------------------------------------------------------- 6.11: проверка по тикету
-# Ожидание ревьювера change_expected: prompt | control | any — в тикете, писатель его не видит.
+# Ожидание ревьювера change_expected: prompt | control | any — в тикете (с --ticket-show его видит и писатель).
 # prompt — меняется то, что модель читает (тексты .md в src/); control — меняется то, что делает код харнесса
 # (видно, если вернуть тексты .md как в виде); any — что-то из двух. После каждой авто-проверки — Ok / Failed: причина.
 
@@ -176,7 +176,8 @@ def _replay(src, root, runs):
     try:
         return json.loads(p.stdout.strip().splitlines()[-1])
     except Exception:  # noqa: BLE001
-        return {str(r): {"kind": "crash", "call": None, "text": (p.stderr or p.stdout).strip()[-400:]} for r in runs}
+        tail = [l for l in (p.stderr or p.stdout).strip().splitlines() if l.strip()]
+        return {str(r): {"kind": "crash", "call": None, "text": tail[-1] if tail else ""} for r in runs}  # строка ошибки, не обрывок трассы
 
 
 def _old_texts_src(run):
