@@ -1,5 +1,5 @@
 """6.11, автор: вид без комментариев и докстрингов в src/*.py и с минимальным README (структура и формат логов).
-plain_view.py ВИД ВЫХОД -> ВЫХОД/{README.md, src/, logs/} и ВЫХОД.linemap.json {файл: {старая строка: новая}}.
+python3 -m nrhsi.plain ВИД ВЫХОД -> ВЫХОД/{README.md, src/, logs/} и ВЫХОД.linemap.json {файл: {старая строка: новая}}.
 Поведение кода то же: ast без докстрингов совпадает."""
 import ast
 import io
@@ -110,6 +110,22 @@ def strip(src):
         fixed[i] = j + 1
         j += 1
     return text, fixed
+
+
+def strip_dir(src):
+    """Все .py в src/ — без комментариев и докстрингов, на месте (дерево: каждый узел). Файл, который не удалось
+    разобрать или у которого поменялось бы поведение, остаётся как есть -> список таких."""
+    left = []
+    for p in sorted(os.listdir(src)):
+        if p.endswith(".py"):
+            f = os.path.join(src, p)
+            try:
+                t, _ = strip(open(f).read())
+            except (AssertionError, SyntaxError, tokenize.TokenError, IndexError) as e:
+                left.append(f"{p}: {type(e).__name__} {e}")
+                continue
+            open(f, "w").write(t)
+    return left
 
 
 def main():

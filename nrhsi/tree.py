@@ -26,6 +26,8 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 import make_start  # noqa: E402
+sys.path.insert(0, ROOT)
+from nrhsi import plain  # noqa: E402
 
 SHORT = {"alfworld": "alf", "appworld": "app"}   # имя бенча у редактора
 # варианты ролей: на каждую сессию — случайный, записывается в tree.json (потом прогоны разбираются по вариантам)
@@ -38,10 +40,14 @@ def measure(a, view, out, seed):
     """Замер src/ вида view: M случайных задач train -> доля ok; out — вид узла (README.md, src/, logs/)."""
     if not os.path.exists(f"{out}/summary.json"):
         shutil.rmtree(out, ignore_errors=True)           # оборванный замер -> заново (раннер не пишет в существующий)
+        left = plain.strip_dir(f"{view}/src")            # 6.11, автор: узел без комментариев и докстрингов (поведение то же)
+        if left:
+            print(json.dumps({"plain_left": left, "view": view}), flush=True)
         subprocess.run([a.bench_py, f"{ROOT}/{a.bench}/runner/run.py", "--view", view, "--out", out,
                         "--tag", os.path.basename(out), "--split", "train", "--n", str(a.m), "--seed", str(seed),
                         "--workers", str(a.workers), "--stand", a.stand, "--no-publish"], check=True)
-        shutil.copy(f"{ROOT}/start/{a.bench}.README.md", f"{out}/README.md")
+        with open(f"{out}/README.md", "w") as f:        # 6.11: минимальный README (структура и формат логов)
+            f.write(plain.README[SHORT[a.bench]])
     s = json.load(open(f"{out}/summary.json"))
     return s["ok"] / s["n"]
 
