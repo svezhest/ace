@@ -169,7 +169,7 @@ def app_episode(bridge, ev, sent_replies, state, diverge):
     return Episode()
 
 
-def play(bench, src, log, at=None, cover=None):
+def play(bench, src, log, at=None, cover=None, watch=None):
     sys.path[:0] = [src]
     import bridge
     import harness
@@ -272,6 +272,20 @@ def play(bench, src, log, at=None, cover=None):
                     last[id(frame)] = frame.f_lineno
                     c = cover.setdefault(f[len(root):], {})
                     c[frame.f_lineno] = c.get(frame.f_lineno, 0) + 1
+                    exprs = (watch or {}).get(f"{f[len(root):]}:{frame.f_lineno}")
+                    if exprs:   # 6.11 --watch: значения выражений строки на её последнем выполнении
+                        vals = {}
+                        for e in exprs:
+                            try:
+                                v = eval(e, {**frame.f_globals, **frame.f_locals})   # одно пространство: генераторам видны локальные
+                                if isinstance(v, (list, tuple)) and len(v) > 3:   # длинный список — его хвост: туда смотрит проверка
+                                    v = f"[... {len(v)} items, last 3: " + ", ".join(repr(x)[:60] for x in v[-3:]) + "]"
+                                    vals[e] = v[:240]
+                                else:
+                                    vals[e] = repr(v)[:160]
+                            except Exception as x:  # noqa: BLE001
+                                vals[e] = f"<{type(x).__name__}>"
+                        cover.setdefault("__val__", {})[f"{f[len(root):]}:{frame.f_lineno}"] = {"call": state["call"], "vals": vals}
                 elif event == "return":
                     last.pop(id(frame), None)   # что вернула функция src и с какой строки: "__ret__" -> {файл: {строка: {значение: раз}}}
                     v = arg if isinstance(arg, (bool, int, type(None))) else type(arg).__name__
@@ -309,7 +323,7 @@ def play(bench, src, log, at=None, cover=None):
     return trace
 
 
-def worker(bench, src, logs, runs=None, at=None, cover=None):
+def worker(bench, src, logs, runs=None, at=None, cover=None, watch=None):
     """Все прогоны вида на одном src, в этом же процессе: модули src перезагружаются для каждого прогона."""
     sys.dont_write_bytecode = True
     out = {}
@@ -321,7 +335,7 @@ def worker(bench, src, logs, runs=None, at=None, cover=None):
             sys.modules.pop(m, None)
         try:
             c = cover.setdefault(p.stem.split("_")[1], {}) if cover is not None else None
-            out[p.stem.split("_")[1]] = play(bench, src, str(p), at, c)
+            out[p.stem.split("_")[1]] = play(bench, src, str(p), at, c, watch)
         finally:
             sys.path[:] = saved
             for m in ("harness", "bridge", "hooks"):
@@ -466,11 +480,13 @@ def main():
     ap.add_argument("--at", type=int, help="с одним прогоном N: вызовы функций src перед вызовом модели K, со значениями")
     ap.add_argument("--json", action="store_true", help="6.11: для проверки по тикету — расхождение каждого прогона как json")
     ap.add_argument("--cover", action="store_true", help="6.11: с --json — сколько раз выполнилась каждая строка src")
+    ap.add_argument("--watch", help="6.11: с --cover — json {\"файл:строка\": [выражения]}: их значения на последнем выполнении строки")
     ap.add_argument("runs", nargs="*")
     a = ap.parse_args()
     if a.json:
         cov = {} if a.cover else None
-        new = worker(a.bench, os.path.abspath(a.src), a.logs, a.runs or None, cover=cov)
+        new = worker(a.bench, os.path.abspath(a.src), a.logs, a.runs or None, cover=cov,
+                     watch=json.loads(a.watch) if a.watch else None)
         div = {r: (None if t["div"] is None else {"kind": t["div"].get("kind"), "call": t["div"].get("call"),
                                                    "text": str(t["div"].get("text", ""))[:600]})
                for r, t in new.items()}

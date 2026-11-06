@@ -53,6 +53,7 @@ def parse_args():
     ap.add_argument("--ticket-ret", action="store_true", help="6.11, с --ticket-cover: у строк return правки — что они вернули в прогоне тикета")
     ap.add_argument("--ticket-first", action="store_true", help="6.11, с --ticket: проверка по тикету — первой в выводе после правки")
     ap.add_argument("--ticket-line", action="store_true", help="6.11, с --ticket: в строке Failed — какое изменённое условие выполнялось и ни разу не было истинным")
+    ap.add_argument("--ticket-values", action="store_true", help="6.11, с --ticket-line: значения операндов названного условия на его последнем выполнении")
     ap.add_argument("--ticket-show", action="store_true", help="6.11, с --ticket: ожидание ревьювера — строкой в наблюдении (писатель видит)")
     ap.add_argument("--resume", help="6.11: лог сессии писателя; история до --resume-turn, этот ход исполняется заново")
     ap.add_argument("--resume-turn", type=int)
@@ -219,6 +220,8 @@ def main():
     C.TICKET_FIRST = a.ticket_first
     assert a.ticket or not a.ticket_line, "--ticket-line needs --ticket"
     C.TICKET_LINE = a.ticket_line
+    assert a.ticket_line or not a.ticket_values, "--ticket-values needs --ticket-line"
+    C.TICKET_VALUES = a.ticket_values
     if a.hide_tools:
         C.HIDDEN = f"{os.path.abspath(a.home)}/work/.tools_{a.tag}"
     F.SCRATCH = a.scratch            # 4.11: механика scratch/ исследователя — и у писателя
@@ -262,4 +265,5 @@ def main():
     summary["ticket_ret"] = a.ticket_ret
     summary["ticket_first"] = a.ticket_first
     summary["ticket_line"] = a.ticket_line
+    summary["ticket_values"] = a.ticket_values
     editor_step(a, first, src_before, summary)

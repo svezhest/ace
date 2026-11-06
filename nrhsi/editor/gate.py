@@ -173,9 +173,9 @@ def edit_checks(run):
 # prompt — меняется то, что модель читает (тексты .md в src/); control — меняется то, что делает код харнесса
 # (видно, если вернуть тексты .md как в виде); any — что-то из двух. После каждой авто-проверки — Ok / Failed: причина.
 
-def _replay(src, root, runs, cover=False):
+def _replay(src, root, runs, cover=False, watch=None):
     cmd = ([sys.executable, RERUN_CORE, "--bench", C.BENCH, "--src", src, "--logs", f"{root}/logs", "--json"]
-           + (["--cover"] if cover else []) + [str(r) for r in runs])
+           + (["--cover"] if cover else []) + (["--watch", json.dumps(watch)] if watch else []) + [str(r) for r in runs])
     p = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
     try:
         out = json.loads(p.stdout.strip().splitlines()[-1])
@@ -220,6 +220,80 @@ def _changed_lines(run):
     return out
 
 
+_SAFE_CALLS = {"len", "set", "list", "tuple", "sorted", "str", "int", "bool", "any", "all", "min", "max", "repr",
+               "get", "strip", "lower", "upper", "split", "startswith", "endswith", "count", "index", "keys", "values", "items"}
+
+
+def _operands(cond):
+    """Выражения-операнды условия (сравнения, `not`, and/or разбираются), которые можно вычислить без побочных эффектов:
+    вызовы — только чистые встроенные и методы строк/словарей, либо функции src без аргументов-вызовов."""
+    import ast
+    try:
+        tree = ast.parse(cond, mode="eval").body
+    except SyntaxError:
+        return []
+    out = []
+
+    def safe(n):
+        for c in ast.walk(n):
+            if isinstance(c, (ast.NamedExpr, ast.Lambda, ast.Await, ast.Yield, ast.YieldFrom)):
+                return False
+            if isinstance(c, ast.Call):
+                f = c.func
+                if isinstance(f, ast.Attribute) and f.attr not in _SAFE_CALLS:
+                    return False   # методы вроде execute, send, append, pop — не вычисляем
+                if isinstance(f, ast.Name) and f.id in ("print", "exec", "eval", "open", "input", "llm", "call_hook", "setattr"):
+                    return False
+                if not isinstance(f, (ast.Name, ast.Attribute)):
+                    return False
+        return True
+
+    def walk(n):
+        if isinstance(n, ast.BoolOp):
+            for v in n.values:
+                walk(v)
+        elif isinstance(n, ast.UnaryOp) and isinstance(n.op, ast.Not):
+            walk(n.operand)
+        elif isinstance(n, ast.Compare):
+            for v in [n.left] + n.comparators:
+                walk(v)
+        elif (isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id in ("all", "any")
+              and n.args and isinstance(n.args[0], (ast.GeneratorExp, ast.ListComp))):
+            walk(n.args[0].generators[0].iter)   # all/any(… for x in X): значение целиком — то же «never true», смотрим на X
+        elif not isinstance(n, ast.Constant) and safe(n):
+            out.append(ast.unparse(n))
+    walk(tree)
+    return list(dict.fromkeys(out))[:4]
+
+
+def _cond_of(text, ln):
+    """Текст условия строки if/elif/while (многострочного — до двоеточия) или выражения return."""
+    src = text[ln - 1].strip()
+    if src.startswith("return "):
+        return src.split("  #")[0][7:].strip()
+    end = next((k for k in range(ln, min(ln + 8, len(text)) + 1) if text[k - 1].split("#")[0].rstrip().endswith(":")), None)
+    if end is None:
+        return None
+    body = " ".join(t.split("#")[0].strip().rstrip("\\").strip() for t in text[ln - 1:end])
+    for kw in ("if ", "elif ", "while "):
+        if body.startswith(kw):
+            return body[len(kw):].rstrip().rstrip(":").strip()
+    return None
+
+
+def _watch(changed):
+    w = {}
+    for rel, (lines, text) in changed.items():
+        for ln in lines:
+            src = text[ln - 1].strip()
+            if src.startswith(("if ", "elif ", "while ", "return ")):
+                c = _cond_of(text, ln)
+                ops = _operands(c) if c else []
+                if ops:
+                    w[f"{rel}:{ln}"] = ops
+    return w
+
+
 def _dead_fact(changed, cov):
     """Одна фраза для строки Failed (6.11 --ticket-line): до двух изменённых условий, которые выполнялись и ни разу
     не были истинны (`if` без выполненного тела; `return <выражение>` с одним и тем же значением), чаще выполнявшиеся — первыми;
@@ -244,13 +318,19 @@ def _dead_fact(changed, cov):
                 ind = len(text[ln - 1]) - len(text[ln - 1].lstrip())
                 body = next((k for k in range(end + 1, len(text) + 1) if text[k - 1].strip() and not text[k - 1].strip().startswith("#")), None)
                 if body and len(text[body - 1]) - len(text[body - 1].lstrip()) > ind and hits.get(body, 0) == 0:
-                    cand.append((n, f"`{src[:80]}` at src/{rel}:{ln} ran {n} times and was never true"))
+                    cand.append((n, f"`{src[:80]}` at src/{rel}:{ln} ran {n} times and was never true", f"{rel}:{ln}"))
             elif code.startswith("return ") and code[7:].strip() not in ("False", "True", "None", "{}", "[]", "0", "1", '""') \
                     and len(rets.get(ln) or {}) == 1 and next(iter(rets[ln])) in ("False", "None", "True"):
-                cand.append((n, f"`{src[:80]}` at src/{rel}:{ln} ran {n} times and returned {next(iter(rets[ln]))} every time"))
+                cand.append((n, f"`{src[:80]}` at src/{rel}:{ln} ran {n} times and returned {next(iter(rets[ln]))} every time", f"{rel}:{ln}"))
     if cand:
         cand.sort(key=lambda c: -c[0])
-        return "your " + "; your ".join(c[1] for c in cand[:2])
+        def with_vals(c):
+            val = (cov.get("__val__") or {}).get(c[2]) if getattr(C, "TICKET_VALUES", False) else None
+            if not (val and val.get("vals")):
+                return c[1]
+            return (c[1] + f" (at its last run, before model call {val['call'] + 1}: "
+                    + ", ".join(f"`{e}` = {v}" for e, v in val["vals"].items()) + ")")
+        return "your " + "; your ".join(with_vals(c) for c in cand[:2])
     if dead:
         return f"your `{dead[2][:80]}` at src/{dead[1]}:{dead[0]} never ran"
     return None if any_ran else "none of the lines you changed ran in it"
@@ -326,9 +406,10 @@ def ticket_check(run):
     exp, runs = C.TICKET["change_expected"], C.TICKET["runs"]
     cover = getattr(C, "TICKET_COVER", False)
     tline = getattr(C, "TICKET_LINE", False)
-    cur, cov = (_replay(f"{run.root}/src", run.root, runs, cover=True) if cover or tline
-                else (_replay(f"{run.root}/src", run.root, runs), {}))
     changed = _changed_lines(run) if cover or tline else {}
+    watch = _watch(changed) if tline and getattr(C, "TICKET_VALUES", False) else None
+    cur, cov = (_replay(f"{run.root}/src", run.root, runs, cover=True, watch=watch) if cover or tline
+                else (_replay(f"{run.root}/src", run.root, runs), {}))
     texts = _texts_differ(run)
     code = _replay(_old_texts_src(run), run.root, runs) if texts else cur
     lines = []
