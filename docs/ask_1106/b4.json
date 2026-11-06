@@ -1,0 +1,34 @@
+[
+ {
+  "id": "01_choice_sw",
+  "obs": "01",
+  "code": true,
+  "turns": [
+   "Two changes to src/ are proposed. (a) Warn when the new code equals the code two steps back and the previous step equals the code three steps back (an A, B, A, B cycle). (b) Compare the new code with every earlier step of the episode, and warn on any match. Which one would you make, and why?"
+  ]
+ },
+ {
+  "id": "02_choice_sw",
+  "obs": "02",
+  "code": true,
+  "turns": [
+   "Two changes to src/ are proposed. (a) Remove the `continue` after the warning, so that the repeated code is run as a step. (b) When the code equals the previous step's code, end the episode. Which one would you make, and why?"
+  ]
+ },
+ {
+  "id": "05_choice_sw",
+  "obs": "05",
+  "code": true,
+  "turns": [
+   "Two changes to src/ are proposed. (a) Remove only the sentence \"Since this task has an answer to be returned, I will pass that as an argument.\" and keep `answer=num_playlists`. (b) Change the example's last step to `apis.supervisor.complete_task()` without an answer. Which one would you make, and why?"
+  ]
+ },
+ {
+  "id": "06_choice_sw",
+  "obs": "06",
+  "code": true,
+  "turns": [
+   "Two changes to src/ are proposed. (a) Change the prompt's line about \"Nothing happened\" to say that an invalid action may be replaced by a different action. (b) In on_before_action, block any action that is not in ctx[\"admissible\"] and ask the model again. Which one would you make, and why?"
+  ]
+ }
+]
