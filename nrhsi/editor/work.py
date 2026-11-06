@@ -197,7 +197,9 @@ def build_work(bench, tag, smoke=True):
         shutil.copytree(f"{C.VIEWS[bench]}/logs", f"{v}/logs")
     if smoke and C.RERUN and not C.RERUN_TOOL:      # --rerun-tool: повтор — инструмент, ядра в копии нет
         shutil.copytree(f"{C.VIEWS[bench]}/src", f"{td}/orig_src", ignore=shutil.ignore_patterns("__pycache__"))
-        shutil.copy(os.path.join(os.path.dirname(C.SMOKE), "..", "..", "editor", "rerun.py"), f"{td}/rerun_core.py")
+        # 6.11: копия писателя заморожена (editor/rerun_writer.py = editor/rerun.py на 19bd077), чтобы правки механики
+        # проверки (rerun.py вызывает gate) не меняли то, что писатель читает в tests/rerun_core.py
+        shutil.copy(os.path.join(os.path.dirname(C.SMOKE), "..", "..", "editor", "rerun_writer.py"), f"{td}/rerun_core.py")
         py = tt(RERUN_PY.replace("BENCH", repr(bench)))
         if C.HIDE_TOOLS:
             assert py.count("ROOT = os.path.dirname(HERE)") == 1
