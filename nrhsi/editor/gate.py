@@ -492,7 +492,7 @@ def _old_texts_src(run):
     """Копия src/ писателя, где все .md — как в виде (новые .md убраны): остаётся только код."""
     import shutil
     view = f"{C.VIEWS[C.BENCH]}/src"
-    t = f"{C.HERE}/work/.ticket_{os.path.basename(run.root)}"
+    t = f"{C.HERE}/.ticket_{os.path.basename(run.root)}"   # 6.11: не в work/ — «..» копии писателя не меняет время
     shutil.rmtree(t, ignore_errors=True)
     shutil.copytree(f"{run.root}/src", t, ignore=shutil.ignore_patterns("__pycache__"))
     for d, _, fs in os.walk(t):

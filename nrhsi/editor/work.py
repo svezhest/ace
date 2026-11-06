@@ -225,6 +225,7 @@ def make_profile(root, tag):
         with open(p + ".tools", "w") as f:
             f.write(F.profile_text(root) + f'(allow file-read* (subpath "{C.HIDDEN}"))\n')
         F._PROFILES.append(p + ".tools")
+    os.utime(os.path.dirname(p), (WORK_MTIME, WORK_MTIME))   # 6.11: профиль пишется в work/ — «..» копии снова одно время
     return p
 
 

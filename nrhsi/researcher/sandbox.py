@@ -248,7 +248,7 @@ def run_bash(cmd, root, prof, info=None):
     for j in reversed(pipeamp):
         run = run[:j] + " 2>&1 |" + run[j + 2:]
     deadline = time.monotonic() + C.CMD_TIMEOUT
-    env = {"PATH": "/usr/bin:/bin", "LANG": "en_US.UTF-8", "HOME": root}
+    env = {"PATH": "/usr/bin:/bin", "LANG": "en_US.UTF-8", "HOME": root, "PYTHONHASHSEED": "0"}   # 6.11: порядок set/dict str одинаков
     if C.PYTHON or C.RUNS_TOOL:
         env.update(PATH=f"{C.BIN}:/usr/bin:/bin", PYTHONDONTWRITEBYTECODE="1", RUNS_OUT_CHARS=str(C.OUT_CHARS), RUNS_FORMAT=C.RUNS_FORMAT)
     run = root_prelude(root) + (f"ulimit -f {C.SCRATCH_FILE_KB}\n" if C.SCRATCH else "") + run
