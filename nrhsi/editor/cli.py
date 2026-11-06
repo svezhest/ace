@@ -85,8 +85,7 @@ def ticket_line(first, t):
     if ks:
         kr = f"Run {ks[0]}" if len(ks) == 1 else "Runs " + ", ".join(map(str, ks[:-1])) + f" and {ks[-1]}"
         line += (f" {kr} passed and should go as in the log: there the harness already does what it should. "
-                 "The check after each edit tells you whether both hold; when both hold, the change does what the "
-                 "observation asks.")
+                 "The check after each edit tells you whether each of the two holds.")
     assert first.count(TICKET_TASK) == 1, "task line not found"
     return first.replace(TICKET_TASK, "\n\n" + line + TICKET_TASK)
 
