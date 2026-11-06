@@ -439,8 +439,15 @@ def main():
     ap.add_argument("--logs", required=True)
     ap.add_argument("--old", help="src, на котором записаны логи: для сравнения ответов хуков")
     ap.add_argument("--at", type=int, help="с одним прогоном N: вызовы функций src перед вызовом модели K, со значениями")
+    ap.add_argument("--json", action="store_true", help="6.11: для проверки по тикету — расхождение каждого прогона как json")
     ap.add_argument("runs", nargs="*")
     a = ap.parse_args()
+    if a.json:
+        new = worker(a.bench, os.path.abspath(a.src), a.logs, a.runs or None)
+        print(json.dumps({r: (None if t["div"] is None else {"kind": t["div"].get("kind"), "call": t["div"].get("call"),
+                                                              "text": str(t["div"].get("text", ""))[:600]})
+                          for r, t in new.items()}))
+        return
     if a.at:
         assert len(a.runs) == 1, "--at needs one run"
         t = worker(a.bench, os.path.abspath(a.src), a.logs, a.runs, a.at)[a.runs[0]]

@@ -160,4 +160,100 @@ def edit_checks(run):
         t += smoke + f"\n{rerun_name()} prints:\n" + clip(full, REVIEW_RERUN).rstrip()
     else:
         t += smoke
+    if C.TICKET:
+        t += "\n\n" + ticket_check(run)
     return t
+
+
+# ---------------------------------------------------------------- 6.11: проверка по тикету
+# Ожидание ревьювера change_expected: prompt | control | any — в тикете, писатель его не видит.
+# prompt — меняется то, что модель читает (тексты .md в src/); control — меняется то, что делает код харнесса
+# (видно, если вернуть тексты .md как в виде); any — что-то из двух. После каждой авто-проверки — Ok / Failed: причина.
+
+def _replay(src, root, runs):
+    cmd = [sys.executable, RERUN_CORE, "--bench", C.BENCH, "--src", src, "--logs", f"{root}/logs", "--json"] + [str(r) for r in runs]
+    p = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+    try:
+        return json.loads(p.stdout.strip().splitlines()[-1])
+    except Exception:  # noqa: BLE001
+        return {str(r): {"kind": "crash", "call": None, "text": (p.stderr or p.stdout).strip()[-400:]} for r in runs}
+
+
+def _old_texts_src(run):
+    """Копия src/ писателя, где все .md — как в виде (новые .md убраны): остаётся только код."""
+    import shutil
+    view = f"{C.VIEWS[C.BENCH]}/src"
+    t = f"{C.HERE}/work/.ticket_{os.path.basename(run.root)}"
+    shutil.rmtree(t, ignore_errors=True)
+    shutil.copytree(f"{run.root}/src", t, ignore=shutil.ignore_patterns("__pycache__"))
+    for d, _, fs in os.walk(t):
+        for f in fs:
+            if f.endswith(".md"):
+                rel = os.path.relpath(os.path.join(d, f), t)
+                if os.path.exists(f"{view}/{rel}"):
+                    shutil.copy(f"{view}/{rel}", os.path.join(d, f))
+                else:
+                    os.remove(os.path.join(d, f))
+    for d, _, fs in os.walk(view):
+        for f in fs:
+            rel = os.path.relpath(os.path.join(d, f), view)
+            if f.endswith(".md") and not os.path.exists(f"{t}/{rel}"):
+                os.makedirs(os.path.dirname(f"{t}/{rel}"), exist_ok=True)
+                shutil.copy(os.path.join(d, f), f"{t}/{rel}")
+    return t
+
+
+def _texts_differ(run):
+    view = f"{C.VIEWS[C.BENCH]}/src"
+    a = {os.path.relpath(os.path.join(d, f), f"{run.root}/src"): open(os.path.join(d, f), errors="replace").read()
+         for d, _, fs in os.walk(f"{run.root}/src") for f in fs if f.endswith(".md")}
+    b = {os.path.relpath(os.path.join(d, f), view): open(os.path.join(d, f), errors="replace").read()
+         for d, _, fs in os.walk(view) for f in fs if f.endswith(".md")}
+    return a != b
+
+
+def _where(d):
+    if d["kind"] == "model" and d["call"] == 1:
+        return "the prompt the model sees differs from the log from the start"
+    at = "before the first model call" if d["call"] == 0 else f"from model call {d['call']} on"
+    return f"it goes differently {at} ({d['text'][:120]})"
+
+
+def ticket_check(run):
+    exp, runs = C.TICKET["change_expected"], C.TICKET["runs"]
+    cur = _replay(f"{run.root}/src", run.root, runs)
+    texts = _texts_differ(run)
+    code = _replay(_old_texts_src(run), run.root, runs) if texts else cur
+    lines = []
+    for r in runs:
+        a, b = cur.get(str(r)), code.get(str(r))
+        crash = next((d for d in (a, b) if d and d["kind"] == "crash"), None)
+        if crash:
+            lines.append(f"Failed: in run {r} the harness crashes" + (f" at model call {crash['call']}" if crash["call"] else "")
+                         + f": {crash['text'].strip().splitlines()[0][:300] if crash['text'].strip() else 'no message'}")
+            continue
+        prompt_eff = texts and a is not None
+        code_eff = b is not None
+        if exp == "control":
+            if code_eff:
+                lines.append(f"Ok: in run {r} the harness now acts differently: {_where(b)}.")
+            elif prompt_eff:
+                lines.append(f"Failed: in run {r} only the texts the model reads have changed; with the old texts run {r} "
+                             "goes exactly as in the log, to the end: the harness code does nothing different in it.")
+            else:
+                lines.append(f"Failed: run {r} goes exactly as in the log, to the end: this edit changes nothing in it.")
+        elif exp == "prompt":
+            if prompt_eff:
+                lines.append(f"Ok: in run {r} the texts the model reads have changed: {_where(a)}.")
+            elif code_eff:
+                lines.append(f"Failed: in run {r} the texts the model reads are as before; only the harness code acts "
+                             f"differently: {_where(b)}.")
+            else:
+                lines.append(f"Failed: run {r} goes exactly as in the log, to the end: this edit changes nothing in it.")
+        else:
+            if prompt_eff or code_eff:
+                lines.append(f"Ok: run {r} changes: {_where(a or b)}.")
+            else:
+                lines.append(f"Failed: run {r} goes exactly as in the log, to the end: this edit changes nothing in it.")
+    run.w({"type": "ticket_check", "expected": exp, "runs": runs, "cur": cur, "code": code, "lines": lines})
+    return "Check against the observation:\n" + "\n".join(lines)

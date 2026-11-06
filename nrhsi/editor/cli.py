@@ -48,6 +48,7 @@ def parse_args():
     ap.add_argument("--navigator", action="store_true", help="5.11: в системном промпте пример прицельного поиска (выдуманный репозиторий)")
     ap.add_argument("--given-files", action="store_true", help="5.11, абляция, с --input-text: README.md и все файлы src/ целиком")
     ap.add_argument("--given-code", action="store_true", help="5.11, с --input-text: под текстом — код src/ вида по его ссылкам")
+    ap.add_argument("--ticket", help="6.11, с --auto-check --rerun: json тикета {change_expected, runs} — скрытое ожидание ревьювера")
     ap.add_argument("--resume", help="6.11: лог сессии писателя; история до --resume-turn, этот ход исполняется заново")
     ap.add_argument("--resume-turn", type=int)
     ap.add_argument("--resume-bash", type=int, default=15, help="сколько bash добавить с хода воскрешения")
@@ -187,6 +188,10 @@ def main():
     C.INTENT, C.INTENT_OPT, C.ASK_CHANGED = a.intent or a.intent_opt, a.intent_opt, a.ask_changed
     assert not (a.hide_tools or a.tools_dir != "tests") or not a.rerun_tool, "--tools-dir/--hide-tools без --rerun-tool"
     C.TOOLS_DIR, C.HIDE_TOOLS = a.tools_dir, a.hide_tools
+    if a.ticket:
+        assert a.auto_check and a.rerun, "--ticket needs --auto-check --rerun"
+        C.TICKET = json.load(open(a.ticket))
+        assert C.TICKET["change_expected"] in ("prompt", "control", "any") and C.TICKET["runs"]
     if a.hide_tools:
         C.HIDDEN = f"{os.path.abspath(a.home)}/work/.tools_{a.tag}"
     F.SCRATCH = a.scratch            # 4.11: механика scratch/ исследователя — и у писателя
@@ -208,7 +213,7 @@ def main():
     os.makedirs(f"{C.HERE}/out", exist_ok=True)
     summary = {"tag": a.tag, "bench": a.bench, "input": a.input, "arm": a.arm, "seed": a.seed,
                "view": C.VIEWS[a.bench], "predict": a.predict, "cite": a.cite, "import_src": a.import_src,
-               "checked": a.checked, "smoke_calls": a.smoke_calls, "rerun": a.rerun, "rerun_at": a.rerun_at, "finish_review": a.finish_review, "goal_k": a.goal_k, "stages": a.stages, "auto_check": a.auto_check, "rerun_tool": a.rerun_tool, "scratch": a.scratch, "tools_dir": a.tools_dir, "hide_tools": a.hide_tools, "given_code": a.given_code, "given_files": a.given_files, "navigator": a.navigator, "intent": a.intent or a.intent_opt, "intent_opt": a.intent_opt, "ask_changed": a.ask_changed, "plan_line": a.plan_line, "broad_example": a.broad_example, "nav_v": a.nav_v, "bash_limit": C.BASH_LIMIT, "goal_text": a.goal_text, "temp": F.TEMP, "input_text": a.input_text, "stand": F.STAND,
+               "checked": a.checked, "smoke_calls": a.smoke_calls, "rerun": a.rerun, "rerun_at": a.rerun_at, "finish_review": a.finish_review, "goal_k": a.goal_k, "stages": a.stages, "auto_check": a.auto_check, "rerun_tool": a.rerun_tool, "scratch": a.scratch, "tools_dir": a.tools_dir, "hide_tools": a.hide_tools, "given_code": a.given_code, "given_files": a.given_files, "navigator": a.navigator, "intent": a.intent or a.intent_opt, "intent_opt": a.intent_opt, "ask_changed": a.ask_changed, "plan_line": a.plan_line, "broad_example": a.broad_example, "nav_v": a.nav_v, "ticket": C.TICKET, "bash_limit": C.BASH_LIMIT, "goal_text": a.goal_text, "temp": F.TEMP, "input_text": a.input_text, "stand": F.STAND,
                "n_reports": len(reports), "view_src_hash": src_before}
     if a.arm == "fix":
         props = propose_step(a, reports, src_before, summary)
