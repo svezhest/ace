@@ -36,6 +36,7 @@ def parse_args():
                     "потом правки не применяются (включает --checked)")
     ap.add_argument("--auto-check", action="store_true", help="каждая применённая правка — pyflakes, smoke, rerun в ответе edit")
     ap.add_argument("--check-auto-only", action="store_true", help="6.11 CL, с --rerun --auto-check: строка проверки — только факт про авто-проверку; ручной rerun — для одного прогона в деталях")
+    ap.add_argument("--clean", action="store_true", help="6.11, с --rerun --auto-check: одна строка проверки (CL), конец bash — факт, повтор команды — обычный вывод, finish без повторов, число финальных ходов в промпте")
     ap.add_argument("--rerun-tool", action="store_true", help="с --rerun: rerun — инструмент rerun(change, run), ok/failed по ожиданию")
     ap.add_argument("--scratch", action="store_true", help="каталог scratch/ копии, куда можно писать")
     ap.add_argument("--tools-dir", default="tests", help="5.11: каталог rerun/smoke в копии (tests, tools, __tools)")
@@ -180,6 +181,12 @@ def editor_step(a, first, src_before, summary):
     if a.plan_line:
         assert "\n# How to work\n" in esys
         esys = esys.replace("\n# How to work\n", "\n# How to work\n" + P.PLAN_LINE + "\n")
+    if a.clean:   # 6.11: «a few turns» — число; «Call finish when you are done» — один раз, в описании finish
+        lim = P.fill(P.LIMIT_LINE)
+        assert lim in esys and esys.count("\n- Call finish when you are done.") == 1
+        esys = esys.replace(lim, P.fill(P.CLEAN_LIMIT_LINE)).replace("\n- Call finish when you are done.", "")
+        assert first.count(" Call finish when you are done.") == 1
+        first = first.replace(" Call finish when you are done.", "")
     esys = WK.tt(esys)        # 5.11 --tools-dir / --hide-tools
     if a.dry:
         print(esys, "\n-----\n", first)
@@ -220,6 +227,11 @@ def main():
         C.STEP_BUDGET = max(C.STEP_BUDGET, C.BASH_LIMIT + 35)
     assert not a.rerun_tool or (a.rerun and not a.rerun_at), "--rerun-tool needs --rerun, not with --rerun-at"
     C.AUTO_CHECK, C.RERUN_TOOL, C.SCRATCH = a.auto_check, a.rerun_tool, a.scratch
+    if a.clean:
+        assert a.rerun and a.auto_check and not (a.rerun_tool or a.checked or a.stages or a.finish_review or a.goal_k), \
+            "--clean: с --rerun --auto-check, без --rerun-tool/--checked/--stages/--finish-review/--goal-k"
+        a.check_auto_only = True
+    C.CLEAN = a.clean
     C.INTENT, C.INTENT_OPT, C.ASK_CHANGED = a.intent or a.intent_opt, a.intent_opt, a.ask_changed
     assert not (a.hide_tools or a.tools_dir != "tests") or not a.rerun_tool, "--tools-dir/--hide-tools без --rerun-tool"
     C.TOOLS_DIR, C.HIDE_TOOLS = a.tools_dir, a.hide_tools
@@ -264,7 +276,7 @@ def main():
     os.makedirs(f"{C.HERE}/out", exist_ok=True)
     summary = {"tag": a.tag, "bench": a.bench, "input": a.input, "arm": a.arm, "seed": a.seed,
                "view": C.VIEWS[a.bench], "predict": a.predict, "cite": a.cite, "import_src": a.import_src,
-               "checked": a.checked, "smoke_calls": a.smoke_calls, "rerun": a.rerun, "rerun_at": a.rerun_at, "finish_review": a.finish_review, "goal_k": a.goal_k, "stages": a.stages, "auto_check": a.auto_check, "check_auto_only": a.check_auto_only, "rerun_tool": a.rerun_tool, "scratch": a.scratch, "tools_dir": a.tools_dir, "hide_tools": a.hide_tools, "given_code": a.given_code, "given_files": a.given_files, "navigator": a.navigator, "intent": a.intent or a.intent_opt, "intent_opt": a.intent_opt, "ask_changed": a.ask_changed, "plan_line": a.plan_line, "broad_example": a.broad_example, "nav_v": a.nav_v, "ticket": C.TICKET, "bash_limit": C.BASH_LIMIT, "goal_text": a.goal_text, "temp": F.TEMP, "input_text": a.input_text, "stand": F.STAND,
+               "checked": a.checked, "smoke_calls": a.smoke_calls, "rerun": a.rerun, "rerun_at": a.rerun_at, "finish_review": a.finish_review, "goal_k": a.goal_k, "stages": a.stages, "auto_check": a.auto_check, "check_auto_only": a.check_auto_only, "clean": a.clean, "rerun_tool": a.rerun_tool, "scratch": a.scratch, "tools_dir": a.tools_dir, "hide_tools": a.hide_tools, "given_code": a.given_code, "given_files": a.given_files, "navigator": a.navigator, "intent": a.intent or a.intent_opt, "intent_opt": a.intent_opt, "ask_changed": a.ask_changed, "plan_line": a.plan_line, "broad_example": a.broad_example, "nav_v": a.nav_v, "ticket": C.TICKET, "bash_limit": C.BASH_LIMIT, "goal_text": a.goal_text, "temp": F.TEMP, "input_text": a.input_text, "stand": F.STAND,
                "n_reports": len(reports), "view_src_hash": src_before}
     if a.arm == "fix":
         props = propose_step(a, reports, src_before, summary)

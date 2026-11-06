@@ -31,6 +31,7 @@ TICKET_WHY = False     # --ticket-why (6.11): к факту — почему н�
 TICKET_PASSED = False  # --ticket-passed (6.11): к проверке — первый задетый удачный прогон: где расходится и какие изменённые условия в нём сработали
 TICKET_ANCHOR = False  # --ticket-anchor (6.11): к значениям — строка лога с ответом модели
 TICKET_VALUES = False  # --ticket-values (6.11): к факту в строке Failed — значения операндов условия на последнем выполнении
+CLEAN = False   # --clean (6.11): база без известных изъянов промпта и ответов (см. cli)
 TICKET = None       # --ticket (6.11): {change_expected: prompt|control|any, runs}; писатель не видит, проверка после правки
 INTENT = False       # --intent (5.11): edit(…, expect_runs, expect); после авто-проверки — сверка с тем, что изменилось
 AUTO_CHECK = False   # --auto-check: каждая применённая правка — pyflakes, smoke и rerun в ответе edit, без bash

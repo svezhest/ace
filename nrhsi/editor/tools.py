@@ -22,6 +22,8 @@ def bash_call(run, args, res):
     if run.final_left or st["bash_calls"] >= run.bash_limit:
         st["bad_call"] += 1
         res["format_fail"] = "bash_unavailable"
+        if C.CLEAN:
+            return "Error: bash is no longer available; this command was not run.", False
         return f"Error: bash is no longer available; this command was not run. Use {run.act}, then call finish.", False
     cmd = args.get("command")
     st["bash_calls"] += 1
@@ -42,7 +44,10 @@ def bash_call(run, args, res):
         run.seen[key] = (st["tool_calls"], out)
         res.update(ok=ok, full_chars=len(full), truncated=len(full) > len(out))
         return out, False
-    if key in run.seen:
+    if key in run.seen and C.CLEAN:   # 6.11: повтор — обычный вывод, как в shell; счёт повторов остаётся
+        st["repeats"] += 1
+        res["repeat"] = True
+    elif key in run.seen:
         st["repeats"] += 1
         res["repeat"] = True
         old = run.seen[key][1]

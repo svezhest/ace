@@ -77,7 +77,7 @@ def fill(t, arm=None):
         t = t.replace("ARM_CONTEXT", ctx).replace("ARM_GOAL", goal)
     t = t.replace("PYTHON_LINE", F.PYTHON_LINE)
     return (t.replace("PROGRAMS", ", ".join(sorted(F.ALLOWED))).replace("OUT_CHARS", str(F.OUT_CHARS))
-            .replace("BASH_LIMIT", str(C.BASH_LIMIT)))
+            .replace("BASH_LIMIT", str(C.BASH_LIMIT)).replace("FINAL_TURNS", str(C.FINAL_TURNS)))
 
 
 RERUN_REPO = ("the agent's runs and the benchmark are not here.", "the agent's recorded runs are in logs/; the benchmark is not here.")
@@ -96,6 +96,8 @@ FINISH_REVIEW_LINE = ("- finish(submit): hand in your changes and end the sessio
 CHECK_LINE = ("- Check each change: run python3 tests/smoke.py, and read the changed lines together with the code that "
               "calls or uses them.")
 LIMIT_LINE = "- bash can be called BASH_LIMIT times; after that only edit and finish remain, for a few turns, and the session ends."
+CLEAN_LIMIT_LINE = ("- bash can be called BASH_LIMIT times; after that FINAL_TURNS turns remain without bash: edits are still "
+                    "applied and checked after each one, and then the session ends.")
 CHECKED_LIMIT_LINE = ("- bash can be called BASH_LIMIT times; after that edits can no longer be checked and are not applied: "
                       "only finish remains, and the session ends.")
 PREDICT_LINE = ("- Check each change: before you run python3 tests/smoke.py, write down what you expect it to print "
