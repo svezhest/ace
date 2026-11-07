@@ -243,8 +243,9 @@ def gist(cmd):
     return ", ".join(progs) + (" on " + ", ".join(files[:4]) if files else "")
 
 
-def cut(msgs, p):
-    """Вырезать вызовы (ou, oj) и (turn, j) с их выводами; пустой ответ ассистента без вызовов — тоже; в конце заметка."""
+def cut(msgs, p, whole=False):
+    """Вырезать вызовы (ou, oj) и (turn, j) с их выводами; пустой ответ ассистента без вызовов — тоже (whole — и с
+    текстом); в конце заметка."""
     res = {m["tool_call_id"]: m["content"] for m in msgs if m["role"] == "tool"}
     drop = {c["id"] for m in msgs if m["role"] == "assistant" for c in m.get("tool_calls") or []   # тот же вывод
             if c["function"]["name"] == "bash" and cmd_of(c["function"]) == p["cmd"]
@@ -258,7 +259,7 @@ def cut(msgs, p):
             m["tool_calls"] = [c for c in m["tool_calls"] if c["id"] not in drop]
             if not m["tool_calls"]:
                 del m["tool_calls"]
-                if not (m.get("content") or "").strip():
+                if whole or not (m.get("content") or "").strip():
                     continue
         out.append(m)
     o = p["orig"].strip()
@@ -292,6 +293,15 @@ def cut_para(msgs, p, para):
     o = o if len(o) <= 400 else o[:400] + " …"
     out[-1] = {"role": "user", "content": f"{k} identical bash calls were taken out of this conversation. What they "
                                           f"tried: {para} Each printed:\n{o}"}
+    return out
+
+
+def cut_para2(msgs, p, para):
+    """para без двух изъянов (7.11): ответ ассистента, у которого не осталось вызовов, вырезан целиком; вывод не обрезан."""
+    out = cut(msgs, p, whole=True)
+    k = out[-1]["content"].split(" identical")[0]
+    out[-1] = {"role": "user", "content": f"{k} identical bash calls were taken out of this conversation. What they "
+                                          f"tried: {para} Each printed:\n{p['orig'].strip()}"}
     return out
 
 
@@ -357,7 +367,7 @@ def para_first(msgs, p, para):
     return out
 
 
-POS = {"para_res": para_res, "para_user": para_user, "para_first": para_first, "abs_now": abs_now}
+POS = {"para2": cut_para2, "para_res": para_res, "para_user": para_user, "para_first": para_first, "abs_now": abs_now}
 
 
 def judge(calls, cmd):
