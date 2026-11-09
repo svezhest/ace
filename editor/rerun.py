@@ -58,6 +58,12 @@ def val(x, depth=0):
     if isinstance(x, (str, int, float, bool, type(None))):
         r = repr(x)
         return r if len(r) <= 100 else r[:100] + "…"
+    if hasattr(x, "__dataclass_fields__") and not isinstance(x, type):
+        if depth > 2:
+            return f"{type(x).__name__}(...)"
+        return f"{type(x).__name__}(" + ", ".join(f"{k}={val(getattr(x, k), depth + 1)}" for k in x.__dataclass_fields__) + ")"
+    if isinstance(x, type) or callable(x):
+        return getattr(x, "__name__", f"<{type(x).__name__}>")
     return f"<{type(x).__name__}>"
 
 
@@ -222,6 +228,7 @@ def play(bench, src, log, at=None, cover=None, watch=None):
                     raise
                 finally:
                     trace["hooks"].append(rec)
+            wrapped.__name__ = name
             return wrapped
 
     real_hooks = harness.hooks
@@ -247,6 +254,7 @@ def play(bench, src, log, at=None, cover=None, watch=None):
                 if rec:
                     rec["ret"] = val(out)
                 return out
+            w.__name__ = name
             return w
         import types
         for mod in (harness, real_hooks):
@@ -382,7 +390,8 @@ def fmt_hook(h):
         return "not called"
     if h.get("raised"):
         return f"raised {h['raised']}"
-    return "None" if h.get("out") is None else json.dumps(h.get("out"), ensure_ascii=False)[:200]
+    out = h.get("out")
+    return "None" if out is None else (out if isinstance(out, str) else json.dumps(out, ensure_ascii=False))[:200]
 
 
 def prompt_diff(d, limit=12):

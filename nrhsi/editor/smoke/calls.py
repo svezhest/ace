@@ -19,6 +19,12 @@ def shape(x, depth=0):
     if isinstance(x, (list, tuple)):
         t = type(x).__name__
         return f"{t}[{len(x)}]" + (f" of {shape(x[0], depth + 1)}" if x and depth <= 1 else "")
+    if hasattr(x, "__dataclass_fields__") and not isinstance(x, type):
+        if depth > 1:
+            return f"{type(x).__name__}(...)"
+        return f"{type(x).__name__}(" + ", ".join(f"{k}={shape(getattr(x, k), depth + 1)}" for k in x.__dataclass_fields__) + ")"
+    if isinstance(x, type) or callable(x):
+        return getattr(x, "__name__", f"{type(x).__name__} object")
     if not isinstance(x, (str, int, float, bool, type(None), bytes)):
         return f"{type(x).__name__} object"
     r = repr(x)
