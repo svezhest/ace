@@ -1,6 +1,6 @@
 """Smoke test: runs src/harness.py and src/bridge.py with a stub task and a stub model (not the benchmark).
 
-    python3 tests/smoke.py
+    python3 tests/smoke.py [DIR]      (DIR: another copy of src/ to run instead, e.g. tests/orig_src)
 
 Two scenarios: the stub task does not end the episode, and it ends it at turn 4. The stub knows nothing of
 the real task: it answers every reply with a placeholder, as the bridge's contract allows. For each scenario
@@ -153,7 +153,8 @@ def report(msgs, marks, task):
 
 
 def main():
-    sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src"))
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    sys.path.insert(0, os.path.join(root, sys.argv[1] if len(sys.argv) > 1 else "src"))
     print("smoke: src/harness.py and src/bridge.py with a stub task and a stub model, not the benchmark. It shows what the "
           "harness adds to the conversation and when; model replies and environment results are left out.")
     try:

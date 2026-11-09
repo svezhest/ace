@@ -145,12 +145,46 @@ def ask_changed(run):
             "Is that what this edit is for?")
 
 
+def smoke_scenarios(full):
+    """Вывод smoke -> [(заголовок сценария, строка исхода, [что харнесс добавил в разговор])]."""
+    out = []
+    for block in full.split("\n== ")[1:]:
+        lines = block.splitlines()
+        out.append((lines[0], lines[1].strip() if len(lines) > 1 else "",
+                    [x.strip() for x in lines[2:] if x.startswith("  after ") and "nothing besides" not in x]))
+    return out
+
+
+def smoke_added(run, full):
+    """10.11: что харнесс добавляет в разговор на заглушке — фактом в ответе на правку, а не «runs without errors».
+    Сравнение с тем же smoke на src до правок (tests/orig_src); без копии — просто то, что добавлено сейчас."""
+    now = smoke_scenarios(full)
+    if not now:
+        return ""
+    if getattr(run, "smoke0", None) is None:
+        orig = f"{run.root}/{C.TOOLS_DIR}/orig_src"
+        run.smoke0 = (smoke_scenarios(WK.tool_run(run, "smoke", f" {C.TOOLS_DIR}/orig_src")[2])
+                      if not C.HIDE_TOOLS and os.path.isdir(orig) else [])
+    if now == run.smoke0:
+        return " With the stub task and model the harness says the same as before your edits."
+    t = " With the stub task and model, where no reply and no answer is ever repeated, the harness now says:"
+    for head, end, added in now:
+        t += f"\n  {head}: " + ("; ".join(added) if added else "nothing besides the environment results")
+        if run.smoke0 and end != dict((h, e) for h, e, _ in run.smoke0).get(head):
+            t += f" ({end})"
+    if run.smoke0:
+        t += "\n  before your edits:"
+        for head, end, added in run.smoke0:
+            t += f"\n  {head}: " + ("; ".join(added) if added else "nothing besides the environment results")
+    return t
+
+
 def edit_checks(run):
     """--auto-check (4.11): после применённой правки — новые предупреждения pyflakes, smoke, rerun; bash не тратится."""
     lint_ = LI.lint_changed(run.root)
     ok, out, full = WK.tool_run(run, "smoke")
     smoke = (WK.tt("python3 tests/smoke.py prints:\n") + out if not ok or "Traceback" in full else
-             WK.tt("python3 tests/smoke.py runs without errors."))
+             WK.tt("python3 tests/smoke.py runs without errors.") + smoke_added(run, full))
     t = "Checks run on src/ after this edit (they use no bash calls):\n"
     first = C.TICKET and getattr(C, "TICKET_FIRST", False)   # 6.11 --ticket-first: проверка по тикету — первой, до общего вывода
     if first:
