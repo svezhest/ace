@@ -408,7 +408,11 @@ def report(new, old, res, runs, detail):
     out = []
     for g in groups.values():
         calls = sorted(set(g["calls"]), key=lambda c: int(c or 0))
-        head = g["head"].replace("{calls}", calls[0] if len(calls) == 1 else "(" + ", ".join(calls) + ")")
+        if len(calls) == 1:
+            head = g["head"].replace("{calls}", calls[0])
+        else:   # 10.11: какой вызов у какого прогона, проваленные и удачные порознь
+            by = [", ".join(f"run {r} at {c}" for (r, ok), c in zip(g["tags"], g["calls"]) if ok == want) for want in (False, True)]
+            head = g["head"].replace("at model call {calls}", "at model call: " + "; ".join(f"{n} — {x}" for n, x in zip(("failed", "passed"), by) if x))
         ex = " (e.g. run " + g["tags"][0][0] + ")" if len(g["tags"]) > 1 and g["body"] and norm(g["body"]) != g["body"] else ""
         out.append(runs_label(g["tags"], len(runs)) + ": " + head + ex + g["body"])
     return "\n".join(out)
@@ -462,10 +466,10 @@ def main():
     ap.add_argument("--bench", choices=["alf", "app"], required=True)
     ap.add_argument("--src", required=True)
     ap.add_argument("--logs", required=True)
-    ap.add_argument("--old", help="src, на котором записаны логи: для сравнения ответов хуков")
-    ap.add_argument("--at", type=int, help="с одним прогоном N: вызовы функций src перед вызовом модели K, со значениями")
-    ap.add_argument("--json", action="store_true", help="6.11: для проверки по тикету — расхождение каждого прогона как json")
-    ap.add_argument("--cover", action="store_true", help="6.11: с --json — сколько раз выполнилась каждая строка src")
+    ap.add_argument("--old", help="the src the logs were recorded on, to compare what the hooks return")
+    ap.add_argument("--at", type=int, help="with one run N: the calls of the functions in src before model call K, with their values")
+    ap.add_argument("--json", action="store_true", help="where each run diverges, as json")
+    ap.add_argument("--cover", action="store_true", help="with --json: how many times each line of src ran")
     ap.add_argument("runs", nargs="*")
     a = ap.parse_args()
     if a.json:

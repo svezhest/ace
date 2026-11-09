@@ -86,8 +86,9 @@ def ticket_line(first, t):
     ks = t.get("keep") or []   # 6.11 TKK: вторая половина — что должно остаться
     if ks:
         kr = f"Run {ks[0]}" if len(ks) == 1 else "Runs " + ", ".join(map(str, ks[:-1])) + f" and {ks[-1]}"
-        line += (f" {kr} passed and should go as in the log: there the harness already does what it should. "
-                 "The check after each edit tells you whether each of the two holds.")
+        line += (f" {kr} passed without this change: the goal is that {'it' if len(ks) == 1 else 'they'} still "
+                 f"{'goes' if len(ks) == 1 else 'go'} exactly as in the log once the change is in. The check after each "
+                 "edit tells you whether each of the two holds.")
     assert first.count(TICKET_TASK) == 1, "task line not found"
     return first.replace(TICKET_TASK, "\n\n" + line + TICKET_TASK)
 
@@ -191,6 +192,9 @@ def editor_step(a, first, src_before, summary):
         esys = esys.replace(lim, P.fill(P.CLEAN_LIMIT_LINE)).replace("\n- Call finish when you are done.", "")
         assert first.count(" Call finish when you are done.") == 1
         first = first.replace(" Call finish when you are done.", "")
+        old = ": README.md and the comments at the top of the code describe how the parts fit together."
+        assert esys.count(old) == 1   # 10.11: в голых видах комментариев нет, README не описывает устройство
+        esys = esys.replace(old, ".")
     esys = WK.tt(esys)        # 5.11 --tools-dir / --hide-tools
     if a.dry:
         print(esys, "\n-----\n", first)

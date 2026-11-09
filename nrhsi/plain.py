@@ -70,7 +70,7 @@ def strip(src):
             if isinstance(d, ast.Expr) and isinstance(d.value, ast.Constant) and isinstance(d.value.value, str):
                 first = lines[d.lineno - 1]
                 assert d.col_offset == len(first) - len(first.lstrip()), d.lineno
-                assert d.end_col_offset == len(lines[d.end_lineno - 1].rstrip()), d.end_lineno
+                assert d.end_col_offset == len(lines[d.end_lineno - 1].rstrip().encode()), d.end_lineno   # смещения ast — в байтах
     new, lmap = [], {}
     for i, ln in enumerate(lines, 1):
         if i in drop:

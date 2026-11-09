@@ -435,7 +435,11 @@ def report(new, old, res, runs, detail):
     out = []
     for g in groups.values():
         calls = sorted(set(g["calls"]), key=lambda c: int(c or 0))
-        head = g["head"].replace("{calls}", calls[0] if len(calls) == 1 else "(" + ", ".join(calls) + ")")
+        if len(calls) == 1:
+            head = g["head"].replace("{calls}", calls[0])
+        else:   # 10.11: какой вызов у какого прогона, проваленные и удачные порознь
+            by = [", ".join(f"run {r} at {c}" for (r, ok), c in zip(g["tags"], g["calls"]) if ok == want) for want in (False, True)]
+            head = g["head"].replace("at model call {calls}", "at model call: " + "; ".join(f"{n} — {x}" for n, x in zip(("failed", "passed"), by) if x))
         ex = " (e.g. run " + g["tags"][0][0] + ")" if len(g["tags"]) > 1 and g["body"] and norm(g["body"]) != g["body"] else ""
         out.append(runs_label(g["tags"], len(runs)) + ": " + head + ex + g["body"])
     return "\n".join(out)

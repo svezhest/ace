@@ -643,10 +643,10 @@ def ticket_check(run):
                 lines.append(f"Failed: in run {r} the harness crashes" + (f" at model call {crash['call']}" if crash["call"] else "")
                              + f": {crash['text'].strip().splitlines()[0][:300] if crash['text'].strip() else 'no message'}")
             elif d is None:
-                lines.append(f"Ok: run {r}, which should go as in the log, goes as in the log"
+                lines.append(f"Ok: run {r}, which passed, still goes exactly as in the log"
                              + (" (with the old texts)" if texts else "") + ".")
             else:
-                lines.append(f"Failed: run {r} passed in the log and should go as in it; "
+                lines.append(f"Failed: this edit changes run {r}, which passed and should still go exactly as in the log; "
                              + ("with the old texts " if texts else "") + f"{_where(d)}.")
     if getattr(C, "TICKET_PASSED", False):   # 6.11: факт о первом задетом удачном прогоне
         if watch is None:

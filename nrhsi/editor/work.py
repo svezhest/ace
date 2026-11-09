@@ -18,7 +18,7 @@ RERUN_README = """- `tests/rerun.py` — replays the runs recorded in `logs/` on
 ```
 $ python3 tests/rerun.py
 runs 2, 5, 9 (1 failed, 2 passed): no changes (same as the log to the end)
-runs 1, 3, 4, 6, 7, 8 (4 failed, 2 passed): diverges at model call (12, 17, 30): what the model sees differs from the log (e.g. run 1)
+runs 1, 3, 4, 6, 7, 8 (4 failed, 2 passed): diverges at model call: failed — run 1 at 12, run 3 at 17, run 4 at 17, run 7 at 30; passed — run 6 at 12, run 8 at 30: what the model sees differs from the log (e.g. run 1)
   + user: foobar
   hook on_observation: {"message": "foobar"} (was None)
 $ python3 tests/rerun.py 3
@@ -169,7 +169,7 @@ def build_work(bench, tag, smoke=True):
             readme = readme.replace(READ_FAILED, "")
         readme = readme.rstrip("\n") + "\n"
     if smoke and C.RERUN:
-        readme += (rerun_tool_readme() if C.RERUN_TOOL else RERUN_README) + (RERUN_AT_README if C.RERUN_AT else "")
+        readme += (rerun_tool_readme() if C.RERUN_TOOL else RERUN_README) + ("" if C.RERUN_TOOL else RERUN_AT_README)
     if smoke:
         readme += SMOKE_README if not C.SMOKE_CALLS else SMOKE_README.replace(
             "or the error. ", "or the error." + SMOKE_CALLS_README + " ")
@@ -199,7 +199,10 @@ def build_work(bench, tag, smoke=True):
         shutil.copytree(f"{C.VIEWS[bench]}/src", f"{td}/orig_src", ignore=shutil.ignore_patterns("__pycache__"))
         # 6.11: копия писателя заморожена (editor/rerun_writer.py = editor/rerun.py на 19bd077), чтобы правки механики
         # проверки (rerun.py вызывает gate) не меняли то, что писатель читает в tests/rerun_core.py
-        shutil.copy(os.path.join(os.path.dirname(C.SMOKE), "..", "..", "editor", "rerun_writer.py"), f"{td}/rerun_core.py")
+        from .. import plain   # 10.11: копия писателя — без комментариев и докстрингов, как src/ вида
+        core = open(os.path.join(os.path.dirname(C.SMOKE), "..", "..", "editor", "rerun_writer.py")).read()
+        with open(f"{td}/rerun_core.py", "w") as f:
+            f.write(plain.strip(core)[0])
         py = tt(RERUN_PY.replace("BENCH", repr(bench)))
         if C.HIDE_TOOLS:
             assert py.count("ROOT = os.path.dirname(HERE)") == 1
