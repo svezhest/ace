@@ -2,13 +2,15 @@
 
 История сессии до хода T берётся из её лога, в промпт вносится правка-гипотеза (--sub), и N независимых
 продолжений идут настоящими ходами редактора (bash исполняется в свежей копии вида) до первого ответа с edit
-или finish. Сама правка не применяется: копия одна на все продолжения, а мерка — что модель решила написать.
+или finish (--stop edit, правка не применяется), до ответа проверки на первую правку (--stop checked) или до конца
+сессии (--stop end). У каждого продолжения своя копия вида и свой лог `<home>/logs/<tag>_rK.jsonl` — полный лог сессии.
 
   python3 editor/roll.py LOG --turn 5 --n 10 --out OUT.jsonl [--sub OLD NEW]... [--max-turns 12] -- АРГУМЕНТЫ РЕДАКТОРА
 
 АРГУМЕНТЫ РЕДАКТОРА — те же, с какими шла сессия LOG (--home и --tag — новые): из них собираются промпт, копия
 вида и песочница. Без --sub системный промпт и первое сообщение обязаны совпасть с логом.
-OUT.jsonl: по строке на продолжение — {k, turns: [{content, calls, results}], edit: аргументы первой правки | None}.
+OUT.jsonl: по строке на продолжение — {k, log, turns: [{content, calls, results}], edit: аргументы первой правки | None,
+checked: ответ проверки на неё}.
 """
 import argparse
 import json
@@ -32,6 +34,9 @@ def main():
     ap.add_argument("--max-turns", type=int, default=12)
     ap.add_argument("--sub", nargs=2, action="append", default=[], metavar=("OLD", "NEW"))
     ap.add_argument("--out", required=True)
+    ap.add_argument("--stop", choices=["edit", "checked", "end"], default="edit",
+                    help="edit: на первом ответе с edit, правка не применяется; checked: правка применена и проверена; "
+                         "end: до конца сессии (не дольше --max-turns)")
     cut = sys.argv.index("--")
     a, rest = ap.parse_args(sys.argv[1:cut]), sys.argv[cut + 1:]
     recs = RS.load(a.log)
@@ -43,18 +48,32 @@ def main():
             assert sum((m.get("content") or "").count(old) for m in ms0[:2]) == 1, f"--sub: {old!r}"
             for m in ms0[:2]:
                 m["content"] = m["content"].replace(old, new)
-        RS.apply_edits(recs, a.turn, root)
         prev = [r for r in recs if r.get("type") == "turn" and r["i"] < a.turn]
         bash = sum(c["name"] == "bash" and "no longer available" not in str(res.get("shown"))
                    for r in prev for c, res in zip(r["tool_calls"], r["results"]))
 
+        from nrhsi.editor import work as WK
+        tag = os.path.basename(log_path)[:-len(".jsonl")]
+        roots = []
+        for k in range(a.n):          # своя копия вида на продолжение: правку можно применить и проверить
+            rk = WK.build_work(C.BENCH, f"{tag}_r{k}")
+            RS.apply_edits(recs, a.turn, rk)
+            roots.append((rk, WK.make_profile(rk, f"{tag}_r{k}")))
+
         def one(k):
-            run = R.Run(role, ms0[0]["content"], ms0[1]["content"], root, prof, seed + 7919 * (k + 1),
-                        f"{log_path}.roll{k}", n_obs)
+            rk, pk = roots[k]
+            run = R.Run(role, ms0[0]["content"], ms0[1]["content"], rk, pk, seed + 7919 * (k + 1),
+                        f"{log_path[:-len('.jsonl')]}_r{k}.jsonl", n_obs)
+            run.w(SE.meta(run, ms0[0]["content"], ms0[1]["content"]))
+            for r in recs[1:]:        # лог продолжения — полный лог сессии: годится для fork.py, roll.py и --resume
+                if r.get("type") == "turn" and r["i"] >= a.turn:
+                    break
+                if r.get("type") in ("turn", "note"):
+                    run.w(r)
             run.messages = json.loads(json.dumps(ms0))
             run.st["turns"], run.st["bash_calls"] = a.turn - 1, bash
             run.st["tool_calls"] = sum(len(r["tool_calls"]) for r in prev)
-            out = {"k": k, "turns": [], "edit": None, "end": None}
+            out = {"k": k, "log": run.log.name, "turns": [], "edit": None, "checked": None, "end": None}
             for _ in range(a.max_turns):
                 r, dt, end = TU.ask(run)
                 if end:
@@ -65,15 +84,22 @@ def main():
                 names = [c["function"]["name"] for c in r["calls"]]
                 t = {"content": r["content"], "calls": [c["function"] for c in r["calls"]], "results": []}
                 out["turns"].append(t)
-                if "edit" in names or "finish" in names:
-                    c = next(c for c in r["calls"] if c["function"]["name"] in ("edit", "finish"))
-                    out["end"] = c["function"]["name"]
-                    out["edit"] = c["function"]["arguments"] if out["end"] == "edit" else None
+                hit = "edit" in names or "finish" in names
+                if hit and out["edit"] is None and "edit" in names:
+                    out["edit"] = next(c for c in r["calls"] if c["function"]["name"] == "edit")["function"]["arguments"]
+                if hit and a.stop == "edit":
+                    out["end"] = "edit" if "edit" in names else "finish"
                     break
                 end = None if r["calls"] else TU.no_call(run, r, rec)
-                TU.run_calls(run, amsg, rec)
+                finished = TU.run_calls(run, amsg, rec)
+                if r["calls"]:
+                    run.w(rec)
                 t["results"] = [x["shown"] for x in rec["results"]]
-                if end or PH.after_turn(run, False):
+                if hit and a.stop == "checked":
+                    out["end"] = "checked"
+                    out["checked"] = t["results"][names.index("edit")] if "edit" in names else None
+                    break
+                if end or PH.after_turn(run, finished):
                     out["end"] = "session end"
                     break
             run.log.close()

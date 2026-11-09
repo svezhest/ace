@@ -596,7 +596,7 @@ def ticket_check(run):
                 lines.append(f"Failed: in run {r} only the texts the model reads have changed; with the old texts run {r} "
                              "goes exactly as in the log, to the end: the harness code does nothing different in it.")
             else:
-                lines.append(f"Failed: run {r} goes exactly as in the log, to the end: this edit changes nothing in it.")
+                lines.append(f"Failed: this edit has no effect in run {r}, the run the observation is about.")
         elif exp == "prompt":
             if prompt_eff:
                 lines.append(f"Ok: in run {r} the texts the model reads have changed: {_where(a)}.")
@@ -604,15 +604,15 @@ def ticket_check(run):
                 lines.append(f"Failed: in run {r} the texts the model reads are as before; only the harness code acts "
                              f"differently: {_where(b)}.")
             else:
-                lines.append(f"Failed: run {r} goes exactly as in the log, to the end: this edit changes nothing in it.")
+                lines.append(f"Failed: this edit has no effect in run {r}, the run the observation is about.")
         else:
             if prompt_eff or code_eff:
                 lines.append(f"Ok: run {r} changes: {_where(a or b)}.")
             else:
-                lines.append(f"Failed: run {r} goes exactly as in the log, to the end: this edit changes nothing in it.")
+                lines.append(f"Failed: this edit has no effect in run {r}, the run the observation is about.")
     if tline and changed:   # самый важный факт покрытия — в саму строку Failed «как в логе»
         for i, r in enumerate(runs):
-            if lines[i].startswith(f"Failed: run {r} goes exactly as in the log"):
+            if lines[i].startswith(f"Failed: this edit has no effect in run {r}"):
                 c = cov.get(str(r)) or {}
             elif why and lines[i].startswith(f"Failed: in run {r} only the texts the model reads have changed"):
                 c = cov_code.get(str(r)) or {}   # код без новых текстов идёт как в логе — факт о нём
