@@ -111,7 +111,7 @@ r = r.replace('''        for m in episode.send(reply):''', '''        status = _
 r = r.replace('messages.append(user(prompt("no_tool_call.md" if not reply.get("tool_calls") else "invalid_tool_call.md")))',
               'messages.append(user(prompt("invalid_tool_call.md")))')
 assert r.count("on_step_countdown") == 1 and r.count("repeated_empty") == 1 and r.count("stalled(steps)") == 1
-hk = alf_hooks.replace('''def on_before_action''', '''def on_step_countdown(now: BeforeModelCall, memory: dict) -> Hint | None:
+hk = alf_hooks.replace('''def on_before_action''', '''def on_step_countdown(now: BeforeModelCall, memory: dict) -> Optional[Hint]:
     if now.turns_left <= 5:
         return Hint(f"You have {now.turns_left} step(s) left. Act quickly and finish the task now.")
     return None
@@ -205,22 +205,22 @@ def app_r(name):
     assert "on_completed" in r and "all_python_blocks(content)" in r
     return h + r
 
-types_r = app_types
+types_r = app_types.replace("from dataclasses import dataclass\n", "from dataclasses import dataclass\nfrom typing import Optional\n")
 for cls in ("AfterStep",):
     a = types_r.index(f"class {cls}:")
     b = types_r.index("\n\n\n", a)
-    types_r = types_r[:b] + "\n    benchmark_end: dict | None" + types_r[b:]
+    types_r = types_r[:b] + "\n    benchmark_end: Optional[dict]" + types_r[b:]
 hooks_r1 = app_hooks + '''
 
-def on_completed(now: AfterStep, memory: dict) -> Hint | None:
+def on_completed(now: AfterStep, memory: dict) -> Optional[Hint]:
     return None
 '''
 view("app_r1", "app", app_r("app_r1"), hooks_r1, types_r)
-types_r4 = types_r.replace("    code: str\n    output: str", "    code: str | None\n    output: str | None")
+types_r4 = types_r.replace("    code: str\n    output: str", "    code: Optional[str]\n    output: Optional[str]")
 assert types_r4 != types_r
 hooks_r4 = app_hooks + '''
 
-def on_completed(now: AfterStep, memory: dict) -> Hint | None:
+def on_completed(now: AfterStep, memory: dict) -> Optional[Hint]:
     verdict = now.benchmark_end or {}
     reason = verdict.get("reason") if isinstance(verdict, dict) else str(verdict)
     message = f"The task was marked {reason}."
