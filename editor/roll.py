@@ -34,6 +34,7 @@ def main():
     ap.add_argument("--max-turns", type=int, default=12)
     ap.add_argument("--sub", nargs=2, action="append", default=[], metavar=("OLD", "NEW"))
     ap.add_argument("--out", required=True)
+    ap.add_argument("--final-turns", type=int, help="ходов без bash после конца бюджета вместо cfg.FINAL_TURNS (с --turn 1)")
     ap.add_argument("--stop", choices=["edit", "checked", "end"], default="edit",
                     help="edit: на первом ответе с edit, правка не применяется; checked: правка применена и проверена; "
                          "end: до конца сессии (не дольше --max-turns)")
@@ -43,6 +44,8 @@ def main():
 
     def session(role, system, first_user, root, prof, seed, log_path, n_obs=0, resume=None):
         ms0 = FK.history(recs, a.turn)
+        if a.turn == 1:               # истории нет: промпт — нынешний (его могли поменять коммиты и --final-turns)
+            ms0 = [{"role": "system", "content": system}, {"role": "user", "content": first_user}]
         assert ms0[0]["content"] == system and ms0[1]["content"] == first_user, "prompt differs from the log"
         for old, new in a.sub:
             assert sum((m.get("content") or "").count(old) for m in ms0[:2]) == 1, f"--sub: {old!r}"
@@ -115,6 +118,9 @@ def main():
         return "roll", {"model_sec": 0.0, "edits_applied": 0, "edits_attempted": 0, "edit_fail": {}, "max_prompt": 0}, []
 
     SE.run_session = session
+    if a.final_turns:
+        assert a.turn == 1
+        C.FINAL_TURNS = a.final_turns
     sys.argv = ["editor"] + rest
     cli.main()
 
