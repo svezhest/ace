@@ -3,6 +3,7 @@
 - `src/` — source code of the agent harness. This is what you edit.
   - `harness.py` — the agent loop: builds the conversation from the prompts in `src/` and the task's messages; hands each model reply to the task; calls the hooks.
   - `hooks.py` — hooks called by `harness.py`; at start each one returns None (changes nothing).
+  - `hook_types.py` — what each hook is given and what it may return.
   - `*.md` — prompts used by `harness.py`; `starting_prompt.md` is the system prompt.
   - `bridge.py` — connection to the benchmark (the AgentBench ALFWorld task, a black box): gives the task's messages, hands it the model's replies, says when and how it ended the episode. Do not edit.
 - `logs/` — runs of this harness.

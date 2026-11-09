@@ -3,7 +3,7 @@
 Builds the conversation from the prompt in src/ (its {{ ... }} slots filled by the benchmark, see
 bridge.py), asks the model for the next step, runs the first ```python block of the reply in the
 task's REPL and shows the output, until the benchmark ends the episode. Runs the hooks from hooks.py;
-code that a hook sends back is not run.
+code that a hook blocks is not run.
 """
 import copy
 import re
@@ -11,6 +11,7 @@ from pathlib import Path
 
 import bridge
 import hooks
+from hook_types import AfterStep, BeforeAction, BeforeModelCall, Block, EpisodeStart, Hint, Step, Tips
 
 SRC = Path(__file__).parent
 FULL_CODE = r"```python\n(.*?)```"
@@ -25,15 +26,11 @@ def user(text):
     return {"role": "user", "content": text}
 
 
-def call_hook(name, ctx, nb):
-    fn = getattr(hooks, name, None)
-    if fn is None:
-        return None
-    try:
-        out = fn(copy.deepcopy(ctx), nb)
-    except Exception:
-        return None
-    return out if isinstance(out, dict) else None
+def call_hook(hook, moment, memory, may_return):
+    out = hook(moment, memory)
+    if out is not None and not isinstance(out, may_return):
+        raise TypeError(f"hooks.{hook.__name__} returned {type(out).__name__}, expected {may_return.__name__} or None")
+    return out
 
 
 def text_to_messages(text):
@@ -66,53 +63,45 @@ def output_message(output):
     return user("Output:\n```\n" + output + ("" if output.endswith("\n") else "\n") + "```\n\n")
 
 
-def make_ctx(messages, episode, history, output="", code=""):
-    return {
-        "messages": copy.deepcopy(messages),
-        "observation": history["last_observations"][-1] if history["last_observations"] else "",
-        "output": output,
-        "code": code,
-        "step": episode.steps,
-        "max_step": bridge.STEP_LIMIT,
-        "remaining_steps": bridge.STEP_LIMIT - episode.steps,
-        "history": copy.deepcopy(history),
-    }
-
-
 def run(episode, llm):
     """Play one episode. `llm(messages)` returns the assistant message. Returns the conversation."""
-    nb = {}
-    history = {"last_actions": [], "last_observations": []}
+    memory = {}
+    steps = []
     messages = text_to_messages(episode.fill(prompt("starting_prompt.md").lstrip()) + "\n\n")
-    out = call_hook("on_init", make_ctx(messages, episode, history), nb) or {}
-    skills = [s["text"] for s in out.get("skills") or [] if isinstance(s, dict) and s.get("text")]
-    if skills:
+    start = call_hook(hooks.on_init, EpisodeStart(
+        messages=copy.deepcopy(messages), step_limit=bridge.STEP_LIMIT), memory, Tips)
+    if start and start.tips:
         messages[-1]["content"] += ("Some tips that may help for this task:\n"
-                                    + "\n".join(f"- {s}" for s in skills) + "\n\n")
+                                    + "\n".join(f"- {t}" for t in start.tips) + "\n\n")
 
     while not episode.finished:
-        out = call_hook("make_pre_hint", make_ctx(messages, episode, history), nb)
-        if out and out.get("message"):
-            messages.append(user(out["message"]))
+        steps_left = bridge.STEP_LIMIT - episode.steps
+        hint = call_hook(hooks.make_pre_hint, BeforeModelCall(
+            messages=copy.deepcopy(messages), earlier_steps=tuple(steps), steps_left=steps_left), memory, Hint)
+        if hint:
+            messages.append(user(hint.message))
 
         reply = llm(messages)
-        action, text = extract_code(reply.get("content") or "")
+        code, text = extract_code(reply.get("content") or "")
         reply["content"] = text + "\n\n"
         messages.append(reply)
 
-        out = call_hook("on_before_action", make_ctx(messages, episode, history, text, action), nb)
-        if out and out.get("kind") == "block_and_prompt":
-            messages.append(user(out.get("message") or "Harness blocked this code. Write another step."))
+        block = call_hook(hooks.on_before_action, BeforeAction(
+            reply_text=text, proposed_code=code, messages=copy.deepcopy(messages), earlier_steps=tuple(steps),
+            steps_left=steps_left), memory, Block)
+        if block:
+            messages.append(user(block.message))
             continue
 
-        obs = episode.execute(action)
-        if obs is None:
+        output = episode.execute(code)
+        if output is None:
             break
-        messages.append(output_message(obs))
-        history["last_actions"].append(action)
-        history["last_observations"].append(obs)
+        messages.append(output_message(output))
+        steps.append(Step(code, output))
 
-        out = call_hook("on_post_step", make_ctx(messages, episode, history, text, action), nb)
-        if out and out.get("kind") == "inject_hint" and out.get("message"):
-            messages.append(user(out["message"]))
+        hint = call_hook(hooks.on_post_step, AfterStep(
+            step=steps[-1], reply_text=text, messages=copy.deepcopy(messages), earlier_steps=tuple(steps[:-1]),
+            steps_left=bridge.STEP_LIMIT - episode.steps), memory, Hint)
+        if hint:
+            messages.append(user(hint.message))
     return messages

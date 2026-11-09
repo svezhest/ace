@@ -20,6 +20,7 @@ os.environ.setdefault("ALFWORLD_DATA", str(ROOT / "data" / "alfworld"))
 import bridge  # noqa: E402
 import fixture  # noqa: E402
 import harness  # noqa: E402
+from hook_types import Block, Hint, Tips  # noqa: E402
 from events import Recorder, events, honest  # noqa: E402
 from fake import Fake  # noqa: E402
 from run import expert_hint  # noqa: E402
@@ -38,7 +39,7 @@ def play(script, hooks=None, game=GAME, guard=False):
     ep = bridge.Episode(rec)
     llm = Fake(script)
     old = harness.hooks
-    harness.hooks = hooks if hooks is not None else types.SimpleNamespace()
+    harness.hooks = hooks if hooks is not None else hooks_with()
     try:
         try:
             msgs = harness.run(ep, bridge.guard(ep, llm) if guard else llm)
@@ -50,12 +51,18 @@ def play(script, hooks=None, game=GAME, guard=False):
     return ep, rec, llm, msgs
 
 
+def hooks_with(**own):
+    """All four hooks; those not given change nothing."""
+    names = ("on_init", "make_pre_hint", "on_before_action", "on_post_step")
+    return types.SimpleNamespace(**{n: own.get(n, lambda moment, memory: None) for n in names})
+
+
 def test_hooks_file_is_empty():
     ns = {}
     exec((SRC / "hooks.py").read_text(), ns)
-    names = sorted(k for k, v in ns.items() if callable(v))
+    names = sorted(k for k, v in ns.items() if isinstance(v, types.FunctionType))
     assert names == ["make_pre_hint", "on_before_action", "on_init", "on_post_step"]
-    assert all(ns[n]({}, {}) is None for n in names)
+    assert all(ns[n](None, {}) is None for n in names)
 
 
 def test_start_is_template_plus_patch(tmp_path):
@@ -108,10 +115,10 @@ def test_repeated_action_ends_episode():
 
 
 def test_guard_ends_a_loop_without_turns():
-    def block(ctx, nb):
-        return {"kind": "block_and_prompt", "message": "blocked"}
+    def block(now, memory):
+        return Block("blocked")
 
-    ep, rec, llm, msgs = play(["look"], hooks=types.SimpleNamespace(on_before_action=block), guard=True)
+    ep, rec, llm, msgs = play(["look"], hooks=hooks_with(on_before_action=block), guard=True)
     assert ep.end == {"reason": "error", "detail": "repeated reply"} and ep.finished
     assert ep.turns == 0 and len(llm.calls) == 3  # three same replies, none handed to the task
 
@@ -138,9 +145,8 @@ def test_game_step_limit():
 def test_noop_hooks_do_not_change_conversation():
     script = [{"text": "x"}] + expert_plan()[:3] + ["look", "inventory"]
 
-    def none(ctx, nb):
-        nb["seen"] = nb.get("seen", 0) + 1
-        ctx["observation"] = "mutated"  # ctx is a copy
+    def none(moment, memory):
+        memory["seen"] = memory.get("seen", 0) + 1
         return None
 
     noop = types.SimpleNamespace(on_init=none, make_pre_hint=none, on_before_action=none, on_post_step=none)
@@ -150,31 +156,59 @@ def test_noop_hooks_do_not_change_conversation():
 
 
 def test_hook_effects_reach_conversation():
-    seen = {}
+    seen = {"before": [], "after": []}
 
-    def on_init(ctx, nb):
-        seen["init_obs"] = ctx["observation"]
-        return {"skills": [{"text": "tip one"}], "tool_hint": "Use exact names."}
+    def on_init(start, memory):
+        seen["start"] = start
+        return Tips(["tip one"], action_tool_note="Use exact names.")
 
-    def make_pre_hint(ctx, nb):
-        return {"message": "pre hint"} if ctx["step"] == 0 and not nb.get("hinted") and not nb.update(hinted=1) else None
-
-    def on_before_action(ctx, nb):
-        if ctx["output"] == "inventory":
-            return {"kind": "block_and_prompt", "message": "blocked"}
+    def make_pre_hint(now, memory):
+        if not now.earlier_steps and not memory.get("hinted"):
+            memory["hinted"] = True
+            return Hint("pre hint")
         return None
 
-    def broken(ctx, nb):
-        raise RuntimeError("bad hook")
+    def on_before_action(now, memory):
+        seen["before"].append(now)
+        return Block("blocked") if now.proposed_action == "inventory" else None
 
-    hooks = types.SimpleNamespace(on_init=on_init, make_pre_hint=make_pre_hint,
-                                  on_before_action=on_before_action, on_post_step=broken)
+    def on_post_step(now, memory):
+        seen["after"].append(now)
+        return Hint("post hint") if len(now.earlier_steps) == 1 else None
+
+    hooks = hooks_with(on_init=on_init, make_pre_hint=make_pre_hint, on_before_action=on_before_action,
+                       on_post_step=on_post_step)
     ep, rec, llm, msgs = play(["inventory", "look", "look", "look"], hooks=hooks)
     assert msgs[0]["content"].endswith("\n\nSome tips that may help for this task:\n- tip one")
     assert msgs[2] == {"role": "user", "content": "pre hint"}
     assert msgs[4] == {"role": "user", "content": "blocked"}
-    assert "Your task is to" in seen["init_obs"]
+    assert "Your task is to" in seen["start"].task and seen["start"].turn_limit == bridge.STEP_LIMIT
+    assert seen["start"].valid_actions and "look" in seen["start"].valid_actions
     assert ep.turns == len(llm.calls) - 1  # the blocked reply was not handed to the task
+    # the step just taken is `step`, exactly as sent and answered; it is not among earlier_steps
+    first, second = seen["after"][0], seen["after"][1]
+    assert first.step.action == "look" and first.earlier_steps == ()
+    assert second.earlier_steps == (first.step,) and second.step.action == "look"
+    assert first.step.observation == next(m for m in msgs if m["role"] == "tool")["content"].partition(harness.ACTIONS)[0]
+    assert seen["before"][2].earlier_steps == (first.step,) and seen["before"][2].current_observation == first.step.observation
+    assert first.turns_left == bridge.STEP_LIMIT - 1 and seen["before"][1].turns_left == bridge.STEP_LIMIT
+    i = msgs.index({"role": "user", "content": "post hint"})
+    assert msgs[i - 1]["role"] == "tool" and sum(m["role"] == "tool" for m in msgs[:i]) == 2
+
+
+def test_hook_errors_are_not_hidden():
+    def broken(now, memory):
+        raise RuntimeError("bad hook")
+
+    def old_style(now, memory):
+        return {"kind": "inject_hint", "message": "x"}
+
+    with pytest.raises(RuntimeError, match="bad hook"):
+        play(["look"], hooks=hooks_with(on_post_step=broken))
+    with pytest.raises(TypeError, match="returned dict, expected Hint or None"):
+        play(["look"], hooks=hooks_with(on_post_step=old_style))
+    with pytest.raises(TypeError, match="returned Hint, expected Block or None"):
+        play(["look"], hooks=hooks_with(on_before_action=lambda now, memory: Hint("x")))
 
 
 def test_honest_check():

@@ -3,6 +3,7 @@
 - `src/` — source code of the agent harness. This is what you edit.
   - `harness.py` — the agent loop: builds the conversation from the prompt in `src/`, hands the code from the model's replies to the benchmark and shows the output; calls the hooks.
   - `hooks.py` — hooks called by `harness.py`; at start each one returns None (changes nothing).
+  - `hook_types.py` — what each hook is given and what it may return.
   - `starting_prompt.md` — the prompt used by `harness.py`. `{{ ... }}` in it are slots that the benchmark fills with the task's values (list in `bridge.py`); the slot names are fixed.
   - `bridge.py` — connection to the benchmark (AppWorld's own agent loop, a black box): fills the slots, has code run in the task's environment, says when and how the loop ended the episode. Do not edit.
 - `logs/` — runs of this harness.

@@ -14,7 +14,7 @@ README = {
 "app": """# AppWorld agent harness
 
 - `src/` — the harness of the agent: the prompt and the code that run it on a task. This is what you edit.
-  - `harness.py` — the agent loop; `hooks.py` — functions that `harness.py` calls.
+  - `harness.py` — the agent loop; `hooks.py` — functions that `harness.py` calls; `hook_types.py` — what each of them is given and may return.
   - `starting_prompt.md` — the prompt. `{{ ... }}` in it are slots that the benchmark fills with the task's values; the slot names are fixed.
   - `bridge.py` — connection to the benchmark. Not part of the harness: do not edit.
 - `logs/` — runs of the harness in `src/` as it was at the start.
@@ -25,7 +25,7 @@ README = {
 "alf": """# ALFWorld agent harness
 
 - `src/` — the harness of the agent: the prompts and the code that run it on a task. This is what you edit.
-  - `harness.py` — the agent loop; `hooks.py` — functions that `harness.py` calls.
+  - `harness.py` — the agent loop; `hooks.py` — functions that `harness.py` calls; `hook_types.py` — what each of them is given and may return.
   - `*.md` — prompts; `starting_prompt.md` is the system prompt.
   - `bridge.py` — connection to the benchmark. Not part of the harness: do not edit.
 - `logs/` — runs of the harness in `src/` as it was at the start.

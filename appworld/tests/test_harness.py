@@ -21,6 +21,7 @@ sys.path[:0] = [str(SRC), str(ROOT / "runner")]
 
 import bridge  # noqa: E402
 import harness  # noqa: E402
+from hook_types import Block, Hint, Tips  # noqa: E402
 import llm as llm_mod  # noqa: E402
 from events import Recorder, events, honest  # noqa: E402
 from fake import Fake  # noqa: E402
@@ -38,7 +39,7 @@ COMPLETE = "Done.\n\n```python\napis.supervisor.complete_task()\n```"
 def play(script, task=TASK, hooks=None, tmp=None, full=False, guard=False):
     """-> (messages, llm, completed, evaluation) [+ (episode, recorder) if full]."""
     old = harness.hooks
-    harness.hooks = hooks if hooks is not None else types.SimpleNamespace()
+    harness.hooks = hooks if hooks is not None else hooks_with()
     root = Path(tmp)
     (root / "data").symlink_to(APPWORLD / "data")
     bench = Benchmark(task, "test", root, root / "env.log")
@@ -66,12 +67,18 @@ def tmp(tmp_path):
     return tmp_path
 
 
+def hooks_with(**own):
+    """All four hooks; those not given change nothing."""
+    names = ("on_init", "make_pre_hint", "on_before_action", "on_post_step")
+    return types.SimpleNamespace(**{n: own.get(n, lambda moment, memory: None) for n in names})
+
+
 def test_start_state():
     ns = {}
     exec((SRC / "hooks.py").read_text(), ns)
-    names = sorted(k for k, v in ns.items() if callable(v))
+    names = sorted(k for k, v in ns.items() if isinstance(v, types.FunctionType))
     assert names == ["make_pre_hint", "on_before_action", "on_init", "on_post_step"]
-    assert all(ns[n]({}, {}) is None for n in names)
+    assert all(ns[n](None, {}) is None for n in names)
     assert (SRC / "starting_prompt.md").read_bytes() == UPSTREAM_PROMPT.read_bytes()
 
 
@@ -137,12 +144,12 @@ def test_step_limit(tmp):
 
 
 def test_noop_hooks_do_not_change_conversation(tmp_path):
-    def none(ctx, nb):
-        nb["seen"] = nb.get("seen", 0) + 1
-        ctx["messages"].clear()  # ctx is a copy
+    def none(moment, memory):
+        memory["seen"] = memory.get("seen", 0) + 1
+        moment.messages.clear()  # a copy of the conversation
         return None
 
-    noop = types.SimpleNamespace(on_init=none, make_pre_hint=none, on_before_action=none, on_post_step=none)
+    noop = hooks_with(on_init=none, make_pre_hint=none, on_before_action=none, on_post_step=none)
     (tmp_path / "a").mkdir(), (tmp_path / "b").mkdir()
     a = play([PRINT_SET, COMPLETE], tmp=tmp_path / "a")[0]
     b = play([PRINT_SET, COMPLETE], hooks=noop, tmp=tmp_path / "b")[0]
@@ -150,28 +157,28 @@ def test_noop_hooks_do_not_change_conversation(tmp_path):
 
 
 def test_hook_effects_reach_conversation(tmp):
-    seen = {}
+    seen = {"after": []}
 
-    def on_init(ctx, nb):
-        seen["task_msg"] = ctx["messages"][-1]["content"]
-        return {"skills": [{"text": "tip one"}]}
+    def on_init(start, memory):
+        seen["task_msg"] = start.messages[-1]["content"]
+        return Tips(["tip one"])
 
-    def make_pre_hint(ctx, nb):
-        if ctx["step"] == 0 and not nb.get("hinted"):
-            nb["hinted"] = True
-            return {"message": "pre hint"}
+    def make_pre_hint(now, memory):
+        if not now.earlier_steps and not memory.get("hinted"):
+            memory["hinted"] = True
+            return Hint("pre hint")
         return None
 
-    def on_before_action(ctx, nb):
-        if "print(1)" in ctx["code"]:
-            return {"kind": "block_and_prompt", "message": "blocked"}
+    def on_before_action(now, memory):
+        seen["reply_text"] = now.reply_text
+        return Block("blocked") if "print(1)" in now.proposed_code else None
+
+    def on_post_step(now, memory):
+        seen["after"].append(now)
         return None
 
-    def broken(ctx, nb):
-        raise RuntimeError("bad hook")
-
-    hooks = types.SimpleNamespace(on_init=on_init, make_pre_hint=make_pre_hint,
-                                  on_before_action=on_before_action, on_post_step=broken)
+    hooks = hooks_with(on_init=on_init, make_pre_hint=make_pre_hint, on_before_action=on_before_action,
+                       on_post_step=on_post_step)
     msgs, llm, completed, ev, ep, rec = play(["```python\nprint(1)\n```", "```python\nprint(2)\n```", COMPLETE],
                                             hooks=hooks, tmp=tmp, full=True)
     n = len(llm.requests[0]) - 1  # pre hint is the last message of the first request
@@ -181,13 +188,29 @@ def test_hook_effects_reach_conversation(tmp):
     assert msgs[n + 2] == {"role": "user", "content": "blocked"}
     assert msgs[n + 4]["content"] == "Output:\n```\n2\n```\n\n"
     assert completed and ep.steps == 2 and len(llm.calls) == 3  # the blocked code was not run: no step
+    first, second = seen["after"]
+    assert (first.step.code, first.step.output, first.earlier_steps) == ("print(2)", "2\n", ())
+    assert second.earlier_steps == (first.step,) and first.steps_left == bridge.STEP_LIMIT - 1
+    assert first.messages == msgs[:n + 5] and "complete_task" in seen["reply_text"]
+
+
+def test_hook_errors_are_not_hidden(tmp_path):
+    def broken(now, memory):
+        raise RuntimeError("bad hook")
+
+    (tmp_path / "a").mkdir(), (tmp_path / "b").mkdir()
+    with pytest.raises(RuntimeError, match="bad hook"):
+        play(["```python\nprint(1)\n```"], hooks=hooks_with(on_post_step=broken), tmp=tmp_path / "a")
+    with pytest.raises(TypeError, match="returned dict, expected Block or None"):
+        play(["```python\nprint(1)\n```"], tmp=tmp_path / "b", hooks=hooks_with(
+            on_before_action=lambda now, memory: {"kind": "block_and_prompt", "message": "x"}))
 
 
 def test_guard_ends_a_loop_without_steps(tmp):
-    def block(ctx, nb):
-        return {"kind": "block_and_prompt", "message": "blocked"}
+    def block(now, memory):
+        return Block("blocked")
 
-    msgs, llm, completed, ev, ep, rec = play(["```python\nprint(1)\n```"], hooks=types.SimpleNamespace(
+    msgs, llm, completed, ev, ep, rec = play(["```python\nprint(1)\n```"], hooks=hooks_with(
         on_before_action=block), tmp=tmp, full=True, guard=True)
     assert ep.end == {"reason": "error", "detail": "repeated reply"} and ep.finished and not completed
     assert ep.steps == 0 and len(llm.calls) == 3  # three same replies, none run
