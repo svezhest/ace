@@ -48,6 +48,22 @@ def rerun_tool_readme():
 
 READ_FAILED = "  - Read the failed runs; the passed runs are there for comparison and grep.\n"
 
+RUNS_README = ("- `tests/runs.py` — reads the runs recorded in `logs/`. `python3 tests/runs.py steps N` prints run N in short, "
+               "one line per model call: its number, the log line, what the model sent → the first line of what came "
+               "back (`steps N 20-30`: calls 20-30). The call numbers are those in the output of `tests/rerun.py`. "
+               "`python3 tests/runs.py show N 40-45` prints lines 40-45 of the log in full.\n")
+
+
+def runs_py():
+    """10.11: bin/runs (навигация по логам, инструмент исследователя) — в копию писателя как tests/runs.py."""
+    from .. import plain
+    src = open(os.path.join(os.path.dirname(C.SMOKE), "..", "bin", "runs")).read()
+    src = plain.strip(src.split("\n", 1)[1])[0]       # без строки запуска, комментариев и докстрингов
+    for cmd in ("show", "grep", "steps", "--help"):
+        src = src.replace(f"runs {cmd}", f"python3 tests/runs.py {cmd}")
+    return src.replace('"""runs — the run logs', '"""python3 tests/runs.py — the run logs')
+
+
 RERUN_AT_README = """`python3 tests/rerun.py N --at K` replays run N on the current `src/` up to model call K and shows, for the step just before it, the lines of the log and every call of a function in `src/harness.py` and `src/hooks.py`, with the values it got and returned: the values the harness really has at that point of the run. An example, from the same other agent:
 ```
 $ python3 tests/rerun.py 3 --at 17
@@ -170,6 +186,7 @@ def build_work(bench, tag, smoke=True):
         readme = readme.rstrip("\n") + "\n"
     if smoke and C.RERUN:
         readme += (rerun_tool_readme() if C.RERUN_TOOL else RERUN_README) + ("" if C.RERUN_TOOL else RERUN_AT_README)
+        readme += "" if C.RERUN_TOOL or C.HIDE_TOOLS else RUNS_README
     if smoke:
         readme += SMOKE_README if not C.SMOKE_CALLS else SMOKE_README.replace(
             "or the error. ", "or the error." + SMOKE_CALLS_README + " ")
@@ -209,6 +226,9 @@ def build_work(bench, tag, smoke=True):
             py = py.replace("ROOT = os.path.dirname(HERE)", f"ROOT = {v!r}")
         with open(f"{td}/rerun.py", "w") as f:
             f.write(py)
+        if not C.HIDE_TOOLS:
+            with open(f"{td}/runs.py", "w") as f:
+                f.write(runs_py())
     for p in glob.glob(f"{v}/src/*"):
         assert os.stat(p).st_nlink == 1, p          # копия, не жёсткая ссылка
     for d, dirs, files in os.walk(v, topdown=False):    # время файлов одно на все сессии: ls -la не разводит пары
