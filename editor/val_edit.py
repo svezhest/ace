@@ -1,6 +1,7 @@
 """Замер правки на val: живьём идут только задачи, где повтор логов базы расходится с записью.
 
   python3 editor/val_edit.py run --bench alf --name 07_PL_s1 --view VIEW --base runs/val_1102/tree_alf_1101_n0 [--control 5]
+  python3 editor/val_edit.py rest --bench alf --name tail_alf_n0 --view VIEW --base BASE   # задачи val, которых нет в BASE
   python3 editor/val_edit.py table
 
 Исполнитель при T=0 детерминирован: если на записанном прогоне базы новый src даёт модели и задаче то же самое,
@@ -62,6 +63,20 @@ def run(a):
                     "--games" if a.bench == "alf" else "--tasks", *tasks], check=True)
 
 
+def rest(a):
+    """База на задачах val, которых нет в прогоне --base (тот же порядок сэмпла): выход runs/val_1109/NAME."""
+    r = json.load(open(f"{a.base}/run.json"))
+    done = {task_of(m) for m in meta(a.base).values()}
+    root = f"{ROOT}/{BENCH[a.bench]}"
+    tasks = [t for t in random.Random(r["seed"]).sample(json.load(open(f"{root}/splits.json"))["val"], r["n"]) if t not in done]
+    print(f"{a.name}: {len(tasks)} tasks not in {a.base}", flush=True)
+    out = f"{OUT}/{a.name}"
+    subprocess.run(["rm", "-rf", out], check=True)
+    subprocess.run([f"{root}/.venv/bin/python", f"{root}/runner/run.py", "--view", os.path.abspath(a.view), "--out", out,
+                    "--tag", f"val_{a.name}", "--split", "val", "--workers", str(a.workers), "--stand", "default", "--no-publish",
+                    "--games" if a.bench == "alf" else "--tasks", *tasks], check=True)
+
+
 def table(_):
     print("| правка | база | задето | из них ok в базе | сделано | ok теперь | + | − | чисто | итог/база | контроль |")
     print("|---|---|---|---|---|---|---|---|---|---|---|")
@@ -91,6 +106,13 @@ def main():
     r.add_argument("--control", type=int, default=0)
     r.add_argument("--workers", type=int, default=2)
     r.set_defaults(fn=run)
+    t = sub.add_parser("rest")
+    t.add_argument("--bench", choices=sorted(BENCH), required=True)
+    t.add_argument("--name", required=True)
+    t.add_argument("--view", required=True)
+    t.add_argument("--base", required=True)
+    t.add_argument("--workers", type=int, default=2)
+    t.set_defaults(fn=rest)
     sub.add_parser("table").set_defaults(fn=table)
     a = ap.parse_args()
     a.fn(a)
