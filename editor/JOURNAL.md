@@ -80,6 +80,115 @@ The agent's failed runs were studied by a colleague; their observations are in t
 
 Your goal: change src/ so that the agent fails fewer tasks. Each observation that points to a weakness of the harness is a candidate for a change. An observation may also be inaccurate, or point to something the harness cannot change; what it says about src/ you can check by reading src/. The same harness runs on every task the agent gets, so aim for changes that help on tasks in general. A change may be to a prompt or to the code.
 
+**Код пробы** (приписано 10.11). Из кода убран в a13b543: в develop осталась одна база. Последний коммит с этим кодом — 951bc3b (`git show 951bc3b:ФАЙЛ`); номера строк в листинге — по нему.
+
+`--arm fix`: шаг вариантов (proposer) перед редактором (B1)
+
+```python
+# nrhsi/editor/prompt.py:57-71
+PROPOSER_T = f"""{REPO_LINE} Nothing in it can be changed.
+
+The agent's failed runs were studied by a colleague; their observations are in the first message. The runs themselves are not in this copy.
+
+Your goal: propose fixes to the harness that would make the agent fail fewer tasks. For each observation that points to a weakness of the harness, find where in src/ it comes from and describe how src/ could be changed to remove it. When there are different reasonable ways to fix it (in a prompt or in the code, at one place or another), record each way as a separate proposal. An observation may be inaccurate, or point to something the harness cannot change; what it says about src/ you can check by reading src/. The same harness runs on every task the agent gets, so aim for fixes that help on tasks in general. An engineer will make the changes from your proposals alone, without the observations, so each proposal should be complete on its own.
+
+# Tools
+{BASH_TOOL_LINES}
+- propose(problem, fix, observations): record one proposed fix. problem: what goes wrong for the agent and what in src/ causes it. fix: where to change src/ (the file and the part of it) and what the change is, in words precise enough for another engineer to make it. observations: the numbers of the observations it rests on.
+- finish(): end the session when your proposals are recorded.
+
+# How to work
+- Record each proposal with propose as soon as you have settled on it; several propose calls in one reply are fine.
+- bash can be called BASH_LIMIT times; after that only propose and finish remain, for a few turns, and the session ends.
+- Call finish when you are done."""
+
+# nrhsi/editor/prompt.py:33-37
+"fix": ("A colleague studied the agent's failed runs and proposed fixes for the harness; the proposals are in the "
+        "first message. The runs themselves are not in this copy.",
+        "Make the proposed fixes you judge sound; where several proposals address the same weakness in "
+        "different ways, choose the way you judge best, or combine them. What a proposal says about src/ you "
+        "can check by reading src/."),
+
+# nrhsi/editor/schema.py:19-26
+PROPOSE_SCHEMA = {"type": "function", "function": {
+    "name": "propose", "description": "Record one proposed fix to the harness.",
+    "parameters": {"type": "object", "properties": {
+        "problem": {"type": "string", "description": "What goes wrong for the agent and what in src/ causes it"},
+        "fix": {"type": "string", "description": "Where to change src/ and what the change is, in words"},
+        "observations": {"type": "array", "items": {"type": "integer"},
+                         "description": "Numbers of the observations this rests on"}},
+        "required": ["problem", "fix", "observations"]}}}
+
+# nrhsi/editor/cli.py:100-117
+def propose_step(a, reports, src_before, summary):
+    """Шаг вариантов -> предложения ([] — редактор пропущен, summary записан); --dry — промпты и заглушка."""
+    psys, pfirst = P.fill(P.PROPOSER_T), IN.first_user_proposer(reports)
+    if a.dry:
+        print(psys, "\n-----\n", pfirst, "\n=====")
+        return [{"problem": "<problem>", "fix": "<fix>"}]
+    proot = WK.build_work(a.bench, a.tag + "_p", smoke=False)
+    pprof = WK.make_profile(proot, a.tag + "_p")
+    pend, pst, props = SE.run_session("proposer", psys, pfirst, proot, pprof, a.seed * 1000 + 7,
+                                      f"{C.HERE}/logs/{a.tag}_p.jsonl", n_obs=len(reports))
+    assert WK.tree_hash(f"{proot}/src") == src_before, "proposer copy changed"
+    summary["proposer"] = {"end": pend, "stats": pst, "n": len(props)}
+    print(json.dumps({"proposer": pend, "proposals": len(props), "max_prompt": pst["max_prompt"],
+                      "min": round(pst["model_sec"] / 60, 1)}), flush=True)
+    if not props:
+        summary["editor"] = {"end": "skipped: no proposals"}
+        save_summary(a.tag, summary)
+    return props
+
+# nrhsi/editor/inputs.py:168-170
+def first_user_proposer(reports):
+    return (observations_text(reports) + "\n\nPropose fixes to the harness for these observations. Call finish when "
+            "you are done.")
+
+# nrhsi/editor/inputs.py:190-194
+def first_user_editor_fix(props):
+    parts = ["Proposed fixes for the harness, from a study of the agent's failed runs:"]
+    for i, p in enumerate(props, 1):
+        parts.append(f"## Proposal {i}\nProblem: {p['problem']}\nFix: {p['fix']}")
+    return "\n\n".join(parts) + "\n\nChange src/ so that the agent fails fewer tasks. Call finish when you are done."
+
+# nrhsi/editor/tools.py:138-154
+def check_proposal(args, n_obs):
+    """-> (problem, fix, номера наблюдений, ошибки)."""
+    p, fx, ob = args.get("problem"), args.get("fix"), args.get("observations")
+    errs = []
+    if not isinstance(p, str) or not p.strip():
+        errs.append("problem must be a non-empty string")
+    if not isinstance(fx, str) or not fx.strip():
+        errs.append("fix must be a non-empty string")
+    if isinstance(ob, (int, str)):
+        ob = [ob]
+    try:
+        ob = [int(x) for x in (ob or [])]
+    except (TypeError, ValueError):
+        ob = None
+    if ob is None or any(not 1 <= x <= n_obs for x in ob):
+        errs.append(f"observations must be a list of observation numbers from 1 to {n_obs}")
+    return p, fx, ob, errs
+
+# nrhsi/editor/tools.py:157-167
+def propose_call(run, args, res):
+    st = run.st
+    p, fx, ob, errs = check_proposal(args, run.n_obs)
+    if errs:
+        st["proposals_rejected"] += 1
+        res["rejected"] = errs
+        return "Error: proposal not recorded: " + "; ".join(errs) + ".", False
+    st["proposals"] += 1
+    run.items.append({"problem": p.strip(), "fix": fx.strip(), "observations": ob, "call": st["tool_calls"],
+                      "final": bool(run.final_left)})
+    return f"Proposal {st['proposals']} recorded.", False
+
+# nrhsi/editor/phase.py:16-17
+"Record the proposals you have settled on with propose now (several propose calls in one reply are "
+"fine), then call finish.")
+```
+
+
 # Tools
 - bash(command): a read-only shell in the working directory. Programs: <белый список>. Pipes, ';', '&&', '||', $(...), for/while loops and if work. Nothing can be written with it. Output longer than 8000 characters is truncated, so read big files in parts (sed -n '40,90p' FILE, head, tail) and search with grep -n.
 - The shell is bash 3.2 with macOS/BSD utilities: GNU-only options are missing (use grep -E, not grep -P; no find -printf).
@@ -334,3 +443,21 @@ Smoke теперь — только «запускается ли и что до
 - `--predict` не выполняется: в LP-сессиях реплик с ожиданием («expect») 0–2 за сессию — как и в L (0–1). Строка промпта не работает; различие L/LP — разброс. Принудить можно механикой (как SAY_FIRST у исследователя: запуск smoke отклоняется, пока в реплике нет ожидания) — не делал.
 - pyflakes: замечания пришли в 6 сессиях из 16.
 Дальше: L s2 (AppWorld) — на задачах с циклами и парно на 20 задачах после перепрогона базы b2.
+
+**Код пробы** (приписано 10.11). Из кода убран в a13b543: в develop осталась одна база. Последний коммит с этим кодом — 951bc3b (`git show 951bc3b:ФАЙЛ`); номера строк в листинге — по нему.
+
+`--predict` (плечо LP; вариант pred дерева)
+
+```python
+# nrhsi/editor/prompt.py:104-107
+PREDICT_LINE = ("- Check each change: before you run python3 tests/smoke.py, write down what you expect it to print "
+                "after your change (which messages, after which replies, how the run ends); after it runs, compare "
+                "the output with what you wrote, line by line, and say where they differ before you go on. Read the "
+                "changed lines together with the code that calls or uses them.")
+
+# nrhsi/editor/cli.py:122-124
+if a.predict:
+    esys = esys.replace(P.CHECK_LINE, P.PREDICT_LINE)
+    assert P.PREDICT_LINE in esys
+```
+

@@ -1,0 +1,8 @@
+Observation from a study of the agent's failed runs (references to logs/ point to the runs in logs/):
+
+## Observation (problem)
+Run 40 fails at the step limit. The task is "look at cd under the desklamp". At step 3 the model turns on the desklamp, and from step 4 on it examines the dresser and the desklamp, and from step 9 to step 50 it strictly alternates "examine dresser 1" and "examine desklamp 1", getting the same two answers each time. Each step from step 9 on is the same as the step two steps before it (same action, same answer) and different from the step right before it. It never looks for the cd. Nothing in the harness reacts: it keeps the history of actions and observations and passes it to the hooks, but no hook looks at it.
+
+Code: the steps are collected at src/harness.py:92 and passed to the hooks as earlier_steps (src/harness.py:82 and :99); on_before_action and on_post_step return None (src/hooks.py:14-19).
+
+Logs: logs/run_40.jsonl, line 12: "You turn on the desklamp 1."; line 13 {"action": "examine dresser 1"} -> line 15 "On the dresser 1, you see a cellphone 2, a desklamp 1, ..."; line 16 {"action": "examine desklamp 1"} -> line 18 "You turn on the desklamp 1."; the same pair repeats up to line 151-153. End at line 154: "step limit".

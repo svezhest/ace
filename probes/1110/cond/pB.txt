@@ -1,0 +1,67 @@
+An observation from a study of an agent's failed runs:
+
+Run 40 fails at the step limit. The task is "look at cd under the desklamp". At step 3 the model turns on the desklamp, and from step 4 on it examines the dresser and the desklamp, and from step 9 to step 50 it strictly alternates "examine dresser 1" and "examine desklamp 1", getting the same two answers each time. It never looks for the cd. Nothing in the harness reacts: it keeps the history of actions and observations and passes it to the hooks, but no hook looks at it.
+
+Code: the steps are collected at src/harness.py:92 and passed to the hooks as earlier_steps (src/harness.py:82 and :99); on_before_action and on_post_step return None (src/hooks.py:14-19).
+
+Logs: logs/run_40.jsonl, line 12: "You turn on the desklamp 1."; line 13 {"action": "examine dresser 1"} -> line 15 "On the dresser 1, you see a cellphone 2, a desklamp 1, ..."; line 16 {"action": "examine desklamp 1"} -> line 18 "You turn on the desklamp 1."; the same pair repeats up to line 151-153. End at line 154: "step limit".
+
+The steps of run 40 (number @line, action → first line of the answer):
+  env (line 3): Here is your task. You are in the middle of a room. Looking quickly around you, you see a bed 
+calls: number @line  what the model sent → first line of the next env message  (tool take_action); [..] other 
+1 @4 look → You are in the middle of a room. Looking quickly around you, you see nothing. AVAILABLE ACTIONS: g
+2 @7 go to dresser 1 → On the dresser 1, you see a cellphone 2, a desklamp 1, a keychain 2, a laptop 1, a mug 
+3 @10 use desklamp 1 → You turn on the desklamp 1. AVAILABLE ACTIONS: examine dresser 1
+4 @13 examine dresser 1 → On the dresser 1, you see a cellphone 2, a desklamp 1, a keychain 2, a laptop 1, a m
+5 @16 examine desklamp 1 → You turn on the desklamp 1. AVAILABLE ACTIONS: examine dresser 1
+6 @19 examine dresser 1 → On the dresser 1, you see a cellphone 2, a desklamp 1, a keychain 2, a laptop 1, a m
+7 @22 examine desklamp 1 → You turn on the desklamp 1. AVAILABLE ACTIONS: examine dresser 1
+8 @25 look → You are facing the dresser 1. Next to it, you see nothing. AVAILABLE ACTIONS: examine dresser 1
+9 @28 examine desklamp 1 → You turn on the desklamp 1. AVAILABLE ACTIONS: examine dresser 1
+10 @31 examine dresser 1 → On the dresser 1, you see a cellphone 2, a desklamp 1, a keychain 2, a laptop 1, a 
+11 @34 examine desklamp 1 → You turn on the desklamp 1. AVAILABLE ACTIONS: examine dresser 1
+12 @37 examine dresser 1 → On the dresser 1, you see a cellphone 2, a desklamp 1, a keychain 2, a laptop 1, a 
+13 @40 examine desklamp 1 → You turn on the desklamp 1. AVAILABLE ACTIONS: examine dresser 1
+14 @43 examine dresser 1 → On the dresser 1, you see a cellphone 2, a desklamp 1, a keychain 2, a laptop 1, a 
+15 @46 examine desklamp 1 → You turn on the desklamp 1. AVAILABLE ACTIONS: examine dresser 1
+16 @49 examine dresser 1 → On the dresser 1, you see a cellphone 2, a desklamp 1, a keychain 2, a laptop 1, a 
+17 @52 examine desklamp 1 → You turn on the desklamp 1. AVAILABLE ACTIONS: examine dresser 1
+18 @55 examine dresser 1 → On the dresser 1, you see a cellphone 2, a desklamp 1, a keychain 2, a laptop 1, a 
+19 @58 examine desklamp 1 → You turn on the desklamp 1. AVAILABLE ACTIONS: examine dresser 1
+20 @61 examine dresser 1 → On the dresser 1, you see a cellphone 2, a desklamp 1, a keychain 2, a laptop 1, a 
+21 @64 examine desklamp 1 → You turn on the desklamp 1. AVAILABLE ACTIONS: examine dresser 1
+22 @67 examine dresser 1 → On the dresser 1, you see a cellphone 2, a desklamp 1, a keychain 2, a laptop 1, a 
+23 @70 examine desklamp 1 → You turn on the desklamp 1. AVAILABLE ACTIONS: examine dresser 1
+24 @73 examine dresser 1 → On the dresser 1, you see a cellphone 2, a desklamp 1, a keychain 2, a laptop 1, a 
+25 @76 examine desklamp 1 → You turn on the desklamp 1. AVAILABLE ACTIONS: examine dresser 1
+26 @79 examine dresser 1 → On the dresser 1, you see a cellphone 2, a desklamp 1, a keychain 2, a laptop 1, a 
+27 @82 examine desklamp 1 → You turn on the desklamp 1. AVAILABLE ACTIONS: examine dresser 1
+28 @85 examine dresser 1 → On the dresser 1, you see a cellphone 2, a desklamp 1, a keychain 2, a laptop 1, a 
+29 @88 examine desklamp 1 → You turn on the desklamp 1. AVAILABLE ACTIONS: examine dresser 1
+30 @91 examine dresser 1 → On the dresser 1, you see a cellphone 2, a desklamp 1, a keychain 2, a laptop 1, a 
+31 @94 examine desklamp 1 → You turn on the desklamp 1. AVAILABLE ACTIONS: examine dresser 1
+32 @97 examine dresser 1 → On the dresser 1, you see a cellphone 2, a desklamp 1, a keychain 2, a laptop 1, a 
+33 @100 examine desklamp 1 → You turn on the desklamp 1. AVAILABLE ACTIONS: examine dresser 1
+34 @103 examine dresser 1 → On the dresser 1, you see a cellphone 2, a desklamp 1, a keychain 2, a laptop 1, a
+35 @106 examine desklamp 1 → You turn on the desklamp 1. AVAILABLE ACTIONS: examine dresser 1
+36 @109 examine dresser 1 → On the dresser 1, you see a cellphone 2, a desklamp 1, a keychain 2, a laptop 1, a
+37 @112 examine desklamp 1 → You turn on the desklamp 1. AVAILABLE ACTIONS: examine dresser 1
+38 @115 examine dresser 1 → On the dresser 1, you see a cellphone 2, a desklamp 1, a keychain 2, a laptop 1, a
+39 @118 examine desklamp 1 → You turn on the desklamp 1. AVAILABLE ACTIONS: examine dresser 1
+40 @121 examine dresser 1 → On the dresser 1, you see a cellphone 2, a desklamp 1, a keychain 2, a laptop 1, a
+41 @124 examine desklamp 1 → You turn on the desklamp 1. AVAILABLE ACTIONS: examine dresser 1
+42 @127 examine dresser 1 → On the dresser 1, you see a cellphone 2, a desklamp 1, a keychain 2, a laptop 1, a
+43 @130 examine desklamp 1 → You turn on the desklamp 1. AVAILABLE ACTIONS: examine dresser 1
+44 @133 examine dresser 1 → On the dresser 1, you see a cellphone 2, a desklamp 1, a keychain 2, a laptop 1, a
+45 @136 examine desklamp 1 → You turn on the desklamp 1. AVAILABLE ACTIONS: examine dresser 1
+46 @139 examine dresser 1 → On the dresser 1, you see a cellphone 2, a desklamp 1, a keychain 2, a laptop 1, a
+47 @142 examine desklamp 1 → You turn on the desklamp 1. AVAILABLE ACTIONS: examine dresser 1
+48 @145 examine dresser 1 → On the dresser 1, you see a cellphone 2, a desklamp 1, a keychain 2, a laptop 1, a
+49 @148 examine desklamp 1 → You turn on the desklamp 1. AVAILABLE ACTIONS: examine dresser 1
+50 @151 examine dresser 1 → On the dresser 1, you see a cellphone 2, a desklamp 1, a keychain 2, a laptop 1, a
+last line (154): {"event": "bridge", "call": "end", "reason": "step limit", "status": "completed", "detail": "
+
+---
+The harness will be changed so that it notices this problem while a run is going. At each step its code has the current step (the action and the answer to it) and the earlier steps of the same run, and nothing else.
+
+Write one or two sentences to add to the observation: the condition on the current step and the earlier steps that holds at the steps where the problem shows and does not hold while a run goes normally. State it so exactly that it can be checked step by step. Write only these sentences.

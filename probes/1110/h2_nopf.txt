@@ -1,0 +1,64 @@
+Applied: src/hooks.py, the new text is at lines 1-45. Lines 1-45 now read:
+     1	import re
+     2	
+     3	from typing import Optional
+     4	
+     5	from hook_types import AfterStep, BeforeAction, BeforeModelCall, Block, EpisodeStart, Hint, Tips
+     6	
+     7	
+     8	def _repeat_key(step_obs, valid_actions):
+     9	    """A key for whether the just-taken step was a no-op that produces the same
+    10	    observation as the previous step (so the model is stuck looping)."""
+    11	    return (step_obs.strip(), tuple("y" if a in valid_actions else "n" for a in valid_actions))
+    12	
+    13	
+    14	def _looping(steps):
+    15	    """True if the last two steps are identical, i.e. the model is repeating
+    16	    the same action+observation pair over and over."""
+    17	    if len(steps) < 2:
+    18	        return False
+    19	    a, b = steps[-2], steps[-1]
+    20	    return a.action == b.action and a.observation == b.observation
+    21	
+    22	
+    23	def on_init(start: EpisodeStart, memory: dict) -> Optional[Tips]:
+    24	    return None
+    25	
+    26	
+    27	def make_pre_hint(now: BeforeModelCall, memory: dict) -> Optional[Hint]:
+    28	    return None
+    29	
+    30	
+    31	def on_before_action(now: BeforeAction, memory: dict) -> Optional[Block]:
+    32	    return None
+    33	
+    34	
+    35	def on_post_step(now: AfterStep, memory: dict) -> Optional[Hint]:
+    36	    steps = (now.earlier_steps, now.step)
+    37	    if _looping(steps):
+    38	        return Hint(
+    39	            message=(
+    40	                "You are repeating the same action and getting the same result. "
+    41	                "This does not help. Re-read your task and the available actions, "
+    42	                "and pick a different action you have not tried yet."
+    43	            )
+    44	        )
+    45	    return None
+
+Checks run on src/ after this edit (they use no bash calls):
+python3 tests/smoke.py runs without errors. With the stub task and model, where no reply and no answer is ever repeated, the harness now says:
+  scenario 1: the stub task does not end the episode: 50 replies, each with a tool call: nothing besides the environment results (crashed after 1 model replies; turns handed to the task: 1; episode ended by the task: False)
+  scenario 2: the stub task ends the episode at turn 4: nothing besides the environment results (crashed after 1 model replies; turns handed to the task: 1; episode ended by the task: False)
+  before your edits:
+  scenario 1: the stub task does not end the episode: 50 replies, each with a tool call: nothing besides the environment results
+  scenario 2: the stub task ends the episode at turn 4: nothing besides the environment results
+python3 tests/rerun.py prints:
+all 29 runs (5 failed, 24 passed): the harness crashes (e.g. run 1): AttributeError: 'tuple' object has no attribute 'action'
+  src/rerun_core.py:207 wrapped: out = fn(*a, **kw)
+  src/hooks.py:37 on_post_step: if _looping(steps):
+  src/hooks.py:20 _looping: return a.action == b.action and a.observation == b.observation
+  hook on_post_step: raised AttributeError: 'tuple' object has no attribute 'action' (src/hooks.py:20) (was None)
+
+Check against the observation:
+Failed: in run 40 the harness crashes at model call 1: AttributeError: 'tuple' object has no attribute 'action'
+Failed: in run 28 the harness crashes at model call 1: AttributeError: 'tuple' object has no attribute 'action'
