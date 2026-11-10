@@ -3,7 +3,6 @@ import json
 import os
 import re
 import subprocess
-import sys
 
 from .cfg import F
 from . import cfg as C
@@ -88,7 +87,7 @@ def edit_checks(run):
 # (видно, если вернуть тексты .md как в виде); any — что-то из двух. После каждой авто-проверки — Ok / Failed: причина.
 
 def _replay(src, root, runs, cover=False, watch=None):
-    cmd = ([sys.executable, RERUN_CORE, "--bench", C.BENCH, "--src", src, "--logs", f"{root}/logs", "--json"]
+    cmd = ([os.path.join(F.BIN, "python3"), RERUN_CORE, "--bench", C.BENCH, "--src", src, "--logs", f"{root}/logs", "--json"]
            + (["--cover"] if cover else []) + (["--watch", json.dumps(watch)] if watch else []) + [str(r) for r in runs])
     p = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
     try:

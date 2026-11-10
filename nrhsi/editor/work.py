@@ -122,11 +122,10 @@ def build_work(bench, tag):
     shutil.copytree(f"{view}/src", f"{v}/tests/orig_src", ignore=shutil.ignore_patterns("__pycache__"))
     shutil.copytree(f"{view}/logs", f"{v}/logs")
     shutil.copy(f"{C.SMOKE}/{bench}.py", f"{v}/tests/smoke.py")
-    # Ядро повтора в копии писателя — editor/rerun_writer.py без комментариев и докстрингов, как src/ вида. Это отдельный
-    # файл, а не editor/rerun.py, по которому идёт проверка тикета: писатель читает tests/rerun_core.py, и правки механики
-    # тикета не должны менять то, что он читает. Файлы расходятся (см. docs/REMOVED-1110.md, «не тронуто»).
+    # Ядро повтора одно — editor/rerun.py: в копию писателя оно идёт без комментариев и докстрингов, как src/ вида,
+    # и по нему же (под тем же python3 песочницы) идёт проверка по тикету.
     from .. import plain
-    core = open(os.path.join(os.path.dirname(C.SMOKE), "..", "..", "editor", "rerun_writer.py")).read()
+    core = open(os.path.join(os.path.dirname(C.SMOKE), "..", "..", "editor", "rerun.py")).read()
     for name, text in (("rerun_core.py", plain.strip(core)[0]), ("rerun.py", RERUN_PY.replace("BENCH", repr(bench))),
                        ("runs.py", runs_py())):
         with open(f"{v}/tests/{name}", "w") as f:
