@@ -12,7 +12,7 @@ from . import phase as PH
 def meta(run, system, first_user):
     return {"type": "meta", "role": "editor", "system": system, "first_user": first_user, "seed": run.seed,
             "temperature": F.TEMP, "stand": F.STAND,
-            "root": run.root, "tools": [t["function"]["name"] for t in SC.TOOLS],
+            "root": run.root, "tools": [t["function"]["name"] for t in SC.TOOLS], "tool_schemas": SC.TOOLS,
             "limits": {"bash_limit": C.BASH_LIMIT, "step_budget": C.STEP_BUDGET, "final_turns": C.FINAL_TURNS,
                        "hard_at": C.HARD_AT, "out_chars": F.OUT_CHARS, "max_gen": F.MAX_GEN}}
 
