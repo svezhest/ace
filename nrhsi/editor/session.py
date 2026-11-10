@@ -1,17 +1,18 @@
-"""Сессия роли: запись meta, цикл ходов до finish или принудительного конца, запись end."""
+"""Сессия писателя: запись meta, цикл ходов до finish или принудительного конца, запись end."""
 import traceback
 
 from .cfg import F
 from . import cfg as C
+from . import schema as SC
 from . import state as R
 from . import turn as TU
 from . import phase as PH
 
 
 def meta(run, system, first_user):
-    return {"type": "meta", "role": run.role, "system": system, "first_user": first_user, "seed": run.seed,
+    return {"type": "meta", "role": "editor", "system": system, "first_user": first_user, "seed": run.seed,
             "temperature": F.TEMP, "stand": F.STAND,
-            "root": run.root, "tools": [t["function"]["name"] for t in run.tools],
+            "root": run.root, "tools": [t["function"]["name"] for t in SC.TOOLS],
             "limits": {"bash_limit": C.BASH_LIMIT, "step_budget": C.STEP_BUDGET, "final_turns": C.FINAL_TURNS,
                        "hard_at": C.HARD_AT, "out_chars": F.OUT_CHARS, "max_gen": F.MAX_GEN}}
 
@@ -29,14 +30,12 @@ def loop(run):
     return end
 
 
-def run_session(role, system, first_user, root, prof, seed, log_path, n_obs=0, resume=None):
-    """role: editor | proposer. -> (причина конца, st, items) — items: правки (editor) или предложения (proposer)."""
-    run = R.Run(role, system, first_user, root, prof, seed, log_path, n_obs)
+def run_session(system, first_user, root, prof, seed, log_path):
+    """-> (причина конца, st, items) — items: правки."""
+    run = R.Run(system, first_user, root, prof, seed, log_path)
     run.w(meta(run, system, first_user))
     end = None
     try:
-        if resume:                   # 6.11: воскрешение — история и ход из старого лога
-            resume(run)
         end = loop(run)
     except BaseException as e:  # noqa: BLE001
         end = f"forced: harness error: {type(e).__name__}: {e}"[:300]

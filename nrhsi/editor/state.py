@@ -1,31 +1,23 @@
-"""Состояние сессии (Run): роль и её инструменты, история, счётчики, правки или предложения, лог."""
+"""Состояние сессии (Run): история, счётчики, правки, лог."""
 import json
 
 from .cfg import F
-from . import cfg as C
 from . import schema as SC
 
 
 class Run:
     """Всё, что меняется за сессию. st и items уходят в запись end и возвращаются из run_session."""
 
-    def __init__(self, role, system, first_user, root, prof, seed, log_path, n_obs):
-        self.role, self.root, self.prof, self.seed, self.n_obs = role, root, prof, seed, n_obs
-        self.tools = SC.role_tools(role)
-        self.final_tools = self.tools[1:]
-        self.act = "edit" if role == "editor" else "propose"
+    def __init__(self, system, first_user, root, prof, seed, log_path):
+        self.root, self.prof, self.seed = root, prof, seed
         self.messages = [{"role": "system", "content": system}, {"role": "user", "content": first_user}]
         self.st = {"turns": 0, "tool_calls": 0, "bash_calls": 0, "denied": 0, "repeats": 0, "truncated": 0,
                    "no_call": 0, "bad_call": 0, "max_prompt": 0, "gen_tokens": 0, "model_sec": 0.0, "final_turns": 0,
-                   "length_stops": 0, "edits_attempted": 0, "edits_applied": 0, "edit_fail": {}, "proposals": 0,
-                   "proposals_rejected": 0}
-        self.items = []                  # правки (editor) или предложения (proposer)
-        self.last_rerun = None           # --intent: полный вывод rerun последней авто-проверки
+                   "length_stops": 0, "edits_attempted": 0, "edits_applied": 0, "edit_fail": {}}
+        self.items = []                  # правки: и применённые, и отказы
         self.seen = {}                   # команда bash -> (номер вызова, вывод); сброс после применённой правки
+        self.smoke0 = None               # что харнесс добавляет в разговор на заглушке до правок (gate.smoke_added)
         self.final_left, self.final_why = 0, None
-        self.goal_sent = False             # --goal-k: цель уже поставлена
-        self.bash_limit = C.STAGES[0] if C.STAGES else C.BASH_LIMIT     # --stages: сдвигается в начале проверки
-        self.stage2 = False                # --stages: часть проверки началась
         self.last_prompt = self.pending = 0      # pending = оценка токенов, добавленных после последнего ответа
         self.log = open(log_path, "w", encoding="utf-8", errors="backslashreplace")
 
@@ -44,4 +36,4 @@ class Run:
 
     def offered(self):
         """Инструменты этого хода: в финальных ходах — без bash."""
-        return self.final_tools if self.final_left else self.tools
+        return SC.TOOLS[1:] if self.final_left else SC.TOOLS

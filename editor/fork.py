@@ -1,6 +1,6 @@
 """10.11: ручной стенд писателя — развилка записанной сессии на ходу T.
 
-История до хода T берётся из лога сессии (как при --resume), в неё вносится правка-гипотеза, и следующий ход
+История до хода T берётся из лога сессии, в неё вносится правка-гипотеза, и следующий ход
 модели снимается N раз. Инструменты не исполняются: видно только, что модель делает в этом месте. Ответы
 кэшируются по содержимому запроса (LOG.fork/<sha>.json), повторный вызов с теми же входами модель не трогает.
 
@@ -11,7 +11,7 @@
   python3 editor/fork.py LOG --turn 17 --final                      # ход без bash (хвост сессии)
   python3 editor/fork.py LOG --turn 17 --show                       # напечатать конец истории и выйти
 
-Продолжить развилку настоящим харнессом: поправить запись хода в копии лога и запустить редактор с --resume.
+Продолжить развилку настоящим харнессом — editor/roll.py.
 """
 import argparse
 import hashlib
@@ -26,8 +26,31 @@ from nrhsi.editor import schema as SC  # noqa: E402
 from nrhsi.editor.cfg import F  # noqa: E402
 
 
+def load(path):
+    return [json.loads(line) for line in open(path)]
+
+
+def apply_edits(recs, upto, root):
+    """Применённые правки ходов < upto — на копию root (той же заменой строки, что и edit) -> сколько их."""
+    n = 0
+    for r in recs:
+        if r.get("type") != "turn" or r["i"] >= upto:
+            continue
+        for c, res in zip(r["tool_calls"], r["results"]):
+            if c["name"] != "edit" or not (res.get("edit") or {}).get("applied"):
+                continue
+            a = json.loads(c["arguments"])
+            p = f"{root}/{a['path']}"
+            old = open(p).read() if os.path.exists(p) else ""
+            assert a["old_string"] == "" or old.count(a["old_string"]) == 1, f"replay edit {r['i']}: old_string"
+            new = a["new_string"] if a["old_string"] == "" else old.replace(a["old_string"], a["new_string"])
+            open(p, "w").write(new)
+            n += 1
+    return n
+
+
 def history(recs, upto):
-    """Сообщения до хода upto (без него), как их строит nrhsi/editor/resume.py."""
+    """Сообщения сессии до хода upto (без него)."""
     meta = recs[0]
     ms = [{"role": "system", "content": meta["system"]}, {"role": "user", "content": meta["first_user"]}]
     for r in recs[1:]:
@@ -82,7 +105,7 @@ def main():
     ap.add_argument("--chars", type=int, default=300)
     ap.add_argument("--out", help="jsonl с полными ответами")
     a = ap.parse_args()
-    recs = [json.loads(line) for line in open(a.log)]
+    recs = load(a.log)
     ms = history(recs, a.turn)
     if a.last:
         assert ms[-1]["role"] == "tool"
@@ -101,8 +124,7 @@ def main():
             for c in m.get("tool_calls") or []:
                 print(f"    > {c['function']['name']} {c['function']['arguments']}")
         return
-    tools = SC.role_tools("editor")
-    tools = tools[1:] if a.final else tools
+    tools = SC.TOOLS[1:] if a.final else SC.TOOLS
     F.apply_stand(a.stand)
     cache = a.log + ".fork"
     os.makedirs(cache, exist_ok=True)

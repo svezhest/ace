@@ -1,4 +1,4 @@
-"""Ворота finish редактора: один раз по итогу всех правок — новые предупреждения pyflakes и падение smoke."""
+"""Проверки писателя: ответ на применённую правку (pyflakes, smoke, rerun, проверка по тикету) и ворота finish."""
 import json
 import os
 import re
@@ -10,139 +10,31 @@ from . import cfg as C
 from . import lint as LI
 from . import work as WK
 
-REVIEW_DIFF, REVIEW_RERUN = 5000, 2500   # --finish-review: символов diff и вывода rerun
+RERUN_CORE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "editor", "rerun.py")   # ядро проверки по тикету
 
 
 def smoke_failure(run):
-    """31.10: правки без проверки — вывод python3 tests/smoke.py, если он упал (или '' — прошёл, нет теста)."""
-    if not os.path.exists(f"{C.HIDDEN if C.HIDE_TOOLS else run.root + '/' + C.TOOLS_DIR}/smoke.py"):
-        return ""
+    """Вывод python3 tests/smoke.py, если он упал ('' — прошёл)."""
     ok, out, full = WK.tool_run(run, "smoke")
-    return WK.tt("python3 tests/smoke.py now prints:\n") + out if not ok or "Traceback" in full else ""
+    return "python3 tests/smoke.py now prints:\n" + out if not ok or "Traceback" in full else ""
 
 
-def finish(run, args=None):
-    """finish -> (текст для модели, конец ли). Шаг вариантов — конец сразу. Редактор: ворота pyflakes и smoke —
-    один раз; --finish-review — обзор (все правки и rerun на них) при каждом finish после изменения src;
-    finish(submit=false) — правки отбрасываются, src как в начале."""
-    if run.role != "editor":
+def finish(run):
+    """finish -> (текст для модели, конец ли). Ворота — новые предупреждения pyflakes и падение smoke — один раз:
+    второй finish завершает как есть."""
+    if run.st.get("lint_at_finish"):
         return "Finished.", True
-    from . import work as WK
-    if C.FINISH_REVIEW and (args or {}).get("submit") in (False, "false", "False"):
-        d = WK.diff_src(C.BENCH, run.root)
-        run.w({"type": "dropped", "diff": d})
-        WK.restore_src(C.BENCH, run.root)
-        run.st["submitted"] = False
-        return "Finished: nothing handed in; src/ is back to how it was at the start.", True
-    h = WK.tree_hash(f"{run.root}/src")
-    review = C.FINISH_REVIEW and run.st["edits_applied"] and h != run.st.get("reviewed_hash")
-    if run.st.get("lint_at_finish") and not review:
-        return "Finished.", True
-    gate = "" if run.st.get("lint_at_finish") else LI.lint_changed(run.root)
-    smoke = "" if run.st.get("lint_at_finish") else smoke_failure(run)
+    gate, smoke = LI.lint_changed(run.root), smoke_failure(run)
     if smoke:
         gate += ("\n" if gate else "") + smoke
     run.st["lint_at_finish"] = True
-    if not review:
-        if not gate:
-            return "Finished.", True
-        return f"Not finished yet. {gate}\nFix them with edit, or call finish again to end as is.", False
-    run.st["reviewed_hash"] = h
-    run.st["reviews"] = run.st.get("reviews", 0) + 1
-    if run.final_left and run.st["reviews"] == 1:
-        run.final_left += 1                  # ход на ответ после первого обзора
-    return (f"Not handed in yet. Here are all your changes and what {rerun_name()} prints on them."
-            + (f"\n{gate}" if gate else "") + f"\n\n{review_text(run)}\n\nIs this the change the observation "
-            "needs? If it is, call finish again to hand it in. If not, change it with edit; or, if you think you "
-            "could not make it, call finish with submit=false to hand in nothing."), False
-
-
-def review_text(run):
-    """--finish-review (4.11): все правки (diff от начала) и вывод python3 tests/rerun.py на них."""
-    from . import work as WK
-    d = WK.diff_src(C.BENCH, run.root)
-    d = d if len(d) <= REVIEW_DIFF else d[:REVIEW_DIFF] + f"\n[... {len(d)} characters in all]"
-    out = f"Your changes against the start:\n```diff\n{d.rstrip()}\n```"
-    if C.RERUN:
-        r = clip(rerun_output(run)[0], REVIEW_RERUN)
-        out += f"\n\n{rerun_name()} prints:\n{r.rstrip()}"
-    return out
+    if not gate:
+        return "Finished.", True
+    return f"Not finished yet. {gate}\nFix them with edit, or call finish again to end as is.", False
 
 
 def clip(t, n):
     return t if len(t) <= n else t[:n] + f"\n[... {len(t)} characters in all]"
-
-
-def rerun_name():
-    return "rerun" if C.RERUN_TOOL else WK.tt("python3 tests/rerun.py")
-
-
-RERUN_CORE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "editor", "rerun.py")
-
-
-def rerun_output(run, n=None):
-    """Вывод повтора прогонов на текущем src/ -> (текст, есть ли расхождение хоть в одном прогоне).
-    --rerun-tool: ядро editor/rerun.py вне копии (в копии его нет), старый src — вид; иначе tests/rerun.py в песочнице."""
-    if C.RERUN_TOOL:
-        cmd = [sys.executable, RERUN_CORE, "--bench", C.BENCH, "--src", f"{run.root}/src", "--logs", f"{run.root}/logs",
-               "--old", f"{C.VIEWS[C.BENCH]}/src"] + ([str(n)] if n is not None else [])
-        p = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
-        full = (p.stdout + p.stderr).strip()
-    else:
-        _, _, full = WK.tool_run(run, "rerun", f" {n}" if n is not None else "")
-        full = full.strip()
-    heads = [l for l in full.splitlines() if l and not l[0].isspace()]
-    changed = any("no changes" not in l for l in heads)
-    return clip(full, F.OUT_CHARS), changed
-
-
-def type_name(x):
-    return "nothing" if x is None else "array[str]" if isinstance(x, list) and any(isinstance(y, str) for y in x) else type(x).__name__
-
-
-HEAD = re.compile(r"(all \d+ runs|runs? [\d, ]+) \(")
-
-
-def changed_runs(full, root):
-    """Строки-заголовки вывода rerun -> (изменившиеся прогоны, удачные, отличается ли промпт)."""
-    res = [json.loads(l) for l in open(f"{root}/logs/results.jsonl")]
-    every = [r["run"] for r in res]
-    passed = {r["run"] for r in res if r.get("ok")}
-    ch, prompt = set(), False
-    for l in full.splitlines():
-        if not l or l[0].isspace():
-            continue
-        m = HEAD.match(l)
-        if not m:
-            continue
-        rs = every if m.group(1).startswith("all") else [int(x) for x in re.findall(r"\d+", m.group(1))]
-        if "the prompt differs" in l:
-            prompt = True
-        elif "no changes" not in l:
-            ch.update(rs)
-    return ch, passed, prompt
-
-
-def intent_report(run, expect):
-    """--intent: ожидание правки (expect_runs) против прогонов, что изменились в повторе."""
-    ch, passed, prompt = changed_runs(run.last_rerun or "", run.root)
-    if prompt:
-        return ("Your expectation: runs " + (", ".join(map(str, expect)) or "none") + ". The prompt differs from the "
-                "log, so every run may go differently from the start; the replay cannot tell which runs change.")
-    fmt = lambda rs: ", ".join(f"{r} (passed)" if r in passed else str(r) for r in sorted(rs)) or "none"
-    ex = set(expect)
-    return (f"Your expectation: runs {fmt(ex)}. Runs that changed: {fmt(ch)}. Changed but not expected: {fmt(ch - ex)}. "
-            f"Expected but unchanged: {fmt(ex - ch)}.")
-
-
-def ask_changed(run):
-    """--ask-changed: удачные в логе прогоны, что после правки идут иначе -> вопрос (None, если таких нет или промпт другой)."""
-    ch, passed, prompt = changed_runs(run.last_rerun or "", run.root)
-    hit = sorted(ch & passed)
-    if prompt or not hit:
-        return None
-    return (f"Runs that passed in the log and go differently now: {', '.join(map(str, hit))}. "
-            "Is that what this edit is for?")
 
 
 def smoke_scenarios(full):
@@ -157,14 +49,12 @@ def smoke_scenarios(full):
 
 def smoke_added(run, full):
     """10.11: что харнесс добавляет в разговор на заглушке — фактом в ответе на правку, а не «runs without errors».
-    Сравнение с тем же smoke на src до правок (tests/orig_src); без копии — просто то, что добавлено сейчас."""
+    Сравнение с тем же smoke на src до правок (tests/orig_src)."""
     now = smoke_scenarios(full)
     if not now:
         return ""
-    if getattr(run, "smoke0", None) is None:
-        orig = f"{run.root}/{C.TOOLS_DIR}/orig_src"
-        run.smoke0 = (smoke_scenarios(WK.tool_run(run, "smoke", f" {C.TOOLS_DIR}/orig_src")[2])
-                      if not C.HIDE_TOOLS and os.path.isdir(orig) else [])
+    if run.smoke0 is None:
+        run.smoke0 = smoke_scenarios(WK.tool_run(run, "smoke", " tests/orig_src")[2])
     if now == run.smoke0:
         return " With the stub task and model the harness says the same as before your edits."
     t = " With the stub task and model, where no reply and no answer is ever repeated, the harness now says:"
@@ -180,30 +70,20 @@ def smoke_added(run, full):
 
 
 def edit_checks(run):
-    """--auto-check (4.11): после применённой правки — новые предупреждения pyflakes, smoke, rerun; bash не тратится."""
+    """Ответ на применённую правку (4.11): новые предупреждения pyflakes, smoke, rerun всех прогонов и проверка по тикету.
+    bash на это не тратится."""
     lint_ = LI.lint_changed(run.root)
     ok, out, full = WK.tool_run(run, "smoke")
-    smoke = (WK.tt("python3 tests/smoke.py prints:\n") + out if not ok or "Traceback" in full else
-             WK.tt("python3 tests/smoke.py runs without errors.") + smoke_added(run, full))
-    t = "Checks run on src/ after this edit (they use no bash calls):\n"
-    first = C.TICKET and getattr(C, "TICKET_FIRST", False)   # 6.11 --ticket-first: проверка по тикету — первой, до общего вывода
-    if first:
-        t += ticket_check(run) + "\n\n"
-    if lint_:
-        t += lint_ + "\n"
-    if C.RERUN:
-        full = rerun_output(run)[0]
-        run.last_rerun = full
-        t += smoke + f"\n{rerun_name()} prints:\n" + clip(full, REVIEW_RERUN).rstrip()
-    else:
-        t += smoke
-    if C.TICKET and not first:
-        t += "\n\n" + ticket_check(run)
-    return t
+    smoke = ("python3 tests/smoke.py prints:\n" + out if not ok or "Traceback" in full else
+             "python3 tests/smoke.py runs without errors." + smoke_added(run, full))
+    rerun = clip(WK.tool_run(run, "rerun")[2].strip(), F.OUT_CHARS)
+    t = ("Checks run on src/ after this edit (they use no bash calls):\n" + (lint_ + "\n" if lint_ else "") + smoke
+         + "\npython3 tests/rerun.py prints:\n" + clip(rerun, C.RERUN_CHARS).rstrip())
+    return t + ("\n\n" + ticket_check(run) if C.TICKET else "")
 
 
 # ---------------------------------------------------------------- 6.11: проверка по тикету
-# Ожидание ревьювера change_expected: prompt | control | any — в тикете (с --ticket-show его видит и писатель).
+# Ожидание ревьювера change_expected: prompt | control | any — в тикете; писатель видит его абзацем в наблюдении.
 # prompt — меняется то, что модель читает (тексты .md в src/); control — меняется то, что делает код харнесса
 # (видно, если вернуть тексты .md как в виде); any — что-то из двух. После каждой авто-проверки — Ok / Failed: причина.
 
@@ -378,8 +258,8 @@ def _watch(changed):
     return w
 
 
-def _dead_fact(changed, cov, hide=frozenset(), r=None):
-    """Одна фраза для строки Failed (6.11 --ticket-line): до двух изменённых условий, которые выполнялись и ни разу
+def _dead_fact(changed, cov):
+    """Одна фраза для строки Failed (6.11): до двух изменённых условий, которые выполнялись и ни разу
     не были истинны (`if` без выполненного тела; `return <выражение>` с одним и тем же значением), чаще выполнявшиеся — первыми;
     или «ни одна изменённая строка не выполнялась». `return False` и подобные литералы не в счёт: они постоянны по построению."""
     ret = cov.get("__ret__") or {}
@@ -408,14 +288,12 @@ def _dead_fact(changed, cov, hide=frozenset(), r=None):
                 cand.append((n, f"`{src[:80]}` at src/{rel}:{ln} ran {n} times and returned {next(iter(rets[ln]))} every time", f"{rel}:{ln}"))
     if cand:
         cand.sort(key=lambda c: -c[0])
-        def with_vals(c):
-            val = (cov.get("__val__") or {}).get(c[2]) if getattr(C, "TICKET_VALUES", False) else None
-            vals = {e: v for e, v in ((val or {}).get("vals") or {}).items() if e not in hide and not _is_err(v)}
+        def with_vals(c):   # значения операндов условия на его последнем выполнении
+            val = (cov.get("__val__") or {}).get(c[2])
+            vals = {e: v for e, v in ((val or {}).get("vals") or {}).items() if not _is_err(v)}
             if not vals:
                 return c[1]
-            anc = (f", after the model's reply at logs/run_{r}.jsonl line {val['line']}" if getattr(C, "TICKET_ANCHOR", False)
-                   and val.get("line") and r is not None else "")
-            return c[1] + f" (at its last run, before model call {val['call'] + 1}{anc}: " + _show_vals(vals) + ")"
+            return c[1] + f" (at its last run, before model call {val['call'] + 1}: " + _show_vals(vals) + ")"
         return "your " + "; your ".join(with_vals(c) for c in cand[:2])
     if dead:
         return f"your `{dead[2][:80]}` at src/{dead[1]}:{dead[0]} never ran"
@@ -423,7 +301,7 @@ def _dead_fact(changed, cov, hide=frozenset(), r=None):
 
 
 def _shadowed(changed):
-    """6.11 --ticket-why: изменённые строки внутри def, который ниже в том же модуле или классе перекрыт def с тем же именем
+    """Изменённые строки внутри def, который ниже в том же модуле или классе перекрыт def с тем же именем
     -> [(файл, имя, строка своего def, строка последнего def, строки своего тела)]."""
     import ast
     out = []
@@ -457,111 +335,6 @@ def _why_fact(changed, cov, r):
         res.append(f"src/{rel} defines `{name}` again at line {later.lineno}, below yours at line {l1}, and the later "
                    f"definition is the one in use" + (f" (it ran {n} times in run {r})" if n else ""))
     return res[:2]
-
-
-def _cond_probes(changed):
-    """6.11 --ticket-passed: {"файл:строка": проба} — значение самого изменённого условия (если вычислимо без побочных эффектов)."""
-    import ast
-    out = {}
-    for rel, (lines, text) in changed.items():
-        for ln in lines:
-            if text[ln - 1].strip().startswith(("if ", "elif ", "while ")):
-                c = _cond_of(text, ln)
-                try:
-                    ok = c and _safe(ast.parse(c, mode="eval"))
-                except SyntaxError:
-                    ok = False
-                if ok:
-                    out[f"{rel}:{ln}"] = f"bool({c})"
-    return out
-
-
-def _fired_fact(changed, cov, hide=frozenset(), cprobe=None):
-    """6.11 --ticket-passed: изменённые условия, тело которых выполнялось в прогоне (до расхождения) и которые истинны на последнем
-    выполнении (если это вычислимо), и `return <выражение>`, вернувшие True, — до двух, со значениями операндов."""
-    res = []
-    vals = cov.get("__val__") or {}
-    ret = cov.get("__ret__") or {}
-    tm = lambda n: f"{n} time" + ("" if n == 1 else "s")
-    for rel, (lines, text) in sorted(changed.items()):
-        hits = {int(k): v for k, v in (cov.get(rel) or {}).items()}
-        rets = {int(k): v for k, v in (ret.get(rel) or {}).items()}
-        for ln in lines:
-            src = text[ln - 1].strip()
-            code = src.split("  #")[0].split(" # ")[0].strip()
-            if hits.get(ln) and code.startswith("return ") and code[7:].strip() not in ("False", "True", "None") \
-                    and (rets.get(ln) or {}).get("True"):
-                res.append((rets[ln]["True"], f"your `{src[:80]}` at src/{rel}:{ln} returned True {tm(rets[ln]['True'])}"))
-                continue
-            if not hits.get(ln) or not src.startswith(("if ", "elif ", "while ")):
-                continue
-            pv = ((vals.get(f"{rel}:{ln}") or {}).get("vals") or {}).get((cprobe or {}).get(f"{rel}:{ln}"))
-            if pv == "False":   # на последнем выполнении ложно: это охрана, не то, что сработало
-                continue
-            end = next((k for k in range(ln, min(ln + 8, len(text)) + 1) if text[k - 1].split("#")[0].rstrip().endswith(":")), None)
-            if end is None:
-                continue
-            ind = len(text[ln - 1]) - len(text[ln - 1].lstrip())
-            body = next((k for k in range(end + 1, len(text) + 1) if text[k - 1].strip() and not text[k - 1].strip().startswith("#")), None)
-            if not body or len(text[body - 1]) - len(text[body - 1].lstrip()) <= ind or not hits.get(body):
-                continue
-            v = vals.get(f"{rel}:{ln}") or {}
-            # пробы элемента all/any выбраны под «ни разу не истинно»; у сработавшего условия они не о том
-            ops = {e: x for e, x in (v.get("vals") or {}).items() if e not in hide and e not in _SYN and not _is_err(x)}
-            res.append((hits[body], f"your `{src[:80]}` at src/{rel}:{ln} was true {tm(hits[body])}"
-                       + (f" (at its last run, before model call {v['call'] + 1}: " + ", ".join(f"`{e}` = {x}" for e, x in ops.items()) + ")"
-                          if ops else "")))
-    # то, после чего прогон разошёлся, обычно сработало раз-другой; охраны вроде `if history:` — на каждом шаге
-    return [t for _, t in sorted(res, key=lambda x: x[0])[:2]]
-
-
-def passed_fact(run, changed, watch, hide):
-    """6.11 --ticket-passed: первый удачный в логе прогон (не из тикета), который с кодом правки (тексты — как в виде) идёт иначе:
-    где он расходится и какие изменённые условия в нём сработали. None — такого нет или промпт отличается от лога."""
-    ch, passed, prompt = changed_runs(run.last_rerun or "", run.root)
-    hit = sorted((ch & passed) - set(C.TICKET["runs"]))
-    if prompt or not hit or not changed:
-        return None
-    r = hit[0]
-    src = _old_texts_src(run) if _texts_differ(run) else f"{run.root}/src"
-    cp = _cond_probes(changed)
-    w = {k: list(v) if isinstance(v, list) else v for k, v in (watch or {}).items()}
-    for where, pr in cp.items():
-        w.setdefault(where, []).append(pr)
-    div, cov = _replay(src, run.root, [r], cover=True, watch=w or None)
-    d = div.get(str(r))
-    if not d or d["kind"] == "crash":
-        return None
-    f = _fired_fact(changed, cov.get(str(r)) or {}, hide | set(cp.values()), cp)
-    more = f" (of {len(hit)} such runs: {', '.join(map(str, hit[:8]))}{' …' if len(hit) > 8 else ''})" if len(hit) > 1 else ""
-    return (f"Run {r} passed in the log{more}; with your code it goes differently from model call {d['call']} on"
-            + (": " + "; ".join(f) if f else "") + ".")
-
-
-def _cover_lines(changed, cov, d):
-    """Строки правки со счётчиками в одном прогоне: подряд идущие с одним счётчиком — одной строкой."""
-    upto = ("to the end of the log" if d is None else
-            "up to model call %s, where it goes differently" % d["call"] if d.get("call") else "until it stops")
-    res = []
-    ret = (cov.get("__ret__") or {}) if getattr(C, "TICKET_RET", False) else {}
-    for rel, (lines, text) in sorted(changed.items()):
-        hits = {int(k): v for k, v in (cov.get(rel) or {}).items()}
-        rets = {int(k): v for k, v in (ret.get(rel) or {}).items()}
-        groups = []
-        for ln in lines:
-            n = hits.get(ln, 0)
-            if groups and groups[-1][2] == n and not rets.get(ln) and not rets.get(groups[-1][1]) and groups[-1][1] == ln - 1 - sum(1 for k in range(groups[-1][1] + 1, ln) if k in lines):
-                groups[-1][1] = ln
-            else:
-                groups.append([ln, ln, n])
-        for a, b, n in groups:
-            where = f"src/{rel}:{a}" + (f"-{b}" if b != a else "")
-            rv = rets.get(b) if text[b - 1].strip().startswith("return") else None
-            got = (" -> returned " + ", ".join(f"{k} {'once' if m == 1 else f'{m} times'}" for k, m in sorted(rv.items(), key=lambda kv: -kv[1])[:3])) if rv else ""
-            res.append(f"  {where}  {'never ran' if n == 0 else 'ran once' if n == 1 else f'ran {n} times'}:  {text[a - 1].strip()[:90]}{got}")
-    if len(res) > 14:
-        res = res[:13] + [f"  ... {len(res) - 13} more groups of changed lines"]
-    return upto, res
 
 
 def _old_texts_src(run):
@@ -605,22 +378,16 @@ def _where(d):
 
 
 def ticket_check(run):
+    """Проверка по тикету после правки: по строке Ok / Failed на прогон тикета (и на прогон keep). К Failed «как в логе» —
+    факт проигрыша: какое изменённое условие выполнялось и ни разу не было истинным, со значениями операндов на последнем
+    выполнении, или что изменённые строки не выполнялись (и почему, если их def перекрыт)."""
     exp, runs = C.TICKET["change_expected"], C.TICKET["runs"]
-    cover = getattr(C, "TICKET_COVER", False)
-    tline = getattr(C, "TICKET_LINE", False)
-    changed = _changed_lines(run) if cover or tline else {}
-    watch = _watch(changed) if tline and getattr(C, "TICKET_VALUES", False) else None
-    why = watch is not None and getattr(C, "TICKET_WHY", False)
-    if why:   # 6.11 --ticket-why: длинные строки — с размером
-        watch["__shape__"] = True
-        if getattr(C, "TICKET_PASSED", False):
-            watch["__shape2__"] = True
-    hide = frozenset()
-    cur, cov = (_replay(f"{run.root}/src", run.root, runs, cover=True, watch=watch) if cover or tline
-                else (_replay(f"{run.root}/src", run.root, runs), {}))
+    changed = _changed_lines(run)
+    watch = _watch(changed)
+    watch["__shape__"] = True   # длинные строки — началом, концом и размером
+    cur, cov = _replay(f"{run.root}/src", run.root, runs, cover=True, watch=watch)
     texts = _texts_differ(run)
-    code, cov_code = ((_replay(_old_texts_src(run), run.root, runs, cover=True, watch=watch) if why
-                       else (_replay(_old_texts_src(run), run.root, runs), {})) if texts else (cur, cov))
+    code, cov_code = _replay(_old_texts_src(run), run.root, runs, cover=True, watch=watch) if texts else (cur, cov)
     lines = []
     for r in runs:
         a, b = cur.get(str(r)), code.get(str(r))
@@ -652,28 +419,18 @@ def ticket_check(run):
                 lines.append(f"Ok: run {r} changes: {_where(a or b)}.")
             else:
                 lines.append(f"Failed: this edit has no effect in run {r}, the run the observation is about.")
-    if tline and changed:   # самый важный факт покрытия — в саму строку Failed «как в логе»
+    if changed:   # факт покрытия — в саму строку Failed «как в логе»
         for i, r in enumerate(runs):
             if lines[i].startswith(f"Failed: this edit has no effect in run {r}"):
                 c = cov.get(str(r)) or {}
-            elif why and lines[i].startswith(f"Failed: in run {r} only the texts the model reads have changed"):
+            elif lines[i].startswith(f"Failed: in run {r} only the texts the model reads have changed"):
                 c = cov_code.get(str(r)) or {}   # код без новых текстов идёт как в логе — факт о нём
             else:
                 continue
-            f = [x for x in [_dead_fact(changed, c, hide, r)] if x] + (_why_fact(changed, c, r) if why else [])
+            f = [x for x in [_dead_fact(changed, c)] if x] + _why_fact(changed, c, r)
             if f:
                 lines[i] = lines[i].rstrip(".") + f"; in run {r} " + "; ".join(f) + "."
-    if cover and changed:   # по одной строке на прогон — после каждой её счётчики
-        assert len(lines) == len(runs)
-        out = []
-        for r, ln in zip(runs, lines):
-            out.append(ln)
-            a = cur.get(str(r))
-            if not (a and a["kind"] == "crash"):
-                upto, cl = _cover_lines(changed, cov.get(str(r)) or {}, a)
-                out.append(f"The lines you changed, as run {r} replays them ({upto}):\n" + "\n".join(cl))
-        lines = out
-    keep = C.TICKET.get("keep") or []   # 6.11 TKK: вторая половина тикета — прогоны, которые должны пойти как в логе
+    keep = C.TICKET.get("keep") or []   # вторая половина тикета (6.11 TKK): прогоны, которые должны пойти как в логе
     if keep:
         kc = _replay(f"{run.root}/src", run.root, keep)
         kk = _replay(_old_texts_src(run), run.root, keep) if texts else kc
@@ -690,13 +447,5 @@ def ticket_check(run):
             else:
                 lines.append(f"Failed: this edit changes run {r}, which passed and should still go exactly as in the log; "
                              + ("with the old texts " if texts else "") + f"{_where(d)}.")
-    if getattr(C, "TICKET_PASSED", False):   # 6.11: факт о первом задетом удачном прогоне
-        if watch is None:
-            changed = changed or _changed_lines(run)
-            watch = _watch(changed)
-        pf = passed_fact(run, changed, watch or None, hide)
-        if pf:
-            lines.append(pf)
-    run.w({"type": "ticket_check", "expected": exp, "runs": runs, "cur": cur, "code": code, "lines": lines,
-           **({"cover": cov} if cover else {})})
+    run.w({"type": "ticket_check", "expected": exp, "runs": runs, "cur": cur, "code": code, "lines": lines})
     return "Check against the observation:\n" + "\n".join(lines)

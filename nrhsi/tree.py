@@ -33,7 +33,7 @@ SHORT = {"alfworld": "alf", "appworld": "app"}   # имя бенча у реда
 # варианты ролей: на каждую сессию — случайный, записывается в tree.json (потом прогоны разбираются по вариантам)
 REVIEWERS = {"b5": [], "b10": ["--set", "BOUNCE_AFTER=10"], "free": ["--set", 'BOUNCE_CHARGE="repeat"'],
              "nob": ["--set", "BOUNCE_AFTER=null"]}
-EDITORS = {"obs": [], "pred": ["--predict"]}
+EDITORS = {"obs": []}   # 10.11: вариант pred (--predict) убран вместе с флагом, docs/REMOVED-1110.md
 
 
 def measure(a, view, out, seed):
@@ -74,7 +74,7 @@ def edit(a, node, rhome, home, tag, seed, var):
     summ = f"{home}/out/{tag}.summary.json"
     if not os.path.exists(summ):
         role("nrhsi.editor", "--home", home, "--rlogs", f"{rhome}/logs", "--bench", SHORT[a.bench], "--view", node,
-             "--input", tag, "--arm", "obs", "--seed", str(seed), "--stand", a.stand, "--tag", tag,
+             "--input", tag, "--seed", str(seed), "--stand", a.stand, "--tag", tag,
              *(["--lint", a.lint] if a.lint else []), *EDITORS[var])
     s = json.load(open(summ))
     return f"{home}/work/{tag}", s["editor"]["stats"]["edits_applied"]

@@ -23,7 +23,7 @@ sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import fork as FK  # noqa: E402
 from nrhsi.editor import cfg as C  # noqa: E402
-from nrhsi.editor import cli, phase as PH, resume as RS, session as SE, state as R, turn as TU  # noqa: E402
+from nrhsi.editor import cli, phase as PH, session as SE, state as R, turn as TU  # noqa: E402
 
 
 def main():
@@ -40,9 +40,9 @@ def main():
                          "end: до конца сессии (не дольше --max-turns)")
     cut = sys.argv.index("--")
     a, rest = ap.parse_args(sys.argv[1:cut]), sys.argv[cut + 1:]
-    recs = RS.load(a.log)
+    recs = FK.load(a.log)
 
-    def session(role, system, first_user, root, prof, seed, log_path, n_obs=0, resume=None):
+    def session(system, first_user, root, prof, seed, log_path):
         ms0 = FK.history(recs, a.turn)
         if a.turn == 1:               # истории нет: промпт — нынешний (его могли поменять коммиты и --final-turns)
             ms0 = [{"role": "system", "content": system}, {"role": "user", "content": first_user}]
@@ -60,15 +60,15 @@ def main():
         roots = []
         for k in range(a.n):          # своя копия вида на продолжение: правку можно применить и проверить
             rk = WK.build_work(C.BENCH, f"{tag}_r{k}")
-            RS.apply_edits(recs, a.turn, rk)
+            FK.apply_edits(recs, a.turn, rk)
             roots.append((rk, WK.make_profile(rk, f"{tag}_r{k}")))
 
         def one(k):
             rk, pk = roots[k]
-            run = R.Run(role, ms0[0]["content"], ms0[1]["content"], rk, pk, seed + 7919 * (k + 1),
-                        f"{log_path[:-len('.jsonl')]}_r{k}.jsonl", n_obs)
+            run = R.Run(ms0[0]["content"], ms0[1]["content"], rk, pk, seed + 7919 * (k + 1),
+                        f"{log_path[:-len('.jsonl')]}_r{k}.jsonl")
             run.w(SE.meta(run, ms0[0]["content"], ms0[1]["content"]))
-            for r in recs[1:]:        # лог продолжения — полный лог сессии: годится для fork.py, roll.py и --resume
+            for r in recs[1:]:        # лог продолжения — полный лог сессии: годится для fork.py, roll.py и replay.py
                 if r.get("type") == "turn" and r["i"] >= a.turn:
                     break
                 if r.get("type") in ("turn", "note"):

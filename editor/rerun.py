@@ -270,8 +270,7 @@ def play(bench, src, log, at=None, cover=None, watch=None):
         if cover is not None:   # 6.11: строки src, выполненные за проигрыш (до расхождения или до конца лога)
             root = os.path.realpath(src) + os.sep
             last = {}
-            shape = bool((watch or {}).get("__shape__"))   # 6.11 --ticket-why: у длинной строки — начало, конец и размер
-            shape2 = shape and bool((watch or {}).get("__shape2__"))   # 6.11 --ticket-passed: и у элементов коротких списков
+            shape = bool((watch or {}).get("__shape__"))   # 6.11: у длинной строки — начало, конец и размер
 
             def rv(v, n):
                 if not shape or not isinstance(v, str) or len(repr(v)) <= n:
@@ -298,15 +297,12 @@ def play(bench, src, log, at=None, cover=None, watch=None):
                                 if isinstance(v, (list, tuple)) and len(v) > 3:   # длинный список — его хвост: туда смотрит проверка
                                     v = f"[... {len(v)} items, last 3: " + ", ".join(rv(x, 60) for x in v[-3:]) + "]"
                                     vals[e] = v if shape else v[:240]
-                                elif shape2 and isinstance(v, (list, tuple)) and v:   # короткий список — каждый элемент со своей формой
-                                    vals[e] = "[" + ", ".join(rv(x, 60) for x in v) + "]"
                                 else:
                                     vals[e] = rv(v, 160)
                             except Exception as x:  # noqa: BLE001
                                 vals[e] = f"<{type(x).__name__}>"
-                        k = state["call"]   # 6.11: строка лога с последним ответом модели перед этим выполнением (для --ticket-anchor)
                         cover.setdefault("__val__", {})[f"{f[len(root):]}:{frame.f_lineno}"] = {
-                            "call": k, "vals": vals, "line": line_of[model_pos[k - 1]] if 0 < k <= len(model_pos) else None}
+                            "call": state["call"], "vals": vals}
                 elif event == "return":
                     last.pop(id(frame), None)   # что вернула функция src и с какой строки: "__ret__" -> {файл: {строка: {значение: раз}}}
                     v = arg if isinstance(arg, (bool, int, type(None))) else type(arg).__name__
