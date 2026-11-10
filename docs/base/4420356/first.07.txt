@@ -1,0 +1,12 @@
+Observation from a study of the agent's failed runs (references to logs/ point to the runs in logs/):
+
+## Observation (problem)
+Run 36 fails at the step limit, and 10 of its 50 turns were plain-text replies without a tool call. In each the model claims it has completed the task (it had not: the episode never ended). Each plain-text reply is handed to the task and counts as one of the 50 turns, and the harness then only tells the model to call the tool. The model then examines the laptop, puts it back, looks around, and claims completion again, over and over.
+
+Code: every reply is passed to episode.send, which counts a turn (src/bridge.py:20-23, STEP_LIMIT at :1); the harness sends replies to the task without checking for a tool call first (src/harness.py:88) and afterwards adds src/no_tool_call.md (src/harness.py:93-94).
+
+Logs: logs/run_36.jsonl, line 25: a plain-text completion claim; line 26: the bridge counts it as turn 8 ("not_shown": "No executable tool calls found..."); line 27: the harness message "You MUST call the take_action tool". Line 34: the next claim, "...The task has been completed." Plain-text replies again at lines 43, 55, 70, 85, 100, 115, 130, 145 (10 in all). End at line 154: "step limit", status "task limit reached".
+
+Change expected: control — what the harness code does in run 36 should change, not only the texts the model reads. Run 3 passed without this change: the goal is that it still goes exactly as in the log once the change is in. The check after each edit tells you whether each of the two holds.
+
+Change src/ so that the agent fails fewer tasks.

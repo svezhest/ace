@@ -1,0 +1,12 @@
+Observation from a study of the agent's failed runs (references to logs/ point to the runs in logs/):
+
+## Observation (problem)
+Run 19 ends with the context exhausted after only 19 executed steps. The model sent the same reply 394 times in a row. Each time the harness answered "You sent the same code as in the previous step..." and asked again, without running the code and without counting a step. Nothing changes between two such turns, so the model gets the same conversation plus one more warning, answers the same way, and this goes on until the context is full. The step limit never comes, because no step is spent.
+
+Code: src/harness.py:102-106. When the code equals the previous step's code, the harness adds the warning and does `continue`: episode.execute is not called and steps is not updated, so the next identical reply is compared with the same previous step again.
+
+Logs: logs/run_19.jsonl, the last executed step is step 19 (line 82). From line 84 to line 871 every model reply is the same code (`matching_playlist = None ...`) and every harness line is the same warning. Line 872: {"event": "bridge", "call": "end", "reason": "stopped"}; logs/results.jsonl: run 19 "context exhausted".
+
+Change expected: control — what the harness code does in run 19 should change, not only the texts the model reads. Run 8 passed without this change: the goal is that it still goes exactly as in the log once the change is in. The check after each edit tells you whether each of the two holds.
+
+Change src/ so that the agent fails fewer tasks.

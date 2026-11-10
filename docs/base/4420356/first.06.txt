@@ -1,0 +1,12 @@
+Observation from a study of the agent's failed runs (references to logs/ point to the runs in logs/):
+
+## Observation (problem)
+Run 11 fails at the step limit. The task is to put two cellphones in a dresser. While holding one cellphone, the model asked to take the second one; that action is not in the list of available actions (one object at a time), and the environment silently did a different action instead: it put the held phone down on the bed. The prompt tells the model that an invalid action gets "Nothing happened", so the model never learns that its action was invalid. It called this "a quirk of the environment" and kept swapping phones on the bed until the step limit; nothing ever went into the dresser. The harness has the list of available actions at every step but does not check the model's action against it.
+
+Code: the promise "if the environment output \"Nothing happened\", that means the previous action is invalid" is in src/starting_prompt.md:1. The available actions are given to the hooks as valid_actions (src/hook_types.py:30). The hook on_before_action (src/hooks.py:14-15) returns None; a Block returned there would make the harness ask again without spending a turn (src/harness.py:81-86).
+
+Logs: logs/run_11.jsonl, line 21: at the bed, the available actions do not include "take cellphone 1 from bed 1". Line 22: the model sends {"action": "take cellphone 1 from bed 1"}; line 24: "You put the cellphone 2 in/on the bed 1." Line 70 and 85: the model calls it "a quirk of the environment". Line 103: {"action": "put cellphone 1 in/on dresser 1"} while at the bed; line 105: "You put the cellphone 1 in/on the bed 1." End at line 154: "step limit".
+
+Change expected: control — what the harness code does in run 11 should change, not only the texts the model reads. Run 3 passed without this change: the goal is that it still goes exactly as in the log once the change is in. The check after each edit tells you whether each of the two holds.
+
+Change src/ so that the agent fails fewer tasks.

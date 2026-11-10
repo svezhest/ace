@@ -1,0 +1,12 @@
+Observation from a study of the agent's failed runs (references to logs/ point to the runs in logs/):
+
+## Observation (problem)
+Run 1 fails at the step limit. From step 13 to step 50 the model alternates between two steps, A, B, A, B: it prints an album id, then shows that album, again and again. The harness has a repeat check, but it compares the new code only with the previous step's code. In an A, B, A, B cycle no two neighbouring steps are equal, so the check never fires and the model is never told it is repeating itself.
+
+Code: the repeat check is at src/harness.py:102-106 (code == steps[-1].code).
+
+Logs: logs/run_1.jsonl, step 13 at line 61 `print(recommendations[0]["album_id"])` -> "2"; step 14 at line 64 `print(apis.spotify.show_album(...))` -> the album (66); the same two alternate up to step 50 (line 172-174). End at line 175: "step limit". No harness message appears in lines 61-175.
+
+Change expected: control — what the harness code does in run 1 should change, not only the texts the model reads. Run 8 passed without this change: the goal is that it still goes exactly as in the log once the change is in. The check after each edit tells you whether each of the two holds.
+
+Change src/ so that the agent fails fewer tasks.

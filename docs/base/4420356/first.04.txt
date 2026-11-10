@@ -1,0 +1,12 @@
+Observation from a study of the agent's failed runs (references to logs/ point to the runs in logs/):
+
+## Observation (problem)
+Run 7 fails at the step limit. From step 10 to step 50 the model alternates between two steps: show note 3085, show note 3084, again and again, about 20 times each. It never went on to the payment requests the task asks for. The harness has a check meant to catch a step that repeats one of the recent steps, but it did not fire once in this run.
+
+Code: the check is _is_new_step at src/harness.py:67-87, called at src/harness.py:139 as _is_new_step(recent_steps, code, output_text(content)). Its exact branch (:73) compares the previous step's output with output_text(content), which is the new reply's code (src/harness.py:56-60), so the two are never equal. Its restart branch (:79-86) counts lines of the new code that equal a whole previous code string, so a repeated multi-line step does not count. The check against the previous step only (:126) does not catch A, B, A, B.
+
+Logs: logs/run_7.jsonl, step 10 at line 53 `note_1 = apis.simple_note.show_note(note_id=3085, ...)\nprint(note_1)`, step 11 at line 56 `note_2 = ...show_note(note_id=3084, ...)\nprint(note_2)`, step 12 at line 59 the first again, and so on up to step 50 at line 173. No "You are repeating the same step" message in the run. End at line 176: "step limit".
+
+Change expected: control — what the harness code does in run 7 should change, not only the texts the model reads. Run 8 passed without this change: the goal is that it still goes exactly as in the log once the change is in. The check after each edit tells you whether each of the two holds.
+
+Change src/ so that the agent fails fewer tasks.

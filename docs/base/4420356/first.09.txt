@@ -1,0 +1,12 @@
+Observation from a study of the agent's failed runs (references to logs/ point to the runs in logs/):
+
+## Observation (problem)
+Run 8 fails at the step limit. The task is to like Venmo transactions involving coworkers. After logging in to Venmo, the model does not continue with the task: it writes the last step of the example dialogue from the prompt word for word, `apis.supervisor.complete_task(answer=num_playlists)`. The variable num_playlists exists only in the example, so this fails with NameError. The model then starts over from the example's first step ("Okay. Let's first find which APIs are available to use in Venmo."), logs in again, and again writes the example's last step. This 8-step cycle repeats four times, and a fifth is cut off by the step limit. The model follows the example dialogue as a script.
+
+Code: the prompt is split into chat messages at the role markers (src/harness.py:29-39, called at :59), so the example is given to the model as its own earlier ASSISTANT turns. The example's first step is src/starting_prompt.md:11-12, num_playlists is defined at :280, and the last step `apis.supervisor.complete_task(answer=num_playlists)` is at :290-294.
+
+Logs: logs/run_8.jsonl, line 66: login successful (step 14). Line 67: the example's sentence and `apis.supervisor.complete_task(answer=num_playlists)`; line 69: "NameError: name 'num_playlists' is not defined". Line 70: "Okay. Let's first find which APIs are available to use in Venmo." The same complete_task at 91, 115, 139, 163 and the same restart at 94, 118, 142, 166. End at line 175: "step limit".
+
+Change expected: any — run 8 should go differently, through the texts the model reads or through the harness code.
+
+Change src/ so that the agent fails fewer tasks.

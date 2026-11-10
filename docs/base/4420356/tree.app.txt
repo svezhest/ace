@@ -1,0 +1,15 @@
+README.md
+src/bridge.py
+src/harness.py
+src/hook_types.py
+src/hooks.py
+src/starting_prompt.md
+tests/orig_src/bridge.py
+tests/orig_src/harness.py
+tests/orig_src/hook_types.py
+tests/orig_src/hooks.py
+tests/orig_src/starting_prompt.md
+tests/rerun.py
+tests/rerun_core.py
+tests/runs.py
+tests/smoke.py

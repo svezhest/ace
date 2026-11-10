@@ -1,0 +1,12 @@
+Observation from a study of the agent's failed runs (references to logs/ point to the runs in logs/):
+
+## Observation (problem)
+Run 9 fails at the step limit. The model re-ran a step that had worked (printing an API doc). The harness warned it: "You sent the same code as in the previous step. This will fail again." The step had not failed. After this warning the model restarted the whole task from the first step ("Okay. Let's first find which APIs are available to use in Venmo."), came back to the same point, got the same warning, and restarted again, five times, until the step limit.
+
+Code: the warning text is at src/harness.py:103-105; it is shown whenever the code equals the previous step's code (src/harness.py:102), whatever the previous step's output was.
+
+Logs: logs/run_9.jsonl, step 11 at line 56 prints the doc of show_received_payment_requests, output at line 57 (no error). Line 58: the same code again; line 59: the harness warning; line 60: "Okay. Let's first find which APIs are available to use in Venmo." The same warning and restart: lines 88-89, 117-118, 146-147, 175-176. End at line 185: "step limit".
+
+Change expected: control — what the harness code does in run 9 should change, not only the texts the model reads. Run 8 passed without this change: the goal is that it still goes exactly as in the log once the change is in. The check after each edit tells you whether each of the two holds.
+
+Change src/ so that the agent fails fewer tasks.

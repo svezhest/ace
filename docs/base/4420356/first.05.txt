@@ -1,0 +1,12 @@
+Observation from a study of the agent's failed runs (references to logs/ point to the runs in logs/):
+
+## Observation (problem)
+Runs 6 and 12 do the task correctly and then fail as "wrong result". Both tasks are actions, not questions (mark a note item as done; play a song), so complete_task should be called without an answer. In both runs the model ends with the same sentence as the last step of the example dialogue in the prompt, "Since this task has an answer to be returned, I will pass that as an argument.", and passes an answer: answer="Note updated." and answer=song_id. The prompt's own instructions say to omit the answer when none is required, but the example's last step does the opposite and the model copies the example.
+
+Code: the example's last ASSISTANT turn is src/starting_prompt.md:311-316 (the sentence and `apis.supervisor.complete_task(answer=num_playlists)`); the instruction to omit the answer is src/starting_prompt.md:359.
+
+Logs: logs/run_6.jsonl, line 48 "Note updated." (the task's change is made), line 49 the model's reply with the example's sentence and `apis.supervisor.complete_task(answer="Note updated.")`, end at line 53 "finished"; logs/results.jsonl: run 6 wrong result. logs/run_12.jsonl, line 72 "Song (Lost in the Mists of Time) is now playing.", line 73 the same sentence and `complete_task(answer=song_id)`, end at line 77; results: run 12 wrong result.
+
+Change expected: prompt — the texts the model reads in runs 6 and 12 should change.
+
+Change src/ so that the agent fails fewer tasks.

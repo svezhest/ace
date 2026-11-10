@@ -1,0 +1,12 @@
+Observation from a study of the agent's failed runs (references to logs/ point to the runs in logs/):
+
+## Observation (problem)
+Run 6 fails at the step limit. The task is "look at box under the desklamp". From step 3 to step 50 the model repeats the same three actions in a cycle: "examine sidetable 1", "use desklamp 1", "look". It never looks for the box. The harness has a check for a stuck model, but it only looks at whether the last actions were empty, so it never fires on this cycle and the model gets no signal that it is going round in circles.
+
+Code: the check is stalled() at src/harness.py:64-68 (STALL_REPEATS at :61); it is called at src/harness.py:106. It returns True only when the last 3 actions are empty strings.
+
+Logs: logs/run_6.jsonl, the cycle is the model lines 10, 13, 16, ... 136, then 140, 144, 148, 152, 156 (step 3 to step 50; from step 46 a countdown message is inserted between steps); the env answers at 12, 15, 18: "On the sidetable 1, you see a desklamp 1." / "You turn on the desklamp 1." / "You are facing the sidetable 1. Next to it, you see nothing.", and the same three again. The episode ends at line 159: {"event": "bridge", "call": "end", "reason": "step limit", ...}.
+
+Change expected: control — what the harness code does in run 6 should change, not only the texts the model reads. Run 1 passed without this change: the goal is that it still goes exactly as in the log once the change is in. The check after each edit tells you whether each of the two holds.
+
+Change src/ so that the agent fails fewer tasks.
