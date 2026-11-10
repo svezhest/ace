@@ -1,0 +1,87 @@
+где	самый ранний коммит со строкой	сессий, где модель её цитирует (из 120: PL, PK, G3–G9)	фраза
+system	10bcde9 29.10	1/120	You are working in a copy of a repository that holds the harness of an AI agent: the prompts and the code that run the agent on tasks.
+system	10bcde9 29.10	0/120	README.md describes the layout; the harness is in src/.
+system	10bcde9 29.10	1/120	This directory is everything there is to read: the agent's recorded runs are in logs/; the benchmark is not here.
+system	10bcde9 29.10	0/120	The agent's failed runs were studied by a colleague; their observations are in the first message.
+system	db6ca35 04.11	0/120	The runs are in logs/: trust your colleague initially; if you are confused, you may check the logs.
+system	10bcde9 29.10	16/120	Your goal: change src/ so that the agent fails fewer tasks.
+system	10bcde9 29.10	2/120	Each observation that points to a weakness of the harness is a candidate for a change.
+system	10bcde9 29.10	0/120	An observation may also be inaccurate, or point to something the harness cannot change; what it says about src/ you can check by reading src/.
+system	10bcde9 29.10	6/120	The same harness runs on every task the agent gets, so aim for changes that help on tasks in general.
+system	10bcde9 29.10	0/120	A change may be to a prompt or to the code.
+system	10bcde9 29.10	0/120	bash(command): a read-only shell in the working directory.
+system	4df895d 10.11	0/120	Programs: :, [, [[, awk, basename, break, cat, cd, column, comm, command, continue, cut, diff, dirname, echo, expr, false, find, grep, head, jq, ls, nl, od, pas
+system	ff33255 30.10	0/120	Pipes, ';', '&&', '||', $(...), for/while loops and if work.
+system	ff33255 30.10	0/120	Nothing can be written with it.
+system	ff33255 30.10	0/120	Output longer than 8000 characters is truncated, so read big files in parts (sed -n '40,90p' FILE, head, tail) and search with grep -n.
+system	10bcde9 29.10	0/120	The shell is bash 3.2 with macOS/BSD utilities:
+system	ff33255 30.10	0/120	GNU-only options are missing (use grep -E, not grep -P; no find -printf).
+system	10bcde9 29.10	0/120	python3 is available (standard library; no network, nothing can be written).
+system	10bcde9 29.10	3/120	edit(path, old_string, new_string): replace old_string with new_string in the file at path, a file in src/ (src/bridge.py is not part of the harness, see README
+system	10bcde9 29.10	0/120	To add text, put an existing neighbouring line in old_string and repeat it in new_string together with the addition.
+system	10bcde9 29.10	0/120	To write into an empty file or to create a new file in src/, give an empty old_string.
+system	10bcde9 29.10	0/120	Each edit is applied at once and you see the changed lines; an edit that cannot be applied leaves the file as it was and tells you why.
+system	10bcde9 29.10	0/120	finish(): end the session when your changes are done.
+system	10bcde9 29.10	2/120	Read the part of src/ a change touches before you edit it, and keep intact what the rest of the harness relies on.
+system	baa52c4 06.11	1/120	Checks run by themselves: after each edit that is applied, pyflakes, python3 tests/smoke.py and python3 tests/rerun.py are run on src/, and their output comes w
+system	baa52c4 06.11	0/120	Read the changed lines together with the code that calls or uses them.
+system	c202812 06.11	0/120	To look at one run in detail, run python3 tests/rerun.py N yourself (see README.md).
+system	a13b543 10.11	0/120	If the runs an observation is about show no changes, your change may have missed.
+system	4df895d 10.11	7/120	bash can be called 25 times; after that 3 turns remain without bash: edits are still applied and checked after each one, and then the session ends.
+tool:bash	10bcde9 29.10	0/120	Run a read-only shell command in the working directory. Pipes, ';', '&&', '||', $(...), for/while loops and if work; nothing can be written. Long output is trun
+tool:bash.command	10bcde9 29.10	0/120	The command line
+tool:edit	10bcde9 29.10	2/120	Replace old_string with new_string in a file in src/. old_string must match the file's current text exactly (spaces, line breaks) and occur in it exactly once; 
+tool:edit.path	10bcde9 29.10	0/120	The file to change, e.g. src/FILE
+tool:edit.old_string	10bcde9 29.10	1/120	Exact text from the file to replace
+tool:edit.new_string	10bcde9 29.10	0/120	The text to put in its place
+tool:finish	10bcde9 29.10	1/120	End the session.
+README.alf	e39a5e1 06.11	0/120	`src/` — the harness of the agent: the prompts and the code that run it on a task.
+README.alf	e25f33f 10.11	0/120	`hooks.py` — functions that `harness.py` calls;
+README.alf	e25f33f 10.11	0/120	`hook_types.py` — what each of them is given and may return.
+README.alf	10bcde9 29.10	0/120	`starting_prompt.md` is the system prompt.
+README.alf	e39a5e1 06.11	0/120	`bridge.py` — connection to the benchmark.
+README.alf	e39a5e1 06.11	8/120	`logs/` — runs of the harness in `src/` as it was at the start.
+README.alf	2a61808 30.10	0/120	`run_N.jsonl` — one episode as a stream of events, one per line.
+README.alf	e9a0022 30.10	0/120	`bridge` — a call through the bridge (`start`;
+README.alf	e9a0022 30.10	0/120	`send`: a model reply handed to the task, `turn` — its number, `not_shown` — the task's messages the harness did not put into the conversation;
+README.alf	e9a0022 30.10	0/120	`end`: how the task ended the episode — `finished`, `step limit`, `error` with `detail`);
+README.alf	e9a0022 30.10	0/120	`prompt` — the system message built from `src/starting_prompt.md`;
+README.alf	e9a0022 30.10	0/120	`env` — a message of the task, as the model received it;
+README.alf	2a61808 30.10	0/120	`harness` — other messages from the harness (`from`: its file in `src/`).
+README.alf	2a61808 30.10	0/120	The `message` fields in order are the conversation as the model saw it.
+README.alf	53b3ddc 03.11	6/120	`tests/rerun.py` — replays the runs recorded in `logs/` on the current `src/`.
+README.alf	53b3ddc 03.11	11/120	The model's replies and the task's messages are taken from the log, so neither the model nor the benchmark is called.
+README.alf	53b3ddc 03.11	31/120	As long as what the harness gives the model and the task is the same as in the log, the log still describes the run; at the first place where it differs, the re
+README.alf	53b3ddc 03.11	1/120	`-` what the log has there, `+` what the harness does now.
+README.alf	53b3ddc 03.11	4/120	From that point on the rest of the log no longer applies.
+README.alf	53b3ddc 03.11	11/120	It also shows the hooks whose answer changed compared with `src/` as it was at the start (a copy of it is in `tests/orig_src/`).
+README.alf	c265677 04.11	25/120	`no changes` means that in those runs the current `src/` gives the model and the task exactly what the log has.
+README.alf	53b3ddc 03.11	3/120	`python3 tests/rerun.py` prints one line per group of runs that behave the same way;
+README.alf	53b3ddc 03.11	1/120	`python3 tests/rerun.py N` shows run N in detail, with the line of `logs/run_N.jsonl`.
+README.alf	39ebcf4 04.11	3/120	An example, from the harness of another agent, where a hook was added that says "foobar" when the observation has both "foo" and "bar" in it:
+README.alf	c265677 04.11	12/120	runs 2, 5, 9 (1 failed, 2 passed): no changes (same as the log to the end)
+README.alf	53b3ddc 03.11	18/120	runs 1, 3, 4, 6, 7, 8 (4 failed, 2 passed): diverges at model call: failed — run 1 at 12, run 3 at 17, run 4 at 17, run 7 at 30; passed — run 6 at 12, run 8 at 
+README.alf	39ebcf4 04.11	1/120	hook on_observation: {"message": "foobar"} (was None)
+README.alf	39ebcf4 04.11	19/120	run 3 (failed): diverges at model call 17 (log line 52): what the model sees differs from the log
+README.alf	39ebcf4 04.11	0/120	The foo is next to the bar, I will take the foo. | act: take foo
+README.alf	39ebcf4 04.11	0/120	hook on_observation at model call 17: {"message": "foobar"} (was None)
+README.alf	bda5669 04.11	1/120	`python3 tests/rerun.py N --at K` replays run N on the current `src/` up to model call K and shows, for the step just before it, the lines of the log and every 
+README.alf	bda5669 04.11	1/120	run 3 (failed), before model call 17 (log line 52):
+README.alf	bda5669 04.11	0/120	calls of the functions in src/harness.py and src/hooks.py, with the values they got and returned:
+README.alf	bda5669 04.11	1/120	harness.make_ctx({'observation': 'The box is open.
+README.alf	bda5669 04.11	1/120	In it you see a foo and a bar.'}, {'actions': [... 12 more, 'go to box', 'open box']}) -> {'observation': 'The box is open.
+README.alf	bda5669 04.11	1/120	In it you see a foo and a bar.', 'step': 16, 'history': {'actions': [... 12 more, 'go to box', 'open box']}}
+README.alf	bda5669 04.11	0/120	harness.call_hook('on_observation', <same as above>) -> {'message': 'foobar'}
+README.alf	bda5669 04.11	0/120	hooks.on_observation(<same as above>) -> {'message': 'foobar'}
+README.alf	f154d23 10.11	0/120	`tests/runs.py` — reads the runs recorded in `logs/`.
+README.alf	4df895d 10.11	1/120	`python3 tests/runs.py steps N` prints run N in short, one line per model call: its number, the log line, what the model sent → the first line of what came back
+README.alf	f154d23 10.11	0/120	The call numbers are those in the output of `tests/rerun.py`.
+README.alf	f154d23 10.11	0/120	`python3 tests/runs.py show N 40-45` prints lines 40-45 of the log in full.
+README.alf	dba5860 30.10	4/120	`tests/smoke.py` — a smoke test: runs src/harness.py with a stub benchmark and a stub model (not the benchmark) and prints what the harness adds to the conversa
+README.app	e39a5e1 06.11	0/120	`src/` — the harness of the agent: the prompt and the code that run it on a task.
+README.app	10bcde9 29.10	0/120	`{{ ... }}` in it are slots that the benchmark fills with the task's values; the slot names are fixed.
+README.app	2a61808 30.10	0/120	`bridge` — a call to the benchmark (`fill`: the values put into the prompt's slots;
+README.app	bce6bdb 30.10	0/120	`execute`: code run by the benchmark, `step` — its number;
+README.app	bce6bdb 30.10	0/120	`end`: how the benchmark ended the episode — `finished`, `step limit`, `error`);
+README.app	2a61808 30.10	0/120	`prompt` — a message the harness built from `src/starting_prompt.md`;
+README.app	bce6bdb 30.10	0/120	`env` — a message with the benchmark's output, as the model received it;

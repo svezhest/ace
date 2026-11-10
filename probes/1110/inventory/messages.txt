@@ -1,0 +1,26 @@
+note:bash end	bash is no longer available. Edits are still applied and checked after each one;
+system:budget	bash can be called BASH_LIMIT times; after that FINAL_TURNS turns remain without bash
+bash:after end	Error: bash is no longer available; this command was not run.
+bash:repeat	This command was already run at tool call
+bash:repeat	Running it again tells you nothing new: change the
+bash:timeout	did not end within
+bash:find	find actions like -exec/-delete are not allowed
+edit:refused	Error: edit not applied.
+edit:syntax	would not parse as Python
+check:head	Checks run on src/ after this edit (they use no bash calls):
+check:smoke ok	python3 tests/smoke.py runs without errors.
+check:smoke same	With the stub task and model the harness says the same as before your edits.
+check:ticket head	Check against the observation:
+check:no effect	Failed: this edit has no effect in run
+check:ok control	the harness now acts differently
+check:keep ok	which passed, still goes exactly as in the log
+check:keep failed	which passed and should still go exactly as in the log
+check:texts only	only the texts the model reads have changed
+check:dead fact	and was never true
+finish:gate	Not finished yet.
+finish:gate	Fix them with edit, or call finish again to end as is.
+note:no call	Your reply contained no tool call. Continue with the tools; call finish when you are done.
+first:ticket	Change expected: control — what the harness code does in
+first:keep	passed without this change: the goal is that it still goes exactly as in the log once the change is in.
+first:keep	The check after each edit tells you whether each of the two holds.
+first:task	Change src/ so that the agent fails fewer tasks.

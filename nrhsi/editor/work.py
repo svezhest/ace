@@ -3,6 +3,7 @@
 import glob
 import hashlib
 import os
+import re
 import shutil
 import subprocess
 
@@ -160,4 +161,5 @@ def tree_hash(d):
 def diff_src(bench, root):
     r = subprocess.run(["diff", "-ruN", "-x", "__pycache__", f"{C.VIEWS[bench]}/src", f"{root}/src"],
                        capture_output=True, text=True)
-    return r.stdout.replace(C.VIEWS[bench] + "/", "a/").replace(root + "/", "b/")
+    out = r.stdout.replace(C.VIEWS[bench] + "/", "a/").replace(root + "/", "b/")
+    return re.sub(r"(?m)^((?:---|\+\+\+) [ab]/\S+)\t.*$", r"\1", out)   # без времени файлов: одна сессия — один diff
