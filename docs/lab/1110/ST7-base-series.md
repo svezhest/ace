@@ -21,4 +21,16 @@
   - Входы 10–13 (текст настоящего ревьювера): замысел по неверной детали — жду на 11 и 13 в обеих сессиях
     (правка ветки `missing` на 11; «защита от повтора упавшего кода» на 13).
   - Время: default около 20 минут на 15 сессий разом, thinking около 40.
-- **Итог.** (дописывается ниже)
+- **Итог: серия прервана, не замерена.** 21:50 по `date`, на 33-й минуте, остановлена по слову автора: стенд
+  освобождён под другую модель. К этому моменту кончилась одна сессия из 30 (`07_default_s1`), остальные прошли
+  3–13 ходов: 30 сессий разом идут примерно по ходу за две-три минуты, оценка «20 и 40 минут» была неверной.
+  Логи оборванных сессий лежат в `runs/base_1110/`; как полные сессии они не годятся, как префиксы первых ходов —
+  годятся. Ожидания выше остаются непроверенными. Перезапуск — той же командой, лучше по 8–10 сессий разом.
+- **Стенд на момент остановки** (чтобы поднять как было): воркер `uv run python worker.py` в
+  `~/Projects/llm/src/worker`, gRPC 127.0.0.1:50051, `QWEN_MODEL=../../weights/ornith15-9b-mlx-8bit`,
+  `QWEN_MAX_BATCH=16`, `QWEN_BATCH_INVARIANT=1`, `QWEN_BATCH_RESERVE_TOKENS=1024`, `QWEN_MAX_CONTEXT=65536`,
+  `QWEN_KV_BITS=0`, `QWEN_PRESENCE_PENALTY=0`, `QWEN_PROMPT_CACHE=1`, `QWEN_PROMPT_CACHE_GB=4`,
+  `QWEN_PROMPT_CACHE_REPLY=0`, `QWEN_PROMPT_CACHE_DISK=~/.cache/qwen-pcdisk`; два шлюза
+  `./target/release/qwen-gateway` в `~/Projects/llm`: `GATEWAY_ADDR=127.0.0.1:8090 GATEWAY_THINKING=off` (default)
+  и `GATEWAY_ADDR=127.0.0.1:8081` (thinking), у обоих
+  `GATEWAY_SERVED_MODEL_NAMES=ornith15-9b,ornith-ai/Ornith-1.5-9B-MLX-8bit`.
