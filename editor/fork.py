@@ -30,25 +30,6 @@ def load(path):
     return [json.loads(line) for line in open(path)]
 
 
-def apply_edits(recs, upto, root):
-    """Применённые правки ходов < upto — на копию root (той же заменой строки, что и edit) -> сколько их."""
-    n = 0
-    for r in recs:
-        if r.get("type") != "turn" or r["i"] >= upto:
-            continue
-        for c, res in zip(r["tool_calls"], r["results"]):
-            if c["name"] != "edit" or not (res.get("edit") or {}).get("applied"):
-                continue
-            a = json.loads(c["arguments"])
-            p = f"{root}/{a['path']}"
-            old = open(p).read() if os.path.exists(p) else ""
-            assert a["old_string"] == "" or old.count(a["old_string"]) == 1, f"replay edit {r['i']}: old_string"
-            new = a["new_string"] if a["old_string"] == "" else old.replace(a["old_string"], a["new_string"])
-            open(p, "w").write(new)
-            n += 1
-    return n
-
-
 def history(recs, upto):
     """Сообщения сессии до хода upto (без него)."""
     meta = recs[0]
