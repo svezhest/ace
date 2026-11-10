@@ -283,25 +283,71 @@ def _operands(cond):
         tree = ast.parse(cond, mode="eval").body
     except SyntaxError:
         return []
-    out = []
+    out, syn = [], []
     safe = _safe
 
-    def walk(n):
+    def gen(n):
+        return (isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id in ("all", "any")
+                and n.args and isinstance(n.args[0], (ast.GeneratorExp, ast.ListComp)))
+
+    def walk(n, acc, neg=False, top=True):
         if isinstance(n, ast.BoolOp):
             for v in n.values:
-                walk(v)
+                walk(v, acc, neg, top)
         elif isinstance(n, ast.UnaryOp) and isinstance(n.op, ast.Not):
-            walk(n.operand)
+            walk(n.operand, acc, not neg, top)
         elif isinstance(n, ast.Compare):
             for v in [n.left] + n.comparators:
-                walk(v)
-        elif (isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id in ("all", "any")
-              and n.args and isinstance(n.args[0], (ast.GeneratorExp, ast.ListComp))):
-            walk(n.args[0].generators[0].iter)   # all/any(… for x in X): значение целиком — то же «never true», смотрим на X
+                walk(v, acc, neg, False)
+        elif gen(n) and top:
+            # all/any(E for x in X): значение целиком — то же «never true». Показываем X и элемент, который решил исход:
+            # первый, где E ложно (all) или истинно (not any); если исход решили все элементы — последний.
+            comp = n.args[0]
+            walk(comp.generators[0].iter, acc, top=False)
+            if not safe(n):
+                return
+            elt, clauses = ast.unparse(comp.elt), "".join(ast.unparse(g) for g in comp.generators)
+            tgt = [ast.unparse(g.target) for g in comp.generators]
+            tgt = tgt[0] if len(tgt) == 1 else "(" + ", ".join(tgt) + ")"
+            inner = []
+            walk(comp.elt, inner, top=False)
+            first = (n.func.id == "all") != neg
+            if first:
+                want = f"not ({elt})" if n.func.id == "all" else f"({elt})"
+                wrap = lambda x: f"next(({x}{clauses} if {want}))"
+                head = f"{'false' if n.func.id == 'all' else 'true'} first at "
+            else:
+                wrap = lambda x: f"[{x}{clauses}][-1]"
+                head = "at the last item "
+            bound = {x.id for g in comp.generators for x in ast.walk(g.target) if isinstance(x, ast.Name)}
+            for i, x in enumerate([tgt] + [x for x in dict.fromkeys(inner) if x not in bound][:3]):   # имена цели уже показаны
+                _SYN[wrap(x)] = (head if i == 0 else "", x)
+                syn.append(wrap(x))
         elif not isinstance(n, ast.Constant) and safe(n):
-            out.append(ast.unparse(n))
-    walk(tree)
-    return list(dict.fromkeys(out))[:4]
+            acc.append(ast.unparse(n))
+    walk(tree, out)
+    return list(dict.fromkeys(out))[:4] + list(dict.fromkeys(syn))
+
+
+_SYN = {}   # выражение-проба для элемента all/any -> (вводные слова, что показать писателю)
+
+
+def _is_err(v):
+    """Ошибка вычисления операнда — обычно короткое замыкание (`out and out.get(...)` при out = None) или элемента нет
+    (StopIteration у пробы all/any): такой операнд условие не вычисляло, показывать его нельзя. Сюда же значение без
+    содержания — `<zip object at 0x…>`."""
+    return isinstance(v, str) and v.startswith("<") and v.endswith(">") and (
+        any(t in v for t in ("Error", "Exception", "StopIteration")) or re.fullmatch(r"<[^<>]* at 0x[0-9a-f]+>", v) is not None)
+
+
+def _show_vals(vals):
+    """«`a` = 1, false first at `b` = 0: `x[b]` = (), `y` = 2»: после элемента all/any — двоеточие и его операнды."""
+    s, head = "", False
+    for e, v in vals.items():
+        pre, name = _SYN.get(e, ("", e))
+        s += ((": " if head else ", ") if s else "") + f"{pre}`{name}` = {v}"
+        head = bool(pre)
+    return s
 
 
 def _cond_of(text, ln):
@@ -364,16 +410,12 @@ def _dead_fact(changed, cov, hide=frozenset(), r=None):
         cand.sort(key=lambda c: -c[0])
         def with_vals(c):
             val = (cov.get("__val__") or {}).get(c[2]) if getattr(C, "TICKET_VALUES", False) else None
-            # ошибка вычисления операнда — обычно это короткое замыкание (`out and out.get(...)` при out = None):
-            # такой операнд условие не вычисляло, показывать его нельзя
-            vals = {e: v for e, v in ((val or {}).get("vals") or {}).items() if e not in hide
-                    and not (isinstance(v, str) and v.startswith("<") and v.endswith(">") and ("Error" in v or "Exception" in v))}
+            vals = {e: v for e, v in ((val or {}).get("vals") or {}).items() if e not in hide and not _is_err(v)}
             if not vals:
                 return c[1]
             anc = (f", after the model's reply at logs/run_{r}.jsonl line {val['line']}" if getattr(C, "TICKET_ANCHOR", False)
                    and val.get("line") and r is not None else "")
-            return (c[1] + f" (at its last run, before model call {val['call'] + 1}{anc}: "
-                    + ", ".join(f"`{e}` = {v}" for e, v in vals.items()) + ")")
+            return c[1] + f" (at its last run, before model call {val['call'] + 1}{anc}: " + _show_vals(vals) + ")"
         return "your " + "; your ".join(with_vals(c) for c in cand[:2])
     if dead:
         return f"your `{dead[2][:80]}` at src/{dead[1]}:{dead[0]} never ran"
@@ -464,8 +506,8 @@ def _fired_fact(changed, cov, hide=frozenset(), cprobe=None):
             if not body or len(text[body - 1]) - len(text[body - 1].lstrip()) <= ind or not hits.get(body):
                 continue
             v = vals.get(f"{rel}:{ln}") or {}
-            ops = {e: x for e, x in (v.get("vals") or {}).items() if e not in hide
-                   and not (isinstance(x, str) and x.startswith("<") and x.endswith(">") and ("Error" in x or "Exception" in x))}
+            # пробы элемента all/any выбраны под «ни разу не истинно»; у сработавшего условия они не о том
+            ops = {e: x for e, x in (v.get("vals") or {}).items() if e not in hide and e not in _SYN and not _is_err(x)}
             res.append((hits[body], f"your `{src[:80]}` at src/{rel}:{ln} was true {tm(hits[body])}"
                        + (f" (at its last run, before model call {v['call'] + 1}: " + ", ".join(f"`{e}` = {x}" for e, x in ops.items()) + ")"
                           if ops else "")))
