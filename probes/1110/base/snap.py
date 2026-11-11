@@ -15,7 +15,7 @@ sys.path.insert(0, ROOT)
 from nrhsi.editor import cfg as C, prompt as P, inputs as IN, work as WK, schema as SC  # noqa: E402
 
 T = f"{ROOT}/runs/typed_1111"
-INPUTS = {"00": ("alf", "alf_n4"), "01": ("app", "app_r1"), "02": ("app", "app_r1"), "03": ("app", "app_r1"),
+INPUTS = {"00": ("alf", "alf_n4"), "01": ("app", "app_r1"), "03": ("app", "app_r1"),
           "04": ("app", "app_r4"), "05": ("app", "app_r4"), "06": ("alf", "alf_r1"), "07": ("alf", "alf_r4chk"),
           "08": ("alf", "alf_r1"), "09": ("app", "app_n2")}
 
