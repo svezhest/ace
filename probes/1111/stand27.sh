@@ -1,5 +1,5 @@
 #!/bin/bash
-# stand27.sh — поднять стенд 27B заново (профиль stands/think27.json): остановить воркер и шлюзы, запустить, дождаться ответа.
+# stand27.sh — поднять стенд 27B заново (профили stands/think27.json — шлюз 8091, и plain27.json — шлюз 8092 без рассуждения): остановить воркер и шлюзы, запустить, дождаться ответа.
 # Зачем заново: кэш промпта прошлой сессии остаётся в памяти воркера (до 6 ГБ), и вторая-третья сессия подряд может
 # упасть на prefill с «[METAL] Insufficient Memory» (11.11 15:40, t3 после 01 и t5). Перезапуск между сессиями это снимает.
 L=/Users/user/Projects/nrhsi/runs/stand_1111; mkdir -p $L
@@ -13,6 +13,7 @@ HF_HUB_OFFLINE=1 QWEN_MODEL=../../weights/qwen38-27b-mlx-5bit QWEN_DRAFT=../../w
 cd /Users/user/Projects/llm
 for i in $(seq 120); do lsof -iTCP:50051 -sTCP:LISTEN > /dev/null 2>&1 && break; sleep 2; done
 GATEWAY_ADDR=127.0.0.1:8091 GATEWAY_SERVED_MODEL_NAMES=qwen38-27b nohup ./target/release/qwen-gateway >> $L/gateway27.log 2>&1 &
+GATEWAY_ADDR=127.0.0.1:8092 GATEWAY_THINKING=off GATEWAY_SERVED_MODEL_NAMES=qwen38-27b nohup ./target/release/qwen-gateway >> $L/gateway27n.log 2>&1 &
 for i in $(seq 120); do
   curl -s -m 120 http://127.0.0.1:8091/v1/chat/completions -H 'content-type: application/json' \
     -d '{"model":"qwen38-27b","messages":[{"role":"user","content":"Say ok"}],"max_tokens":8,"temperature":0}' | grep -q '"choices"' \
