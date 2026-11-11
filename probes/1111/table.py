@@ -17,22 +17,21 @@ PY = "/Users/user/Projects/nrhsi/nrhsi/bin/python3"
 
 
 def replay(work):
-    r = subprocess.run([PY, "tests/rerun.py"], cwd=work, capture_output=True, text=True)
-    out, f, p, crash = r.stdout + r.stderr, 0, 0, False
-    if "the prompt differs from the log" in out:
-        return None
-    for line in out.splitlines():
-        m = re.match(r"(?:runs?|all) .*?\((\d+) failed, (\d+) passed\): (.*)", line) or re.match(r"run (\d+) \((failed|passed)\): (.*)", line)
-        if not m:
+    """(проваленных иначе, удачных иначе, есть ли падение) по editor/rerun.py --json; None — промпт отличается от лога."""
+    bench = re.search(r"R\.worker\('(\w+)'", open(f"{work}/tests/rerun.py").read()).group(1)
+    r = subprocess.run([PY, "/Users/user/Projects/nrhsi/editor/rerun.py", "--bench", bench, "--src", f"{work}/src",
+                        "--logs", f"{work}/logs", "--json"], capture_output=True, text=True)
+    div = json.loads(r.stdout.strip().splitlines()[-1])
+    ok = {str(json.loads(l)["run"]): bool(json.loads(l).get("ok")) for l in open(f"{work}/logs/results.jsonl")}
+    f = p = 0
+    crash = False
+    for run, d in div.items():
+        if d is None:
             continue
-        if line.startswith("run ") and m.group(2) in ("failed", "passed"):
-            a, b, what = (1, 0, m.group(3)) if m.group(2) == "failed" else (0, 1, m.group(3))
-        else:
-            a, b, what = int(m.group(1)), int(m.group(2)), m.group(3)
-        if what.startswith("no changes"):
-            continue
-        crash |= "crash" in what
-        f, p = f + a, p + b
+        if d["kind"] == "model" and d["call"] == 1:
+            return None
+        crash |= d["kind"] == "crash"
+        f, p = f + (not ok[run]), p + ok[run]
     return f, p, crash
 
 
