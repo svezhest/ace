@@ -24,6 +24,9 @@ def key(m):
     return json.dumps(m, sort_keys=True, ensure_ascii=False)
 
 
+ADDED_CHARS = 2000       # знаков сообщения, которое харнесс теперь добавляет в разговор (строки «+»)
+
+
 def short(m, n=160):
     if m is None:
         return "-"
@@ -427,7 +430,7 @@ def report(new, old, res, runs, detail):
             body = ""
             if detail or d["kind"] == "bridge":
                 body += "".join(f"\n  - {short(m)}" for m in d["old"][:2])
-            body += "".join(f"\n  + {short(m)}" for m in d["new"][:3])
+            body += "".join(f"\n  + {short(m, ADDED_CHARS)}" for m in d["new"][:3])
         seen = {}
         for h, p in notes:
             s = f"hook {h['hook']}" + (f" at model call {h['call']}" if detail else "") + f": {fmt_hook(h)} (was {fmt_hook(p)})"

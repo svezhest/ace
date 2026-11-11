@@ -37,13 +37,21 @@ def clip(t, n):
 
 
 def smoke_scenarios(full):
-    """Вывод smoke -> [(заголовок сценария, строка исхода, [что харнесс добавил в разговор])]."""
+    """Вывод smoke -> [(заголовок сценария, строка исхода, [с чего разговор начинается и что харнесс в него добавил])].
+    Начало — строка «before reply 1: N messages (роли)»: число и роли стартовых сообщений, без их текста."""
     out = []
     for block in full.split("\n== ")[1:]:
         lines = block.splitlines()
         out.append((lines[0], lines[1].strip() if len(lines) > 1 else "",
-                    [x.strip() for x in lines[2:] if x.startswith("  after ") and "nothing besides" not in x]))
+                    [x.strip() for x in lines[2:] if x.startswith(("  after ", "  before reply 1:")) and "nothing besides" not in x]))
     return out
+
+
+def smoke_line(added, start0):
+    """Строка сценария: начало разговора называется, только если оно не такое, как до правок."""
+    said = [x for x in added if not x.startswith("before reply 1:")]
+    start = [x for x in added if x.startswith("before reply 1:") and x not in start0]
+    return "; ".join(start + said) if start + said else "nothing besides the environment results"
 
 
 def smoke_added(run, full):
@@ -57,14 +65,16 @@ def smoke_added(run, full):
     if now == run.smoke0:
         return " With the stub task and model the harness says the same as before your edits."
     t = " With the stub task and model, where no reply and no answer is ever repeated, the harness now says:"
+    was = dict((h, a) for h, _, a in run.smoke0)
     for head, end, added in now:
-        t += f"\n  {head}: " + ("; ".join(added) if added else "nothing besides the environment results")
+        t += f"\n  {head}: " + smoke_line(added, was.get(head, []))
         if run.smoke0 and end != dict((h, e) for h, e, _ in run.smoke0).get(head):
             t += f" ({end})"
     if run.smoke0:
         t += "\n  before your edits:"
+        new = dict((h, a) for h, _, a in now)
         for head, end, added in run.smoke0:
-            t += f"\n  {head}: " + ("; ".join(added) if added else "nothing besides the environment results")
+            t += f"\n  {head}: " + smoke_line(added, new.get(head, []))
     return t
 
 

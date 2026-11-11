@@ -1,14 +1,18 @@
 """11.11: виды runs/typed_1110 -> runs/typed_1111. Из app_r1 и app_r4 убрана проверка «The previous step produced this
 output again»: она сравнивает код ответа с выводом прошлого шага и не срабатывает никогда (след старых узлов e3–e8).
 Из app_r1 убрана и output_text — больше ей пользоваться некому; в app_r4 она остаётся, её зовёт _is_new_step (вход 04).
-Остальные виды — копии. Во входах 01–04 сдвинуты ссылки на строки src/harness.py. typed_1110 не меняется: на нём
+Остальные виды — копии; README всех видов — из nrhsi/plain.py (в нём назван конец эпизода
+защитой моста, «repeated reply»). Во входах 01–04 сдвинуты ссылки на строки src/harness.py. typed_1110 не меняется: на нём
 записаны прежние сессии и идут проигрыши probes/1110/gold. Проверка — tests/rerun.py в копии писателя: «no changes».
 
   python3 tools/port_typed_1111.py"""
 import shutil
+import sys
 from pathlib import Path
 
 N = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(N / "nrhsi"))
+import plain  # noqa: E402
 OLD, NEW = N / "runs/typed_1110", N / "runs/typed_1111"
 
 OUTPUT_TEXT = '''def output_text(content):
@@ -46,6 +50,7 @@ for d in sorted(p for p in OLD.iterdir() if p.is_dir() and p.name != "in"):
     if (NEW / d.name).exists():
         shutil.rmtree(NEW / d.name)
     shutil.copytree(d, NEW / d.name, symlinks=True)
+    (NEW / d.name / "README.md").write_text(plain.README[d.name[:3]])     # README: конец эпизода защитой моста назван
     if d.name in CUT:
         h = NEW / d.name / "src/harness.py"
         h.write_text(cut(h.read_text(), [(c, "") for c in CUT[d.name]], d.name))
