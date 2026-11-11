@@ -214,7 +214,8 @@ def play(bench, src, log, at=None, cover=None, watch=None):
             diverge(kind="model", call=k + 1, text="what the model sees differs from the log", at=j,
                     new=messages[j:j + 3], old=want[j:j + 3] or [conv[model_pos[k]]], bench=bench,
                     ran_log=steps_log, ran_now=state["send"], was=ev[line_of[j] - 1]["event"] if j < len(want) else "model",
-                    prev=ev[line_of[j - 1] - 1]["event"] if j else None, **extra)
+                    prev=ev[line_of[j - 1] - 1]["event"] if j else None,
+                    sent=next((m for m in reversed(want[:j] + [conv[model_pos[k - 1]]] if k else []) if m["role"] == "assistant"), None), **extra)
         reply = json.loads(key(conv[model_pos[k]]))
         if bench == "app" and (reply.get("content") or "").endswith("\n\n"):
             reply["content"] = reply["content"][:-2]   # в логе ответ после обрезки харнессом, с его "\n\n"
@@ -432,6 +433,26 @@ def said(m, n):
     return '"' + s[:n] + ("…" if len(s) > n else "") + '"'
 
 
+def sent_text(d, n=90):
+    """Что прислала модель перед местом расхождения: действие (ALF) или первая строка кода (AppWorld)."""
+    import re
+    m = d.get("sent")
+    if not m:
+        return ""
+    if m.get("tool_calls"):
+        a = m["tool_calls"][0]["function"]["arguments"]
+        try:
+            a = json.loads(a).get("action", a)
+        except Exception:
+            pass
+        s = str(a)
+    else:
+        c = re.search(r"```python\n(.*?)(```|$)", m.get("content") or "", re.S)
+        lines = [l for l in (c.group(1) if c else m.get("content") or "").strip().splitlines() if l.strip()]
+        s = (lines[0] if lines else "") + (" …" if len(lines) > 1 else "")
+    return ' "' + s[:n] + ("…" if len(s) > n else "") + '"'
+
+
 def event_of(d):
     """Что харнесс делает иначе на месте расхождения — по логу и повтору, без толкования. None: прежняя форма «- / +»."""
     if d is None or d["kind"] != "model" or d["call"] == 1 or "was" not in d or not d["old"]:
@@ -448,7 +469,8 @@ def event_of(d):
 def event_text(d, first):
     """Одно событие полными предложениями: что было в логе, что харнесс делает теперь. first — номер прогона той же
     группы, уже описанного выше (тогда коротко), или None."""
-    c, w = event_of(d), WORDS[d["bench"]]
+    c, w = event_of(d), {k: v.replace(" code", " code" + sent_text(d)).replace(" action", " action" + sent_text(d)) if k in ("ran",) else v
+                         for k, v in WORDS[d["bench"]].items()}
     old = said(d["old"][0], WAS_CHARS)
     new = said(d["new"][0], ADDED_CHARS) if d["new"] else ""
     if c == "skipped":
@@ -497,7 +519,8 @@ def report_plain(new, old, res, runs):
             if ev[r] is None:
                 out.append("- " + report_diff(new, old, res, [r], detail=True).replace("\n", "\n  "))
                 continue
-            groups.setdefault((ev[r], norm(said(d["new"][0], ADDED_CHARS)) if d["new"] else ""), []).append(r)
+            hk = (hook_notes(new[r]["hooks"], old[r]["hooks"]) if old else [])[:1]
+            groups.setdefault((ev[r], hk[0][0]["hook"] if hk else norm(said(d["new"][0], ADDED_CHARS)) if d["new"] else ""), []).append(r)
         for k, rs in sorted(groups.items(), key=lambda g: g[0][0].startswith("reworded")):   # смена одного текста — после изменений поведения
             for r in rs[:SAME_RUNS]:
                 d = new[r]["div"]
@@ -505,7 +528,7 @@ def report_plain(new, old, res, runs):
                 if k not in firsts:
                     firsts[k] = r
                     for h, p in (hook_notes(new[r]["hooks"], old[r]["hooks"]) if old else [])[:1]:
-                        line += f"\n  Hook {h['hook']} returns {fmt_hook(h)} here; with the original src/ it returned {fmt_hook(p)}."
+                        line += f" This message comes from the hook {h['hook']}; with the original src/ the hook returned {fmt_hook(p)} here."
                 out.append(line)
             rest = rs[SAME_RUNS:]
             if rest:
