@@ -86,7 +86,7 @@ def edit_checks(run):
     smoke = ("python3 tests/smoke.py prints:\n" + out if not ok or "Traceback" in full else
              "python3 tests/smoke.py runs without errors." + smoke_added(run, full))
     rerun = clip(WK.tool_run(run, "rerun")[2].strip(), F.OUT_CHARS)
-    t = ("Checks run on src/ after this edit (they use no bash calls):\n" + (lint_ + "\n" if lint_ else "") + smoke
+    t = ("Checks run on src/ after this edit:\n" + (lint_ + "\n" if lint_ else "") + smoke
          + "\npython3 tests/rerun.py prints:\n" + clip(rerun, C.RERUN_CHARS).rstrip())
     return t + ("\n\n" + ticket_check(run) if C.TICKET else "")
 

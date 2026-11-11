@@ -17,8 +17,7 @@ PYTHON_LINE
 
 # How to work
 - Read the part of src/ a change touches before you edit it, and keep intact what the rest of the harness relies on.
-- Checks run by themselves: after each edit that is applied, pyflakes, python3 tests/smoke.py and python3 tests/rerun.py are run on src/, and their output comes with the edit's answer; this uses no bash calls. Read the changed lines together with the code that calls or uses them. To look at one run in detail, run python3 tests/rerun.py N yourself (see README.md). If the runs an observation is about show no changes, your change may have missed.
-- bash can be called BASH_LIMIT times; after that FINAL_TURNS turns remain without bash: edits are still applied and checked after each one, and then the session ends."""
+- Checks run by themselves: after each edit that is applied, pyflakes, python3 tests/smoke.py and python3 tests/rerun.py are run on src/, and their output comes with the edit's answer. Read the changed lines together with the code that calls or uses them. To look at one run in detail, run python3 tests/rerun.py N yourself (see README.md). If the runs an observation is about show no changes, your change may have missed."""
 
 
 def system():
