@@ -7,7 +7,8 @@ import os
 _R = os.environ.get("NRHSI_ROOT")
 if _R:
     import sys
-    _fw = sys.base_prefix.split(".framework/")[0] + ".framework/"   # stdlib интерпретатора
+    _bp = sys.base_prefix                                           # stdlib интерпретатора: фреймворк или префикс
+    _fw = _bp.split(".framework/")[0] + ".framework/" if ".framework/" in _bp else _bp.rstrip("/") + "/"
     _SYS = (_fw, "/dev/", "/usr/share/", "/usr/lib/", "/System/", "/Library/Developer/",
             os.path.dirname(os.path.abspath(__file__)) + "/") + tuple(
         x.rstrip("/") + "/" for x in os.environ.get("NRHSI_SYS", "").split(":") if x)   # наши программы (runs, smoke)

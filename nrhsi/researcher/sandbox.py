@@ -45,9 +45,14 @@ def exec_programs():
 
 
 def py_paths():
-    """29.10: python3 для песочницы. bin/python3 -> PY_LINK -> .../Python3.framework/Versions/X/bin/python3.X —
-    запускалка, она порождает Resources/Python.app/Contents/MacOS/Python. -> пути для профиля."""
+    """python3 для песочницы: bin/python3 -> PY_LINK -> запускалка. -> пути для профиля; framework — каталог,
+    где лежит stdlib. Сборка-фреймворк (29.10): .../Python3.framework/Versions/X/bin/python3.X порождает
+    Resources/Python.app/Contents/MacOS/Python. Обычная сборка (11.11): ПРЕФИКС/bin/python3.X, stdlib в ПРЕФИКС/lib."""
     launcher = os.path.realpath(C.PY_LINK)
+    if ".framework/" not in launcher:
+        assert os.path.isfile(launcher), launcher
+        return {"launcher": launcher, "app": launcher, "framework": os.path.dirname(os.path.dirname(launcher)),
+                "link": C.PY_LINK}
     ver = os.path.dirname(os.path.dirname(launcher))                 # .../Python3.framework/Versions/3.9
     fw = os.path.dirname(os.path.dirname(ver))                       # .../Python3.framework
     app = os.path.join(ver, "Resources/Python.app/Contents/MacOS/Python")
@@ -223,7 +228,8 @@ def root_prelude(root):
 def root_paths(text, root):
     text = re.sub(r'  File "' + re.escape(C.SITE) + r'/sitecustomize\.py", line \d+, in \w+\n[^\n]*\n', "", text)
     text = re.sub(r"/bin/bash: line \d+: ", "bash: ", text)       # номер строки — с учётом пролога
-    return text.replace(C.BIN, "/usr/local/bin").replace(root + "/", "/").replace(root, "/")
+    text = text.replace(C.BIN, "/usr/local/bin").replace(root + "/", "/").replace(root, "/")
+    return text.replace(py_paths()["framework"], "/usr/local") if C.PYTHON or C.RUNS_TOOL else text   # stdlib в трассах
 
 
 def run_bash(cmd, root, prof, info=None):
