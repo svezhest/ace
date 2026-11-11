@@ -92,7 +92,7 @@ def play(harness, Ep, script, mk):
         msgs, end = convo.get("m") or [], f"crashed after {len(marks)} model replies"
         e = sys.exc_info()
         tb = [f for f in traceback.extract_tb(e[2]) if f.filename != __file__]   # only the harness frames
-        err = "Traceback (most recent call last):\n" + "".join(traceback.format_list(tb)) + \
+        err = "Traceback (most recent call last):\n" + "".join(traceback.format_list(tb[-3:])) + \
             "".join(traceback.format_exception_only(e[0], e[1]))
     return ep, msgs, marks, end, err
 
@@ -154,7 +154,7 @@ def main():
         print(f"  {end}; steps run: {ep.steps}; episode ended by the benchmark: {bool(ep.finished)}"
               + (f" ({ep.end})" if ep.end else ""))
         if err:
-            print("  " + "\n  ".join(err.rstrip().splitlines()[-8:]))
+            print("  " + "\n  ".join(err.rstrip().splitlines()))
         for line in report(msgs, marks, ep):
             print(line)
 
