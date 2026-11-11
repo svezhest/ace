@@ -56,6 +56,26 @@
   - t5, ход 11: значения из сводки («17», будильники, «passed») в рассуждении появятся — это проверка, что строка
     прочитана; сузит ли условие — один к одному: блок «Check» по-прежнему отвечает Ok по run 8, и тикет просит
     блокировать. Не сбылось, если значений в рассуждении снова нет.
+- **Итог второй формы, 18:12 по `date`.** Две развилки, 17:50–18:11 (`t3r.fork2`, `t5.fork2`).
+  - t3, ход 24: сбылось. «So in the log, at model call 5, the harness did NOT run the code (it triggered the old repeat
+    guard). And now the new harness also does not run it… only the message text differs». Неверного «doesn't fire» нет,
+    bash не вызван; ход ушёл на уборку (лишняя константа), в конце рассуждения — свой вопрос, не блокирует ли правило
+    законный повтор после смены состояния.
+  - t5, ход 11: событие прочитано, решение прежнее. «Run 3: only the message text changed (the same block, just with
+    the new wording)»; «Runs 8, 20 (passing runs): the harness now blocks a re-send that was previously executed — this
+    is the intended behavior change (… in the log it recovered and succeeded, so it's likely to recover here too)».
+    Самих значений («17») в рассуждении нет. Условие не сужено; дальше — bash и план «страховки» (конец эпизода после
+    трёх блокировок подряд).
+  - **Сравнение форм на этих двух ходах:** событие названо верно — 0 из 2 с «-»/«+» (t3 — неверная причина, t5 — не
+    прочитано), 2 из 2 с явными предложениями. Решение на плохом тикете (t5) не изменила ни одна.
+- **Третья проба: блок «Check against the observation» без «Ok» по удачному прогону.** Один ход, t5/11; к сводке второй
+  формы добавлена замена блока (текст вписан руками в `t5.last3.txt`, кода в `gate.py` ещё нет): «The observation names
+  runs 1, 4, 8 and 9. — Runs 1, 4 and 9 failed in the log. Now the harness acts differently in each of them. — Run 8
+  passed in the log: the task was solved there. Now the harness acts differently in it too: at model call 10 it does
+  not run the code that it ran in the log.» База для сравнения — `t5.fork2`.
+  **Ожидание (18:12 по `date`):** один к двум, что условие сузит: тикет прямо просит блокировать и приводит run 8 примером;
+  по мерке «точность реализации входа» буквальное исполнение — не ошибка писателя. Смотрю прежде всего, что он скажет
+  о run 8 в рассуждении и в итоге: исчезнет ли «it recovered».
 - **Длина.** На итоге t5 сводка — 2,2 тыс. знаков против 0,5 тыс.; на эталоне 06 (ALF, 19 расходящихся прогонов) —
   20,0 тыс. против 14,0 тыс.: сообщения хука там свои у каждого прогона, группы почти не склеиваются, строка хука
   повторяет сообщение. Для 9B это надо ужимать до замера на ALF; здесь не сделано.
