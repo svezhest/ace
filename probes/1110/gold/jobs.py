@@ -1,10 +1,11 @@
-import subprocess, sys
+import os, subprocess, sys
 from concurrent.futures import ThreadPoolExecutor
 G = sys.argv[1]
+RUN = ["probes/1110/nostand.py"] if os.environ.get("NOSTAND") else []   # NOSTAND=1: стенд не поднят
 def one(line):
     n, log, a = line.rstrip("\n").split("|")
     with open(f"{G}/cur/{n}.out", "w") as f:
-        r = subprocess.run([sys.executable, "editor/replay.py", log, "--"] + a.split() + ["--home", f"{G}/cur/{n}", "--tag", "t"],
+        r = subprocess.run([sys.executable] + RUN + ["editor/replay.py", log, "--"] + a.split() + ["--home", f"{G}/cur/{n}", "--tag", "t"],
                            stdout=f, stderr=subprocess.STDOUT, cwd="/Users/user/Projects/nrhsi")
     return n, r.returncode
 with ThreadPoolExecutor(6) as ex:
