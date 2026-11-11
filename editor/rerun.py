@@ -24,7 +24,9 @@ def key(m):
     return json.dumps(m, sort_keys=True, ensure_ascii=False)
 
 
-ADDED_CHARS = 2000       # знаков сообщения, которое харнесс теперь добавляет в разговор (строки «+»)
+ADDED_CHARS = 2000
+WAS_CHARS = 110      # строка «-» сводки: что было в логе на месте расхождения
+WAS_RUNS = 5       # знаков сообщения, которое харнесс теперь добавляет в разговор (строки «+»)
 
 
 def short(m, n=160):
@@ -437,8 +439,10 @@ def report(new, old, res, runs, detail):
             seen[s] = seen.get(s, 0) + 1
         for s, n in list(seen.items())[:3]:
             body += f"\n  {s}" + (f" ×{n}" if detail and n > 1 else "")
-        g = groups.setdefault(norm(head + body), {"head": head, "body": body, "tags": [], "calls": []})
+        g = groups.setdefault(norm(head + body), {"head": head, "body": body, "tags": [], "calls": [], "was": []})
         g["tags"].append((r, bool(res.get(r, {}).get("ok"))))
+        if d is not None and d["kind"] == "model" and d["call"] > 1 and not detail and d["old"]:
+            g["was"].append((r, bool(res.get(r, {}).get("ok")), short(d["old"][0], WAS_CHARS)))
         g["calls"].append(str(d["call"]) if d else "")
     out = []
     for g in groups.values():
@@ -449,8 +453,23 @@ def report(new, old, res, runs, detail):
             by = [", ".join(f"run {r} at {c}" for (r, ok), c in zip(g["tags"], g["calls"]) if ok == want) for want in (False, True)]
             head = g["head"].replace("at model call {calls}", "at model call: " + "; ".join(f"{n} — {x}" for n, x in zip(("failed", "passed"), by) if x))
         ex = " (e.g. run " + g["tags"][0][0] + ")" if len(g["tags"]) > 1 and g["body"] and norm(g["body"]) != g["body"] else ""
-        out.append(runs_label(g["tags"], len(runs)) + ": " + head + ex + g["body"])
+        out.append(runs_label(g["tags"], len(runs)) + ": " + head + ex + was_lines(g["was"]) + g["body"])
     return "\n".join(out)
+
+
+def was_lines(was):
+    """11.11: что стояло в логе на месте расхождения — строки «-» перед «+», как в diff. В сводке раньше была только «+»,
+    и замена прежнего сообщения харнесса не отличалась от замены ответа среды. Удачные прогоны первыми, не больше WAS_RUNS."""
+    if not was:
+        return ""
+    if len({w for _, _, w in was}) == 1:
+        return f"\n  - {was[0][2]}"
+    was = sorted(was, key=lambda x: not x[1])
+    out = "".join(f"\n  - run {r} ({'passed' if ok else 'failed'}): {w}" for r, ok, w in was[:WAS_RUNS])
+    rest = was[WAS_RUNS:]
+    if rest:
+        out += f"\n  - ... and {len(rest)} more ({sum(1 for _, ok, _ in rest if not ok)} failed, {sum(1 for _, ok, _ in rest if ok)} passed)"
+    return out
 
 
 def report_at(r, t, log, at, ok):
