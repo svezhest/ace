@@ -45,7 +45,7 @@ for log in sorted(glob.glob(f"{H}/logs/*{SUB}*.jsonl")):
         print(f"{tag} | идёт: {sum(x.get('type') == 'turn' for x in L)} ходов")
         continue
     st, turns = end[-1]["stats"], [x for x in L if x.get("type") == "turn"]
-    fe = next((x["i"] for x in turns if any(c["name"] == "edit" for c in x["tool_calls"])), None)
+    fe = next((x["i"] for x in turns if any(c["name"] == "edit" for c in x.get("tool_calls") or [])), None)
     last = ""
     for x in turns:
         for r in x.get("results") or []:
