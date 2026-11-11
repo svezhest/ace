@@ -79,8 +79,9 @@ SCRATCH_MAX = 64 * 2**20         # больше — каталог очищае�
 SCRATCH_FILE_KB = 16384          # ulimit -f: файл не больше стольких КБ
 BIN = os.path.join(PKG, "bin")                   # runs и python3 -> PY_LINK; в PATH песочницы первым
 SITE = os.path.join(PKG, "site")                 # sitecustomize.py: «/» = корень вида и для python3
-PY_LINK = "/Library/Developer/CommandLineTools/usr/bin/python3"   # /usr/bin/python3 — обёртка xcode-select:
-                                                                  # в песочнице не работает
+# 11.11: python3 песочницы — тот же 3.11.11, под которым идут бенчи (до того — 3.9.6 из CommandLineTools:
+# правку с match или X | None проверки называли падением, хотя агент с ней работает).
+PY_LINK = os.path.expanduser("~/.local/share/uv/python/cpython-3.11.11-macos-aarch64-none/bin/python3.11")
 
 # A2: политики контекста. Значения — в meta лога сессии.
 POLICIES = {
