@@ -2,7 +2,8 @@
 
   DEEPSEEK_API_KEY=... python3 probes/1111/ds/run_ds.py on|off -- АРГУМЕНТЫ РЕДАКТОРА (--stand не нужен)
 
-on|off — рассуждение модели (thinking enabled / disabled). Ключ берётся из окружения и никуда не пишется.
+on|off — рассуждение модели (thinking enabled / disabled). DS_BASH_LIMIT=N — лимит bash N вместо 25
+(бюджет всех вызовов N + 70, окно харнесса 150 000 вместо 54 000: у модели провайдера окно не узкое место). Ключ берётся из окружения и никуда не пишется.
 Лог сессии — как у писателя (HOME/logs/TAG.jsonl: каждый ход, рассуждение, вызовы, ответы инструментов);
 сырые запросы и ответы API — HOME/raw/TAG.jsonl.
 В режиме рассуждения провайдер требует возвращать reasoning_content прежних ходов; в учёт окна харнесса
@@ -93,6 +94,11 @@ def main():
     os.makedirs(f"{home}/raw", exist_ok=True)
     RAW = open(f"{home}/raw/{tag}.jsonl", "w")
     F.apply_stand, F.chat = apply_stand, chat
+    if os.environ.get("DS_BASH_LIMIT"):          # больший лимит bash: бюджет вызовов и окно харнесса — под него
+        from nrhsi.editor import cfg as EC
+        EC.BASH_LIMIT = int(os.environ["DS_BASH_LIMIT"])
+        EC.STEP_BUDGET = EC.BASH_LIMIT + 70
+        EC.HARD_AT, RC.CTX = 150000, 200000
     sys.argv = [sys.argv[0]] + args
     cli.main()
 
