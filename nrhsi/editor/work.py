@@ -107,6 +107,9 @@ print(R.report(new, old, R.results(logs), runs, detail=bool(args)))
 """
 
 
+CORE_README = ("`tests/rerun_core.pyc` is the compiled engine that `tests/rerun.py` runs; its source is not in this "
+               "directory. Everything it does is described above.\n")
+
 WORK_MTIME = 1793491200   # 2026-11-01 00:00 UTC
 
 
@@ -127,7 +130,7 @@ def build_work(bench, tag):
     assert readme.count(READ_FAILED) == 1   # 4.11, автор: писатель сначала доверяет коллеге (строка — для ревьювера)
     readme = readme.replace(READ_FAILED, "").rstrip("\n") + "\n"
     with open(f"{v}/README.md", "w") as f:
-        f.write(readme + RERUN_README + RERUN_AT_README + RUNS_README + SMOKE_README)
+        f.write(readme + RERUN_README + RERUN_AT_README + CORE_README + RUNS_README + SMOKE_README)
     shutil.copytree(f"{view}/src", f"{v}/src", ignore=shutil.ignore_patterns("__pycache__"))
     shutil.copytree(f"{view}/src", f"{v}/tests/orig_src", ignore=shutil.ignore_patterns("__pycache__"))
     shutil.copytree(f"{view}/logs", f"{v}/logs")
@@ -136,10 +139,18 @@ def build_work(bench, tag):
     # и по нему же (под тем же python3 песочницы) идёт проверка по тикету.
     from .. import plain
     core = open(os.path.join(os.path.dirname(C.SMOKE), "..", "..", "editor", "rerun.py")).read()
-    for name, text in (("rerun_core.py", plain.strip(core)[0]), ("rerun.py", RERUN_PY.replace("BENCH", repr(bench))),
-                       ("runs.py", runs_py())):
+    for name, text in (("rerun.py", RERUN_PY.replace("BENCH", repr(bench))), ("runs.py", runs_py())):
         with open(f"{v}/tests/{name}", "w") as f:
             f.write(text)
+    # 12.11 (проба RC): ядро — скомпилированным модулем без исходника. Исходник в 647 строк писатель читал целиком
+    # (4–9 вызовов bash, до 38 % знаков всех ответов инструментов); что ядро делает, сказано в README.
+    tmp = f"{C.HERE}/.core_{tag}.py"
+    with open(tmp, "w") as f:
+        f.write(plain.strip(core)[0])
+    subprocess.run([os.path.join(F.BIN, "python3"), "-c",
+                    "import py_compile, sys; py_compile.compile(sys.argv[1], cfile=sys.argv[2], dfile='rerun_core.py', doraise=True, "
+                    "invalidation_mode=py_compile.PycInvalidationMode.UNCHECKED_HASH)", tmp, f"{v}/tests/rerun_core.pyc"], check=True)
+    os.remove(tmp)
     for p in glob.glob(f"{v}/src/*"):
         assert os.stat(p).st_nlink == 1, p          # копия, не жёсткая ссылка
     for d, dirs, files in os.walk(v, topdown=False):    # время файлов одно на все сессии: ls -la не разводит пары
