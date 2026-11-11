@@ -15,13 +15,22 @@ SMOKE_README = ("- `tests/smoke.py` — a smoke test: runs src/harness.py with a
                 "Run it with `python3 tests/smoke.py`.\n")
 
 
-RERUN_README = """- `tests/rerun.py` — replays the runs recorded in `logs/` on the current `src/`. The model's replies and the task's messages are taken from the log, so neither the model nor the benchmark is called. As long as what the harness gives the model and the task is the same as in the log, the log still describes the run; at the first place where it differs, the replay of that run stops and the difference is printed: `-` what the log has there, `+` what the harness does now. From that point on the rest of the log no longer applies. It also shows the hooks whose answer changed compared with `src/` as it was at the start (a copy of it is in `tests/orig_src/`). `no changes` means that in those runs the current `src/` gives the model and the task exactly what the log has. `python3 tests/rerun.py` prints one line per group of runs that behave the same way; `python3 tests/rerun.py N` shows run N in detail, with the line of `logs/run_N.jsonl`. An example, from the harness of another agent, where a hook was added that says "foobar" when the observation has both "foo" and "bar" in it:
+RERUN_README = """- `tests/rerun.py` — replays the runs recorded in `logs/` on the current `src/`. The model's replies and the task's messages are taken from the log, so neither the model nor the benchmark is called. As long as what the harness gives the model and the task is the same as in the log, the log still describes the run; at the first place where it differs, the replay of that run stops: from that point on the rest of the log no longer applies, and what the model would do next is not known. `python3 tests/rerun.py` says for each run what the harness did at that place in the log and what it does now, the passed runs first; "goes exactly as in the log" (or `no changes`) means that in those runs the current `src/` gives the model and the task exactly what the log has. `python3 tests/rerun.py N` shows run N in detail, with the line of `logs/run_N.jsonl`: `-` what the log has there, `+` what the harness does now, and the hooks whose answer changed compared with `src/` as it was at the start (a copy of it is in `tests/orig_src/`). An example, from the harness of another agent, where a hook was added that says "foobar" when the observation has both "foo" and "bar" in it:
 ```
 $ python3 tests/rerun.py
-runs 2, 5, 9 (1 failed, 2 passed): no changes (same as the log to the end)
-runs 1, 3, 4, 6, 7, 8 (4 failed, 2 passed): diverges at model call: failed — run 1 at 12, run 3 at 17, run 4 at 17, run 7 at 30; passed — run 6 at 12, run 8 at 30: what the model sees differs from the log (e.g. run 1)
-  + user: foobar
-  hook on_observation: {"message": "foobar"} (was None)
+9 runs replayed on your src/. 6 go differently from the log: 2 passed runs and 4 failed runs. 3 go exactly as in the log. Each run is replayed up to the first place where the harness does something different from the log; what the model would do after that is not known: the replay only has the model's replies from the log.
+
+Passed runs (in the log the task was solved). 2 of them now go differently:
+- run 6, model call 12. Now the harness gives the model a message that the log does not have here: "foobar" This message comes from the hook on_observation; with the original src/ the hook returned None here.
+- run 8, model call 30. The same as run 6: now the harness gives the model a message that the log does not have here.
+- runs 5, 9. Go exactly as in the log.
+
+Failed runs. 4 of them now go differently:
+- run 1, model call 12. The same as run 6: now the harness gives the model a message that the log does not have here.
+- run 3, model call 17. The same as run 6: now the harness gives the model a message that the log does not have here.
+- run 4, model call 17. The same as run 6: now the harness gives the model a message that the log does not have here.
+- run 7 (model call 30). The same as run 6.
+- run 2. Goes exactly as in the log.
 $ python3 tests/rerun.py 3
 run 3 (failed): diverges at model call 17 (log line 52): what the model sees differs from the log
   - assistant: The foo is next to the bar, I will take the foo. | act: take foo

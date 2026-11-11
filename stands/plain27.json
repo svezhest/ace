@@ -1,0 +1,47 @@
+{
+  "name": "plain27",
+  "doc": "Писатель на Qwen 27B (5 бит) без рассуждения, драфтер DFlash2: ступень между think27 и 9B. Воркер тот же, что у think27; шлюз свой, с GATEWAY_THINKING=off, порт 8092 (клиент без рассуждения ничего не шлёт, решает шлюз). Поднять оба шлюза: probes/1111/stand27.sh. Один поток, temperature 0.0 — сессия детерминирована.",
+  "model": "qwen38-27b",
+  "served_model": "qwen38-27b-mlx-5bit",
+  "worker": {
+    "port": 50051,
+    "count": 1,
+    "env": {
+      "QWEN_MODEL": "../../weights/qwen38-27b-mlx-5bit",
+      "QWEN_KV_BITS": "0",
+      "QWEN_MRQMM5": "1",
+      "QWEN_DRAFT": "../../weights/qwen38-27b-dflash2",
+      "QWEN_MAX_BATCH": "1",
+      "QWEN_MAX_CONTEXT": "65536",
+      "QWEN_PROMPT_CACHE": "1",
+      "QWEN_PROMPT_CACHE_MOVE": "1",
+      "QWEN_PROMPT_CACHE_GB": "3",
+      "QWEN_PROMPT_CACHE_CKPTS": "4",
+      "QWEN_WIRED_LIMIT_GB": "27",
+      "QWEN_CACHE_LIMIT_GB": "1",
+      "QWEN_SDPA_FUSED_MIN_KV": "8192",
+      "QWEN_PREFILL_BUDGET": "16777216",
+      "QWEN_PRESENCE_PENALTY": "0",
+      "QWEN_BATCH_MEM_GB": "3.2"
+    }
+  },
+  "gateways": {
+    "main": {
+      "port": 8092,
+      "cmd": "./target/release/qwen-gateway",
+      "env": {
+        "GATEWAY_ADDR": "127.0.0.1:8092",
+        "GATEWAY_THINKING": "off",
+        "GATEWAY_SERVED_MODEL_NAMES": "qwen38-27b"
+      },
+      "thinking": false
+    }
+  },
+  "agent": {
+    "gateway": "main",
+    "temperature": 0.0,
+    "max_tokens": 8192,
+    "thinking": false,
+    "think_budget": null
+  }
+}

@@ -21,7 +21,8 @@
       "QWEN_CACHE_LIMIT_GB": "1",
       "QWEN_SDPA_FUSED_MIN_KV": "8192",
       "QWEN_PREFILL_BUDGET": "16777216",
-      "QWEN_PRESENCE_PENALTY": "0"
+      "QWEN_PRESENCE_PENALTY": "0",
+      "QWEN_BATCH_MEM_GB": "3.2"
     }
   },
   "gateways": {
