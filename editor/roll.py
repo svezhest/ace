@@ -43,6 +43,9 @@ def main():
     ap.add_argument("--stop", choices=["edit", "checked", "end"], default="edit",
                     help="edit: на первом ответе с edit, правка не применяется; checked: правка применена и проверена; "
                          "end: до конца сессии (не дольше --max-turns)")
+    ap.add_argument("--replayed", action="store_true", help="история до развилки — проигранная нынешним кодом, а не записанная: "
+                    "модель видит ответы инструментов от нынешнего харнесса (проба правки ответов стенда); в логе продолжения "
+                    "ходы до развилки остаются записанными")
     ap.add_argument("--capture", help="файл: вместо вызова модели записать сюда первый запрос продолжения и выйти "
                     "(сверка с запросом живой сессии — editor/fork_check.py --roll)")
     cut = sys.argv.index("--")
@@ -105,7 +108,8 @@ def main():
                     break
                 if r.get("type") in ("turn", "note"):
                     run.w(r)
-            run.messages = json.loads(json.dumps(ms0))
+            if not a.replayed:
+                run.messages = json.loads(json.dumps(ms0))
             out = {"k": k, "log": run.log.name, "turns": [], "edit": None, "checked": None, "end": None,
                    "prefix_diff": prefix_diff}
             for _ in range(a.max_turns):
