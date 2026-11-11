@@ -455,6 +455,8 @@ def sent_text(d, n=90):
 
 def event_of(d):
     """Что харнесс делает иначе на месте расхождения — по логу и повтору, без толкования. None: прежняя форма «- / +»."""
+    if d is not None and d["kind"] == "end" and d["text"].startswith("the harness adds messages after") and d["new"]:
+        return "added_end"
     if d is None or d["kind"] != "model" or d["call"] == 1 or "was" not in d or not d["old"]:
         return None
     if not d["new"]:
@@ -469,6 +471,10 @@ def event_of(d):
 def event_text(d, first):
     """Одно событие полными предложениями: что было в логе, что харнесс делает теперь. first — номер прогона той же
     группы, уже описанного выше (тогда коротко), или None."""
+    if event_of(d) == "added_end":
+        if first:
+            return f"The same as run {first}: after the last message of the log the harness now gives the model one more message."
+        return f"After the last message of the log the harness now gives the model one more message: {said(d['new'][0], ADDED_CHARS)}"
     c, w = event_of(d), {k: v.replace(" code", " code" + sent_text(d)).replace(" action", " action" + sent_text(d)) if k in ("ran",) else v
                          for k, v in WORDS[d["bench"]].items()}
     old = said(d["old"][0], WAS_CHARS)
@@ -487,8 +493,8 @@ def event_text(d, first):
     if c == "removed":
         return f"In the log the harness gave the model this message here: {said(d['old'][0], 300)} Now it does not."
     if first:
-        return f"The same as run {first}: the harness gives the model a message that the log does not have here."
-    return f"Up to this point the harness does the same as in the log. Then it gives the model a message that the log does not have: {new}"
+        return f"The same as run {first}: now the harness gives the model a message that the log does not have here."
+    return f"Now the harness gives the model a message that the log does not have here: {new}"
 
 
 def report_plain(new, old, res, runs):
@@ -498,19 +504,22 @@ def report_plain(new, old, res, runs):
     ev = {r: event_of(new[r]["div"]) for r in runs}
     same = [r for r in runs if new[r]["div"] is None]
     text_only = [r for r in runs if ev[r] in ("reworded", "reworded_after")]
-    n = len(runs) - len(same) - len(text_only)
-    head = f"{len(runs)} runs replayed on your src/: {n} go differently from the log"
+    diff = [r for r in runs if r not in same and r not in text_only]
+    np, nf = sum(1 for r in diff if ok[r]), sum(1 for r in diff if not ok[r])
+    head = (f"{len(runs)} runs replayed on your src/. {len(diff)} go differently from the log: {np} passed run{'s' * (np != 1)} "
+            f"and {nf} failed run{'s' * (nf != 1)}.")
     if text_only:
-        head += f", {len(text_only)} differ{'s' if len(text_only) == 1 else ''} only in the text of a message from the harness"
-    head += (f", {len(same)} go{'es' if len(same) == 1 else ''} exactly as in the log. Each run is replayed up to the first place "
+        head += f" {len(text_only)} differ{'s' if len(text_only) == 1 else ''} only in the text of a message from the harness."
+    head += (f" {len(same)} go{'es' if len(same) == 1 else ''} exactly as in the log. Each run is replayed up to the first place "
              "where the harness does something different from the log; what the model would do after that is not known: "
              "the replay only has the model's replies from the log.")
     out, firsts = [head], {}
-    for want, title in ((True, "Passed runs (in the log the task was solved):"), (False, "Failed runs:")):
+    for want, title in ((True, "Passed runs (in the log the task was solved)"), (False, "Failed runs")):
         sec = [r for r in runs if ok[r] == want]
         if not sec:
             continue
-        out += ["", title]
+        k = sum(1 for r in sec if r in diff)
+        out += ["", title + (f". {k} of them now go{'es' if k == 1 else ''} differently:" if k else ":")]
         groups = {}
         for r in sec:
             d = new[r]["div"]

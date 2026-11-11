@@ -18,17 +18,17 @@ SMOKE_README = ("- `tests/smoke.py` — a smoke test: runs src/harness.py with a
 RERUN_README = """- `tests/rerun.py` — replays the runs recorded in `logs/` on the current `src/`. The model's replies and the task's messages are taken from the log, so neither the model nor the benchmark is called. As long as what the harness gives the model and the task is the same as in the log, the log still describes the run; at the first place where it differs, the replay of that run stops: from that point on the rest of the log no longer applies, and what the model would do next is not known. `python3 tests/rerun.py` says for each run what the harness did at that place in the log and what it does now, the passed runs first; "goes exactly as in the log" (or `no changes`) means that in those runs the current `src/` gives the model and the task exactly what the log has. `python3 tests/rerun.py N` shows run N in detail, with the line of `logs/run_N.jsonl`: `-` what the log has there, `+` what the harness does now, and the hooks whose answer changed compared with `src/` as it was at the start (a copy of it is in `tests/orig_src/`). An example, from the harness of another agent, where a hook was added that says "foobar" when the observation has both "foo" and "bar" in it:
 ```
 $ python3 tests/rerun.py
-9 runs replayed on your src/: 6 go differently from the log, 3 go exactly as in the log. Each run is replayed up to the first place where the harness does something different from the log; what the model would do after that is not known: the replay only has the model's replies from the log.
+9 runs replayed on your src/. 6 go differently from the log: 2 passed runs and 4 failed runs. 3 go exactly as in the log. Each run is replayed up to the first place where the harness does something different from the log; what the model would do after that is not known: the replay only has the model's replies from the log.
 
-Passed runs (in the log the task was solved):
-- run 6, model call 12. Up to this point the harness does the same as in the log. Then it gives the model a message that the log does not have: "foobar" This message comes from the hook on_observation; with the original src/ the hook returned None here.
-- run 8, model call 30. The same as run 6: the harness gives the model a message that the log does not have here.
+Passed runs (in the log the task was solved). 2 of them now go differently:
+- run 6, model call 12. Now the harness gives the model a message that the log does not have here: "foobar" This message comes from the hook on_observation; with the original src/ the hook returned None here.
+- run 8, model call 30. The same as run 6: now the harness gives the model a message that the log does not have here.
 - runs 5, 9. Go exactly as in the log.
 
-Failed runs:
-- run 1, model call 12. The same as run 6: the harness gives the model a message that the log does not have here.
-- run 3, model call 17. The same as run 6: the harness gives the model a message that the log does not have here.
-- run 4, model call 17. The same as run 6: the harness gives the model a message that the log does not have here.
+Failed runs. 4 of them now go differently:
+- run 1, model call 12. The same as run 6: now the harness gives the model a message that the log does not have here.
+- run 3, model call 17. The same as run 6: now the harness gives the model a message that the log does not have here.
+- run 4, model call 17. The same as run 6: now the harness gives the model a message that the log does not have here.
 - run 7 (model call 30). The same as run 6.
 - run 2. Goes exactly as in the log.
 $ python3 tests/rerun.py 3
