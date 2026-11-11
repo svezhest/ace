@@ -24,9 +24,9 @@ def key(m):
     return json.dumps(m, sort_keys=True, ensure_ascii=False)
 
 
-ADDED_CHARS = 2000
-WAS_CHARS = 110      # строка «-» сводки: что было в логе на месте расхождения
-WAS_RUNS = 5       # знаков сообщения, которое харнесс теперь добавляет в разговор (строки «+»)
+ADDED_CHARS = 2000       # знаков сообщения, которое харнесс теперь добавляет в разговор
+WAS_CHARS = 110          # знаков того, что стояло в логе на месте расхождения (сводка)
+SAME_RUNS = 3            # столько прогонов одной группы сводка называет по отдельности, остальные — одной строкой
 
 
 def short(m, n=160):
@@ -173,6 +173,7 @@ def app_episode(bridge, ev, sent_replies, state, diverge):
                 diverge(kind="bridge", call=state["call"], text="the code run in the task differs",
                         new=[{"role": "code", "content": code}], old=[{"role": "code", "content": execs[i]["code"]}])
             self.steps += 1
+            state["send"] += 1
             if i + 1 == len(execs) and by_task:
                 self.finished, self.end = True, end_rec
             return execs[i]["out"]
@@ -207,8 +208,13 @@ def play(bench, src, log, at=None, cover=None, watch=None):
         if [key(m) for m in messages] != [key(m) for m in want]:
             j = next((j for j, (a, b) in enumerate(zip(messages, want)) if key(a) != key(b)), min(len(messages), len(want)))
             extra = {"new_all": messages, "old_all": want} if k == 0 else {}
+            # 11.11, для сводки: сколько шагов задачи (execute / send) было в логе до этого вызова и сколько сделал харнесс
+            # сейчас; чьё сообщение стояло в логе на месте расхождения и перед ним (env / harness / model)
+            steps_log = sum(1 for e in ev[:line_of[model_pos[k]] - 1] if e["event"] == "bridge" and e.get("call") in ("execute", "send"))
             diverge(kind="model", call=k + 1, text="what the model sees differs from the log", at=j,
-                    new=messages[j:j + 3], old=want[j:j + 3] or [conv[model_pos[k]]], **extra)
+                    new=messages[j:j + 3], old=want[j:j + 3] or [conv[model_pos[k]]], bench=bench,
+                    ran_log=steps_log, ran_now=state["send"], was=ev[line_of[j] - 1]["event"] if j < len(want) else "model",
+                    prev=ev[line_of[j - 1] - 1]["event"] if j else None, **extra)
         reply = json.loads(key(conv[model_pos[k]]))
         if bench == "app" and (reply.get("content") or "").endswith("\n\n"):
             reply["content"] = reply["content"][:-2]   # в логе ответ после обрезки харнессом, с его "\n\n"
@@ -412,7 +418,112 @@ def norm(s):
     return re.sub(r"\d+", "N", re.sub(r'"[^"\n]*"|\'[^\'\n]*\'', '"…"', s))
 
 
+WORDS = {"app": {"ran": "ran the model's code", "got": "the output", "norun": "does not run this code",
+                 "norun_log": "did not run this code", "done": "The code is run"},
+         "alf": {"ran": "sent the model's action to the task", "got": "the answer", "norun": "does not send this action",
+                 "norun_log": "did not send this action", "done": "The action is sent"}}
+
+
+def said(m, n):
+    s = m.get("content") or ""
+    if s.startswith(OUT_HEAD) and s.endswith(OUT_TAIL):
+        s = s[len(OUT_HEAD):-len(OUT_TAIL)]
+    s = s.strip().replace("\n", "\\n")
+    return '"' + s[:n] + ("…" if len(s) > n else "") + '"'
+
+
+def event_of(d):
+    """Что харнесс делает иначе на месте расхождения — по логу и повтору, без толкования. None: прежняя форма «- / +»."""
+    if d is None or d["kind"] != "model" or d["call"] == 1 or "was" not in d or not d["old"]:
+        return None
+    if not d["new"]:
+        return "removed" if d["was"] == "harness" else None
+    if d["ran_log"] > d["ran_now"] and d["was"] == "env":
+        return "skipped"
+    if d["was"] == "harness":
+        return "reworded" if d["prev"] == "model" else "reworded_after"
+    return "added" if d["was"] == "model" else None
+
+
+def event_text(d, first):
+    """Одно событие полными предложениями: что было в логе, что харнесс делает теперь. first — номер прогона той же
+    группы, уже описанного выше (тогда коротко), или None."""
+    c, w = event_of(d), WORDS[d["bench"]]
+    old = said(d["old"][0], WAS_CHARS)
+    new = said(d["new"][0], ADDED_CHARS) if d["new"] else ""
+    if c == "skipped":
+        if first:
+            return f"The same as run {first}: in the log the harness {w['ran']} and {w['got']} was {old}. Now the harness {w['norun']}."
+        return (f"In the log the harness {w['ran']} and the model got {w['got']}: {old}. Now the harness "
+                f"{w['norun']}. The model gets this message instead: {new}")
+    if c == "reworded":
+        return (f"The harness does the same as in the log: in the log it also {w['norun_log']}. Only the text of its "
+                f"message is different. In the log: {said(d['old'][0], 300)} Now: {new}")
+    if c == "reworded_after":
+        return (f"{w['done']} as in the log. The message the harness gives the model after it is different. "
+                f"In the log: {said(d['old'][0], 300)} Now: {new}")
+    if c == "removed":
+        return f"In the log the harness gave the model this message here: {said(d['old'][0], 300)} Now it does not."
+    if first:
+        return f"The same as run {first}: the harness gives the model a message that the log does not have here."
+    return f"Up to this point the harness does the same as in the log. Then it gives the model a message that the log does not have: {new}"
+
+
+def report_plain(new, old, res, runs):
+    """11.11, сводка после правки явными предложениями. Прежняя сводка печатала только новое сообщение («+ user: …»):
+    шаг, который в логе исполнился, а теперь не исполняется, и смена текста прежнего сообщения выглядели одинаково."""
+    ok = {r: bool(res.get(r, {}).get("ok")) for r in runs}
+    ev = {r: event_of(new[r]["div"]) for r in runs}
+    same = [r for r in runs if new[r]["div"] is None]
+    text_only = [r for r in runs if ev[r] in ("reworded", "reworded_after")]
+    n = len(runs) - len(same) - len(text_only)
+    head = f"{len(runs)} runs replayed on your src/: {n} go differently from the log"
+    if text_only:
+        head += f", {len(text_only)} differ{'s' if len(text_only) == 1 else ''} only in the text of a message from the harness"
+    head += (f", {len(same)} go{'es' if len(same) == 1 else ''} exactly as in the log. Each run is replayed up to the first place "
+             "where the harness does something different from the log; what the model would do after that is not known: "
+             "the replay only has the model's replies from the log.")
+    out, firsts = [head], {}
+    for want, title in ((True, "Passed runs (in the log the task was solved):"), (False, "Failed runs:")):
+        sec = [r for r in runs if ok[r] == want]
+        if not sec:
+            continue
+        out += ["", title]
+        groups = {}
+        for r in sec:
+            d = new[r]["div"]
+            if d is None:
+                continue
+            if ev[r] is None:
+                out.append("- " + report_diff(new, old, res, [r], detail=True).replace("\n", "\n  "))
+                continue
+            groups.setdefault((ev[r], norm(said(d["new"][0], ADDED_CHARS)) if d["new"] else ""), []).append(r)
+        for k, rs in sorted(groups.items(), key=lambda g: g[0][0].startswith("reworded")):   # смена одного текста — после изменений поведения
+            for r in rs[:SAME_RUNS]:
+                d = new[r]["div"]
+                line = f"- run {r}, model call {d['call']}. " + event_text(d, firsts.get(k))
+                if k not in firsts:
+                    firsts[k] = r
+                    for h, p in (hook_notes(new[r]["hooks"], old[r]["hooks"]) if old else [])[:1]:
+                        line += f"\n  Hook {h['hook']} returns {fmt_hook(h)} here; with the original src/ it returned {fmt_hook(p)}."
+                out.append(line)
+            rest = rs[SAME_RUNS:]
+            if rest:
+                out.append(f"- run{'s' if len(rest) > 1 else ''} " + ", ".join(f"{r} (model call {new[r]['div']['call']})" for r in rest)
+                           + f". The same as run {firsts[k]}.")
+        quiet = [r for r in sec if new[r]["div"] is None]
+        if quiet:
+            out.append(f"- run{'s' if len(quiet) > 1 else ''} " + ", ".join(quiet) + f". Go{'es' if len(quiet) == 1 else ''} exactly as in the log.")
+    return "\n".join(out)
+
+
 def report(new, old, res, runs, detail):
+    if not detail and any(event_of(new[r]["div"]) for r in runs):
+        return report_plain(new, old, res, runs)
+    return report_diff(new, old, res, runs, detail)
+
+
+def report_diff(new, old, res, runs, detail):
     """detail=False: одна строка на группу прогонов с одинаковым (с точностью до кавычек и чисел) расхождением;
     True: ещё номер вызова, строка лога и что было в логе."""
     groups = {}
@@ -439,10 +550,8 @@ def report(new, old, res, runs, detail):
             seen[s] = seen.get(s, 0) + 1
         for s, n in list(seen.items())[:3]:
             body += f"\n  {s}" + (f" ×{n}" if detail and n > 1 else "")
-        g = groups.setdefault(norm(head + body), {"head": head, "body": body, "tags": [], "calls": [], "was": []})
+        g = groups.setdefault(norm(head + body), {"head": head, "body": body, "tags": [], "calls": []})
         g["tags"].append((r, bool(res.get(r, {}).get("ok"))))
-        if d is not None and d["kind"] == "model" and d["call"] > 1 and not detail and d["old"]:
-            g["was"].append((r, bool(res.get(r, {}).get("ok")), short(d["old"][0], WAS_CHARS)))
         g["calls"].append(str(d["call"]) if d else "")
     out = []
     for g in groups.values():
@@ -453,23 +562,8 @@ def report(new, old, res, runs, detail):
             by = [", ".join(f"run {r} at {c}" for (r, ok), c in zip(g["tags"], g["calls"]) if ok == want) for want in (False, True)]
             head = g["head"].replace("at model call {calls}", "at model call: " + "; ".join(f"{n} — {x}" for n, x in zip(("failed", "passed"), by) if x))
         ex = " (e.g. run " + g["tags"][0][0] + ")" if len(g["tags"]) > 1 and g["body"] and norm(g["body"]) != g["body"] else ""
-        out.append(runs_label(g["tags"], len(runs)) + ": " + head + ex + was_lines(g["was"]) + g["body"])
+        out.append(runs_label(g["tags"], len(runs)) + ": " + head + ex + g["body"])
     return "\n".join(out)
-
-
-def was_lines(was):
-    """11.11: что стояло в логе на месте расхождения — строки «-» перед «+», как в diff. В сводке раньше была только «+»,
-    и замена прежнего сообщения харнесса не отличалась от замены ответа среды. Удачные прогоны первыми, не больше WAS_RUNS."""
-    if not was:
-        return ""
-    if len({w for _, _, w in was}) == 1:
-        return f"\n  - {was[0][2]}"
-    was = sorted(was, key=lambda x: not x[1])
-    out = "".join(f"\n  - run {r} ({'passed' if ok else 'failed'}): {w}" for r, ok, w in was[:WAS_RUNS])
-    rest = was[WAS_RUNS:]
-    if rest:
-        out += f"\n  - ... and {len(rest)} more ({sum(1 for _, ok, _ in rest if not ok)} failed, {sum(1 for _, ok, _ in rest if ok)} passed)"
-    return out
 
 
 def report_at(r, t, log, at, ok):
