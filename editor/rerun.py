@@ -341,7 +341,7 @@ def play(bench, src, log, at=None, cover=None, watch=None):
                             "new": [], "old": [conv[model_pos[state["call"]]]]}
     except Exception:
         import traceback
-        tb = [f for f in traceback.extract_tb(sys.exc_info()[2]) if not f.filename.endswith("rerun.py")]
+        tb = [f for f in traceback.extract_tb(sys.exc_info()[2]) if not f.filename.endswith(("rerun.py", "rerun_core.py"))]
         e = sys.exc_info()[1]
         text = "\n".join(f"  src/{Path(f.filename).name}:{f.lineno} {f.name}: {(f.line or '').strip()}" for f in tb[-3:])
         trace["div"] = {"kind": "crash", "call": state["call"], "text": f"{type(e).__name__}: {e}\n{text}", "new": [], "old": []}
