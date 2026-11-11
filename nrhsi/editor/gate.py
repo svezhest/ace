@@ -386,6 +386,54 @@ def _where(d):
     return f"it goes differently {at} ({d['text'][:120]})"
 
 
+def _passed_runs(root):
+    """Номера прогонов вида, которые в логе удались (logs/results.jsonl)."""
+    out = []
+    for l in open(f"{root}/logs/results.jsonl"):
+        r = json.loads(l)
+        if r.get("ok"):
+            out.append(str(r["run"]))
+    return out
+
+
+def _passed_rest(run, texts, named):
+    """12.11: удачные прогоны, не названные тикетом, по умолчанию должны идти как в логе. Сравнивать можно только прогоны,
+    записанные на этом харнессе: прогон, который расходится уже на исходном src/ вида, в проверку не входит. Смена одного
+    текста сообщения харнесса (поведение то же) — не нарушение. При правке текстов .md — код с текстами из вида."""
+    rest = [r for r in _passed_runs(run.root) if r not in named]
+    if not rest:
+        return []
+    if not hasattr(run, "_base_div"):
+        run._base_div = _replay(f"{C.VIEWS[C.BENCH]}/src", run.root, rest)
+    rest = [r for r in rest if run._base_div.get(r) is None]
+    div = _replay(_old_texts_src(run) if texts else f"{run.root}/src", run.root, rest)
+    old = " (with the old texts)" if texts else ""
+    same = [r for r in rest if div.get(r) is None]
+    worded = [r for r in rest if div.get(r) and (div[r].get("event") or "").startswith("reworded")]
+    hit = [r for r in rest if div.get(r) and r not in worded]
+    lines = []
+    for r in hit[:3]:
+        d = div[r]
+        if d["kind"] == "crash":
+            lines.append(f"Failed: in run {r}, which passed, the harness now crashes" + (f" at model call {d['call']}" if d["call"] else "")
+                         + f": {d['text'].strip().splitlines()[0][:300] if d['text'].strip() else 'no message'}")
+        else:
+            lines.append(f"Failed: this edit changes run {r}, which passed and should still go exactly as in the log; "
+                         + ("with the old texts " if texts else "") + f"{_where(d)}.")
+    if len(hit) > 3:
+        more = hit[3:]
+        lines.append(f"Failed: this edit also changes run{'s' if len(more) > 1 else ''} {', '.join(more)}, which passed and "
+                     "should still go exactly as in the log.")
+    if worded:
+        lines.append(f"Ok: in run{'s' if len(worded) > 1 else ''} {', '.join(worded)}, which passed, the harness does the same "
+                     f"as in the log{old}; only the text of its message is different.")
+    if same:
+        n = len(same)
+        lines.append((f"Ok: the other {n} runs that passed" if n > 1 else f"Ok: run {same[0]}, which passed,")
+                     + f" still go{'es' if n == 1 else ''} exactly as in the log{old}.")
+    return lines
+
+
 def ticket_check(run):
     """Проверка по тикету после правки: по строке Ok / Failed на прогон тикета (и на прогон keep). К Failed «как в логе» —
     факт проигрыша: какое изменённое условие выполнялось и ни разу не было истинным, со значениями операндов на последнем
@@ -456,5 +504,6 @@ def ticket_check(run):
             else:
                 lines.append(f"Failed: this edit changes run {r}, which passed and should still go exactly as in the log; "
                              + ("with the old texts " if texts else "") + f"{_where(d)}.")
+    lines += _passed_rest(run, texts, {str(r) for r in list(runs) + list(keep)})
     run.w({"type": "ticket_check", "expected": exp, "runs": runs, "cur": cur, "code": code, "lines": lines})
     return "Check against the observation:\n" + "\n".join(lines)

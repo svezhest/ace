@@ -658,7 +658,7 @@ def main():
         new = worker(a.bench, os.path.abspath(a.src), a.logs, a.runs or None, cover=cov,
                      watch=json.loads(a.watch) if a.watch else None)
         div = {r: (None if t["div"] is None else {"kind": t["div"].get("kind"), "call": t["div"].get("call"),
-                                                   "text": str(t["div"].get("text", ""))[:600]})
+                                                   "text": str(t["div"].get("text", ""))[:600], "event": event_of(t["div"])})
                for r, t in new.items()}
         print(json.dumps({"div": div, "cover": cov} if a.cover else div))
         return
