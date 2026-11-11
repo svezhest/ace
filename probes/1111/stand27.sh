@@ -7,7 +7,7 @@ p=$(pgrep -f 'qwen-gateway|python3? worker.py'); [ -n "$p" ] && kill $p
 for i in $(seq 60); do pgrep -f 'qwen-gateway|python3? worker.py' > /dev/null || break; sleep 1; done
 cd /Users/user/Projects/llm/src/worker
 HF_HUB_OFFLINE=1 QWEN_MODEL=../../weights/qwen38-27b-mlx-5bit QWEN_DRAFT=../../weights/qwen38-27b-dflash2 QWEN_KV_BITS=0 \
-  QWEN_MRQMM5=1 QWEN_MAX_BATCH=1 QWEN_MAX_CONTEXT=65536 QWEN_PROMPT_CACHE=1 QWEN_PROMPT_CACHE_MOVE=1 QWEN_PROMPT_CACHE_GB=6 \
+  QWEN_MRQMM5=1 QWEN_MAX_BATCH=1 QWEN_MAX_CONTEXT=65536 QWEN_PROMPT_CACHE=1 QWEN_PROMPT_CACHE_MOVE=1 QWEN_PROMPT_CACHE_GB=3 \
   QWEN_PROMPT_CACHE_CKPTS=4 QWEN_WIRED_LIMIT_GB=27 QWEN_CACHE_LIMIT_GB=1 QWEN_SDPA_FUSED_MIN_KV=8192 \
   QWEN_PREFILL_BUDGET=16777216 QWEN_PRESENCE_PENALTY=0 nohup uv run python worker.py >> $L/worker27.log 2>&1 &
 cd /Users/user/Projects/llm

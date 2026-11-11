@@ -18,7 +18,7 @@ for x in (json.loads(l) for l in open(LOG)):
         print("  R:", one(r, RN) + (" … " + one(r[-RN:], RN) if len(r) > 2 * RN else one(r[RN:], RN)))
     if x.get("content"):
         print("  T:", one(x["content"], 400))
-    for c, res in zip(x["tool_calls"], x.get("results") or []):
+    for c, res in zip((x.get("tool_calls") or []), x.get("results") or []):
         try:
             a = json.loads(c["arguments"])
         except Exception:  # noqa: BLE001

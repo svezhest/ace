@@ -15,7 +15,7 @@
       "QWEN_MAX_CONTEXT": "65536",
       "QWEN_PROMPT_CACHE": "1",
       "QWEN_PROMPT_CACHE_MOVE": "1",
-      "QWEN_PROMPT_CACHE_GB": "6",
+      "QWEN_PROMPT_CACHE_GB": "3",
       "QWEN_PROMPT_CACHE_CKPTS": "4",
       "QWEN_WIRED_LIMIT_GB": "27",
       "QWEN_CACHE_LIMIT_GB": "1",
