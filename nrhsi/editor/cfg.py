@@ -16,8 +16,8 @@ SMOKE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "smoke")   # sm
 BENCH = None             # --bench (work.build_work)
 TICKET = None            # --ticket: {change_expected: prompt|control|any, runs, keep} — ожидание ревьювера; проверка после правки
 
-BASH_LIMIT = 25          # вызовов bash; потом — финальные ходы
-STEP_BUDGET = 60         # всех вызовов инструментов
+BASH_LIMIT = 60          # вызовов bash; потом — финальные ходы
+STEP_BUDGET = 100        # всех вызовов инструментов
 FINAL_TURNS = 3          # ходов без bash: правки применяются и проверяются
 HARD_AT = 54000          # оценка prompt -> финальные ходы
 MAX_NO_CALL = 6
