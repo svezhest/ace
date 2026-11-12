@@ -1,0 +1,24 @@
+Observation from a study of the agent's failed runs (references to logs/ point to the runs in logs/):
+
+## Observation (problem)
+run_1 fails as "step limit". After a KeyError (line 57) the model starts alternating two steps: messages 61, 67, 73 are byte-identical (`print(recommendations[0]["album_id"])`), and 64, 70, 76 are the same `show_album` call. This goes on until line 172. The harness has a repeat guard, but it only compares the new code with the previous step (src/harness.py:95-99), so an A, B, A, B pattern is never detected. The guard should look at the last few steps, not only the last one.
+Evidence:
+- logs/run_1.jsonl:61,67,73 identical `print(recommendations[0]["album_id"])`
+- logs/run_1.jsonl:64,70,76 identical `print(apis.spotify.show_album(album_id=recommendations[0]["album_id"]))`
+- logs/run_1.jsonl:175 'bridge end', reason 'step limit'
+- src/harness.py:95 `code == steps[-1].code` compares only with the previous step
+
+## Passed runs
+An earlier edit written for this observation also changed runs 8 and 20, which passed: in the log both tasks were solved, and with that edit the harness answered differently to model call 9 of run 8 and to model call 10 of run 20. What the log has there (`python3 tests/runs.py steps 8 7-9` and `python3 tests/runs.py steps 20 8-10`):
+
+logs/run_8.jsonl: 94 lines, 23 model calls; results.jsonl: {"run": 8, "ok": true, "reason": "success"}
+7 @43 page_index = 0 → Output: Execution failed. Traceback: File "<python-input>", line 4, in <module>
+8 @46 spotify_access_token = login_result["access_token"] → Output: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJzcG90aWZ5K2JyX3JpdHRAZ21haWwuY29tIiwiZXhwIjoxNjg0NDEy…
+9 @49 page_index = 0 → Output: 17
+
+logs/run_20.jsonl: 70 lines, 15 model calls; results.jsonl: {"run": 20, "ok": true, "reason": "success"}
+8 @46 page_index = 0 → Output: Execution failed. Traceback: File "<python-input>", line 4, in <module>
+9 @49 phone_access_token = login_result["access_token"] → Output: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJwaG9uZSs2NzI3MzAwMDk5IiwiZXhwIjoxNjg0NDEyMDk4fQ.kb4T1rr…
+10 @52 page_index = 0 → Output: [ { "alarm_id": 414,
+
+The change should make the harness act differently in run 1 and leave runs 8 and 20 exactly as in the log.
