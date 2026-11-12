@@ -239,6 +239,62 @@ def _parts(cond):
     return out
 
 
+def _any_parts(cond):
+    """12.11: `any(A and B for x in X)` — само или частью цепочки `and`. Для строки Failed: у скольких элементов X истинна
+    каждая часть и каковы операнды ложной части на первом элементе, где остальные части истинны. Писатель 27B писал
+    верный замысел «тот же код и тот же вывод» с выводом не того шага; строка показывала хвост X, а не то, какая половина
+    ложна. -> [{iter, total, parts: [{text, count, others, ops: [(операнд, выражение)]}]}]; выражения идут в --watch."""
+    import ast
+    try:
+        tree = ast.parse(cond, mode="eval").body
+    except SyntaxError:
+        return []
+    out = []
+    for n in (tree.values if isinstance(tree, ast.BoolOp) and isinstance(tree.op, ast.And) else [tree]):
+        if not (isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id == "any" and len(n.args) == 1
+                and isinstance(n.args[0], (ast.GeneratorExp, ast.ListComp))):
+            continue
+        comp = n.args[0]
+        elt = comp.elt
+        if not (isinstance(elt, ast.BoolOp) and isinstance(elt.op, ast.And) and 2 <= len(elt.values) <= 3 and _safe(n)):
+            continue
+        clauses = "".join(ast.unparse(g) for g in comp.generators)
+        parts = []
+        for i, v in enumerate(elt.values):
+            text = ast.unparse(v)
+            rest = [ast.unparse(o) for j, o in enumerate(elt.values) if j != i]
+            ops = [ast.unparse(x) for x in ([v.left] + v.comparators if isinstance(v, ast.Compare) else [])
+                   if not isinstance(x, ast.Constant) and _safe(x)]
+            cond_rest = " and ".join(f"({r})" for r in rest)
+            parts.append({"text": text, "count": f"sum((1{clauses} if ({text})))", "others": rest,
+                          "ops": [(o, f"next(({o}{clauses} if {cond_rest}))") for o in ops]})
+        out.append({"iter": ast.unparse(comp.generators[0].iter), "total": f"sum((1{clauses}))", "parts": parts})
+    return out
+
+
+def _any_exprs(cond):
+    return [e for a in _any_parts(cond) for e in [a["total"]] + [p["count"] for p in a["parts"]]
+            + [e for p in a["parts"] for _, e in p["ops"]]]
+
+
+def _any_said(cond, vals):
+    """Фразы для строки Failed по _any_parts: счёт по частям и операнды ложной части там, где остальные истинны."""
+    said = []
+    for a in _any_parts(cond):
+        tot, cnt = vals.get(a["total"]), [vals.get(p["count"]) for p in a["parts"]]
+        if tot is None or any(c is None for c in cnt):
+            continue
+        t = (f"of the {tot} items of `{a['iter']}`, " + ", ".join(f"`{p['text']}` was true for {c}" for p, c in zip(a["parts"], cnt))
+             + f", and never {'both' if len(cnt) == 2 else 'all'} for the same item")
+        for p in a["parts"]:
+            ov = ", ".join(f"`{o}` = {vals[e]}" for o, e in p["ops"] if e in vals)
+            if ov:
+                t += ("; at the first item where " + " and ".join(f"`{r}`" for r in p["others"])
+                      + f" {'was' if len(p['others']) == 1 else 'were'} true: {ov}")
+        said.append(t)
+    return said
+
+
 _FALSY = ("False", "None", "0", "[]", "{}", "()", "''", '""', "set()")
 _SYN = {}   # выражение-проба для элемента all/any -> (вводные слова, что показать писателю)
 
@@ -285,7 +341,7 @@ def _watch(changed):
                 c = _cond_of(text, ln)
                 ops = _operands(c) if c else []
                 if ops:
-                    w[f"{rel}:{ln}"] = list(dict.fromkeys(ops + [e for part, po in _parts(c) for e in [part] + po]))
+                    w[f"{rel}:{ln}"] = list(dict.fromkeys(ops + [e for part, po in _parts(c) for e in [part] + po] + _any_exprs(c)))
     return w
 
 
@@ -314,7 +370,7 @@ def _dead_fact(changed, cov):
                 body = next((k for k in range(end + 1, len(text) + 1) if text[k - 1].strip() and not text[k - 1].strip().startswith("#")), None)
                 if body and len(text[body - 1]) - len(text[body - 1].lstrip()) > ind and hits.get(body, 0) == 0:
                     cand.append((n, f"`{src[:200]}` at src/{rel}:{ln} ran {n} times and was never true", f"{rel}:{ln}",
-                                 _parts(_cond_of(text, ln) or "")))
+                                 _parts(_cond_of(text, ln) or ""), _cond_of(text, ln) or ""))
             elif code.startswith("return ") and code[7:].strip() not in ("False", "True", "None", "{}", "[]", "0", "1", '""') \
                     and len(rets.get(ln) or {}) == 1 and next(iter(rets[ln])) in ("False", "None", "True"):
                 cand.append((n, f"`{src[:80]}` at src/{rel}:{ln} ran {n} times and returned {next(iter(rets[ln]))} every time", f"{rel}:{ln}"))
@@ -325,6 +381,9 @@ def _dead_fact(changed, cov):
             vals = {e: v for e, v in ((val or {}).get("vals") or {}).items() if not _is_err(v)}
             if not vals:
                 return c[1]
+            extra = _any_said(c[4], vals) if len(c) > 4 else []
+            tail = ("; " + "; ".join(extra)) if extra else ""
+            hide = set(_any_exprs(c[4])) if len(c) > 4 else set()
             parts = [(e, po) for e, po in (c[3] if len(c) > 3 else []) if e in vals]
             if len(parts) > 1 and any(vals[e] in _FALSY for e, _ in parts):
                 said = []
@@ -334,9 +393,12 @@ def _dead_fact(changed, cov):
                         said.append(f"`{e}` was false" + (f" ({ov})" if ov else ""))
                     else:
                         said.append(f"`{e}` was true")
-                return c[1] + f". At its last run, before model call {val['call'] + 1}: " + "; ".join(said)
+                return c[1] + f". At its last run, before model call {val['call'] + 1}: " + "; ".join(said) + tail
             pe = {e for e, _ in (c[3] if len(c) > 3 else [])}
-            return c[1] + f" (at its last run, before model call {val['call'] + 1}: " + _show_vals({e: v for e, v in vals.items() if e not in pe}) + ")"
+            if extra and not parts:   # условие — один any(...): счёт по его частям вместо хвоста списка и последнего элемента
+                return c[1] + f". At its last run, before model call {val['call'] + 1}: " + "; ".join(extra)
+            return (c[1] + f" (at its last run, before model call {val['call'] + 1}: "
+                    + _show_vals({e: v for e, v in vals.items() if e not in pe and e not in hide}) + ")" + tail)
         return "your " + "; your ".join(with_vals(c) for c in cand[:2])
     if dead:
         return f"your `{dead[2][:80]}` at src/{dead[1]}:{dead[0]} never ran"
