@@ -147,19 +147,47 @@ _SAFE_CALLS = {"len", "set", "list", "tuple", "sorted", "str", "int", "bool", "a
                "get", "strip", "lower", "upper", "split", "startswith", "endswith", "count", "index", "keys", "values", "items"}
 
 
-def _safe(n):
-    """Выражение без побочных эффектов: вызовы — только чистые встроенные и методы строк/словарей или функции по имени."""
+_PURE_NAMES = {"len", "set", "frozenset", "list", "tuple", "dict", "sorted", "reversed", "str", "int", "float", "bool", "any",
+               "all", "min", "max", "sum", "abs", "round", "repr", "enumerate", "zip", "range", "isinstance", "type"}
+_DEFS = {}   # функции уровня модуля из изменённых файлов src: имя -> def (заполняет _watch перед разбором условий)
+
+
+def _pure_def(d, seen):
+    """Тело функции src без побочных эффектов: ничего не пишет в атрибут или по индексу, не удаляет, не объявляет
+    global, а все её вызовы проходят _safe (функции src — рекурсивно)."""
+    import ast
+    for c in ast.walk(d):
+        if isinstance(c, (ast.Global, ast.Nonlocal, ast.Delete, ast.With, ast.AsyncWith, ast.Import, ast.ImportFrom)):
+            return False
+        tg = (c.targets if isinstance(c, ast.Assign) else [c.target] if isinstance(c, (ast.AugAssign, ast.AnnAssign, ast.For)) else [])
+        if any(isinstance(x, (ast.Attribute, ast.Subscript)) for t in tg for x in ast.walk(t)):
+            return False
+    return _safe(d, seen)
+
+
+def _safe(n, seen=frozenset()):
+    """Выражение без побочных эффектов. Вызовы: чистые встроенные, методы строк и словарей, а функция src по имени —
+    только если её тело само без побочных эффектов (12.11: писатель вынес шаг в `_do_step(episode, ...)`, условие
+    `if not _do_step(...)` вычислялось пробой ещё раз, код задачи исполнялся дважды, и проверка ответила «Ok: in run 1
+    the harness now acts differently» на правку, которая не меняет ни одного прогона)."""
     import ast
     for c in ast.walk(n):
         if isinstance(c, (ast.NamedExpr, ast.Lambda, ast.Await, ast.Yield, ast.YieldFrom)):
             return False
         if isinstance(c, ast.Call):
             f = c.func
-            if isinstance(f, ast.Attribute) and f.attr not in _SAFE_CALLS:
-                return False   # методы вроде execute, send, append, pop — не вычисляем
-            if isinstance(f, ast.Name) and f.id in ("print", "exec", "eval", "open", "input", "llm", "call_hook", "setattr"):
-                return False
-            if not isinstance(f, (ast.Name, ast.Attribute)):
+            if isinstance(f, ast.Attribute):
+                if f.attr not in _SAFE_CALLS:
+                    return False   # методы вроде execute, send, append, pop — не вычисляем
+            elif isinstance(f, ast.Name):
+                if f.id == "next" and c.args and isinstance(c.args[0], ast.GeneratorExp):
+                    continue       # next((x for ...), None) — новый генератор, чужой итератор не расходуется
+                if f.id in _PURE_NAMES:
+                    continue
+                d = _DEFS.get(f.id)
+                if d is None or f.id in seen or not _pure_def(d, seen | {f.id}):
+                    return False
+            else:
                 return False
     return True
 
@@ -255,7 +283,14 @@ def _cond_of(text, ln):
 
 
 def _watch(changed):
+    import ast
     w = {}
+    _DEFS.clear()
+    for rel, (lines, text) in changed.items():
+        try:
+            _DEFS.update({d.name: d for d in ast.parse("\n".join(text) + "\n").body if isinstance(d, (ast.FunctionDef, ast.AsyncFunctionDef))})
+        except SyntaxError:
+            pass
     for rel, (lines, text) in changed.items():
         for ln in lines:
             src = text[ln - 1].strip()
