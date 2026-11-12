@@ -30,7 +30,7 @@ def cls(src):
 
 
 for arg in sys.argv[1:]:
-    name, w = arg.split("=", 1)
+    name, w = arg.rsplit("=", 1)   # путь без «=», метка — любая
     new = open(f"{w}/src/harness.py").read()
     old = open(f"{VIEW}/src/harness.py").read()
     changed = {j + 1 for tag, _, _, j1, j2 in difflib.SequenceMatcher(None, old.splitlines(), new.splitlines()).get_opcodes()
