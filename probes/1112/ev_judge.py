@@ -55,6 +55,7 @@ def main():
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--full-steps", action="store_true", help="шаги с кодом целиком (ev_input.steps_full)")
     ap.add_argument("--shuffle", help="зерно порядка задетых прогонов во входе")
+    ap.add_argument("--blocks", action="store_true", help="EV5: блок на каждый задетый прогон (ev_input.run_blocks)")
     a = ap.parse_args()
     prof = json.load(open(os.path.join(ROOT, "stands", a.stand + ".json")))
     items = json.load(open(a.items))
@@ -64,7 +65,7 @@ def main():
         items = items[: a.limit]
     rows = [json.loads(l) for l in open(a.states)]
     obs = re.sub(r"^Observation from a study of the agent's failed runs[^\n]*\n+", "", open(a.obs).read())
-    variant = ("_full" if a.full_steps else "") + (f"_sh{a.shuffle}" if a.shuffle is not None else "")
+    variant = ("_blocks" if a.blocks else "") + ("_full" if a.full_steps else "") + (f"_sh{a.shuffle}" if a.shuffle is not None else "")
     cache = os.path.join(ROOT, "runs/ev_1112/inputs" + variant)
     os.makedirs(cache, exist_ok=True)
     done = {json.loads(l)["state"] for l in open(a.out)} if os.path.exists(a.out) else set()
@@ -74,7 +75,7 @@ def main():
         p = os.path.join(cache, it["state"] + ".txt")
         if not os.path.exists(p):
             row = next(r for r in rows if r["state"] == it["state"] and r["log"] == it["log"] and r["n"] == it["n"])
-            open(p, "w").write(EI.build(row, rows, a.view, a.bench, obs, a.work, a.full_steps, a.shuffle))
+            open(p, "w").write(EI.build(row, rows, a.view, a.bench, obs, a.work, a.full_steps, a.shuffle, a.blocks))
         user = open(p).read()
         t0 = time.time()
         r = call(prof, EI.SYSTEM, user, a.seed)
