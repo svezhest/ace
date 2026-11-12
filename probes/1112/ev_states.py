@@ -90,7 +90,11 @@ def main():
     src0 = read_src(os.path.join(a.view, "src"))
     rows, todo = [], {}
     for log in a.logs:
-        ch = chain(log, src0)
+        try:
+            ch = chain(log, src0)
+        except (AssertionError, KeyError) as e:   # сессия шла на другом src вида: правка не ложится
+            print(f"пропуск {log}: {e!r}"[:200])
+            continue
         for n, (turn, files) in enumerate(ch, 1):
             h = hashlib.md5(json.dumps(files, sort_keys=True).encode()).hexdigest()
             todo[h] = files
