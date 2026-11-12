@@ -7,7 +7,8 @@ W=$M-wt/$1; [ "$1" = main ] && W=$M
 nn=$2; STAND=$3; s=${4:-1}; H=${5:-$M/runs/bl_1112}; mkdir -p $H
 case $nn in
   t[1-5]) b=app; v=app_r1; in=$T/in/$nn.txt; tk=$M/docs/tickets_1111/$nn.json;;
-  t1c) b=app; v=app_r1; in=$M/docs/tickets_1112/t1c.txt; tk=$M/docs/tickets_1112/t1c.json;;   # проба CI: № 1 + шаги задетых удачных прогонов
+  t[1-5]c) b=app; v=app_r1; in=$M/docs/tickets_1112/$nn.txt; tk=$M/docs/tickets_1112/$nn.json;;   # проба CI: вход + шаги задетых удачных прогонов
+  k10c) b=alf; v=alf_n4; in=$M/docs/tickets_1112/k10c.txt; tk=$M/docs/tickets_1112/k10c.json;;
   k10) b=alf; v=alf_n4; in=$T/in/10_real.txt; tk=$M/docs/tickets_1111/k10.json;;
   01) b=app; v=app_r1; in=$T/in/01_v_rr.txt; tk=$M/docs/tickets_1106k/01.json;;
   08) b=alf; v=alf_r1; in=$T/in/08_v_rr.txt; tk=$M/docs/tickets_1106k/08.json;;
