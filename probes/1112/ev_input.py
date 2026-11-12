@@ -40,7 +40,77 @@ def steps_text(work, run, call, before=6):
     return "\n".join(lines)
 
 
-def build(row, rows, view, bench, obs, work):
+def _runs_mod(work):
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("writer_runs", os.path.join(work, "tests", "runs.py"))
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m
+
+
+def _cap(lines, n, w):
+    lines = [l.rstrip()[:w] + ("…" if len(l.rstrip()) > w else "") for l in lines]
+    return lines[:n] + ([f"… (+{len(lines) - n} more lines)"] if len(lines) > n else [])
+
+
+def steps_full(work, run, call, before=6):
+    """Шаги K-before..K-1 с кодом целиком (runs.py steps показывает только первую строку кода — разные шаги выглядят
+    одинаковыми, EV3 c6957a) и первыми строками ответа среды."""
+    R = _runs_mod(work)
+    objs = [R._obj(x) for x in open(os.path.join(work, "logs", f"run_{run}.jsonl"))]
+    calls = [i for i, o in enumerate(objs) if R._is_model(o)]
+    a, b = max(1, call - before), min(call - 1, len(calls))
+    out = [f"Run {run}: what the model sees at model call {call} differs from the log, so the edited harness acts "
+           f"differently right after model call {call - 1} (the last step below). Steps {a}-{b} of the log:"]
+    for k in range(a, b + 1):
+        i = calls[k - 1]
+        m = R._msg(objs[i])
+        code = []
+        for tc in m.get("tool_calls") or []:
+            f = tc.get("function") or {}
+            arg = f.get("arguments")
+            try:
+                arg = json.loads(arg) if isinstance(arg, str) else arg
+            except ValueError:
+                pass
+            if isinstance(arg, dict) and len(arg) == 1 and isinstance(list(arg.values())[0], str):
+                arg = list(arg.values())[0]
+            code += (arg if isinstance(arg, str) else json.dumps(arg, ensure_ascii=False)).splitlines()
+        if not code:
+            t = R._text(m)
+            blocks = re.findall(r"```[^\n]*\n(.*?)(?:```|$)", t, re.S)
+            code = "\n".join(blocks).splitlines() if blocks else ["text: " + t.strip()]
+        code = [l for l in code if l.strip()]
+        nxt = calls[k] if k < len(calls) else len(objs)
+        env = next((objs[x] for x in range(i + 1, nxt) if R._is_env(objs[x])), None)
+        resp = ([l for l in R._text(R._msg(env)).splitlines() if l.strip() and not l.strip().startswith("```")]
+                if env else ["(no env message)"])
+        out.append(f"model call {k}, the model's code:")
+        out += ["    " + l for l in _cap(code, 30, 200)]
+        out.append("  the model got:")
+        out += ["    " + l for l in _cap(resp, 4, 200)]
+    return "\n".join(out)
+
+
+def shuffle_report(report, rnd):
+    """Задетые прогоны в отчёте перепрогона — в случайном порядке внутри своего раздела (строки «- run N, model call»)."""
+    lines, out, i = report.split("\n"), [], 0
+    while i < len(lines):
+        if re.match(r"- run \d+, ", lines[i]):
+            j = i
+            while j < len(lines) and re.match(r"- run \d+, ", lines[j]):
+                j += 1
+            blk = lines[i:j]
+            rnd.shuffle(blk)
+            out += blk
+            i = j
+        else:
+            out.append(lines[i])
+            i += 1
+    return "\n".join(out)
+
+
+def build(row, rows, view, bench, obs, work, full_steps=False, shuffle=None):
     src0 = ES.read_src(os.path.join(view, "src"))
     sess = sorted((r for r in rows if r["log"] == row["log"] and r["n"] <= row["n"]), key=lambda r: r["n"])
     files = ES.chain(os.path.join(ROOT, row["log"]), src0)[: row["n"]]
@@ -62,13 +132,24 @@ def build(row, rows, view, bench, obs, work):
         rep = subprocess.run([sys.executable, ES.CORE, "--bench", bench, "--src", os.path.join(tmp, "src"),
                               "--logs", os.path.join(view, "logs")], capture_output=True, text=True, timeout=900)
     report = (rep.stdout or rep.stderr).strip().replace("on your src/", "on the edited src/")
+    rnd = None
+    if shuffle is not None:
+        import random
+        rnd = random.Random(f"{shuffle}:{row['state']}")
+        report = shuffle_report(report, rnd)
     table = subprocess.run([sys.executable, "tests/runs.py"], cwd=work, capture_output=True, text=True).stdout.strip()
     parts.append("## The recorded runs\n" + table)
     parts.append("## Replay of all recorded runs with the edited src/\n" + report)
     sl = []
-    for r, d in sorted(row["div"].items(), key=lambda kv: int(kv[0]) if kv[0].isdigit() else 0):
+    div = sorted(row["div"].items(), key=lambda kv: int(kv[0]) if kv[0].isdigit() else 0)
+    if rnd:
+        rnd.shuffle(div)
+    for r, d in div:
         if d and r.isdigit() and d.get("call"):
-            sl.append(f"Run {r}, before model call {d['call']}:\n" + steps_text(work, r, d["call"]))
+            if full_steps:
+                sl.append(steps_full(work, r, d["call"]))
+            else:
+                sl.append(f"Run {r}, before model call {d['call']}:\n" + steps_text(work, r, d["call"]))
     if sl:
         parts.append("## The steps of the log before each place where a run goes differently\n" + "\n\n".join(sl))
     return "\n\n".join(parts)
@@ -82,12 +163,14 @@ def main():
     ap.add_argument("--bench", default="app")
     ap.add_argument("--obs", default=os.path.join(ROOT, "runs/typed_1111/in/t1.txt"))
     ap.add_argument("--work", required=True, help="копия писателя с полными логами вида (для tests/runs.py)")
+    ap.add_argument("--full-steps", action="store_true", help="шаги с кодом целиком (иначе runs.py steps)")
+    ap.add_argument("--shuffle", help="зерно: задетые прогоны в отчёте и в шагах в случайном порядке")
     a = ap.parse_args()
     rows = [json.loads(l) for l in open(a.states)]
     row = next(r for r in rows if r["state"].startswith(a.state))
     obs = open(a.obs).read()
     obs = re.sub(r"^Observation from a study of the agent's failed runs[^\n]*\n+", "", obs)
-    print(build(row, rows, a.view, a.bench, obs, a.work))
+    print(build(row, rows, a.view, a.bench, obs, a.work, a.full_steps, a.shuffle))
 
 
 if __name__ == "__main__":
