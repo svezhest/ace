@@ -215,10 +215,10 @@ def run_blocks(bench, src, logs, work, before=6, after=3, earlier=False, brief=F
         d = j["div"][r]
         k = d["call"]
         if win:
-            # EV10 (автор 13.11): окно до места K−b−rand(0..n), у каждого прогона своё (зерно — правка и прогон);
+            # EV10 (автор 13.11): окно до места K−b−rand(n), rand(n) ∈ 0..n−1 — начала окон 6; 7..9; 10..14; 15..24 не пересекаются, у каждого прогона своё (зерно — правка и прогон);
             # заголовок без «in the log the task was solved / failed» (неясная строка; исход есть в таблице прогонов)
             import random
-            before = win[0] + random.Random(f"{state}:{r}").randint(0, win[1])
+            before = win[0] + (random.Random(f"{state}:{r}").randrange(win[1]) if win[1] else 0)
             blk = [f"### Run {r}"]
         else:
             blk = [f"### Run {r} (in the log the task {'was solved' if j['ok'][r] else 'failed'})"]
