@@ -28,3 +28,6 @@
   - Счёт — в шуме от 36 из 40; смотрю обоснования.
 - **Запуск.** `ev_judge.py … --stand plain27 --blocks --brief --prompt runs` → `t1_plain27_blocks_runs_brief.jsonl`,
   `08_plain27_blocks_runs_brief.jsonl` (`runs/ev_1112/run_ev9.sh`).
+- **Остановлена (13.11, ~13:10) на 9 ответах t1 из 21** — автор сменил вход: убрать ряд версий и исход в заголовке
+  блока, вместо краткой строки на шаг — полное окно разной ширины ([EV10](EV10-window-width.md)). Ответы — в
+  `t1_plain27_blocks_runs_brief.jsonl`, не считал.

@@ -58,6 +58,10 @@ PROMPTS = {
     "runs": f"{_INTRO}\n\n{_GOAL_V1}\n\nYou get {_GIVEN_BLOCKS}\n\n{_FORM_RUNS}",
     "runs_and": f"{_INTRO}\n\n{_GOAL_AND}\n\nYou get {_GIVEN_BLOCKS}\n\n{_FORM_RUNS}",
 }
+# EV10 (автор 13.11): во входе нет ряда версий правки — из описания входа убрана и его строка
+_VERS = " (if the colleague edited several times, also each version as a diff against the one before it)"
+assert _VERS in _GIVEN_BLOCKS
+PROMPTS["runs_w"] = f"{_INTRO}\n\n{_GOAL_V1}\n\nYou get {_GIVEN_BLOCKS.replace(_VERS, '')}\n\n{_FORM_RUNS}"
 assert _GOAL_V1 in SYSTEM
 
 
@@ -189,7 +193,7 @@ print(json.dumps({"ok": {r: bool(res.get(r, {}).get("ok")) for r in new}, "div":
 """
 
 
-def run_blocks(bench, src, logs, work, before=6, after=3, earlier=False, brief=False):
+def run_blocks(bench, src, logs, work, before=6, after=3, earlier=False, brief=False, win=None, state=""):
     """EV5: свой блок на каждый задетый прогон вместо отчёта rerun.py. Отчёт склеивает прогоны с похожим действием
     харнесса («The same as run 14») — у склеенного прогона нет ни своего кода, ни сообщения (ревью сабагента 13.11);
     вызов «model call K» в строке отчёта показывает код ответа K−1; деление на passed / failed читается как
@@ -210,7 +214,14 @@ def run_blocks(bench, src, logs, work, before=6, after=3, earlier=False, brief=F
     for r in moved:
         d = j["div"][r]
         k = d["call"]
-        blk = [f"### Run {r} (in the log the task {'was solved' if j['ok'][r] else 'failed'})"]
+        if win:
+            # EV10 (автор 13.11): окно до места K−b−rand(0..n), у каждого прогона своё (зерно — правка и прогон);
+            # заголовок без «in the log the task was solved / failed» (неясная строка; исход есть в таблице прогонов)
+            import random
+            before = win[0] + random.Random(f"{state}:{r}").randint(0, win[1])
+            blk = [f"### Run {r}"]
+        else:
+            blk = [f"### Run {r} (in the log the task {'was solved' if j['ok'][r] else 'failed'})"]
         if d["kind"] == "model" and k and k > 1:
             blk.append(f"The edited harness acts differently right after model call {k - 1}. {d['text']}")
             if brief and k - before > 1:
@@ -255,14 +266,14 @@ def shuffle_report(report, rnd):
     return "\n".join(out)
 
 
-def build(row, rows, view, bench, obs, work, full_steps=False, shuffle=None, blocks=False, earlier=False, brief=False):
+def build(row, rows, view, bench, obs, work, full_steps=False, shuffle=None, blocks=False, earlier=False, brief=False, win=None):
     src0 = ES.read_src(os.path.join(view, "src"))
     sess = sorted((r for r in rows if r["log"] == row["log"] and r["n"] <= row["n"]), key=lambda r: r["n"])
     files = ES.chain(os.path.join(ROOT, row["log"]), src0)[: row["n"]]
     final = files[-1][1]
     parts = [(obs.strip() if obs.lstrip().startswith("## ") else "## Observation\n" + obs.strip()),
              "## The edit (diff against the original src/)\n```diff\n" + ES.udiff(src0, final).rstrip() + "\n```"]
-    if len(files) > 1:
+    if len(files) > 1 and not win:
         prev, ds = src0, []
         for k, (_, f) in enumerate(files, 1):
             ds.append(f"Version {k}:\n```diff\n" + ES.udiff(prev, f).rstrip() + "\n```")
@@ -278,7 +289,7 @@ def build(row, rows, view, bench, obs, work, full_steps=False, shuffle=None, blo
             table = subprocess.run([sys.executable, "tests/runs.py"], cwd=work, capture_output=True, text=True).stdout.strip()
             parts.append("## The recorded runs\n" + table)
             parts.append("## Replay of all recorded runs with the edited src/\n"
-                         + run_blocks(bench, os.path.join(tmp, "src"), os.path.join(view, "logs"), work, earlier=earlier, brief=brief))
+                         + run_blocks(bench, os.path.join(tmp, "src"), os.path.join(view, "logs"), work, earlier=earlier, brief=brief, win=win, state=row["state"]))
             return "\n\n".join(parts)
         rep = subprocess.run([sys.executable, ES.CORE, "--bench", bench, "--src", os.path.join(tmp, "src"),
                               "--logs", os.path.join(view, "logs")], capture_output=True, text=True, timeout=900)
