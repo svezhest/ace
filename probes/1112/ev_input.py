@@ -88,12 +88,15 @@ def render_steps(work, run, a, b):
             code = "\n".join(blocks).splitlines() if blocks else ["text: " + t.strip()]
         code = [l for l in code if l.strip()]
         nxt = calls[k] if k < len(calls) else len(objs)
-        env = next((objs[x] for x in range(i + 1, nxt) if R._is_env(objs[x])), None)
+        # EV5b: первое сообщение модели после шага — от среды (env) или от харнесса (harness: прежняя защита не
+        # исполнила код). В EV5 бралась только среда, и блок прежней защиты выглядел как «(no env message)».
+        env = next((objs[x] for x in range(i + 1, nxt) if objs[x] and objs[x].get("event") in ("env", "harness")
+                    and isinstance(objs[x].get("message"), dict)), None)
         resp = ([l for l in R._text(R._msg(env)).splitlines() if l.strip() and not l.strip().startswith("```")]
-                if env else ["(no env message)"])
+                if env else ["(no message)"])
         out.append(f"model call {k}, the model's code:")
         out += ["    " + l for l in _cap(code, 30, 200)]
-        out.append("  the model got:")
+        out.append("  the harness did not run it and said:" if env and env.get("event") == "harness" else "  the model got:")
         out += ["    " + l for l in _cap(resp, 4, 200)]
     return "\n".join(out)
 
