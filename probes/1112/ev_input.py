@@ -262,6 +262,36 @@ def run_blocks(bench, src, logs, work, before=6, after=3, earlier=False, brief=F
     return "\n\n".join(out)
 
 
+def render_raw(work, run, a, b):
+    """EV12 (автор 13.11: «правильнее вообще не толковать ответ и показывать его как есть»): шаг k — ответ модели как
+    есть (текст и вызовы инструментов), затем каждое сообщение, пришедшее модели до следующего вызова, с источником из
+    лога (env → Env, harness → Harness). Обрезка: ответ — 30 строк, сообщение — 6 строк, строка — 200 знаков."""
+    R = _runs_mod(work)
+    objs = [R._obj(x) for x in open(os.path.join(work, "logs", f"run_{run}.jsonl"))]
+    calls = [i for i, o in enumerate(objs) if R._is_model(o)]
+    a, b = max(1, a), min(b, len(calls))
+    out = []
+    for k in range(a, b + 1):
+        i = calls[k - 1]
+        m = R._msg(objs[i])
+        lines = R._text(m).strip("\n").splitlines()
+        for tc in m.get("tool_calls") or []:
+            f = tc.get("function") or {}
+            args = f.get("arguments")
+            lines.append(f"tool call {f.get('name')}: " + (args if isinstance(args, str) else json.dumps(args, ensure_ascii=False)))
+        out.append(f"Step {k}")
+        out.append("  Model:")
+        out += ["    " + l for l in _cap(lines or ["(empty)"], 30, 200)]
+        nxt = calls[k] if k < len(calls) else len(objs)
+        got = [o for o in objs[i + 1:nxt] if o and isinstance(o.get("message"), dict)]
+        for o in got:
+            out.append(f"  {o.get('event', '?').capitalize()}:")
+            out += ["    " + l for l in _cap(R._text(R._msg(o)).strip("\n").splitlines() or ["(empty)"], 6, 200)]
+        if not got:
+            out.append("  (the run ended here)" if k == len(calls) else "  (no message before the next step)")
+    return "\n".join(out)
+
+
 def _chars(work, run):
     """Знаков в сообщениях прогона: всего и до каждого вызова модели (список, индекс k−1 — до вызова k)."""
     R = _runs_mod(work)
@@ -294,8 +324,13 @@ def run_blocks_v2(bench, src, logs, work, state, sparse=None, before=6, after=3)
         k = d["call"]
         tot, bef = _chars(work, r)
         prev = "OK (task solved)" if j["ok"][r] else "NOT OK (task failed)"
-        if not (d["kind"] == "model" and k and k > 1):
-            out.append(f"### Run {r}: previously {prev}, {tot} chars, {len(bef)} steps.\n{d['text']}")
+        # место — после шага last: для «what the model sees differs» call = K (расходится вход вызова K), для конца
+        # эпизода, падения и задачи (end / crash / bridge) call = число сделанных вызовов
+        last = (k - 1) if d["kind"] == "model" else (k or 0)
+        k = last + 1
+        if last < 1:
+            out.append(f"### Run {r}: previously {prev}, {tot} chars, {len(bef)} steps; now diverges before step 1.\n"
+                       f"Diff: {d['text']}")
             continue
         at = bef[k - 1] if k - 1 < len(bef) else tot
         blk = [f"### Run {r}: previously {prev}, {tot} chars, {len(bef)} steps; now diverges at {at} chars, after "
@@ -307,11 +342,11 @@ def run_blocks_v2(bench, src, logs, work, state, sparse=None, before=6, after=3)
             if picks:
                 blk.append(f"(steps {', '.join(map(str, picks))} are picked at random from earlier in the run; then "
                            f"steps {max(1, k - before)}-{k - 1} in a row)")
-                blk.append("\n".join(render_steps(work, r, x, x, "Step") for x in picks))
-        blk.append(render_steps(work, r, k - before, k - 1, "Step"))
+                blk.append("\n".join(render_raw(work, r, x, x) for x in picks))
+        blk.append(render_raw(work, r, k - before, k - 1))
         blk.append("<-- Divergence point")
         blk.append("Diff: " + d["text"])
-        aft = render_steps(work, r, k, k + after - 1, "Step")
+        aft = render_raw(work, r, k, k + after - 1)
         if aft:
             blk.append("Note: the previous run continued with the following steps. They might not be the same now.")
             blk.append(aft)
