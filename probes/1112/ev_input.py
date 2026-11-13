@@ -437,7 +437,11 @@ def build_prompt(row, view, bench, obs):
     шага 1, чем бы правка его ни меняла (файл промпта или код харнесса); показан на прогоне наблюдения (первый
     run_N в нём). None — промпт не менялся."""
     src0 = ES.read_src(os.path.join(view, "src"))
-    final = ES.chain(os.path.join(ROOT, row["log"]), src0)[: row["n"]][-1][1]
+    return build_prompt_from(ES.chain(os.path.join(ROOT, row["log"]), src0)[: row["n"]][-1][1], view, bench, obs)
+
+
+def build_prompt_from(final, view, bench, obs):
+    """build_prompt по готовым файлам правки (rel -> текст, как ES.read_src)."""
     run = (re.findall(r"run_(\d+)", obs) or ["1"])[0]
     with tempfile.TemporaryDirectory() as tmp:
         p = subprocess.run([sys.executable, "-c", PROMPT0, os.path.join(ROOT, "editor"), bench, _write(final, tmp),
@@ -452,8 +456,15 @@ def build_prompt(row, view, bench, obs):
 
 def build(row, rows, view, bench, obs, work, full_steps=False, shuffle=None, blocks=False, earlier=False, brief=False, win=None, sparse=None, v2=False, logic_only=False):
     src0 = ES.read_src(os.path.join(view, "src"))
-    sess = sorted((r for r in rows if r["log"] == row["log"] and r["n"] <= row["n"]), key=lambda r: r["n"])
     files = ES.chain(os.path.join(ROOT, row["log"]), src0)[: row["n"]]
+    return build_from(files, view, bench, obs, work, row["state"], full_steps, shuffle, blocks, earlier, brief, win, sparse,
+                      v2, logic_only, row.get("div"))
+
+
+def build_from(files, view, bench, obs, work, state, full_steps=False, shuffle=None, blocks=False, earlier=False, brief=False,
+               win=None, sparse=None, v2=False, logic_only=False, div_row=None):
+    """build по готовому ряду версий правки files = [(ход, {rel: текст})], последняя — итог; state — зерно случайных шагов."""
+    src0 = ES.read_src(os.path.join(view, "src"))
     final = files[-1][1]
     j, note = None, ""
     if logic_only:
@@ -485,13 +496,13 @@ def build(row, rows, view, bench, obs, work, full_steps=False, shuffle=None, blo
             open(p, "w").write(text)
         if v2:
             parts.append("## Replay of all recorded runs with the edited src/\n"
-                         + note + run_blocks_v2(bench, os.path.join(tmp, "src"), os.path.join(view, "logs"), work, row["state"], sparse, j=j))
+                         + note + run_blocks_v2(bench, os.path.join(tmp, "src"), os.path.join(view, "logs"), work, state, sparse, j=j))
             return "\n\n".join(parts)
         if blocks:
             table = subprocess.run([sys.executable, "tests/runs.py"], cwd=work, capture_output=True, text=True).stdout.strip()
             parts.append("## The recorded runs\n" + table)
             parts.append("## Replay of all recorded runs with the edited src/\n"
-                         + note + run_blocks(bench, os.path.join(tmp, "src"), os.path.join(view, "logs"), work, earlier=earlier, brief=brief, win=win, state=row["state"], sparse=sparse, j=j))
+                         + note + run_blocks(bench, os.path.join(tmp, "src"), os.path.join(view, "logs"), work, earlier=earlier, brief=brief, win=win, state=state, sparse=sparse, j=j))
             return "\n\n".join(parts)
         rep = subprocess.run([sys.executable, ES.CORE, "--bench", bench, "--src", os.path.join(tmp, "src"),
                               "--logs", os.path.join(view, "logs")], capture_output=True, text=True, timeout=900)
@@ -499,13 +510,13 @@ def build(row, rows, view, bench, obs, work, full_steps=False, shuffle=None, blo
     rnd = None
     if shuffle is not None:
         import random
-        rnd = random.Random(f"{shuffle}:{row['state']}")
+        rnd = random.Random(f"{shuffle}:{state}")
         report = shuffle_report(report, rnd)
     table = subprocess.run([sys.executable, "tests/runs.py"], cwd=work, capture_output=True, text=True).stdout.strip()
     parts.append("## The recorded runs\n" + table)
     parts.append("## Replay of all recorded runs with the edited src/\n" + report)
     sl = []
-    div = sorted(row["div"].items(), key=lambda kv: int(kv[0]) if kv[0].isdigit() else 0)
+    div = sorted((div_row or {}).items(), key=lambda kv: int(kv[0]) if kv[0].isdigit() else 0)
     if rnd:
         rnd.shuffle(div)
     for r, d in div:

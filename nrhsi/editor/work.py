@@ -127,17 +127,12 @@ def build_work(bench, tag):
     assert readme.count(READ_FAILED) == 1   # 4.11, автор: писатель сначала доверяет коллеге (строка — для ревьювера)
     readme = readme.replace(READ_FAILED, "").rstrip("\n") + "\n"
     with open(f"{v}/README.md", "w") as f:
-        f.write(readme + RERUN_README + RERUN_AT_README + RUNS_README + SMOKE_README)
+        f.write(readme + RUNS_README.replace(" The call numbers are those in the output of `tests/rerun.py`.", ""))   # 13.11: без rerun и smoke — вердикт даёт оценщик
     shutil.copytree(f"{view}/src", f"{v}/src", ignore=shutil.ignore_patterns("__pycache__"))
     shutil.copytree(f"{view}/src", f"{v}/tests/orig_src", ignore=shutil.ignore_patterns("__pycache__"))
     shutil.copytree(f"{view}/logs", f"{v}/logs")
-    shutil.copy(f"{C.SMOKE}/{bench}.py", f"{v}/tests/smoke.py")
-    # Ядро повтора одно — editor/rerun.py: в копию писателя оно идёт без комментариев и докстрингов, как src/ вида,
-    # и по нему же (под тем же python3 песочницы) идёт проверка по тикету.
-    from .. import plain
-    core = open(os.path.join(os.path.dirname(C.SMOKE), "..", "..", "editor", "rerun.py")).read()
-    for name, text in (("rerun_core.py", plain.strip(core)[0]), ("rerun.py", RERUN_PY.replace("BENCH", repr(bench))),
-                       ("runs.py", runs_py())):
+    # 13.11 (автор): rerun и smoke в копии нет — вердикт по правке даёт оценщик на finish (nrhsi/editor/review.py)
+    for name, text in (("runs.py", runs_py()),):
         with open(f"{v}/tests/{name}", "w") as f:
             f.write(text)
     for p in glob.glob(f"{v}/src/*"):

@@ -33,6 +33,7 @@ def parse_args():
 def main():
     a = parse_args()
     C.HERE, C.RLOGS, C.LINT = os.path.abspath(a.home), a.rlogs, a.lint
+    C.REVIEW_OBS = a.input_text
     if a.ticket:
         C.TICKET = json.load(open(a.ticket))
         assert C.TICKET["change_expected"] in ("prompt", "control", "any") and C.TICKET["runs"]
