@@ -66,6 +66,19 @@ _FORM_RUNS_STEP = _FORM_RUNS.replace("Run N, model call K:", "Run N, step K:").r
 assert _FORM_RUNS_STEP.count("step K") == 2
 PROMPTS["runs_v2"] = f"{_INTRO}\n\n{_GOAL_V1}\n\nYou get {_GIVEN_BLOCKS.replace(_VERS, '')}\n\n{_FORM_RUNS_STEP}"
 PROMPTS["runs_w"] = f"{_INTRO}\n\n{_GOAL_V1}\n\nYou get {_GIVEN_BLOCKS.replace(_VERS, '')}\n\n{_FORM_RUNS}"
+# EV13 (автор 13.11): правку промпта смотрит отдельный оценщик — задача, промпт до и после; цель вместо запретов,
+# без условия конкретной задачи
+PROMPTS["prompt_edit"] = """You review an edit to the prompt of an AI agent (a language model) that works on tasks. A colleague studied the agent's failed runs and wrote an observation: what went wrong and what should change. Another colleague then edited the prompt to do that.
+
+Your goal is to say whether the edited prompt is a good instruction for the agent on any task it may get:
+- each new or changed instruction tells the agent what to do; where it says what not to do, it also says what to do instead;
+- the prompt stays general: it carries no details of the particular task from the observation (its names, values or the exact condition of that task).
+
+You get the observation, and each changed prompt file before and after the edit.
+
+Answer in this form. First, one line for each new or changed passage of the prompt: what it tells the agent, and whether it meets both points.
+Then:
+Verdict: Ok or Failed"""
 assert _GOAL_V1 in SYSTEM
 
 
@@ -386,11 +399,35 @@ def shuffle_report(report, rnd):
     return "\n".join(out)
 
 
-def build(row, rows, view, bench, obs, work, full_steps=False, shuffle=None, blocks=False, earlier=False, brief=False, win=None, sparse=None, v2=False):
+def is_prompt(rel):
+    """Файл промпта харнесса (src/*.md) — его правку смотрит отдельный оценщик промпта (автор 13.11)."""
+    return rel.endswith(".md")
+
+
+def build_prompt(row, view, obs):
+    """Оценщик промпта (автор 13.11): только задача (наблюдение), промпт до и промпт после. None — промпт не менялся."""
+    src0 = ES.read_src(os.path.join(view, "src"))
+    final = ES.chain(os.path.join(ROOT, row["log"]), src0)[: row["n"]][-1][1]
+    changed = sorted(r for r in set(src0) | set(final) if is_prompt(r) and src0.get(r, "") != final.get(r, ""))
+    if not changed:
+        return None
+    parts = [(obs.strip() if obs.lstrip().startswith("## ") else "## Observation\n" + obs.strip())]
+    for rel in changed:
+        parts.append(f"## {rel} before the edit\n```\n{src0.get(rel, '(no such file)').rstrip()}\n```")
+        parts.append(f"## {rel} after the edit\n```\n{final.get(rel, '(file removed)').rstrip()}\n```")
+    return "\n\n".join(parts)
+
+
+def build(row, rows, view, bench, obs, work, full_steps=False, shuffle=None, blocks=False, earlier=False, brief=False, win=None, sparse=None, v2=False, logic_only=False):
     src0 = ES.read_src(os.path.join(view, "src"))
     sess = sorted((r for r in rows if r["log"] == row["log"] and r["n"] <= row["n"]), key=lambda r: r["n"])
     files = ES.chain(os.path.join(ROOT, row["log"]), src0)[: row["n"]]
     final = files[-1][1]
+    if logic_only:
+        # правки промпта вырезаются: файлы промпта — как в исходном src; если больше ничего не изменилось — пропуск
+        final = {r: t for r, t in final.items() if not is_prompt(r)} | {r: t for r, t in src0.items() if is_prompt(r)}
+        if final == src0:
+            return None
     parts = [(obs.strip() if obs.lstrip().startswith("## ") else "## Observation\n" + obs.strip()),
              "## The edit (diff against the original src/)\n```diff\n" + ES.udiff(src0, final).rstrip() + "\n```"]
     if len(files) > 1 and not win and not v2:
