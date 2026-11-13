@@ -92,6 +92,39 @@ def steps_full(work, run, call, before=6):
             + render_steps(work, run, a, b))
 
 
+def _step_code(R, m):
+    """Код шага: аргументы вызова инструмента или блоки ``` из текста ответа модели."""
+    code = []
+    for tc in m.get("tool_calls") or []:
+        f = tc.get("function") or {}
+        arg = f.get("arguments")
+        try:
+            arg = json.loads(arg) if isinstance(arg, str) else arg
+        except ValueError:
+            pass
+        if isinstance(arg, dict) and len(arg) == 1 and isinstance(list(arg.values())[0], str):
+            arg = list(arg.values())[0]
+        code += (arg if isinstance(arg, str) else json.dumps(arg, ensure_ascii=False)).splitlines()
+    if not code:
+        t = R._text(m)
+        blocks = re.findall(r"```[^\n]*\n(.*?)(?:```|$)", t, re.S)
+        code = "\n".join(blocks).splitlines() if blocks else ["text: " + t.strip()]
+    return [l for l in code if l.strip()]
+
+
+def earlier_same(work, run, k):
+    """EV8: на каких вызовах раньше в этом прогоне модель прислала тот же код, что на вызове k. Окно блока — 6 шагов;
+    в run 9 (t1) прежние такие же шаги (9, 11, 12) вне окна, и шаг 19 выглядит первым — ложные «Failed» T и NT."""
+    R = _runs_mod(work)
+    objs = [R._obj(x) for x in open(os.path.join(work, "logs", f"run_{run}.jsonl"))]
+    calls = [i for i, o in enumerate(objs) if R._is_model(o)]
+    if not 1 <= k <= len(calls):
+        return None, []
+    codes = [_step_code(R, R._msg(objs[i])) for i in calls[:k]]
+    kind = "action" if R._msg(objs[calls[k - 1]]).get("tool_calls") else "code"
+    return kind, [j + 1 for j in range(k - 1) if codes[j] == codes[k - 1]]
+
+
 def render_steps(work, run, a, b):
     R = _runs_mod(work)
     objs = [R._obj(x) for x in open(os.path.join(work, "logs", f"run_{run}.jsonl"))]
@@ -101,22 +134,7 @@ def render_steps(work, run, a, b):
     for k in range(a, b + 1):
         i = calls[k - 1]
         m = R._msg(objs[i])
-        code = []
-        for tc in m.get("tool_calls") or []:
-            f = tc.get("function") or {}
-            arg = f.get("arguments")
-            try:
-                arg = json.loads(arg) if isinstance(arg, str) else arg
-            except ValueError:
-                pass
-            if isinstance(arg, dict) and len(arg) == 1 and isinstance(list(arg.values())[0], str):
-                arg = list(arg.values())[0]
-            code += (arg if isinstance(arg, str) else json.dumps(arg, ensure_ascii=False)).splitlines()
-        if not code:
-            t = R._text(m)
-            blocks = re.findall(r"```[^\n]*\n(.*?)(?:```|$)", t, re.S)
-            code = "\n".join(blocks).splitlines() if blocks else ["text: " + t.strip()]
-        code = [l for l in code if l.strip()]
+        code = _step_code(R, m)
         nxt = calls[k] if k < len(calls) else len(objs)
         # EV5b: первое сообщение модели после шага — от среды (env) или от харнесса (harness: прежняя защита не
         # исполнила код). В EV5 бралась только среда, и блок прежней защиты выглядел как «(no env message)».
@@ -149,7 +167,7 @@ print(json.dumps({"ok": {r: bool(res.get(r, {}).get("ok")) for r in new}, "div":
 """
 
 
-def run_blocks(bench, src, logs, work, before=6, after=3):
+def run_blocks(bench, src, logs, work, before=6, after=3, earlier=False):
     """EV5: свой блок на каждый задетый прогон вместо отчёта rerun.py. Отчёт склеивает прогоны с похожим действием
     харнесса («The same as run 14») — у склеенного прогона нет ни своего кода, ни сообщения (ревью сабагента 13.11);
     вызов «model call K» в строке отчёта показывает код ответа K−1; деление на passed / failed читается как
@@ -176,6 +194,11 @@ def run_blocks(bench, src, logs, work, before=6, after=3):
             blk.append(f"The log before it, model calls {max(1, k - before)}-{k - 1} (the last one is the step the "
                        "edited harness handles differently):")
             blk.append(render_steps(work, r, k - before, k - 1))
+            if earlier:
+                kind, same_k = earlier_same(work, r, k - 1)
+                blk.append(f"Earlier in this run, the model sent the same {kind} as at model call {k - 1} at model calls "
+                           f"{', '.join(map(str, same_k))}." if same_k else
+                           f"Earlier in this run, the model never sent the same {kind} as at model call {k - 1}.")
             aft = render_steps(work, r, k, k + after - 1)
             if aft:
                 blk.append(f"The log after it, with the original harness, model calls {k}-{k + after - 1}:")
@@ -206,7 +229,7 @@ def shuffle_report(report, rnd):
     return "\n".join(out)
 
 
-def build(row, rows, view, bench, obs, work, full_steps=False, shuffle=None, blocks=False):
+def build(row, rows, view, bench, obs, work, full_steps=False, shuffle=None, blocks=False, earlier=False):
     src0 = ES.read_src(os.path.join(view, "src"))
     sess = sorted((r for r in rows if r["log"] == row["log"] and r["n"] <= row["n"]), key=lambda r: r["n"])
     files = ES.chain(os.path.join(ROOT, row["log"]), src0)[: row["n"]]
@@ -229,7 +252,7 @@ def build(row, rows, view, bench, obs, work, full_steps=False, shuffle=None, blo
             table = subprocess.run([sys.executable, "tests/runs.py"], cwd=work, capture_output=True, text=True).stdout.strip()
             parts.append("## The recorded runs\n" + table)
             parts.append("## Replay of all recorded runs with the edited src/\n"
-                         + run_blocks(bench, os.path.join(tmp, "src"), os.path.join(view, "logs"), work))
+                         + run_blocks(bench, os.path.join(tmp, "src"), os.path.join(view, "logs"), work, earlier=earlier))
             return "\n\n".join(parts)
         rep = subprocess.run([sys.executable, ES.CORE, "--bench", bench, "--src", os.path.join(tmp, "src"),
                               "--logs", os.path.join(view, "logs")], capture_output=True, text=True, timeout=900)
