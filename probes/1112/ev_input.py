@@ -193,7 +193,7 @@ print(json.dumps({"ok": {r: bool(res.get(r, {}).get("ok")) for r in new}, "div":
 """
 
 
-def run_blocks(bench, src, logs, work, before=6, after=3, earlier=False, brief=False, win=None, state=""):
+def run_blocks(bench, src, logs, work, before=6, after=3, earlier=False, brief=False, win=None, state="", sparse=None):
     """EV5: свой блок на каждый задетый прогон вместо отчёта rerun.py. Отчёт склеивает прогоны с похожим действием
     харнесса («The same as run 14») — у склеенного прогона нет ни своего кода, ни сообщения (ревью сабагента 13.11);
     вызов «model call K» в строке отчёта показывает код ответа K−1; деление на passed / failed читается как
@@ -228,6 +228,16 @@ def run_blocks(bench, src, logs, work, before=6, after=3, earlier=False, brief=F
                 blk.append(f"The log from the start of the run, model calls 1-{k - before - 1}, one line per call "
                            "(the code on one line, and the first line of what came back):")
                 blk.append(render_brief(work, r, 1, k - before - 1))
+            if sparse:
+                # EV11 (автор 13.11): к окну K−6…K+2 — по одному шагу из интервалов K−b−rand(n), b,n = 15,10; 10,5; 7,3
+                # (начала K−24…K−15, K−14…K−10, K−9…K−7: растут и не пересекаются), каждый случайно, своё зерно
+                import random
+                picks = sorted({k - b - random.Random(f"{state}:{r}:{b}").randrange(n) for b, n in sparse})
+                picks = [p for p in picks if 1 <= p < k - before]
+                if picks:
+                    blk.append(f"A few earlier steps of the log, picked at random, one at a time: model calls "
+                               f"{', '.join(map(str, picks))}:")
+                    blk.append("\n".join(render_steps(work, r, p, p) for p in picks))
             blk.append(f"The log before it, model calls {max(1, k - before)}-{k - 1} (the last one is the step the "
                        "edited harness handles differently):")
             blk.append(render_steps(work, r, k - before, k - 1))
@@ -266,7 +276,7 @@ def shuffle_report(report, rnd):
     return "\n".join(out)
 
 
-def build(row, rows, view, bench, obs, work, full_steps=False, shuffle=None, blocks=False, earlier=False, brief=False, win=None):
+def build(row, rows, view, bench, obs, work, full_steps=False, shuffle=None, blocks=False, earlier=False, brief=False, win=None, sparse=None):
     src0 = ES.read_src(os.path.join(view, "src"))
     sess = sorted((r for r in rows if r["log"] == row["log"] and r["n"] <= row["n"]), key=lambda r: r["n"])
     files = ES.chain(os.path.join(ROOT, row["log"]), src0)[: row["n"]]
@@ -289,7 +299,7 @@ def build(row, rows, view, bench, obs, work, full_steps=False, shuffle=None, blo
             table = subprocess.run([sys.executable, "tests/runs.py"], cwd=work, capture_output=True, text=True).stdout.strip()
             parts.append("## The recorded runs\n" + table)
             parts.append("## Replay of all recorded runs with the edited src/\n"
-                         + run_blocks(bench, os.path.join(tmp, "src"), os.path.join(view, "logs"), work, earlier=earlier, brief=brief, win=win, state=row["state"]))
+                         + run_blocks(bench, os.path.join(tmp, "src"), os.path.join(view, "logs"), work, earlier=earlier, brief=brief, win=win, state=row["state"], sparse=sparse))
             return "\n\n".join(parts)
         rep = subprocess.run([sys.executable, ES.CORE, "--bench", bench, "--src", os.path.join(tmp, "src"),
                               "--logs", os.path.join(view, "logs")], capture_output=True, text=True, timeout=900)
