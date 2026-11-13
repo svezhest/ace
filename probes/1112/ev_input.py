@@ -74,7 +74,7 @@ Your goal is to say whether the edited prompt is a good instruction for the agen
 - each new or changed instruction tells the agent what to do; where it says what not to do, it also says what to do instead;
 - the prompt stays general: it carries no details of the particular task from the observation (its names, values or the exact condition of that task).
 
-You get the observation, and each changed prompt file before and after the edit.
+You get the observation, and what the model gets before its first step in one recorded run, before and after the edit: each message with its role. Both contain the task of that run, which the harness puts into the prompt for every task.
 
 Answer in this form. First, one line for each new or changed passage of the prompt: what it tells the agent, and whether it meets both points.
 Then:
@@ -196,7 +196,7 @@ EVENTS = r"""
 import json, sys
 sys.path.insert(0, sys.argv[1])
 import rerun as R
-new = R.worker(sys.argv[2], sys.argv[3], sys.argv[4])
+new = R.worker(sys.argv[2], sys.argv[3], sys.argv[4], past_prompt=sys.argv[5] == "1")
 res = R.results(sys.argv[4])
 div = {}
 for r, t in new.items():
@@ -206,18 +206,34 @@ for r, t in new.items():
         continue
     text = R.event_text(d, None) if R.event_of(d) else R.report_diff(new, None, res, [r], detail=True)
     div[r] = {"call": d.get("call"), "kind": d.get("kind"), "text": text}
-print(json.dumps({"ok": {r: bool(res.get(r, {}).get("ok")) for r in new}, "div": div}))
+print(json.dumps({"ok": {r: bool(res.get(r, {}).get("ok")) for r in new}, "div": div,
+                  "prompt": [r for r, t in new.items() if t.get("prompt")]}))
+"""
+
+# 13.11: то, что модель получает до шага 1, в одном прогоне — до правки и после (перепрогон с past_prompt)
+PROMPT0 = r"""
+import json, sys
+sys.path.insert(0, sys.argv[1])
+import rerun as R
+t = R.worker(sys.argv[2], sys.argv[3], sys.argv[4], runs=[sys.argv[5]], past_prompt=True)[sys.argv[5]]
+print(json.dumps(t.get("prompt")))
 """
 
 
-def run_blocks(bench, src, logs, work, before=6, after=3, earlier=False, brief=False, win=None, state="", sparse=None):
+def events(bench, src, logs, past_prompt=False):
+    """Перепрогон всех прогонов: исход в логе, место расхождения; past_prompt — сравнивать то, что идёт после промпта
+    (сообщений до шага 1), и перечислить прогоны, где промпт стал другим."""
+    p = subprocess.run([sys.executable, "-c", EVENTS, os.path.join(ROOT, "editor"), bench, src, logs, "1" if past_prompt else "0"],
+                       capture_output=True, text=True, timeout=900)
+    return json.loads(p.stdout.strip().splitlines()[-1])
+
+
+def run_blocks(bench, src, logs, work, before=6, after=3, earlier=False, brief=False, win=None, state="", sparse=None, j=None):
     """EV5: свой блок на каждый задетый прогон вместо отчёта rerun.py. Отчёт склеивает прогоны с похожим действием
     харнесса («The same as run 14») — у склеенного прогона нет ни своего кода, ни сообщения (ревью сабагента 13.11);
     вызов «model call K» в строке отчёта показывает код ответа K−1; деление на passed / failed читается как
     «безопасно». Здесь: предложение rerun.event_text по этому прогону (без склейки), шаги лога до места и после."""
-    p = subprocess.run([sys.executable, "-c", EVENTS, os.path.join(ROOT, "editor"), bench, src, logs],
-                       capture_output=True, text=True, timeout=900)
-    j = json.loads(p.stdout.strip().splitlines()[-1])
+    j = j or events(bench, src, logs)
     runs = sorted(j["div"], key=int)
     moved = [r for r in runs if j["div"][r]]
     same = [r for r in runs if not j["div"][r]]
@@ -320,13 +336,11 @@ def _chars(work, run):
     return tot, before
 
 
-def run_blocks_v2(bench, src, logs, work, state, sparse=None, before=6, after=3):
+def run_blocks_v2(bench, src, logs, work, state, sparse=None, before=6, after=3, j=None):
     """EV12 (автор 13.11): без таблицы прогонов; заголовок прогона — исход, длина и место расхождения в знаках и шагах;
     «Context:» — шаги до места; «<-- Divergence point»; «Diff:» — что харнесс делал в логе и что делает теперь;
     шаги лога после места с оговоркой, что теперь они могут быть другими."""
-    p = subprocess.run([sys.executable, "-c", EVENTS, os.path.join(ROOT, "editor"), bench, src, logs],
-                       capture_output=True, text=True, timeout=900)
-    j = json.loads(p.stdout.strip().splitlines()[-1])
+    j = j or events(bench, src, logs)
     runs = sorted(j["div"], key=int)
     moved = [r for r in runs if j["div"][r]]
     out = [f"{len(runs)} runs replayed with the edited src/. {len(moved)} go differently from the log: runs "
@@ -399,23 +413,41 @@ def shuffle_report(report, rnd):
     return "\n".join(out)
 
 
-def is_prompt(rel):
-    """Файл промпта харнесса (src/*.md) — его правку смотрит отдельный оценщик промпта (автор 13.11)."""
-    return rel.endswith(".md")
+def _write(files, tmp):
+    for rel, text in files.items():
+        p = os.path.join(tmp, rel)
+        os.makedirs(os.path.dirname(p), exist_ok=True)
+        open(p, "w").write(text)
+    return os.path.join(tmp, "src")
 
 
-def build_prompt(row, view, obs):
-    """Оценщик промпта (автор 13.11): только задача (наблюдение), промпт до и промпт после. None — промпт не менялся."""
+def _messages(ms):
+    """Сообщения как есть: роль и текст, вызов инструмента — как в шагах."""
+    out = []
+    for m in ms:
+        body = (m.get("content") or "").rstrip()
+        for tc in m.get("tool_calls") or []:
+            body += ("\n" if body else "") + f"tool call {tc['function']['name']}: {tc['function']['arguments']}"
+        out.append(f"[{m['role']}]\n{body}")
+    return "\n\n".join(out)
+
+
+def build_prompt(row, view, bench, obs):
+    """Оценщик промпта (автор 13.11): задача (наблюдение), промпт до и после. Промпт — всё, что модель получает до
+    шага 1, чем бы правка его ни меняла (файл промпта или код харнесса); показан на прогоне наблюдения (первый
+    run_N в нём). None — промпт не менялся."""
     src0 = ES.read_src(os.path.join(view, "src"))
     final = ES.chain(os.path.join(ROOT, row["log"]), src0)[: row["n"]][-1][1]
-    changed = sorted(r for r in set(src0) | set(final) if is_prompt(r) and src0.get(r, "") != final.get(r, ""))
-    if not changed:
+    run = (re.findall(r"run_(\d+)", obs) or ["1"])[0]
+    with tempfile.TemporaryDirectory() as tmp:
+        p = subprocess.run([sys.executable, "-c", PROMPT0, os.path.join(ROOT, "editor"), bench, _write(final, tmp),
+                            os.path.join(view, "logs"), run], capture_output=True, text=True, timeout=900)
+    pr = json.loads(p.stdout.strip().splitlines()[-1])
+    if not pr:
         return None
-    parts = [(obs.strip() if obs.lstrip().startswith("## ") else "## Observation\n" + obs.strip())]
-    for rel in changed:
-        parts.append(f"## {rel} before the edit\n```\n{src0.get(rel, '(no such file)').rstrip()}\n```")
-        parts.append(f"## {rel} after the edit\n```\n{final.get(rel, '(file removed)').rstrip()}\n```")
-    return "\n\n".join(parts)
+    return "\n\n".join([(obs.strip() if obs.lstrip().startswith("## ") else "## Observation\n" + obs.strip()),
+                        f"## What the model gets before its first step in run {run}, before the edit\n" + _messages(pr["old_all"]),
+                        f"## What the model gets before its first step in run {run}, after the edit\n" + _messages(pr["new_all"])])
 
 
 def build(row, rows, view, bench, obs, work, full_steps=False, shuffle=None, blocks=False, earlier=False, brief=False, win=None, sparse=None, v2=False, logic_only=False):
@@ -423,11 +455,20 @@ def build(row, rows, view, bench, obs, work, full_steps=False, shuffle=None, blo
     sess = sorted((r for r in rows if r["log"] == row["log"] and r["n"] <= row["n"]), key=lambda r: r["n"])
     files = ES.chain(os.path.join(ROOT, row["log"]), src0)[: row["n"]]
     final = files[-1][1]
+    j, note = None, ""
     if logic_only:
-        # правки промпта вырезаются: файлы промпта — как в исходном src; если больше ничего не изменилось — пропуск
-        final = {r: t for r, t in final.items() if not is_prompt(r)} | {r: t for r, t in src0.items() if is_prompt(r)}
-        if final == src0:
+        # 13.11 (автор): промпт — всё, что модель получает до шага 1, его смотрит оценщик промпта; здесь перепрогон
+        # сравнивает то, что идёт после промпта. Если после него ни один прогон не идёт иначе, а промпт изменился, —
+        # правка целиком правка промпта, пропуск
+        with tempfile.TemporaryDirectory() as tmp:
+            j = events(bench, _write(final, tmp), os.path.join(view, "logs"), past_prompt=True)
+        moved = [r for r in j["div"] if j["div"][r]]
+        if j["prompt"] and not moved:
             return None
+        if j["prompt"]:
+            note = (f"The edit also changes what the model gets before its first step (the prompt) in runs "
+                    f"{', '.join(sorted(j['prompt'], key=int))}; that change is reviewed separately. The replay below "
+                    "compares what comes after the prompt with the log.\n")
     parts = [(obs.strip() if obs.lstrip().startswith("## ") else "## Observation\n" + obs.strip()),
              "## The edit (diff against the original src/)\n```diff\n" + ES.udiff(src0, final).rstrip() + "\n```"]
     if len(files) > 1 and not win and not v2:
@@ -444,13 +485,13 @@ def build(row, rows, view, bench, obs, work, full_steps=False, shuffle=None, blo
             open(p, "w").write(text)
         if v2:
             parts.append("## Replay of all recorded runs with the edited src/\n"
-                         + run_blocks_v2(bench, os.path.join(tmp, "src"), os.path.join(view, "logs"), work, row["state"], sparse))
+                         + note + run_blocks_v2(bench, os.path.join(tmp, "src"), os.path.join(view, "logs"), work, row["state"], sparse, j=j))
             return "\n\n".join(parts)
         if blocks:
             table = subprocess.run([sys.executable, "tests/runs.py"], cwd=work, capture_output=True, text=True).stdout.strip()
             parts.append("## The recorded runs\n" + table)
             parts.append("## Replay of all recorded runs with the edited src/\n"
-                         + run_blocks(bench, os.path.join(tmp, "src"), os.path.join(view, "logs"), work, earlier=earlier, brief=brief, win=win, state=row["state"], sparse=sparse))
+                         + note + run_blocks(bench, os.path.join(tmp, "src"), os.path.join(view, "logs"), work, earlier=earlier, brief=brief, win=win, state=row["state"], sparse=sparse, j=j))
             return "\n\n".join(parts)
         rep = subprocess.run([sys.executable, ES.CORE, "--bench", bench, "--src", os.path.join(tmp, "src"),
                               "--logs", os.path.join(view, "logs")], capture_output=True, text=True, timeout=900)

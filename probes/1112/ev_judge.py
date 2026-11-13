@@ -61,7 +61,7 @@ def main():
     ap.add_argument("--brief", action="store_true", help="EV9: в блоке — весь прогон до окна, по строке на шаг")
     ap.add_argument("--v2", action="store_true", help="EV12: без таблицы прогонов, заголовок/Context/Divergence/Diff/Note")
     ap.add_argument("--sparse", action="store_true", help="EV11: к окну — по случайному шагу из K−24…K−15, K−14…K−10, K−9…K−7")
-    ap.add_argument("--part", choices=["logic", "prompt"], help="EV13: logic — правка без файлов промпта (src/*.md), prompt — только промпт до и после; нечего смотреть — verdict skip")
+    ap.add_argument("--part", choices=["logic", "prompt"], help="logic — перепрогон после промпта, prompt — то, что модель получает до шага 1, до и после правки; нечего смотреть — verdict skip")
     ap.add_argument("--win", help="EV10: окно до места «B,N» — шаги с K−B−rand(0..N); без ряда версий и исхода в заголовке")
     a = ap.parse_args()
     win = tuple(int(x) for x in a.win.split(",")) if a.win else None
@@ -74,7 +74,7 @@ def main():
         items = items[: a.limit]
     rows = [json.loads(l) for l in open(a.states)]
     obs = re.sub(r"^Observation from a study of the agent's failed runs[^\n]*\n+", "", open(a.obs).read())
-    variant = ("_blocks" if a.blocks else "") + ("_earlier" if a.earlier else "") + ("_brief" if a.brief else "") + (f"_w{win[0]}r{win[1]}" if win else "") + ("_sparse" if a.sparse else "") + ("_v2" if a.v2 else "") + ("_full" if a.full_steps else "") + (f"_sh{a.shuffle}" if a.shuffle is not None else "") + (f"_{a.part}" if a.part else "")
+    variant = ("_blocks" if a.blocks else "") + ("_earlier" if a.earlier else "") + ("_brief" if a.brief else "") + (f"_w{win[0]}r{win[1]}" if win else "") + ("_sparse" if a.sparse else "") + ("_v2" if a.v2 else "") + ("_full" if a.full_steps else "") + (f"_sh{a.shuffle}" if a.shuffle is not None else "") + (f"_{a.part}_fact" if a.part else "")
     cache = os.path.join(ROOT, "runs/ev_1112/inputs" + variant)
     os.makedirs(cache, exist_ok=True)
     done = {json.loads(l)["state"] for l in open(a.out)} if os.path.exists(a.out) else set()
@@ -84,7 +84,7 @@ def main():
         p = os.path.join(cache, it["state"] + ".txt")
         if not os.path.exists(p):
             row = next(r for r in rows if r["state"] == it["state"] and r["log"] == it["log"] and r["n"] == it["n"])
-            u = (EI.build_prompt(row, a.view, obs) if a.part == "prompt" else
+            u = (EI.build_prompt(row, a.view, a.bench, obs) if a.part == "prompt" else
                  EI.build(row, rows, a.view, a.bench, obs, a.work, a.full_steps, a.shuffle, a.blocks, a.earlier, a.brief, win, sparse, a.v2, a.part == "logic"))
             open(p, "w").write(u or "")
         user = open(p).read()
