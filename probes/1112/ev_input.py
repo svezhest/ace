@@ -125,6 +125,28 @@ def earlier_same(work, run, k):
     return kind, [j + 1 for j in range(k - 1) if codes[j] == codes[k - 1]]
 
 
+def render_brief(work, run, a, b):
+    """EV9: шаги a..b по строке — код шага в одну строку (строки через « ; ») и первая строка ответа. Окно в 6 шагов
+    прячет начало прогона (run 9 t1: прогон начат заново после отказа прежнего харнесса на вызове 12); весь прогон
+    до окна — без отбора, какие шаги показать (EV8: отбор «тот же код раньше» — наводка на цикл)."""
+    R = _runs_mod(work)
+    objs = [R._obj(x) for x in open(os.path.join(work, "logs", f"run_{run}.jsonl"))]
+    calls = [i for i, o in enumerate(objs) if R._is_model(o)]
+    a, b = max(1, a), min(b, len(calls))
+    out = []
+    for k in range(a, b + 1):
+        i = calls[k - 1]
+        code = " ; ".join(l.strip() for l in _step_code(R, R._msg(objs[i])))
+        nxt = calls[k] if k < len(calls) else len(objs)
+        env = next((objs[x] for x in range(i + 1, nxt) if objs[x] and objs[x].get("event") in ("env", "harness")
+                    and isinstance(objs[x].get("message"), dict)), None)
+        resp = [l.strip() for l in R._text(R._msg(env)).splitlines() if l.strip() and not l.strip().startswith("```")
+                and l.strip() != "Output:" and re.search(r"\w", l)] if env else []
+        who = "the harness did not run it and said" if env and env.get("event") == "harness" else "got"
+        out.append(f"model call {k}: {_cap([code], 1, 160)[0]} → {who}: {_cap(resp[:1] or ['(nothing)'], 1, 100)[0]}")
+    return "\n".join(out)
+
+
 def render_steps(work, run, a, b):
     R = _runs_mod(work)
     objs = [R._obj(x) for x in open(os.path.join(work, "logs", f"run_{run}.jsonl"))]
@@ -167,7 +189,7 @@ print(json.dumps({"ok": {r: bool(res.get(r, {}).get("ok")) for r in new}, "div":
 """
 
 
-def run_blocks(bench, src, logs, work, before=6, after=3, earlier=False):
+def run_blocks(bench, src, logs, work, before=6, after=3, earlier=False, brief=False):
     """EV5: свой блок на каждый задетый прогон вместо отчёта rerun.py. Отчёт склеивает прогоны с похожим действием
     харнесса («The same as run 14») — у склеенного прогона нет ни своего кода, ни сообщения (ревью сабагента 13.11);
     вызов «model call K» в строке отчёта показывает код ответа K−1; деление на passed / failed читается как
@@ -191,6 +213,10 @@ def run_blocks(bench, src, logs, work, before=6, after=3, earlier=False):
         blk = [f"### Run {r} (in the log the task {'was solved' if j['ok'][r] else 'failed'})"]
         if d["kind"] == "model" and k and k > 1:
             blk.append(f"The edited harness acts differently right after model call {k - 1}. {d['text']}")
+            if brief and k - before > 1:
+                blk.append(f"The log from the start of the run, model calls 1-{k - before - 1}, one line per call "
+                           "(the code on one line, and the first line of what came back):")
+                blk.append(render_brief(work, r, 1, k - before - 1))
             blk.append(f"The log before it, model calls {max(1, k - before)}-{k - 1} (the last one is the step the "
                        "edited harness handles differently):")
             blk.append(render_steps(work, r, k - before, k - 1))
@@ -229,7 +255,7 @@ def shuffle_report(report, rnd):
     return "\n".join(out)
 
 
-def build(row, rows, view, bench, obs, work, full_steps=False, shuffle=None, blocks=False, earlier=False):
+def build(row, rows, view, bench, obs, work, full_steps=False, shuffle=None, blocks=False, earlier=False, brief=False):
     src0 = ES.read_src(os.path.join(view, "src"))
     sess = sorted((r for r in rows if r["log"] == row["log"] and r["n"] <= row["n"]), key=lambda r: r["n"])
     files = ES.chain(os.path.join(ROOT, row["log"]), src0)[: row["n"]]
@@ -252,7 +278,7 @@ def build(row, rows, view, bench, obs, work, full_steps=False, shuffle=None, blo
             table = subprocess.run([sys.executable, "tests/runs.py"], cwd=work, capture_output=True, text=True).stdout.strip()
             parts.append("## The recorded runs\n" + table)
             parts.append("## Replay of all recorded runs with the edited src/\n"
-                         + run_blocks(bench, os.path.join(tmp, "src"), os.path.join(view, "logs"), work, earlier=earlier))
+                         + run_blocks(bench, os.path.join(tmp, "src"), os.path.join(view, "logs"), work, earlier=earlier, brief=brief))
             return "\n\n".join(parts)
         rep = subprocess.run([sys.executable, ES.CORE, "--bench", bench, "--src", os.path.join(tmp, "src"),
                               "--logs", os.path.join(view, "logs")], capture_output=True, text=True, timeout=900)
