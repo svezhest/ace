@@ -55,6 +55,7 @@ def main():
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--full-steps", action="store_true", help="шаги с кодом целиком (ev_input.steps_full)")
     ap.add_argument("--shuffle", help="зерно порядка задетых прогонов во входе")
+    ap.add_argument("--prompt", default="v1", help="ev_input.PROMPTS: v1 | runs | runs_and")
     ap.add_argument("--blocks", action="store_true", help="EV5: блок на каждый задетый прогон (ev_input.run_blocks)")
     a = ap.parse_args()
     prof = json.load(open(os.path.join(ROOT, "stands", a.stand + ".json")))
@@ -78,7 +79,7 @@ def main():
             open(p, "w").write(EI.build(row, rows, a.view, a.bench, obs, a.work, a.full_steps, a.shuffle, a.blocks))
         user = open(p).read()
         t0 = time.time()
-        r = call(prof, EI.SYSTEM, user, a.seed)
+        r = call(prof, EI.PROMPTS[a.prompt], user, a.seed)
         msg = r["choices"][0]["message"]
         content, reasoning = msg.get("content") or "", msg.get("reasoning_content") or msg.get("reasoning") or ""
         v, wr, wc = parse(content)
@@ -87,7 +88,7 @@ def main():
         place_ok = bool(d and d.get("call") and wc in (d["call"], d["call"] - 1))
         out = {"state": it["state"], "label": it["label"], "cls": it["cls"], "verdict": v, "where_run": wr,
                "where_call": wc, "place_ok": place_ok, "sec": round(time.time() - t0, 1), "chars_in": len(user),
-               "content": content, "reasoning": reasoning, "usage": r.get("usage"), "stand": a.stand, "seed": a.seed}
+               "content": content, "reasoning": reasoning, "usage": r.get("usage"), "stand": a.stand, "seed": a.seed, "prompt": a.prompt}
         with open(a.out, "a") as f:
             f.write(json.dumps(out, ensure_ascii=False) + "\n")
         print(f"{time.strftime('%H:%M:%S')} {it['state'][:6]} {it['cls']:8} label={it['label']:6} verdict={v} "

@@ -30,6 +30,36 @@ Where: run N, model call K: the place in the replay that decides your verdict.
 What happens there: one sentence: what the step in the log was, and what the edited harness does at it.
 Verdict: Ok or Failed"""
 
+_INTRO = SYSTEM.split("\n\nYour goal")[0]
+_GIVEN = SYSTEM.split("\n\nYou get ")[1].split("\n\nAnswer in")[0]
+_GOAL_V1 = "Your goal is to say whether the edit is right: whether, in the recorded runs, it changes what the harness does at the problem the observation describes, and leaves the harness as it was at the steps that were fine."
+# EV6b (идея 2 сабагента 13.11): цель — двойное условие; «место, решающее вердикт» следует из него
+_GOAL_AND = ("Your goal is to say whether the edit is right. It is right when, in the recorded runs, it changes what "
+             "the harness does at the problem the observation describes, and every step where the edited harness acts "
+             "differently from the log is part of that problem. A step that was fine in the log and is now handled "
+             "differently makes the edit wrong.")
+# EV6a (идея 1 сабагента и моя): по строке на каждый задетый прогон до вердикта — перебор, который рассуждение T
+# делает молча, переносится в ответ NT
+_FORM_RUNS = """Answer in this form. First, one line for each run that goes differently, in the order of the replay:
+Run N, model call K: what the step in the log was, and whether it is part of the problem the observation describes or a step that was fine.
+Then:
+Where: run N, model call K: the place in the replay that decides your verdict.
+Verdict: Ok or Failed"""
+# описание входа по блокам (run_blocks): шаги лога до места и после него — после уже с прежним харнессом
+_GIVEN_BLOCKS = _GIVEN.replace(
+    "what the model would have done after that is not known. For each run that goes differently, you also get the "
+    "steps of the log just before that place.",
+    "what the model would have done after that with the edited harness is not known. For each run that goes "
+    "differently, you also get the steps of the log just before that place and just after it (after it, the log "
+    "shows what the model did with the original harness).")
+assert _GIVEN_BLOCKS != _GIVEN
+PROMPTS = {
+    "v1": SYSTEM,
+    "runs": f"{_INTRO}\n\n{_GOAL_V1}\n\nYou get {_GIVEN_BLOCKS}\n\n{_FORM_RUNS}",
+    "runs_and": f"{_INTRO}\n\n{_GOAL_AND}\n\nYou get {_GIVEN_BLOCKS}\n\n{_FORM_RUNS}",
+}
+assert _GOAL_V1 in SYSTEM
+
 
 def steps_text(work, run, call, before=6):
     a = max(1, call - before)
