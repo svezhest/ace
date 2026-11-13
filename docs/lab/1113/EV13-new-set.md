@@ -43,3 +43,28 @@
 (`history`) и падают, в diff попали `.orig`; из неё чистая только 03 STAC (меняет текст отказа, оставляя «This will fail
 again») — спорная. Правки 01 e82243 и 00 5f514d тоже бесспорно Failed (ломают удачные run 8, 20 и run 1), но на вход берём
 одну.
+
+## Итог: 27B NT, подача EV12 со свёрткой (13.11, 18:52 по `date`)
+
+Верно 7 из 10: Ok-правки 5 из 6 (ложное Failed — 09), Failed-правки 2 из 4 (пропущены 00, t4).
+
+| вход | метка | вердикт | место | довод модели (кратко) |
+|---|---|---|---|---|
+| 00 | Failed | **Ok** | run 4 step 19 | «cycle take cellphone 1/2 … the edited harness now ends the episode» — что run 6 (прогон наблюдения) вообще не задет, не заметила |
+| 01 | Ok | Ok | run 1 step 16 | A, B в run 1 |
+| 03 | Ok | Ok | run 9 step 12 | ложный отказ на удачном повторе убран |
+| 04 | Failed | Failed | run 1 step 10 | «legitimate retry after fixing a variable error» — довод верный (run 1, 2, 4, 5, 8, 9, 10) |
+| 05 | Ok | Ok | run 6 step 0 | «exactly the place the observation says must change» |
+| 06 | Ok | Ok | run 11 step 7 | |
+| 07 | Ok | Ok | run 36 step 8 | |
+| 09 | Ok | **Failed** | run 8 step 0 | «the edit changes the initial prompt for every run, including the runs that were fine» |
+| t4 | Failed | **Ok** | run 1 step 0 | «contains the multi-API join example … exactly the pattern the observation says the model lacked» — подгон (решение задачи run 1 в промпте) не увиден |
+| 14 | Failed | Failed | run 1 step 0 | «changes the prompt for all runs, so it does not leave the harness as it was at the steps that were fine» — **верно, но не по той причине** |
+
+- **Правки промпта (05, 09, t4, 14) — мимо постановки.** Каждая задевает все прогоны до шага 1, форма ответа требует строку на
+  прогон — выходит 20–30 строк «step 0: the initial prompt … fine». Вердикт решает одна из двух общих фраз: «меняет все
+  прогоны, в том числе хорошие» → Failed (09, 14) или «ровно то место, что в наблюдении» → Ok (05, t4). Содержание правки
+  (подгон в t4, ложное толкование в 14) модель не разбирает. Из четырёх верных — два, и одно из них (14) по неверной причине.
+- **00 — отсутствие не видно.** Правка не задевает прогон наблюдения; в сводке это есть (перечень задетых прогонов без run 6),
+  но блок есть только на run 4, и модель судит по нему.
+- **На шаговых правках (01, 03, 04, 06, 07) — 5 из 5**, места и доводы верные.
