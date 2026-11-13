@@ -77,3 +77,27 @@ again») — спорная. Правки 01 e82243 и 00 5f514d тоже бес
 `prompt_edit`; `ev_judge.py --part logic|prompt` (b468445). Набор: логика — 00, 01, 03, 04, 06, 07, 09 (логическая часть
 правки 09 — `example_as_transcript` в `harness.py`); промпт — 05 Ok, 09 Ok (маркер USER и исправленная строка
 примера), t4 Failed, 14 Failed. Ответы логики на 00–07 взяты из прежних запусков: вход совпадает символ в символ.
+
+## Итог: 27B NT, логика и промпт раздельно (13.11, 19:24 по `date`)
+
+| логика | метка | EV12 | EV6a |
+|---|---|---|---|
+| 00 | Failed | **Ok** (run 4 c19) | Failed (run 4 c19) |
+| 01 | Ok | Ok | Ok |
+| 03 | Ok | Ok | **Failed** — читает выполненный теперь повтор в run 3, 14 как «изменение на нормальном шаге» |
+| 04 | Failed | Failed | Failed |
+| 06 | Ok | Ok | Ok |
+| 07 | Ok | Ok | Ok |
+| 09 | Ok | **Failed** | **Failed** |
+
+Промпт: 05 Ok → Ok, 09 Ok → **Failed**, t4 Failed → Failed, 14 Failed → Failed.
+
+- **Логика: EV12 и EV6a — по 5 из 7**, ошибаются на разных правках (00 у EV12, 03 у EV6a) — в шуме. 00 у EV6a верно по вердикту,
+  но довод другой («model was making progress … wrong intervention»), не «run 6 не задет».
+- **Логика 09 — та же беда, что у промпта.** `example_as_transcript` в `harness.py` перестраивает сообщения, все прогоны
+  расходятся до шага 1, и модель снова пишет «changes the initial prompt for every run … fine» → Failed. Правка кода, которая
+  меняет то, что модель получает до первого шага, по сути правка промпта; разделение по файлам её не ловит.
+- **Промпт: 3 из 4, доводы по делу.** t4: «includes specific details from the observation: `recommendations`, … "classical" and
+  "current year"»; 14: «the exact phrase "songs played so far in my Spotify music player queue"». 09 — Failed по третьему
+  критерию, которого в инструкции нет: «the core issue … is not addressed by this change alone» (промптовая часть 09 сама
+  проблему и не решает, решает `harness.py`).
