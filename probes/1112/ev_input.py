@@ -124,7 +124,7 @@ def render_steps(work, run, a, b):
                     and isinstance(objs[x].get("message"), dict)), None)
         resp = ([l for l in R._text(R._msg(env)).splitlines() if l.strip() and not l.strip().startswith("```")]
                 if env else ["(no message)"])
-        out.append(f"model call {k}, the model's code:")
+        out.append(f"model call {k}, the model's {'action' if m.get('tool_calls') else 'code'}:")
         out += ["    " + l for l in _cap(code, 30, 200)]
         out.append("  the harness did not run it and said:" if env and env.get("event") == "harness" else "  the model got:")
         out += ["    " + l for l in _cap(resp, 4, 200)]
