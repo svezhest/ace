@@ -22,29 +22,31 @@ def finish(run):
     """finish -> (текст для модели, конец ли). 13.11 (автор): вердикт оценщика — Ok завершает, иначе писатель получает
     ответ оценщика и правит дальше. Без изменений в src/ оценивать нечего — конец. После RV.ROUNDS вердиктов — конец как есть."""
     from . import review as RV
-    if WK.tree_hash(f"{run.root}/src") == WK.tree_hash(f"{C.VIEWS[C.BENCH]}/src"):
-        return "Finished.", True
+    h = WK.tree_hash(f"{run.root}/src")
+    if h == WK.tree_hash(f"{C.VIEWS[C.BENCH]}/src") or h == run.st.get("reviewed_hash"):
+        return "Finished.", True   # нечего оценивать, или после Failed ничего не изменено — конец как есть
     if run.st.get("reviews", 0) >= RV.ROUNDS:
         return "Finished.", True
     run.st["reviews"] = run.st.get("reviews", 0) + 1
     ok, text, rec = RV.review(run)
     run.w(rec)
-    run.st["review_ok"] = ok
+    run.st["review_ok"], run.st["reviewed_hash"] = ok, h
     return text, ok
 
 
 def review_at_end(run):
     """Конец ходов без Ok оценщика -> (None, '') — оценивать нечего или круги исчерпаны; (ok, текст) — вердикт."""
     from . import review as RV
-    if run.st.get("review_ok") or WK.tree_hash(f"{run.root}/src") == WK.tree_hash(f"{C.VIEWS[C.BENCH]}/src"):
-        return None, ""
+    h = WK.tree_hash(f"{run.root}/src")
+    if run.st.get("review_ok") or h in (WK.tree_hash(f"{C.VIEWS[C.BENCH]}/src"), run.st.get("reviewed_hash")):
+        return None, ""   # Ok уже был, правки нет, или с последнего вердикта ничего не изменено
     if run.st.get("reviews", 0) >= RV.ROUNDS:
         return None, ""
     run.st["reviews"] = run.st.get("reviews", 0) + 1
     ok, text, rec = RV.review(run)
     rec["at_end"] = True
     run.w(rec)
-    run.st["review_ok"] = ok
+    run.st["review_ok"], run.st["reviewed_hash"] = ok, h
     return ok, text
 
 
