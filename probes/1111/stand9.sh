@@ -3,6 +3,9 @@
 L=/Users/user/Projects/nrhsi/runs/stand_1111; mkdir -p $L
 p=$(pgrep -f 'qwen-gateway|python3? worker.py'); [ -n "$p" ] && kill $p
 for i in $(seq 60); do pgrep -f 'qwen-gateway|python3? worker.py' > /dev/null || break; sleep 1; done
+# 13.11: воркер не всегда выходит по SIGTERM — тогда новый воркер падал по памяти рядом со старым; добиваем и проверяем порт
+p=$(pgrep -f 'qwen-gateway|python3? worker.py'); [ -n "$p" ] && { kill -9 $p; sleep 2; }
+lsof -iTCP:50051 -sTCP:LISTEN > /dev/null 2>&1 && { echo "$(date +%H:%M:%S) port 50051 still busy, not starting"; exit 1; }
 cd /Users/user/Projects/llm/src/worker
 HF_HUB_OFFLINE=1 QWEN_MODEL=../../weights/ornith15-9b-mlx-8bit QWEN_KV_BITS=0 QWEN_MAX_CONTEXT=65536 QWEN_PRESENCE_PENALTY=0 \
   QWEN_PROMPT_CACHE=1 QWEN_PROMPT_CACHE_GB=4 QWEN_PROMPT_CACHE_REPLY=0 QWEN_BATCH_RESERVE_TOKENS=1024 \
