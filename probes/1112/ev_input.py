@@ -319,6 +319,18 @@ def run_blocks_v2(bench, src, logs, work, state, sparse=None, before=6, after=3)
     out = [f"{len(runs)} runs replayed with the edited src/. {len(moved)} go differently from the log: runs "
            f"{', '.join(moved) or 'none'}. The other {len(runs) - len(moved)} go exactly as in the log. Each run is "
            "replayed up to the first place where the edited harness does something different from the log."]
+    # EV13: прогоны, расходящиеся до шага 1 (правка промпта), — одним разделом, если текст расхождения у всех один
+    # (без «run N (…):»); иначе — по блоку, как раньше. 20–30 одинаковых блоков нового не дают.
+    lst = lambda d: (d["call"] - 1) if d["kind"] == "model" else (d["call"] or 0)
+    first = [r for r in moved if lst(j["div"][r]) < 1]
+    same = {re.sub(r"^run \d+ \([a-z]+\): ", "", j["div"][r]["text"]) for r in first}
+    if len(first) > 1 and len(same) == 1:
+        okr = [r for r in first if j["ok"][r]]
+        bad = [r for r in first if not j["ok"][r]]
+        out.append(f"### Runs {', '.join(first)}: they diverge before step 1, all in the same way.\n"
+                   f"Previously OK (task solved): runs {', '.join(okr) or 'none'}. Previously NOT OK (task failed): "
+                   f"runs {', '.join(bad) or 'none'}.\nDiff: {same.pop()}")
+        moved = [r for r in moved if r not in first]
     for r in moved:
         d = j["div"][r]
         k = d["call"]
