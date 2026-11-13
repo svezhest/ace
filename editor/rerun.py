@@ -181,7 +181,7 @@ def app_episode(bridge, ev, sent_replies, state, diverge):
     return Episode()
 
 
-def play(bench, src, log, at=None, cover=None, watch=None):
+def play(bench, src, log, at=None, cover=None, watch=None, past_prompt=False):
     sys.path[:0] = [src]
     import bridge
     import harness
@@ -190,7 +190,7 @@ def play(bench, src, log, at=None, cover=None, watch=None):
     model_pos = [i for i, m in enumerate(conv) if m["role"] == "assistant" and ev[line_of[i] - 1]["event"] == "model"]
     trace = {"hooks": [], "div": None}
     stopped = end_of_log(ev)[0].get("reason") == "stopped"
-    state = {"call": 0, "send": 0}
+    state = {"call": 0, "send": 0, "pre": (0, 0)}
 
     def diverge(**kw):
         trace["div"] = kw
@@ -199,20 +199,28 @@ def play(bench, src, log, at=None, cover=None, watch=None):
     def llm(messages, tools=None):
         k = state["call"]
         state["call"] += 1
+        want = conv[:model_pos[k]] if k < len(model_pos) else conv
+        if past_prompt and k == 0 and [key(m) for m in messages] != [key(m) for m in want]:
+            # 13.11 (автор): то, что модель получает до шага 1, — промпт, его смотрит отдельный оценщик; дальше
+            # сравниваем то, что идёт после него: n_new сообщений промпта теперь против n_old в логе
+            trace["prompt"] = {"new_all": [dict(m) for m in messages], "old_all": want}   # копия: харнесс дописывает в этот список
+            state["pre"] = (len(messages), len(want))
+        n_new, n_old = state["pre"]
         if k >= len(model_pos):
-            if stopped and [key(m) for m in messages] == [key(m) for m in conv]:
+            if stopped and [key(m) for m in messages[n_new:]] == [key(m) for m in conv[n_old:]]:
                 raise Diverged()   # запись оборвал стенд (контекст, время) ровно на этом запросе: расхождения нет
             diverge(kind="model", call=k + 1, text="the harness asks the model once more; the log has no reply here",
-                    at=len(conv), new=messages[len(conv):] or messages[-1:], old=[])
-        want = conv[:model_pos[k]]
-        if [key(m) for m in messages] != [key(m) for m in want]:
-            j = next((j for j, (a, b) in enumerate(zip(messages, want)) if key(a) != key(b)), min(len(messages), len(want)))
+                    at=len(conv), new=messages[len(conv) - n_old + n_new:] or messages[-1:], old=[])
+        cur, ref = messages[n_new:], want[n_old:]
+        if [key(m) for m in cur] != [key(m) for m in ref]:
+            j = next((j for j, (a, b) in enumerate(zip(cur, ref)) if key(a) != key(b)), min(len(cur), len(ref)))
+            jm, j = j + n_new, j + n_old   # jm — в сообщениях харнесса, j — в логе
             extra = {"new_all": messages, "old_all": want} if k == 0 else {}
             # 11.11, для сводки: сколько шагов задачи (execute / send) было в логе до этого вызова и сколько сделал харнесс
             # сейчас; чьё сообщение стояло в логе на месте расхождения и перед ним (env / harness / model)
             steps_log = sum(1 for e in ev[:line_of[model_pos[k]] - 1] if e["event"] == "bridge" and e.get("call") in ("execute", "send"))
             diverge(kind="model", call=k + 1, text="what the model sees differs from the log", at=j,
-                    new=messages[j:j + 3], old=want[j:j + 3] or [conv[model_pos[k]]], bench=bench,
+                    new=messages[jm:jm + 3], old=want[j:j + 3] or [conv[model_pos[k]]], bench=bench,
                     ran_log=steps_log, ran_now=state["send"], was=ev[line_of[j] - 1]["event"] if j < len(want) else "model",
                     prev=ev[line_of[j - 1] - 1]["event"] if j else None,
                     sent=next((m for m in reversed(want[:j] + [conv[model_pos[k - 1]]] if k else []) if m["role"] == "assistant"), None), **extra)
@@ -327,12 +335,15 @@ def play(bench, src, log, at=None, cover=None, watch=None):
         finally:
             if cover is not None:
                 sys.settrace(None)
-        if [key(m) for m in out] != [key(m) for m in conv]:
-            j = next((j for j, (a, b) in enumerate(zip(out, conv)) if key(a) != key(b)), min(len(out), len(conv)))
-            text = ("the harness ends the episode here; the log goes on" if len(out) < len(conv) else
+        n_new, n_old = state["pre"]
+        cur, ref = out[n_new:], conv[n_old:]
+        if [key(m) for m in cur] != [key(m) for m in ref]:
+            j = next((j for j, (a, b) in enumerate(zip(cur, ref)) if key(a) != key(b)), min(len(cur), len(ref)))
+            jm, j = j + n_new, j + n_old
+            text = ("the harness ends the episode here; the log goes on" if len(cur) < len(ref) else
                     "the harness adds messages after the log's last one" if j == len(conv) else
                     "the conversation at the end differs from the log")
-            diverge(kind="end", call=state["call"], text=text, at=j, new=out[j:j + 3], old=conv[j:j + 3])
+            diverge(kind="end", call=state["call"], text=text, at=j, new=out[jm:jm + 3], old=conv[j:j + 3])
     except Diverged:
         pass
     except bridge.Loop:
@@ -352,7 +363,7 @@ def play(bench, src, log, at=None, cover=None, watch=None):
     return trace
 
 
-def worker(bench, src, logs, runs=None, at=None, cover=None, watch=None):
+def worker(bench, src, logs, runs=None, at=None, cover=None, watch=None, past_prompt=False):
     """Все прогоны вида на одном src, в этом же процессе: модули src перезагружаются для каждого прогона."""
     sys.dont_write_bytecode = True
     out = {}
@@ -364,7 +375,7 @@ def worker(bench, src, logs, runs=None, at=None, cover=None, watch=None):
             sys.modules.pop(m, None)
         try:
             c = cover.setdefault(p.stem.split("_")[1], {}) if cover is not None else None
-            out[p.stem.split("_")[1]] = play(bench, src, str(p), at, c, watch)
+            out[p.stem.split("_")[1]] = play(bench, src, str(p), at, c, watch, past_prompt)
         finally:
             sys.path[:] = saved
             for m in ("harness", "bridge", "hooks"):
