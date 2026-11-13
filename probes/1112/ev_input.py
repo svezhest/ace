@@ -61,6 +61,10 @@ PROMPTS = {
 # EV10 (автор 13.11): во входе нет ряда версий правки — из описания входа убрана и его строка
 _VERS = " (if the colleague edited several times, also each version as a diff against the one before it)"
 assert _VERS in _GIVEN_BLOCKS
+# EV12 (автор 13.11): шаги зовутся Step, без таблицы прогонов; форма ответа — «step K»
+_FORM_RUNS_STEP = _FORM_RUNS.replace("Run N, model call K:", "Run N, step K:").replace("Where: run N, model call K:", "Where: run N, step K:")
+assert _FORM_RUNS_STEP.count("step K") == 2
+PROMPTS["runs_v2"] = f"{_INTRO}\n\n{_GOAL_V1}\n\nYou get {_GIVEN_BLOCKS.replace(_VERS, '')}\n\n{_FORM_RUNS_STEP}"
 PROMPTS["runs_w"] = f"{_INTRO}\n\n{_GOAL_V1}\n\nYou get {_GIVEN_BLOCKS.replace(_VERS, '')}\n\n{_FORM_RUNS}"
 assert _GOAL_V1 in SYSTEM
 
@@ -151,7 +155,7 @@ def render_brief(work, run, a, b):
     return "\n".join(out)
 
 
-def render_steps(work, run, a, b):
+def render_steps(work, run, a, b, lab="model call"):
     R = _runs_mod(work)
     objs = [R._obj(x) for x in open(os.path.join(work, "logs", f"run_{run}.jsonl"))]
     calls = [i for i, o in enumerate(objs) if R._is_model(o)]
@@ -168,7 +172,7 @@ def render_steps(work, run, a, b):
                     and isinstance(objs[x].get("message"), dict)), None)
         resp = ([l for l in R._text(R._msg(env)).splitlines() if l.strip() and not l.strip().startswith("```")]
                 if env else ["(no message)"])
-        out.append(f"model call {k}, the model's {'action' if m.get('tool_calls') else 'code'}:")
+        out.append(f"{lab} {k}, the model's {'action' if m.get('tool_calls') else 'code'}:")
         out += ["    " + l for l in _cap(code, 30, 200)]
         out.append("  the harness did not run it and said:" if env and env.get("event") == "harness" else "  the model got:")
         out += ["    " + l for l in _cap(resp, 4, 200)]
@@ -258,6 +262,65 @@ def run_blocks(bench, src, logs, work, before=6, after=3, earlier=False, brief=F
     return "\n\n".join(out)
 
 
+def _chars(work, run):
+    """Знаков в сообщениях прогона: всего и до каждого вызова модели (список, индекс k−1 — до вызова k)."""
+    R = _runs_mod(work)
+    objs = [R._obj(x) for x in open(os.path.join(work, "logs", f"run_{run}.jsonl"))]
+    tot, before = 0, []
+    for o in objs:
+        if not o or not isinstance(o.get("message"), dict):
+            continue
+        if R._is_model(o):
+            before.append(tot)
+        m = o["message"]
+        tot += len(R._text(m)) + sum(len(json.dumps(tc, ensure_ascii=False)) for tc in m.get("tool_calls") or [])
+    return tot, before
+
+
+def run_blocks_v2(bench, src, logs, work, state, sparse=None, before=6, after=3):
+    """EV12 (автор 13.11): без таблицы прогонов; заголовок прогона — исход, длина и место расхождения в знаках и шагах;
+    «Context:» — шаги до места; «<-- Divergence point»; «Diff:» — что харнесс делал в логе и что делает теперь;
+    шаги лога после места с оговоркой, что теперь они могут быть другими."""
+    p = subprocess.run([sys.executable, "-c", EVENTS, os.path.join(ROOT, "editor"), bench, src, logs],
+                       capture_output=True, text=True, timeout=900)
+    j = json.loads(p.stdout.strip().splitlines()[-1])
+    runs = sorted(j["div"], key=int)
+    moved = [r for r in runs if j["div"][r]]
+    out = [f"{len(runs)} runs replayed with the edited src/. {len(moved)} go differently from the log: runs "
+           f"{', '.join(moved) or 'none'}. The other {len(runs) - len(moved)} go exactly as in the log. Each run is "
+           "replayed up to the first place where the edited harness does something different from the log."]
+    for r in moved:
+        d = j["div"][r]
+        k = d["call"]
+        tot, bef = _chars(work, r)
+        prev = "OK (task solved)" if j["ok"][r] else "NOT OK (task failed)"
+        if not (d["kind"] == "model" and k and k > 1):
+            out.append(f"### Run {r}: previously {prev}, {tot} chars, {len(bef)} steps.\n{d['text']}")
+            continue
+        at = bef[k - 1] if k - 1 < len(bef) else tot
+        blk = [f"### Run {r}: previously {prev}, {tot} chars, {len(bef)} steps; now diverges at {at} chars, after "
+               f"step {k - 1}.", "Context:"]
+        if sparse:
+            import random
+            picks = sorted({k - b - random.Random(f"{state}:{r}:{b}").randrange(n) for b, n in sparse})
+            picks = [x for x in picks if 1 <= x < k - before]
+            if picks:
+                blk.append(f"(steps {', '.join(map(str, picks))} are picked at random from earlier in the run; then "
+                           f"steps {max(1, k - before)}-{k - 1} in a row)")
+                blk.append("\n".join(render_steps(work, r, x, x, "Step") for x in picks))
+        blk.append(render_steps(work, r, k - before, k - 1, "Step"))
+        blk.append("<-- Divergence point")
+        blk.append("Diff: " + d["text"])
+        aft = render_steps(work, r, k, k + after - 1, "Step")
+        if aft:
+            blk.append("Note: the previous run continued with the following steps. They might not be the same now.")
+            blk.append(aft)
+        else:
+            blk.append("Note: the previous run ended here.")
+        out.append("\n".join(blk))
+    return "\n\n".join(out)
+
+
 def shuffle_report(report, rnd):
     """Задетые прогоны в отчёте перепрогона — в случайном порядке внутри своего раздела (строки «- run N, model call»)."""
     lines, out, i = report.split("\n"), [], 0
@@ -276,14 +339,14 @@ def shuffle_report(report, rnd):
     return "\n".join(out)
 
 
-def build(row, rows, view, bench, obs, work, full_steps=False, shuffle=None, blocks=False, earlier=False, brief=False, win=None, sparse=None):
+def build(row, rows, view, bench, obs, work, full_steps=False, shuffle=None, blocks=False, earlier=False, brief=False, win=None, sparse=None, v2=False):
     src0 = ES.read_src(os.path.join(view, "src"))
     sess = sorted((r for r in rows if r["log"] == row["log"] and r["n"] <= row["n"]), key=lambda r: r["n"])
     files = ES.chain(os.path.join(ROOT, row["log"]), src0)[: row["n"]]
     final = files[-1][1]
     parts = [(obs.strip() if obs.lstrip().startswith("## ") else "## Observation\n" + obs.strip()),
              "## The edit (diff against the original src/)\n```diff\n" + ES.udiff(src0, final).rstrip() + "\n```"]
-    if len(files) > 1 and not win:
+    if len(files) > 1 and not win and not v2:
         prev, ds = src0, []
         for k, (_, f) in enumerate(files, 1):
             ds.append(f"Version {k}:\n```diff\n" + ES.udiff(prev, f).rstrip() + "\n```")
@@ -295,6 +358,10 @@ def build(row, rows, view, bench, obs, work, full_steps=False, shuffle=None, blo
             p = os.path.join(tmp, rel)
             os.makedirs(os.path.dirname(p), exist_ok=True)
             open(p, "w").write(text)
+        if v2:
+            parts.append("## Replay of all recorded runs with the edited src/\n"
+                         + run_blocks_v2(bench, os.path.join(tmp, "src"), os.path.join(view, "logs"), work, row["state"], sparse))
+            return "\n\n".join(parts)
         if blocks:
             table = subprocess.run([sys.executable, "tests/runs.py"], cwd=work, capture_output=True, text=True).stdout.strip()
             parts.append("## The recorded runs\n" + table)

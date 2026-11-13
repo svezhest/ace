@@ -36,7 +36,7 @@ def call(prof, system, user, seed):
 def parse(text):
     t = re.sub(r"<think>.*?</think>", "", text or "", flags=re.S)
     v = re.findall(r"Verdict:\s*\**\s*(Ok|OK|Failed|FAILED)", t)
-    w = re.search(r"Where:\s*\**\s*run\s*(\d+)[^\n]*?call\s*(\d+)", t, flags=re.I)
+    w = re.search(r"Where:\s*\**\s*run\s*(\d+)[^\n]*?(?:call|step)\s*(\d+)", t, flags=re.I)
     return (v[-1].capitalize() if v else None), (w.group(1) if w else None), (int(w.group(2)) if w else None)
 
 
@@ -59,6 +59,7 @@ def main():
     ap.add_argument("--blocks", action="store_true", help="EV5: блок на каждый задетый прогон (ev_input.run_blocks)")
     ap.add_argument("--earlier", action="store_true", help="EV8: в блоке — на каких вызовах раньше был тот же код")
     ap.add_argument("--brief", action="store_true", help="EV9: в блоке — весь прогон до окна, по строке на шаг")
+    ap.add_argument("--v2", action="store_true", help="EV12: без таблицы прогонов, заголовок/Context/Divergence/Diff/Note")
     ap.add_argument("--sparse", action="store_true", help="EV11: к окну — по случайному шагу из K−24…K−15, K−14…K−10, K−9…K−7")
     ap.add_argument("--win", help="EV10: окно до места «B,N» — шаги с K−B−rand(0..N); без ряда версий и исхода в заголовке")
     a = ap.parse_args()
@@ -72,7 +73,7 @@ def main():
         items = items[: a.limit]
     rows = [json.loads(l) for l in open(a.states)]
     obs = re.sub(r"^Observation from a study of the agent's failed runs[^\n]*\n+", "", open(a.obs).read())
-    variant = ("_blocks" if a.blocks else "") + ("_earlier" if a.earlier else "") + ("_brief" if a.brief else "") + (f"_w{win[0]}r{win[1]}" if win else "") + ("_sparse" if a.sparse else "") + ("_full" if a.full_steps else "") + (f"_sh{a.shuffle}" if a.shuffle is not None else "")
+    variant = ("_blocks" if a.blocks else "") + ("_earlier" if a.earlier else "") + ("_brief" if a.brief else "") + (f"_w{win[0]}r{win[1]}" if win else "") + ("_sparse" if a.sparse else "") + ("_v2" if a.v2 else "") + ("_full" if a.full_steps else "") + (f"_sh{a.shuffle}" if a.shuffle is not None else "")
     cache = os.path.join(ROOT, "runs/ev_1112/inputs" + variant)
     os.makedirs(cache, exist_ok=True)
     done = {json.loads(l)["state"] for l in open(a.out)} if os.path.exists(a.out) else set()
@@ -82,7 +83,7 @@ def main():
         p = os.path.join(cache, it["state"] + ".txt")
         if not os.path.exists(p):
             row = next(r for r in rows if r["state"] == it["state"] and r["log"] == it["log"] and r["n"] == it["n"])
-            open(p, "w").write(EI.build(row, rows, a.view, a.bench, obs, a.work, a.full_steps, a.shuffle, a.blocks, a.earlier, a.brief, win, sparse))
+            open(p, "w").write(EI.build(row, rows, a.view, a.bench, obs, a.work, a.full_steps, a.shuffle, a.blocks, a.earlier, a.brief, win, sparse, a.v2))
         user = open(p).read()
         t0 = time.time()
         r = call(prof, EI.PROMPTS[a.prompt], user, a.seed)
