@@ -33,6 +33,21 @@ def finish(run):
     return text, ok
 
 
+def review_at_end(run):
+    """Конец ходов без Ok оценщика -> (None, '') — оценивать нечего или круги исчерпаны; (ok, текст) — вердикт."""
+    from . import review as RV
+    if run.st.get("review_ok") or WK.tree_hash(f"{run.root}/src") == WK.tree_hash(f"{C.VIEWS[C.BENCH]}/src"):
+        return None, ""
+    if run.st.get("reviews", 0) >= RV.ROUNDS:
+        return None, ""
+    run.st["reviews"] = run.st.get("reviews", 0) + 1
+    ok, text, rec = RV.review(run)
+    rec["at_end"] = True
+    run.w(rec)
+    run.st["review_ok"] = ok
+    return ok, text
+
+
 def clip(t, n):
     return t if len(t) <= n else t[:n] + f"\n[... {len(t)} characters in all]"
 
