@@ -18,6 +18,7 @@ PYTHON_LINE
 # How to work
 - Read the part of src/ a change touches before you edit it, and keep intact what the rest of the harness relies on.
 - Read the changed lines together with the code that calls or uses them.
+- A prompt is an instruction to the agent on every task it gets. When you change one, write each instruction as what the agent should do (where something should not be done, also say what to do instead), and keep it general: the names, values and exact condition of the task in an observation stay out of it.
 - bash can be called BASH_LIMIT times; after that FINAL_TURNS turns remain without bash: edits are still applied and finish still goes to the reviewer, and then the session ends."""
 
 
