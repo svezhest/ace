@@ -28,7 +28,12 @@ for tag in sys.argv[2:]:
         open(out, "a").write(json.dumps({"tag": tag, "verdict": "skip"}) + "\n")
         print(tag, "skip", flush=True)
         continue
-    r = EJ.call(prof, EI.PROMPTS[PROMPT[var]], user, 1)
+    try:
+        r = EJ.call(prof, EI.PROMPTS[PROMPT[var]], user, 1)
+    except Exception as e:  # noqa: BLE001 — 14.11: 500 от шлюза на большом входе; записать и идти дальше
+        open(out, "a").write(json.dumps({"tag": tag, "verdict": "error", "chars_in": len(user), "error": str(e)}) + "\n")
+        print(tag, "error", len(user), e, flush=True)
+        continue
     c = r["choices"][0]["message"].get("content") or ""
     v = EJ.parse(c)[0]
     open(out, "a").write(json.dumps({"tag": tag, "verdict": v, "chars_in": len(user), "content": c}, ensure_ascii=False) + "\n")
