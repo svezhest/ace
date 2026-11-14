@@ -105,3 +105,7 @@
   срабатывает уже после `complete_task` (прогон кончен), в промпте — «played so far… check the music player state».
   Оценщик: код Failed верно («injects a verification hint after a successful complete_task»), промпт Ok — пропуск. С ним
   итог EV15 — 20 сессий: Ok 10, спорно 3, F 7.
+- **Поправка изъяна разделения (14.11, ветка feature/writer-evaluator).** Пропуск логики — только если код правки сам
+  (файлы `.md` — как в исходном src) меняет промпт или кода нет; иначе код идёт оценщику логики. Проверено без модели: 14 s2 —
+  теперь вход логики («30 runs replayed… 0 go differently»), 09 набора EV13 (`example_as_transcript`), 05, t4, 14 — по-прежнему
+  пропуск; входы логики 00–07 набора те же по длине.
