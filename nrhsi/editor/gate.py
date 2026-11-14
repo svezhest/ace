@@ -19,17 +19,35 @@ def smoke_failure(run):
 
 
 def finish(run):
-    """finish -> (текст для модели, конец ли). Ворота — новые предупреждения pyflakes и падение smoke — один раз:
-    второй finish завершает как есть."""
-    if run.st.get("lint_at_finish"):
+    """finish -> (текст для модели, конец ли). 13.11 (автор): вердикт оценщика — Ok завершает, иначе писатель получает
+    ответ оценщика и правит дальше. Без изменений в src/ оценивать нечего — конец. После RV.ROUNDS вердиктов — конец как есть."""
+    from . import review as RV
+    h = WK.tree_hash(f"{run.root}/src")
+    if h == WK.tree_hash(f"{C.VIEWS[C.BENCH]}/src") or h == run.st.get("reviewed_hash"):
+        return "Finished.", True   # нечего оценивать, или после Failed ничего не изменено — конец как есть
+    if run.st.get("reviews", 0) >= RV.ROUNDS:
         return "Finished.", True
-    gate, smoke = LI.lint_changed(run.root), smoke_failure(run)
-    if smoke:
-        gate += ("\n" if gate else "") + smoke
-    run.st["lint_at_finish"] = True
-    if not gate:
-        return "Finished.", True
-    return f"Not finished yet. {gate}\nFix them with edit, or call finish again to end as is.", False
+    run.st["reviews"] = run.st.get("reviews", 0) + 1
+    ok, text, rec = RV.review(run)
+    run.w(rec)
+    run.st["review_ok"], run.st["reviewed_hash"] = ok, h
+    return text, ok
+
+
+def review_at_end(run):
+    """Конец ходов без Ok оценщика -> (None, '') — оценивать нечего или круги исчерпаны; (ok, текст) — вердикт."""
+    from . import review as RV
+    h = WK.tree_hash(f"{run.root}/src")
+    if run.st.get("review_ok") or h in (WK.tree_hash(f"{C.VIEWS[C.BENCH]}/src"), run.st.get("reviewed_hash")):
+        return None, ""   # Ok уже был, правки нет, или с последнего вердикта ничего не изменено
+    if run.st.get("reviews", 0) >= RV.ROUNDS:
+        return None, ""
+    run.st["reviews"] = run.st.get("reviews", 0) + 1
+    ok, text, rec = RV.review(run)
+    rec["at_end"] = True
+    run.w(rec)
+    run.st["review_ok"], run.st["reviewed_hash"] = ok, h
+    return ok, text
 
 
 def clip(t, n):
@@ -81,6 +99,7 @@ def smoke_added(run, full):
 def edit_checks(run):
     """Ответ на применённую правку (4.11): новые предупреждения pyflakes, smoke, rerun всех прогонов и проверка по тикету.
     bash на это не тратится."""
+    return ""   # 13.11 (автор): проверки после правки убраны — писатель получает вердикт оценщика на finish
     lint_ = LI.lint_changed(run.root)
     ok, out, full = WK.tool_run(run, "smoke")
     smoke = ("python3 tests/smoke.py prints:\n" + out if not ok or "Traceback" in full else

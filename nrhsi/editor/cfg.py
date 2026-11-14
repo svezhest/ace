@@ -14,6 +14,7 @@ RLOGS = None             # логи сессий исследователя, --i
 LINT = None              # каталог с pyflakes (pip install --target), первым в sys.path; None — pyflakes окружения
 SMOKE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "smoke")   # smoke/<бенч>.py -> tests/smoke.py копии
 BENCH = None             # --bench (work.build_work)
+REVIEW_OBS = None        # файл наблюдения (--input-text): его же получает оценщик на finish
 TICKET = None            # --ticket: {change_expected: prompt|control|any, runs, keep} — ожидание ревьювера; проверка после правки
 
 BASH_LIMIT = 25          # вызовов bash; потом — финальные ходы

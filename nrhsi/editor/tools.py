@@ -51,7 +51,8 @@ def edit_call(run, args, res):
     res["edit"] = {k: rec.get(k) for k in ("rel", "fail", "applied", "syntax")}
     if rec.get("applied"):
         run.seen.clear()                     # файлы изменились: повтор чтения разрешён
-        text += "\n\n" + GA.edit_checks(run)
+        checks = GA.edit_checks(run)
+        text += "\n\n" + checks if checks else ""
     return text, False
 
 

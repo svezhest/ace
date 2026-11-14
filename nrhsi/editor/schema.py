@@ -15,6 +15,6 @@ EDIT_SCHEMA = {"type": "function", "function": {
         "new_string": {"type": "string", "description": "The text to put in its place"}},
         "required": ["path", "old_string", "new_string"]}}}
 FINISH_SCHEMA = {"type": "function", "function": {
-    "name": "finish", "description": "End the session.", "parameters": {"type": "object", "properties": {}}}}
+    "name": "finish", "description": "Submit your changes to the reviewer: Ok ends the session; otherwise you get the reviewer's answer.", "parameters": {"type": "object", "properties": {}}}}
 
 TOOLS = [BASH_SCHEMA, EDIT_SCHEMA, FINISH_SCHEMA]
