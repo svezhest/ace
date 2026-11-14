@@ -475,7 +475,15 @@ def build_from(files, view, bench, obs, work, state, full_steps=False, shuffle=N
             j = events(bench, _write(final, tmp), os.path.join(view, "logs"), past_prompt=True)
         moved = [r for r in j["div"] if j["div"][r]]
         if j["prompt"] and not moved:
-            return None
+            # 14.11 (EV15 14 s2): пропуск, только если и сам код правки (файлы промпта — как в исходном src) меняет промпт
+            # или кода нет; код, который не меняет ни промпт, ни прогоны, смотрит оценщик логики
+            code_only = {r: t for r, t in final.items() if not r.endswith(".md")} | {r: t for r, t in src0.items() if r.endswith(".md")}
+            if code_only == src0:
+                return None
+            with tempfile.TemporaryDirectory() as tmp:
+                jc = events(bench, _write(code_only, tmp), os.path.join(view, "logs"), past_prompt=True)
+            if jc["prompt"]:
+                return None
         if j["prompt"]:
             note = (f"The edit also changes what the model gets before its first step (the prompt) in runs "
                     f"{', '.join(sorted(j['prompt'], key=int))}; that change is reviewed separately. The replay below "
