@@ -5,6 +5,7 @@ Ok — обе части Ok или пропущены; иначе писател
 import json
 import os
 import re
+import subprocess
 import sys
 import time
 
@@ -33,9 +34,17 @@ def review(run):
     final = EI.ES.read_src(os.path.join(run.root, "src"))
     prof = json.load(open(os.path.join(ROOT, "stands", STAND + ".json")))
     tag = f"{os.path.basename(run.root)}_{run.st['tool_calls']}"
-    parts = [("code", EI.build_from([(0, final)], full, C.BENCH, obs, work, tag, blocks=True, logic_only=True), "runs"),
-             ("prompt", EI.build_prompt_from(final, full, C.BENCH, obs), "prompt_edit")]
     rec, bad = {"type": "review", "call": run.st["tool_calls"], "stand": STAND, "parts": []}, []
+    try:
+        parts = [("code", EI.build_from([(0, final)], full, C.BENCH, obs, work, tag, blocks=True, logic_only=True), "runs"),
+                 ("prompt", EI.build_prompt_from(final, full, C.BENCH, obs), "prompt_edit")]
+    except subprocess.TimeoutExpired as e:
+        # 14.11 (EV16 00): перепрогон не кончился — харнесс, вероятно, крутится без вызова модели; это факт о правке
+        text = (f"Replaying the recorded runs on the changed src/ did not finish within {int(e.timeout) // 60} minutes. "
+                "The replay only takes the model's replies from the logs, so the time goes to the harness itself: on "
+                "some recorded run the changed harness seems to loop without ever asking the model again.")
+        rec["parts"].append({"part": "replay", "verdict": "Failed", "content": text})
+        return False, ("Not finished yet. " + text + "\n\nChange src/ with edit, then call finish again."), rec
     for name, user, prompt in parts:
         if not user:
             rec["parts"].append({"part": name, "verdict": "skip"})
