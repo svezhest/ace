@@ -13,7 +13,7 @@ VAR = {"ev6a": dict(blocks=True), "v2": dict(blocks=True, win=(6, 0), sparse=((1
 PROMPT = {"ev6a": "runs", "v2": "runs_v2"}
 prof = json.load(open(os.path.join(ROOT, "stands", "plain27.json")))
 var = sys.argv[1]
-out = os.path.join(H, f"ev20_{var}_plain27.jsonl")
+out = os.path.join(H, f"ev20_{var}_plain27{os.environ.get('EV20_TAG', '')}.jsonl")   # 15.11: EV20_TAG=_q4 — тот же замер на другом стенде
 done = {json.loads(l)["tag"] for l in open(out)} if os.path.exists(out) else set()
 for tag in sys.argv[2:]:
     if tag in done:
