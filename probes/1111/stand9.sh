@@ -7,7 +7,7 @@ for i in $(seq 60); do pgrep -f 'qwen-gateway|python3? worker.py' > /dev/null ||
 p=$(pgrep -f 'qwen-gateway|python3? worker.py'); [ -n "$p" ] && { kill -9 $p; sleep 2; }
 lsof -iTCP:50051 -sTCP:LISTEN > /dev/null 2>&1 && { echo "$(date +%H:%M:%S) port 50051 still busy, not starting"; exit 1; }
 cd /Users/user/Projects/llm/src/worker
-HF_HUB_OFFLINE=1 QWEN_MODEL=../../weights/ornith15-9b-mlx-8bit QWEN_KV_BITS=0 QWEN_MAX_CONTEXT=65536 QWEN_PRESENCE_PENALTY=0 \
+HF_HUB_OFFLINE=1 QWEN_MODEL=../../weights/ornith15-9b-mlx-8bit QWEN_KV_BITS=0 QWEN_MAX_CONTEXT=131072 QWEN_PRESENCE_PENALTY=0 \
   QWEN_PROMPT_CACHE=1 QWEN_PROMPT_CACHE_GB=4 QWEN_PROMPT_CACHE_REPLY=0 QWEN_BATCH_RESERVE_TOKENS=1024 \
   QWEN_PROMPT_CACHE_DISK=/Users/user/.cache/qwen-pcdisk QWEN_MAX_BATCH=16 QWEN_BATCH_INVARIANT=1 \
   nohup uv run python worker.py >> $L/worker9.log 2>&1 &
