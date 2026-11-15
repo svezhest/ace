@@ -53,6 +53,11 @@ def apply_stand(name, roles=("agent",)):
     import stand as ST
     prof = ST.load(name)
     rec = ST.check(prof, list(roles))
+    # 15.11: окно модели — из профиля, а не константа cfg (CTX 65536 пережил переход стенда на 98304:
+    # обрыв «слишком большой промпт» срабатывал на 55844 и резал сессию раньше её собственного порога)
+    ctx = next((e.get("QWEN_MAX_CONTEXT") for e in rec["worker"].values() if e.get("QWEN_MAX_CONTEXT")), None)
+    if ctx:
+        C.CTX = int(ctx)
     g = ST.gen(prof, "agent")
     C.URL, C.MODEL, C.TEMP = g["url"] + "/chat/completions", g["model"], g["temperature"]
     C.MAX_GEN, C.THINKING, C.THINK_BUDGET = g["max_tokens"], g["thinking"], g["think_budget"]

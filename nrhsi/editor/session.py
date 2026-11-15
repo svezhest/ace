@@ -14,7 +14,7 @@ def meta(run, system, first_user):
             "temperature": F.TEMP, "stand": F.STAND,
             "root": run.root, "tools": [t["function"]["name"] for t in SC.TOOLS], "tool_schemas": SC.TOOLS,
             "limits": {"bash_limit": C.BASH_LIMIT, "step_budget": C.STEP_BUDGET, "final_turns": C.FINAL_TURNS,
-                       "hard_at": C.HARD_AT, "out_chars": F.OUT_CHARS, "max_gen": F.MAX_GEN}}
+                       "hard_at": C.HARD_AT, "ctx": F.CTX, "out_chars": F.OUT_CHARS, "max_gen": F.MAX_GEN}}
 
 
 def loop(run):
@@ -22,10 +22,10 @@ def loop(run):
     end = None
     while end is None:
         est = run.est()
+        if est >= F.CTX - F.MAX_GEN - 1500:          # физический предел — первым: финальные ходы уже некуда отправить
+            return "forced: context estimate too large to send"
         if est >= C.HARD_AT and not run.final_left:
             PH.enter_final(run, "context")
-        if est >= F.CTX - F.MAX_GEN - 1500:
-            return "forced: context estimate too large to send"
         end = TU.turn(run, est)
     return end
 
