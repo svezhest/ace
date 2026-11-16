@@ -22,7 +22,10 @@ def call(prof, system, user, seed):
     ag = prof["agent"]
     gw = prof["gateways"][ag["gateway"]]
     body = {"model": prof["model"], "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
-            "temperature": ag["temperature"], "seed": seed, "max_tokens": ag["max_tokens"]}
+            "temperature": ag["temperature"], "seed": seed, "max_tokens": ag["max_tokens"],
+            # 16.11 (llm-81): оценщик кэш только читает — его запись вытесняла из кэша длинную беседу писателя,
+            # и следующий ход писателя шёл холодным префиллом (78k — 19 мин); у оценщика кэш и так всегда промах
+            "prompt_cache": "read"}
     if ag["thinking"]:
         body["enable_thinking"] = True
         if ag.get("think_budget"):
