@@ -9,7 +9,7 @@ lsof -iTCP:50051 -sTCP:LISTEN > /dev/null 2>&1 && { echo "$(date +%H:%M:%S) port
 cd /Users/user/Projects/llm/src/worker
 HF_HUB_OFFLINE=1 QWEN_MODEL=../../weights/ornith15-9b-mlx-8bit QWEN_KV_BITS=0 QWEN_MAX_CONTEXT=131072 QWEN_PRESENCE_PENALTY=0 \
   QWEN_PROMPT_CACHE=1 QWEN_PROMPT_CACHE_GB=4 QWEN_PROMPT_CACHE_REPLY=0 QWEN_BATCH_RESERVE_TOKENS=1024 \
-  QWEN_PROMPT_CACHE_DISK=/Users/user/.cache/qwen-pcdisk QWEN_MAX_BATCH=16 QWEN_DRAFT=auto \
+  QWEN_PROMPT_CACHE_DISK=/Users/user/.cache/qwen-pcdisk QWEN_MAX_BATCH=16 QWEN_DRAFT=auto QWEN_DRAFT_DFLASH=../../weights/qwen35-9b-dflash QWEN_DRAFT_MTP=none \
   nohup uv run python worker.py >> $L/worker9.log 2>&1 &
 cd /Users/user/Projects/llm
 for i in $(seq 120); do lsof -iTCP:50051 -sTCP:LISTEN > /dev/null 2>&1 && break; sleep 2; done
