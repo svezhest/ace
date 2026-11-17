@@ -38,7 +38,8 @@ def call(prof, system, user, seed):
 
 def parse(text):
     t = re.sub(r"<think>.*?</think>", "", text or "", flags=re.S)
-    v = re.findall(r"Verdict:\s*\**\s*(Ok|OK|Failed|FAILED)", t)
+    # 17.11 (EV28): 9B T пишет и «## Verdict\nOk» — двоеточие необязательно, значение может стоять со следующей строки
+    v = re.findall(r"Verdict\**\s*:?\s*\**\s*(Ok|OK|Failed|FAILED)\b", t)
     w = re.search(r"Where:\s*\**\s*run\s*(\d+)[^\n]*?(?:call|step)\s*(\d+)", t, flags=re.I)
     return (v[-1].capitalize() if v else None), (w.group(1) if w else None), (int(w.group(2)) if w else None)
 
