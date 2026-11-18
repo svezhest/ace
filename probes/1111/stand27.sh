@@ -9,15 +9,12 @@ for i in $(seq 60); do pgrep -f 'qwen-gateway|python3? worker.py' > /dev/null ||
 p=$(pgrep -f 'qwen-gateway|python3? worker.py'); [ -n "$p" ] && { kill -9 $p; sleep 2; }
 lsof -iTCP:50051 -sTCP:LISTEN > /dev/null 2>&1 && { echo "$(date +%H:%M:%S) port 50051 still busy, not starting"; exit 1; }
 cd /Users/user/Projects/llm/src/worker
-# 15.11, вечер: финальный квант — oQ4e (автор 15.11: «когда сессия там полностью закончит возьмешь oQ4e»);
-# llm main a905163: 6-битный mrqmm (QWEN_MRQMM6) + fusion GDN по ширинам, verify attention одним проходом
-# (QWEN_VERIFY_ATT=2), text-only. Скорость DFlash на 2K равна uniform 4-bit (37,1 против 37,6 ток/с), KL вдвое лучше.
-# Окружение должно совпадать с stands/plain27*.json ключ в ключ: stand.check() сравнивает его целиком.
-HF_HUB_OFFLINE=1 QWEN_MODEL=../../weights/qwen38-27b-mlx-oq4e QWEN_DRAFT=../../weights/qwen38-27b-dflash2 QWEN_TEXT_ONLY=1 \
-  QWEN_MRQMM4=1 QWEN_MRQMM5=1 QWEN_MRQMM6=1 QWEN_KV_BITS=0 \
-  QWEN_MAX_BATCH=1 QWEN_MAX_CONTEXT=98304 QWEN_PROMPT_CACHE=1 QWEN_PROMPT_CACHE_MOVE=1 QWEN_PROMPT_CACHE_GB=6 QWEN_PROMPT_CACHE_CKPTS=4 \
-  QWEN_PREFILL_RESERVE_GB=2.5 QWEN_WIRED_LIMIT_GB=27 QWEN_CACHE_LIMIT_GB=1 QWEN_SDPA_FUSED_MIN_KV=8192 \
-  QWEN_PREFILL_BUDGET=16777216 QWEN_PRESENCE_PENALTY=0 nohup uv run python worker.py >> $L/worker27.log 2>&1 &
+# 18.11: рецепт llm-81, набор A (main 2df454b): q8 KV, предел 24 ГиБ, без драфтеров. Замер 70K писателя + 40K оценщика:
+# пик 22,6 ГиБ (1,4 под пределом), декод на 70K 14 ток/с. С драфтерами (набор B) пик 24,1 — в упор к пределу, своп ~5 ГиБ.
+# Выбор A/B — за автором; до его слова — A. Проверка: в worker27.log «KV budget 5.35 GiB (cap 24.0 GiB…)».
+# Окружение должно совпадать с stands/*27*.json ключ в ключ: stand.check() сравнивает его целиком.
+HF_HUB_OFFLINE=1 QWEN_MODEL=../../weights/qwen38-27b-mlx-oq4e QWEN_TEXT_ONLY=1 QWEN_MRQMM4=1 QWEN_MRQMM5=1 QWEN_MRQMM6=1 QWEN_KV_BITS=8 QWEN_KVQ_PREFILL_FUSED=1 QWEN_DECODE_ATT=8192 QWEN_MAX_BATCH=1 QWEN_MAX_CONTEXT=98304 QWEN_PROMPT_CACHE=1 QWEN_PROMPT_CACHE_MOVE=1 QWEN_PROMPT_CACHE_GB=6 QWEN_PROMPT_CACHE_CKPTS=4 QWEN_PREFILL_RESERVE_GB=2.5 QWEN_WIRED_LIMIT_GB=24 QWEN_CACHE_LIMIT_GB=1 QWEN_SDPA_FUSED_MIN_KV=8192 QWEN_PREFILL_BUDGET=16777216 QWEN_PRESENCE_PENALTY=0 \
+  nohup uv run python worker.py >> $L/worker27.log 2>&1 &
 cd /Users/user/Projects/llm
 for i in $(seq 120); do lsof -iTCP:50051 -sTCP:LISTEN > /dev/null 2>&1 && break; sleep 2; done
 GATEWAY_ADDR=127.0.0.1:8091 GATEWAY_SERVED_MODEL_NAMES=qwen38-27b nohup ./target/release/qwen-gateway >> $L/gateway27.log 2>&1 &
