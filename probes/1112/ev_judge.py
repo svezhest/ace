@@ -21,6 +21,10 @@ import ev_input as EI  # noqa: E402
 def call(prof, system, user, seed):
     ag = prof["agent"]
     gw = prof["gateways"][ag["gateway"]]
+    # 19.11 (EV34): фраза уровня effort (родная Qwen, ветка llm-81 effort-levels) — в начало системного сообщения,
+    # затем пустая строка и сам промпт: та же форма, что ставит воркер llm (у оценщика нет инструментов)
+    if ag.get("effort_phrase"):
+        system = ag["effort_phrase"] + "\n\n" + system
     body = {"model": prof["model"], "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
             "temperature": ag["temperature"], "seed": seed, "max_tokens": ag["max_tokens"],
             # 16.11 (llm-81): оценщик кэш только читает — его запись вытесняла из кэша длинную беседу писателя,
