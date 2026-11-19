@@ -26,6 +26,8 @@ def call(prof, system, user, seed):
             # 16.11 (llm-81): оценщик кэш только читает — его запись вытесняла из кэша длинную беседу писателя,
             # и следующий ход писателя шёл холодным префиллом (78k — 19 мин); у оценщика кэш и так всегда промах
             "prompt_cache": "read"}
+    # 19.11: выборка из профиля (top_p, top_k, min_p, presence_penalty); нет ключа — значение стенда по умолчанию
+    body.update(ag.get("sampling") or {})
     if ag["thinking"]:
         body["enable_thinking"] = True
         if ag.get("think_budget"):

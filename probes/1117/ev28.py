@@ -1,6 +1,7 @@
 """EV28: подача автора (v2, runs_v2) на 9B — оценщик с рассуждением (eval9t) и без (eval9), на 26 размеченных правках кода
 из EV25/EV26 (входы те же: runs/evw_1113/ev25_in/v2/). Один вызов, T=0.
-  python3 probes/1117/ev28.py <stand>     → runs/evw_1113/ev28_v2_<stand>.jsonl"""
+  python3 probes/1117/ev28.py <stand>     → runs/evw_1113/ev28_v2_<stand>.jsonl
+  python3 probes/1117/ev28.py <stand> <seed> → runs/evw_1113/ev28_v2_<stand>_s<seed>.jsonl (19.11, EV32: выборка, несколько seed)"""
 import json, os, sys
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.join(ROOT, "probes", "1112"))
@@ -11,16 +12,17 @@ LABEL = {**{t: "F" for t in "03_bl_o4_s1 03_ck_o4_s1 06_ck_o4_s2 01_nl_s1 00_bl_
          **{t: "Ok" for t in ("00_ck_o4_s1 06_nl_s1 06_ev_s1 07_nl_s1 00_cx_o4_s1 01_cx_o4_s1 03_cx_o4_s1 04_bl_o4_s1 04_ck_o4_s1 "
                               "04_cx_o4_s1 06_bl_o4_s1 06_ck_o4_s1 06_cx_o4_s1 07_bl_o4_s1 07_ck_o4_s1 07_cx_o4_s1 09_ck_o4_s1").split()}}
 stand = sys.argv[1]
+seed = int(sys.argv[2]) if len(sys.argv) > 2 else None
 prof = json.load(open(os.path.join(ROOT, "stands", stand + ".json")))
 H = os.path.join(ROOT, "runs", "evw_1113")
-out = os.path.join(H, f"ev28_v2_{stand}.jsonl")
+out = os.path.join(H, f"ev28_v2_{stand}" + (f"_s{seed}" if seed else "") + ".jsonl")
 done = {json.loads(l)["tag"] for l in open(out)} if os.path.exists(out) else set()
 for tag, lab in LABEL.items():
     if tag in done:
         continue
     user = open(os.path.join(H, "ev25_in", "v2", tag + ".txt")).read()
     try:
-        r = EJ.call(prof, EI.PROMPTS["runs_v2"], user, 1)
+        r = EJ.call(prof, EI.PROMPTS["runs_v2"], user, seed or 1)
     except Exception as e:  # noqa: BLE001
         open(out, "a").write(json.dumps({"tag": tag, "label": lab, "verdict": "error", "error": str(e)}) + "\n")
         print(tag, "error", e, flush=True)
