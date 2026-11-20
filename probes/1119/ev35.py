@@ -56,16 +56,21 @@ def one(tag):
         d = haiku(EI.PROMPTS[prompt], user)
         c = d.get("result") or ""
         rec["parts"].append({"part": name, "verdict": None if d.get("is_error") else EJ.parse(c)[0], "content": c,
-                             "chars_in": len(user), "sec": round(time.time() - t0, 1), "is_error": d.get("is_error")})
+                             "chars_in": len(user), "sec": round(time.time() - t0, 1), "is_error": d.get("is_error"),
+                             "usage": d.get("usage"), "reasoning": d.get("reasoning")})
     vs = [p["verdict"] for p in rec["parts"] if p["verdict"] != "skip"]
     rec["verdict"] = "Ok" if all(v == "Ok" for v in vs) else ("Failed" if "Failed" in vs else None)
     return rec
 
 
-if __name__ == "__main__":
+def main(n):
     done = {json.loads(l)["tag"] for l in open(OUT)} if os.path.exists(OUT) else set()
     todo = [t for t in TAGS if t not in done]
-    with ThreadPoolExecutor(int(sys.argv[1]) if len(sys.argv) > 1 else 3) as ex:
+    with ThreadPoolExecutor(n) as ex:
         for r in ex.map(one, todo):
             open(OUT, "a").write(json.dumps(r, ensure_ascii=False) + "\n")
             print(r["tag"], r["verdict"], [(p["part"], p["verdict"]) for p in r["parts"]], flush=True)
+
+
+if __name__ == "__main__":
+    main(int(sys.argv[1]) if len(sys.argv) > 1 else 3)
