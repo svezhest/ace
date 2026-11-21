@@ -31,8 +31,8 @@ VERDICT = (INTRO + "\n\n" + GOAL + "\n\n"
     "You get the observation; the edit as a diff against the original src/; and a review of the replay of all "
     "recorded runs with the edited src/. The replay sends the model's recorded replies through the edited harness and "
     "stops each run at the first place where the harness does something different from the log. Each run that goes "
-    "differently was reviewed on its own, from the steps of the log around that place; you get one line per run: "
-    "what the step in the log was, what the edited harness does there instead, and whether the step is part of the "
+    "differently was reviewed on its own, from the steps of the log around that place; for each such run you get "
+    "the replay's line about it and the review line: what the step in the log was, what the edited harness does there instead, and whether the step is part of the "
     "problem the observation describes or a step that was fine.\n\n"
     "Answer in this form:\n"
     "Where: run N, step K: the place in the replay that decides your verdict.\n"
@@ -74,8 +74,12 @@ def ask(prof, system, user, seed, done, follow):
 
 
 def line_of(c):
-    m = re.search(r"(?im)^\W*Run\s+\d+,?\s+step\s+\d+.*$", re.sub(r"<think>.*?</think>", "", c, flags=re.S))
-    return m.group(0).strip().strip("*-• ") if m else ""
+    """Ответ от первой строки «Run N, step K» до конца (до 1200 знаков): модель порой пишет заголовок, а суть — ниже."""
+    t = re.sub(r"<think>.*?</think>", "", c, flags=re.S)
+    m = re.search(r"(?im)^\W*Run\s+\d+,?\s+step\s+\d+", t)
+    if not m:
+        return ""
+    return re.sub(r"\s*\n\s*", " ", t[m.start():].strip()).strip("*-#• ")[:1200]
 
 
 def one(prof, seed, tag, label):
@@ -89,12 +93,18 @@ def one(prof, seed, tag, label):
     head, blocks = s[:i], re.split(r"\n(?=### Run )", s[i:])
     lines = []
     for b in blocks:
-        c, calls = ask(prof, PER_RUN, head + b, seed, lambda c: bool(line_of(c)), ASK_LINE)
+        hdr = b.splitlines()[0]
         n = re.match(r"### Run (\d+)", b).group(1)
+        k = re.search(r"after step (\d+)", hdr)
+        # 21.11 (v2): в v1 9B писала строку о прогоне из наблюдения, а не о своём блоке (03_bl: блок run 3 -> «Run 9»);
+        # какой прогон разбирать — факт входа, называется явно
+        task = f"\n\nThe run to review here is run {n}" + (f": the place where the replay goes differently, after step {k.group(1)}." if k else ".")
+        c, calls = ask(prof, PER_RUN, head + b.rstrip() + task, seed, lambda c: bool(line_of(c)), ASK_LINE)
         ln = line_of(c) or f"Run {n}: (no review line)"
-        lines.append(ln)
+        # вывод получает заголовок блока перепрогона (прогон, был ли он удачным, где расходится) и строку модели
+        lines.append(hdr.lstrip("# ").strip() + "\n" + ln)
         rec["runs"].append({"run": n, "line": ln, "content": c, "calls": calls})
-    user = head.rstrip() + "\n\n## Review of each run that goes differently\n" + "\n".join(lines) + "\n"
+    user = head.rstrip() + "\n\n## Review of each run that goes differently\n" + "\n\n".join(lines) + "\n"
     c, calls = ask(prof, VERDICT, user, seed, lambda c: EJ.parse(c)[0], ASK_VERDICT)
     rec.update(mode="split", content=c, calls=calls, verdict=EJ.parse(c)[0], chars_in=len(user))
     return rec
