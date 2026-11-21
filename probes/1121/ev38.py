@@ -16,8 +16,8 @@ H = os.path.join(ROOT, "runs", "evw_1113")
 BASE = EI.PROMPTS["runs_v2"]
 INTRO, GOAL = BASE.split("\n\n")[0], BASE.split("\n\n")[1]
 
-# 21.11 (EV39): как устроен шаг во входе — «Model» реплика, «Env» ответ на неё; при пустом LAYOUT — EV38 v2
-LAYOUT = os.environ.get("EV_LAYOUT", "1") and (" Each step shows the model's reply (Model) and then what came back to "
+# 21.11 (EV39): как устроен шаг во входе — «Model» реплика, «Env» ответ на неё (EV38 v2 — коммит ac917fe)
+LAYOUT = (" Each step shows the model's reply (Model) and then what came back to "
     "it (Env); so what the model had in front of it when it made step K is the Env of step K-1, and the Env of step K "
     "is the answer to step K.")
 PER_RUN = (INTRO + "\n\n" + GOAL + "\n\n"
