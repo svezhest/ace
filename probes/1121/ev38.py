@@ -16,12 +16,16 @@ H = os.path.join(ROOT, "runs", "evw_1113")
 BASE = EI.PROMPTS["runs_v2"]
 INTRO, GOAL = BASE.split("\n\n")[0], BASE.split("\n\n")[1]
 
+# 21.11 (EV39): как устроен шаг во входе — «Model» реплика, «Env» ответ на неё; при пустом LAYOUT — EV38 v2
+LAYOUT = os.environ.get("EV_LAYOUT", "1") and (" Each step shows the model's reply (Model) and then what came back to "
+    "it (Env); so what the model had in front of it when it made step K is the Env of step K-1, and the Env of step K "
+    "is the answer to step K.")
 PER_RUN = (INTRO + "\n\n" + GOAL + "\n\n"
     "You get the observation; the edit as a diff against the original src/; and the replay of one recorded run with "
     "the edited src/. The replay sends the model's recorded replies through the edited harness and stops the run at "
     "the first place where the harness does something different from the log; what the model would have done after "
     "that with the edited harness is not known. You also get the steps of the log just before that place and just "
-    "after it (after it, the log shows what the model did with the original harness). Each run that goes "
+    "after it (after it, the log shows what the model did with the original harness)." + LAYOUT + " Each run that goes "
     "differently is reviewed on its own in the same way; here you review this one run.\n\n"
     "Answer with one line:\n"
     "Run N, step K: what the step in the log was, what the edited harness does there instead, and whether the step "
