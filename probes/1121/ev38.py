@@ -27,9 +27,9 @@ PER_RUN = (INTRO + "\n\n" + GOAL + "\n\n"
     "that with the edited harness is not known. You also get the steps of the log just before that place and just "
     "after it (after it, the log shows what the model did with the original harness)." + LAYOUT + " Each run that goes "
     "differently is reviewed on its own in the same way; here you review this one run.\n\n"
-    # 21.11 (EV40): сначала дословная выписка опоры из входа
-    "First copy, word for word, the lines of the input your judgement rests on (from the steps, the Diff, or the "
-    "edit). Then write one line:\n"
+    # 21.11 (EV41): сначала правило из наблюдения, затем шаг по нему (EV40 — выписка, коммит ff2ea5a)
+    "First write, in one sentence, what the observation says makes a step part of the problem. Then check this step "
+    "against it, using what the input shows. Then write one line:\n"
     "Run N, step K: what the step in the log was, what the edited harness does there instead, and whether the step "
     "is part of the problem the observation describes or a step that was fine.")
 
