@@ -12,12 +12,15 @@ VIEW = {"00": "alf_n4", "01": "app_r1", "03": "app_r1", "04": "app_r4", "05": "a
 INP = {"00": "00_v_rr", "01": "01_v_rr", "03": "03_v_rr", "04": "04_v_rr", "05": "05_v_rr", "06": "06_v_rr", "07": "07_v_rr", "09": "09_v_rr", "14": "14_real", "t4": "t4"}
 H, T, FULL = (os.path.join(ROOT, "runs", d) for d in ("evw_1113", "typed_1111", "full_1112"))
 VAR = {"ev6a": dict(blocks=True), "v2": dict(blocks=True, win=(6, 0), sparse=((15, 10), (10, 5), (7, 3)), v2=True)}
-PROMPT = {"ev6a": "runs", "v2": "runs_v2"}
+VAR["v3"] = VAR["v2"]  # 22.11 (EV43): как v2, последние 2 шага перед местом — без обрезки сообщений (EI.FULL_LAST)
+PROMPT = {"ev6a": "runs", "v2": "runs_v2", "v3": "runs_v2"}
 mode, var, tags = sys.argv[1], sys.argv[2], sys.argv[3:]
 ind = os.path.join(H, "ev25_in", var)
 os.makedirs(ind, exist_ok=True)
 
 if mode == "build":
+    if var == "v3":
+        EI.FULL_LAST = 2
     for tag in tags:
         k = tag.split("_")[0]
         bench = "alf" if VIEW[k].startswith("alf") else "app"

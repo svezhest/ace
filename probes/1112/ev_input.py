@@ -291,7 +291,12 @@ def run_blocks(bench, src, logs, work, before=6, after=3, earlier=False, brief=F
     return "\n\n".join(out)
 
 
-def render_raw(work, run, a, b):
+# 22.11 (EV43, вход v3): последние FULL_LAST шагов перед местом расхождения — сообщения харнесса и среды без обрезки
+# до 6 строк (до FULL_LINES строк): то, что модель видела, когда делала шаг, и ответ на него. 0 — как в v2.
+FULL_LAST, FULL_LINES = 0, 80
+
+
+def render_raw(work, run, a, b, full_from=None):
     """EV12 (автор 13.11: «правильнее вообще не толковать ответ и показывать его как есть»): шаг k — ответ модели как
     есть (текст и вызовы инструментов), затем каждое сообщение, пришедшее модели до следующего вызова, с источником из
     лога (env → Env, harness → Harness). Обрезка: ответ — 30 строк, сообщение — 6 строк, строка — 200 знаков."""
@@ -315,7 +320,8 @@ def render_raw(work, run, a, b):
         got = [o for o in objs[i + 1:nxt] if o and isinstance(o.get("message"), dict)]
         for o in got:
             out.append(f"  {o.get('event', '?').capitalize()}:")
-            out += ["    " + l for l in _cap(R._text(R._msg(o)).strip("\n").splitlines() or ["(empty)"], 6, 200)]
+            cap = FULL_LINES if full_from is not None and k >= full_from else 6
+            out += ["    " + l for l in _cap(R._text(R._msg(o)).strip("\n").splitlines() or ["(empty)"], cap, 200)]
         if not got:
             out.append("  (the run ended here)" if k == len(calls) else "  (no message before the next step)")
     return "\n".join(out)
@@ -382,7 +388,7 @@ def run_blocks_v2(bench, src, logs, work, state, sparse=None, before=6, after=3,
                 blk.append(f"(steps {', '.join(map(str, picks))} are picked at random from earlier in the run; then "
                            f"steps {max(1, k - before)}-{k - 1} in a row)")
                 blk.append("\n".join(render_raw(work, r, x, x) for x in picks))
-        blk.append(render_raw(work, r, k - before, k - 1))
+        blk.append(render_raw(work, r, k - before, k - 1, full_from=(k - FULL_LAST) if FULL_LAST else None))
         blk.append("<-- Divergence point")
         blk.append("Diff: " + d["text"])
         aft = render_raw(work, r, k, k + after - 1)
