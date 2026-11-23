@@ -8,7 +8,7 @@ ROOT = os.path.dirname(PKG)                                            # кор�
 HERE = None              # каталог сессий: logs/, views/ (--home; researcher/fsr.py — researcher/)
 LAYOUT = None            # вид по умолчанию (--view; researcher/fsr.py — alfworld/view_v3)
 # модель и генерация — только из профиля стенда (stands/<имя>.json, apply_stand в policy.py); до него None
-URL = MODEL = TEMP = THINKING = THINK_BUDGET = STAND = None
+URL = MODEL = TEMP = THINKING = THINK_BUDGET = STAND = SAMPLING = None
 
 CTX = 65536
 MAX_GEN = None           # max_tokens — из профиля стенда

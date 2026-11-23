@@ -12,6 +12,8 @@ def chat(messages, temp, seed, tools=None, tool_choice=None):
     assert C.URL, "no stand profile applied (policy.apply_stand)"
     body = {"model": C.MODEL, "messages": messages, "temperature": temp, "seed": seed, "max_tokens": C.MAX_GEN}
     url = C.URL
+    # 23.11: выборка из профиля стенда (top_p, top_k, min_p, presence_penalty); нет ключа — как раньше
+    body.update(C.SAMPLING or {})
     if C.THINKING:
         body["enable_thinking"] = True
         if C.THINK_BUDGET:

@@ -61,6 +61,7 @@ def apply_stand(name, roles=("agent",)):
     g = ST.gen(prof, "agent")
     C.URL, C.MODEL, C.TEMP = g["url"] + "/chat/completions", g["model"], g["temperature"]
     C.MAX_GEN, C.THINKING, C.THINK_BUDGET = g["max_tokens"], g["thinking"], g["think_budget"]
+    C.SAMPLING = g.get("sampling")
     C.STAND = ST.meta(prof, rec)
     return C.STAND
 

@@ -1,0 +1,74 @@
+{
+  "name": "res9t",
+  "doc": "19.11 (EV34): оценщик 9B T по уровню effort — medium: без фразы, бюджет 4096. Выборка по карточке (как eval9tc). Стенд stand9q (batch-invariant).",
+  "model": "ornith15-9b",
+  "served_model": "ornith15-9b-mlx-8bit",
+  "worker": {
+    "port": 50051,
+    "count": 1,
+    "env": {
+      "QWEN_MODEL": "../../weights/ornith15-9b-mlx-8bit",
+      "QWEN_KV_BITS": "8",
+      "QWEN_MAX_CONTEXT": "131072",
+      "QWEN_PRESENCE_PENALTY": "0",
+      "QWEN_PROMPT_CACHE": "1",
+      "QWEN_PROMPT_CACHE_GB": "4",
+      "QWEN_PROMPT_CACHE_REPLY": "0",
+      "QWEN_BATCH_RESERVE_TOKENS": "1024",
+      "QWEN_PROMPT_CACHE_DISK": "/Users/user/.cache/qwen-pcdisk-q8",
+      "QWEN_MAX_BATCH": "16",
+      "QWEN_WIRED_LIMIT_GB": "21",
+      "QWEN_CACHE_LIMIT_GB": "1",
+      "QWEN_DRAFT_DFLASH": "none",
+      "QWEN_DRAFT_MTP": "none",
+      "QWEN_BATCH_INVARIANT": "1"
+    }
+  },
+  "gateways": {
+    "main": {
+      "port": 8090,
+      "cmd": "./target/release/qwen-gateway",
+      "env": {
+        "GATEWAY_ADDR": "127.0.0.1:8090",
+        "GATEWAY_THINKING": "off",
+        "GATEWAY_SERVED_MODEL_NAMES": "ornith15-9b,ornith-ai/Ornith-1.5-9B-MLX-8bit"
+      },
+      "thinking": false
+    },
+    "think": {
+      "port": 8081,
+      "cmd": "./target/release/qwen-gateway",
+      "env": {
+        "GATEWAY_ADDR": "127.0.0.1:8081",
+        "GATEWAY_SERVED_MODEL_NAMES": "ornith15-9b,ornith-ai/Ornith-1.5-9B-MLX-8bit"
+      },
+      "thinking": true
+    }
+  },
+  "executor": {
+    "gateway": "main",
+    "alfworld": {
+      "temperature": 0.0,
+      "max_tokens": 4096
+    },
+    "appworld": {
+      "temperature": 0.0,
+      "seed": 100,
+      "max_tokens": null
+    }
+  },
+  "agent": {
+    "gateway": "think",
+    "temperature": 1.0,
+    "max_tokens": 4096,
+    "thinking": true,
+    "think_budget": 2048,
+    "sampling": {
+      "top_p": 0.95,
+      "top_k": 20,
+      "min_p": 0.0,
+      "presence_penalty": 0.0
+    }
+  },
+  "note": "23.11: исследователь 9B с мышлением — выборка по карточке (T 1,0, top_p 0,95, top_k 20), бюджет мысли 2048 на ход, как thinking.json; стенд stand9q"
+}
