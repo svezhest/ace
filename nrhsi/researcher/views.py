@@ -5,6 +5,7 @@ import os
 import random
 import shutil
 import stat
+import subprocess
 
 from . import cfg as C
 
@@ -119,3 +120,11 @@ def _link(src, dst, base=None):
             s = os.path.join(root, f)
             if stat.S_ISREG(os.lstat(s).st_mode) and _inside(os.path.realpath(s), base):
                 os.link(s, os.path.join(r, f), follow_symlinks=False)
+
+
+def steps_text(root, tids):
+    """24.11 (per-run): runs steps N для каждого выбранного run — как его печатает программа runs в виде."""
+    env = {"PATH": "/usr/bin:/bin", "LANG": "en_US.UTF-8", "RUNS_OUT_CHARS": str(10**7), "RUNS_FORMAT": C.RUNS_FORMAT,
+           "PYTHONDONTWRITEBYTECODE": "1"}
+    return {n: subprocess.run([C.PY_LINK, os.path.join(C.BIN, "runs"), "steps", str(n)], cwd=root, env=env,
+                              capture_output=True, text=True, check=True).stdout for n in tids}

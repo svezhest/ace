@@ -223,8 +223,20 @@ def build_system():
             .replace("STEP_BUDGET", str(C.STEP_BUDGET)).replace("EX_EV", ex_ev()).replace("EX_CHECK", EX_CHECK))
 
 
+STEPS_TEXT = None       # 24.11 (per-run): вывод runs steps N выбранных run — во втором абзаце первого сообщения
+ONE_RUN_FIRST = ("Investigate failed run {n} in this repository: what went wrong in it, as the environment's responses "
+                 "show it, and what in the harness, if anything, made it fail or could have prevented it. Here is the "
+                 "run step by step, as runs steps {n} prints it:")
+
+
 def first_user():
-    return CAUSE_FIRST if C.CAUSE else FIRST_USER
+    base = CAUSE_FIRST if C.CAUSE else FIRST_USER
+    if not STEPS_TEXT:
+        return base
+    if len(STEPS_TEXT) == 1:
+        (n, txt), = STEPS_TEXT.items()
+        return ONE_RUN_FIRST.format(n=n) + "\n\n" + txt.rstrip() + "\n\nCall finish when you are done."
+    return base + "\n\n" + "\n\n".join(f"runs steps {n}:\n{t.rstrip()}" for n, t in STEPS_TEXT.items())
 
 
 SYSTEM = build_system()

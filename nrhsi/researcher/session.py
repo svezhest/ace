@@ -26,6 +26,7 @@ def session(mode, k, seed, temp, tag, resume=None, max_turns=None, runs=None):
     vname, lock = V.claim_view(f"{name}_{tag}")
     try:
         root = V.build_view(vname, tids)
+        P.STEPS_TEXT = V.steps_text(root, tids)
         prof = S.sandbox_profile(root)
         os.makedirs(f"{C.HERE}/logs", exist_ok=True)
         suffix = vname[len(f"{name}_{tag}"):]
