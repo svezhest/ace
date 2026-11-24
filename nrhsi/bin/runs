@@ -1,4 +1,4 @@
-#!/Users/user/Projects/nrhsi/nrhsi/bin/python3
+#!/Users/user/.local/share/uv/python/cpython-3.11.11-macos-aarch64-none/bin/python3.11
 """runs — навигация по логам вида: logs/run_N.jsonl (одна строка = одно сообщение) и logs/results.jsonl.
 Сообщение печатается сырой строкой jsonl как есть, номер сообщения = номер строки файла. О бенчмарке ничего не
 знает, только читает. Запускается в песочнице исследователя (PATH = nrhsi/bin:...); интерпретатор — CLT python 3.9
